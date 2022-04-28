@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<title>vim_folds_my_vimrc</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<div id="Vim - My Folding Vimrc Settings"><h1 id="Vim - My Folding Vimrc Settings" class="header"><a href="#Vim - My Folding Vimrc Settings">Vim - My Folding Vimrc Settings</a></h1></div>
+
+<pre>
+" Vimscript Folding Settings ------------------------------------------------{{{
+"
+"set foldmethod=indent
+"set foldmethod=manual
+"set foldmethod=marker
+"set foldmethod=syntax
+" Displays the folding status to the left of the number column
+set foldcolumn=2
+" This should make fresh files open without closed folds
+" (unless the restore folding status overrides the file).
+"set foldlevelstart=99
+"
+" Save and restore folding status in a file:
+augroup save_folds
+    autocmd!
+    autocmd BufWinLeave *.* mkview
+    autocmd BufWinEnter *.* silent loadview
+augroup END
+"
+" Set .vimrc to use 'marker' folds by default
+augroup filetype_vim
+    autocmd!
+    autocmd FileType vim setlocal foldmethod=marker
+augroup END
+"
+" Set python files to use 'indent' folds by default
+augroup filetype_python
+    autocmd!
+    autocmd FileType python setlocal foldmethod=indent
+augroup END
+"
+" Allow for zj &amp; zk to go to next and previous fold:
+nnoremap &lt;silent&gt; &lt;leader&gt;zj :call NextClosedFold('j')&lt;cr&gt;
+nnoremap &lt;silent&gt; &lt;leader&gt;zk :call NextClosedFold('k')&lt;cr&gt;
+
+function! NextClosedFold(dir)
+    let cmd = 'norm!z' . a:dir
+    let view = winsaveview()
+    let [l0, l, open] = [0, view.lnum, 1]
+    while l != l0 &amp;&amp; open
+        exe cmd
+        let [l0, l] = [l, line('.')]
+        let open = foldclosed(l) &lt; 0
+    endwhile
+    if open
+        call winrestview(view)
+    endif
+endfunction
+"
+"}}}
+
+
+" Vimscript Create Fold Marker ----------------------------------{{{
+" Structured to prevent fold happening on this function! And added
+" a new line to prevent the mark encapsulating the whole file:
+" :call Folder("my header")
+function! Folder(word)
+    let a:width = 76
+    let a:inserted_word = ' ' . a:word . ' '
+    let a:word_width = strlen(a:inserted_word)
+    let a:length = (a:width - a:word_width)
+    let a:hashes = repeat('-', a:length)
+    let a:start = '"'
+    let a:finisha = '{{'
+    let a:finishb = '{'
+    let a:finish = a:finisha . a:finishb
+    "let a:word_line = a:start . a:inserted_word . a:hashes . a:finish
+    let a:enda = '" }}'
+    let a:endb = '}'
+    let a:end = a:enda . a:endb
+    " Stating the string variables as a list allows for ',' to make a new line
+    let a:word_line = [a:start . a:inserted_word . a:hashes . a:finish , a:end]
+
+    :put =a:word_line
+    ":put =a:end
+endfunction
+" Call the Folder function with :Fold &lt;string&gt; &lt;string&gt;
+command! -nargs=1 Fold :call Folder(&lt;q-args&gt;)
+" }}}
+
+</pre>
+
+</body>
+</html>
