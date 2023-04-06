@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<title>vim_commands_and_registers</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a><br>
+</p>
+
+<p>
+<a href="https://stackoverflow.com/questions/3997078/how-to-paste-yanked-text-into-the-vim-command-line">https://stackoverflow.com/questions/3997078/how-to-paste-yanked-text-into-the-vim-command-line</a>
+<br>
+<br>
+Here is an explanation of what you can do with registers.<br>
+What you can do with registers is extraordinary, and once you know how to use them you cannot live without them.<br>
+</p>
+
+<p>
+Registers are basically storage locations for strings. Vim has many registers that work in different ways:
+</p>
+
+<p>
+<code>0</code> (yank register: when you use y in normal mode, without specifying a register, yanked text goes there and also to the default register),<br>
+<code>1 to 9</code> (shifting delete registers, when you use commands such as <code>c</code> or <code>d</code>, what has been deleted goes to register 1, what was in register 1 goes to register 2, etc.),<br>
+<code>"</code> (default register, also known as unnamed register. This is where the <code>"</code> comes in <code>Ctrl-R</code>, <code>")</code>,<br>
+<code>a</code> to <code>z</code> for your own use (capitalized A to Z are for appending to corresponding registers).<br>
+<code>_</code> (acts like /dev/null (Unix) or NUL (Windows), you can write to it but it's discarded and when you read from it, it is always empty),<br>
+<code>-</code> (small delete register),<br>
+<code>/</code> (search pattern register, updated when you look for text with <code>/</code> <code>?</code> <code>*</code> or <code>#</code> for instance; you can also write to it to dynamically change the search pattern),<br>
+<code>:</code> (stores last VimL typed command via Q or :, readonly),<br>
+<code>+</code> and <code>*</code> (system clipboard registers, you can write to them to set the clipboard and read the clipboard contents from them)<br>
+See :help registers for the full reference.
+</p>
+
+<p>
+You can, at any moment, use :registers to display the contents of all registers. Synonyms and shorthands for this command are<br>
+<code>:display</code><br>
+<code>:reg</code><br>
+<code>:di</code><br><br>
+</p>
+
+<p>
+In Insert or Command-line mode<br>
+<code>Ctrl-R</code><br>
+plus a register name, inserts the contents of this register. If you want to insert them literally (no auto-indenting, no conversion of control characters like 0x08 to backspace, etc), you can use<br>
+<code>Ctrl-R</code>, <code>Ctrl-O</code>, <code>register name</code><br>
+See :help i_CTRL-R and following paragraphs for more reference.<br>
+</p>
+
+<p>
+But you can also do the following (and I probably forgot many uses for registers).<br>
+</p>
+
+<p>
+In normal mode, hit <code>":p</code>. The last command you used in vim is pasted into your buffer.<br>
+Let's decompose: <code>"</code> is a Normal mode command that lets you select what register is to be used during the next yank, delete or paste operation. So <code>":</code> selects the colon register (storing last command). Then p is a command you already know, it pastes the contents of the register.<br>
+Let's decompose: <code>"</code> is a Normal mode command that lets you select what register is to be used during the next yank, delete or paste operation. So <code>":</code> selects the colon register (storing last command). Then <code>p</code> is a command you already know, it pastes the contents of the register.
+</p>
+
+<p>
+cf. :help ", :help quote_:
+</p>
+
+<p>
+You're editing a VimL file (for instance your .vimrc) and would like to execute a couple of consecutive lines right now: <code>yj:@"Enter</code>.
+Here, yj yanks current and next line (this is because j is a linewise motion but this is out of scope of this answer) into the default register (also known as the unnamed register). Then the :@ Ex command plays Ex commands stored in the register given as argument, and " is how you refer to the unnamed register. Also see the top of this answer, which is related.
+</p>
+
+<p>
+Do not confuse <code>"</code> used here (which is a register name) with the <code>"</code> from the previous example, which was a Normal-mode command.
+</p>
+
+<p>
+cf. :help :@ and :help quote_quote
+</p>
+
+<p>
+Insert the last search pattern into your file in Insert mode, or into the command line, with<br>
+<code>Ctrl-R</code>, <code>/.</code>
+</p>
+
+<p>
+cf. :help quote_/, help i_CTRL-R
+</p>
+
+<p>
+Corollary: Keep your search pattern but add an alternative: / Ctrl-R, / \|alternative.
+</p>
+
+<p>
+You've selected two words in the middle of a line in visual mode, yanked them with y, they are in the unnamed register. Now you want to open a new line just below where you are, with those two words: :pu. This is shorthand for :put ". The :put command, like many Ex commands, works only linewise.
+</p>
+
+<p>
+cf. :help :put
+</p>
+
+<p>
+You could also have done: :call setreg('"', @", 'V') then p. The setreg function sets the register of which the name is given as first argument (as a string), initializes it with the contents of the second argument (and you can use registers as variables with the name @x where x is the register name in VimL), and turns it into the mode specified in the third argument, V for linewise, nothing for characterwise and literal ^V for blockwise.
+</p>
+
+<p>
+cf. :help setreg(). The reverse functions are getreg() and getregtype().
+</p>
+
+<p>
+If you have recorded a macro with qa...q, then :echo @a will tell you what you have typed, and @a will replay the macro (probably you knew that one, very useful in order to avoid repetitive tasks)
+</p>
+
+<p>
+cf. :help q, help @
+</p>
+
+<p>
+Corollary from the previous example: If you have 8go in the clipboard, then @+ will play the clipboard contents as a macro, and thus go to the 8th byte of your file. Actually this will work with almost every register. If your last inserted string was dd in Insert mode, then @. will (because the . register contains the last inserted string) delete a line. (Vim documentation is wrong in this regard, since it states that the registers #, %, : and . will only work with p, P, :put and Ctrl-R).
+</p>
+
+<p>
+cf. :help @
+</p>
+
+<p>
+Don't confuse :@ (command that plays Vim commands from a register) and @ (normal-mode command that plays normal-mode commands from a register).
+</p>
+
+<p>
+Notable exception is @:. The command register does not contain the initial colon neither does it contain the final carriage return. However in Normal mode, @: will do what you expect, interpreting the register as an Ex command, not trying to play it in Normal mode. So if your last command was :e, the register contains e but @: will reload the file, not go to end of word.
+</p>
+
+<p>
+cf. :help @:
+</p>
+
+<p>
+Show what you will be doing in Normal mode before running it: @='dd' Enter. As soon as you hit the = key, Vim switches to expression evaluation: as you enter an expression and hit Enter, Vim computes it, and the result acts as a register content. Of course the register = is read-only, and one-shot. Each time you start using it, you will have to enter a new expression.
+</p>
+
+<p>
+cf. :help quote_=
+</p>
+
+<p>
+Corollary: If you are editing a command, and you realize that you should need to insert into your command line some line from your current buffer: don't press Esc! Use Ctrl-R =getline(58) Enter. After that you will be back to command line editing, but it has inserted the contents of the 58th line.
+</p>
+
+<p>
+Define a search pattern manually: :let @/ = 'foo'
+</p>
+
+<p>
+cf. :help :let
+</p>
+
+<p>
+Note that doing that, you needn't to escape / in the pattern. However you need to double all single quotes of course.
+</p>
+
+<p>
+Copy all lines beginning with foo, and afterwards all lines containing bar to clipboard, chain these commands: qaq (resets the a register storing an empty macro inside it), :g/^foo/y A, :g/bar/y A, :let @+ = @a.
+</p>
+
+<p>
+Using a capital register name makes the register work in append mode
+</p>
+
+<p>
+Better, if Q has not been remapped by mswin.vim, start Ex mode with Q, chain those “colon commands” which are actually better called “Ex commands”, and go back to Normal mode by typing visual.
+</p>
+
+<p>
+cf. :help :g, :help :y, :help Q
+</p>
+
+<p>
+Double-space your file: :g/^/put _. This puts the contents of the black hole register (empty when reading, but writable, behaving like /dev/null) linewise, after each line (because every line has a beginning!).
+</p>
+
+<p>
+Add a line containing foo before each line: :g/^/-put ='foo'. This is a clever use of the expression register. Here, - is a synonym for .-1 (cf. :help :range). Since :put puts the text after the line, you have to explicitly tell it to act on the previous one.
+</p>
+
+<p>
+Copy the entire buffer to the system clipboard: :%y+.
+</p>
+
+<p>
+cf. :help :range (for the % part) and :help :y.
+</p>
+
+<p>
+If you have misrecorded a macro, you can type :let @a=' Ctrl-R =replace(@a,"'","''",'g') Enter ' and edit it. This will modify the contents of the macro stored in register a, and it's shown here how you can use the expression register to do that. Another, simpler, way of modifying a macro is to paste it in a buffer ("ap), edit it, and put it again into the register, by selecting it and "ay.
+</p>
+
+<p>
+If you did dddd, you might do uu in order to undo. With p you could get the last deleted line. But actually you can also recover up to 9 deletes with the registers @1 through @9.
+</p>
+
+<p>
+Even better, if you do "1P, then . in Normal mode will play "2P, and so on.
+</p>
+
+<p>
+cf. :help . and :help quote_number
+</p>
+
+<p>
+If you want to insert the current date in Insert mode:<br>
+Ctrl-R=strftime('%y%m%d')Enter.<br>
+</p>
+
+<p>
+cf. :help strftime()
+</p>
+
+<p>
+Once again, what can be confusing:
+</p>
+
+<p>
+<code>:@</code> is a command-line command that interprets the contents of a register as vimscript and sources it<br>
+</p>
+
+<p>
+<code>@</code> in normal mode command that interprets the contents of a register as normal-mode keystrokes (except when you use : register, that contains last played command without the initial colon: in this case it replays the command as if you also re-typed the colon and the final return key).<br>
+</p>
+
+<p>
+<code>"</code> in normal mode command that helps you select a register for yank, paste, delete, correct, etc.
+</p>
+
+<p>
+<code>"</code> is also a valid register name (the default, or unnamed, register) and therefore can be passed as an arguments for commands that expect register names
+</p>
+
+</body>
+</html>
