@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<title>python_qt_pyside2_example_qthreads</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<div id="[[Python]]"><h1 id="[[Python]]" class="header"><a href="#[[Python]]"><a href="Python.html">Python</a></a></h1></div>
+
+<div id="[[python_qt_pyside2|Qt - PySide2]]"><h1 id="[[python_qt_pyside2|Qt - PySide2]]" class="header"><a href="#[[python_qt_pyside2|Qt - PySide2]]"><a href="python_qt_pyside2.html">Qt - PySide2</a></a></h1></div>
+
+<ul>
+<li>
+1 of 3 - Before adding QThread
+
+</ul>
+
+<pre python>
+
+# Mike Miller
+# https://www.youtube.com/watch?v=M2vg6Ky6M1U
+
+# QThread - override the run method in a subclass
+# Main app creates the worker (thread)
+# Variables don't flow between threads, but slots &amp; signals do.
+# This means you can send data to main thread on completion.
+# Int to update progbar or results perhaps.
+
+# worker thread emits 'finished' signal
+# You can create your own custom signals
+
+
+import sys
+import time
+from PySide2.QtWidgets import (
+        QApplication,
+        QDialog,
+        QProgressBar,
+        QStyleFactory,
+        QPushButton,
+        QVBoxLayout,
+        QHBoxLayout,
+        QDial,
+        QLCDNumber,
+        QSlider,
+        )
+
+
+class DlgMain(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("My GUI")
+
+        self.prg = QProgressBar()
+        self.prg.setStyle(QStyleFactory.create("Windows"))
+        self.prg.setTextVisible(True)
+        self.prg.setRange(0, 30)
+
+        self.btnStart = QPushButton("Start")
+        self.btnStart.clicked.connect(self.evt_btnStart_clicked)
+
+        # Distraction to prove interface is responsive:
+
+        #self.dial = QDial()
+        self.dial = QSlider()
+        self.lcd = QLCDNumber()
+        self.dial.valueChanged.connect(self.lcd.display)
+
+        self.lytLCD = QHBoxLayout()
+        self.lytLCD.addWidget(self.dial)
+        self.lytLCD.addWidget(self.lcd)
+
+        self.lytMain = QVBoxLayout()
+        self.lytMain.addWidget(self.prg)
+        self.lytMain.addWidget(self.btnStart)
+        self.lytMain.addLayout(self.lytLCD)
+        self.setLayout(self.lytMain)
+
+    def evt_btnStart_clicked(self):
+        for x in range(31):
+            print(x)
+            time.sleep(0.05)
+            self.prg.setValue(x)
+            app.processEvents()
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    dlgMain = DlgMain()
+    dlgMain.show()
+    sys.exit(app.exec_())
+</pre>
+
+<ul>
+<li>
+2 of 3 - Adding bare QThread
+
+</ul>
+
+<pre python>
+# Mike Miller
+# https://www.youtube.com/watch?v=M2vg6Ky6M1U
+# https://www.youtube.com/watch?v=G7ffF0U36b0
+
+# QThread - override the run method in a subclass
+# Main app creates the worker (thread)
+# Variables don't flow between threads, but slots &amp; signals do.
+# This means you can send data to main thread on completion.
+# Int to update progbar or results perhaps.
+
+# worker thread emits 'finished' signal
+# You can create your own custom signals
+
+
+import sys
+import time
+from PySide2.QtWidgets import (
+        QApplication,
+        QDialog,
+        QProgressBar,
+        QStyleFactory,
+        QPushButton,
+        QVBoxLayout,
+        QHBoxLayout,
+        QDial,
+        QLCDNumber,
+        QMessageBox,
+        QSlider,
+        )
+from PySide2.QtCore import (
+        QThread,
+        )
+
+
+class DlgMain(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("My GUI")
+
+        self.prg = QProgressBar()
+        self.prg.setStyle(QStyleFactory.create("Windows"))
+        self.prg.setTextVisible(True)
+
+        self.btnStart = QPushButton("Start")
+        self.btnStart.clicked.connect(self.evt_btnStart_clicked)
+
+        # Distraction to prove interface is responsive:
+
+        #self.dial = QDial()
+        self.dial = QSlider()
+        self.lcd = QLCDNumber()
+        self.dial.valueChanged.connect(self.lcd.display)
+
+        self.lytLCD = QHBoxLayout()
+        self.lytLCD.addWidget(self.dial)
+        self.lytLCD.addWidget(self.lcd)
+
+        self.lytMain = QVBoxLayout()
+        self.lytMain.addWidget(self.prg)
+        self.lytMain.addWidget(self.btnStart)
+        self.lytMain.addLayout(self.lytLCD)
+        self.setLayout(self.lytMain)
+
+    def evt_btnStart_clicked(self):
+        self.worker = WorkerThread()
+        self.worker.start()
+        self.worker.finished.connect(self.evt_worker_finished)
+
+    def evt_worker_finished(self):
+        QMessageBox.information(self, "Done!", "Worker thread complete")
+
+
+
+class WorkerThread(QThread):
+    def run(self):
+        for x in range(20, 101, 20):
+            print(x)
+            time.sleep(2)
+
+            # We can't call these from this thread:
+            #self.prg.setValue(x)
+            #app.processEvents()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    dlgMain = DlgMain()
+    dlgMain.show()
+    sys.exit(app.exec_())
+</pre>
+
+
+<ul>
+<li>
+3 of 3 - Full Implementation
+
+</ul>
+
+
+<pre python>
+# Mike Miller
+# https://www.youtube.com/watch?v=M2vg6Ky6M1U
+# https://www.youtube.com/watch?v=G7ffF0U36b0
+
+# QThread - override the run method in a subclass
+# Main app creates the worker (thread)
+# Variables don't flow between threads, but slots &amp; signals do.
+# This means you can send data to main thread on completion.
+# Int to update progbar or results perhaps.
+
+# worker thread emits 'finished' signal
+# You can create your own custom signals
+
+
+import sys
+import time
+from PySide2.QtWidgets import (
+        QApplication,
+        QDialog,
+        QProgressBar,
+        QStyleFactory,
+        QPushButton,
+        QVBoxLayout,
+        QHBoxLayout,
+        QDial,
+        QLCDNumber,
+        QMessageBox,
+        QSlider,
+        )
+from PySide2.QtCore import (
+        QThread,
+        Signal,
+        )
+
+
+class DlgMain(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("My GUI")
+
+        self.prg = QProgressBar()
+        self.prg.setStyle(QStyleFactory.create("Windows"))
+        self.prg.setTextVisible(True)
+
+        self.btnStart = QPushButton("Start")
+        self.btnStart.clicked.connect(self.evt_btnStart_clicked)
+
+        # Distraction to prove interface is responsive:
+
+        #self.dial = QDial()
+        self.dial = QSlider()
+        self.lcd = QLCDNumber()
+        self.dial.valueChanged.connect(self.lcd.display)
+
+        self.lytLCD = QHBoxLayout()
+        self.lytLCD.addWidget(self.dial)
+        self.lytLCD.addWidget(self.lcd)
+
+        self.lytMain = QVBoxLayout()
+        self.lytMain.addWidget(self.prg)
+        self.lytMain.addWidget(self.btnStart)
+        self.lytMain.addLayout(self.lytLCD)
+        self.setLayout(self.lytMain)
+
+    def evt_btnStart_clicked(self):
+        self.worker = WorkerThread()
+        self.worker.start()
+        # Connect the built-in 'finished' signal to a custom finished slot:
+        #self.worker.finished.connect(self.evt_worker_finished)
+        # Catch signals from the WorkerThread and pass to a slot methods:
+        self.worker.update_progress.connect(self.evt_update_progress)
+        self.worker.worker_complete.connect(self.evt_worker_finished)
+
+    def evt_worker_finished(self, emp):
+        # The middle arg doesn't appear on MacOS:
+        QMessageBox.information(self, "Done!", "Worker thread complete\n\n{} {}".format(emp["fn"], emp["ln"]))
+
+    def evt_update_progress(self, val):
+        self.prg.setValue(val)
+
+
+class WorkerThread(QThread):
+    # Create custom Signals to be picked up (in Slots):
+    update_progress = Signal(int)
+    worker_complete = Signal(dict)
+
+    def run(self):
+        for x in range(20, 101, 20):
+            print(x)
+            time.sleep(0.5)
+            #'Emit' the signal:
+            self.update_progress.emit(x)
+
+        self.worker_complete.emit({"emp_id": 1234, "fn": "Mike", "ln": "Miller"})
+
+            # We can't call these from this thread:
+            #self.prg.setValue(x)
+            #app.processEvents()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    dlgMain = DlgMain()
+    dlgMain.show()
+    sys.exit(app.exec_())
+
+</pre>
+
+</body>
+</html>
