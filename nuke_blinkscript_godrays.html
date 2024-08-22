@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_blinkscript_godrays</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<div id="[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+
+<div id="[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+
+<div id="Nuke - Blinkscript - God Rays Effect"><h2 id="Nuke - Blinkscript - God Rays Effect" class="header"><a href="#Nuke - Blinkscript - God Rays Effect">Nuke - Blinkscript - God Rays Effect</a></h2></div>
+
+
+<div id="Blank (Template) Blinkscript"><h2 id="Blank (Template) Blinkscript" class="header"><a href="#Blank (Template) Blinkscript">Blank (Template) Blinkscript</a></h2></div>
+
+
+<pre C++>
+kernel BlankKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+    local:
+      // This local variable is not exposed to the user.
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    }
+    
+    void process() {
+    
+        // Write the result to the output image
+        dst() = src();
+    }
+};
+</pre>
+
+<div id="Blank (Template) Blinkscript-Two Inputs (for 2 distortion maps)"><h4 id="Two Inputs (for 2 distortion maps)" class="header"><a href="#Blank (Template) Blinkscript-Two Inputs (for 2 distortion maps)">Two Inputs (for 2 distortion maps)</a></h4></div>
+
+<p>
+This starting setup caries a lot of code from the STMap example.
+</p>
+
+
+<pre C++>
+kernel GodraysKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap; // the first distortion input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMapB; // the second distortion input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+      float slider;
+      
+    local:
+      // This local variable is not exposed to the user.
+      float2 UV;
+      int2 resolution;
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    resolution.x = src.bounds.width();
+    resolution.y = src.bounds.height();
+    
+    }
+    
+    void process(int2 pos) {
+    
+        UV.x = (STMap().x + (STMapB().x-STMap().x) * slider) * resolution.x - 0.5f;
+        UV.y = (STMap().y + (STMapB().y-STMap().y) * slider) * resolution.y - 0.5f;
+    
+        // Write the result to the output image
+        dst() = bilinear(src, UV.x, UV.y);
+    }
+};
+</pre>
+
+<div id="Blank (Template) Blinkscript-Starting the Godray code"><h4 id="Starting the Godray code" class="header"><a href="#Blank (Template) Blinkscript-Starting the Godray code">Starting the Godray code</a></h4></div>
+
+<p>
+Adding for loops.
+</p>
+
+<pre C++>
+kernel GodraysKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap; // the first distortion input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMapB; // the second distortion input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+      float slider;
+      int count; // variable to count in for loop
+      
+    local:
+      // This local variable is not exposed to the user.
+      float2 UV;
+      int2 resolution;
+      float4 output;
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    resolution.x = src.bounds.width();
+    resolution.y = src.bounds.height();
+    
+    }
+    
+    void process(int2 pos) {
+        
+        for(int i = 0; i &lt; count; i++) {
+        
+    
+            UV.x = (STMap().x + (STMapB().x-STMap().x) * (float(i)/count)) * resolution.x - 0.5f;
+            UV.y = (STMap().y + (STMapB().y-STMap().y) * (float(i)/count)) * resolution.y - 0.5f;
+            
+            // add the result to the previous iteration till end:
+            output += bilinear(src, UV.x, UV.y);
+        
+        }
+        
+        // Write the result to the output image
+        // Average output by dividing by the number of iterations:
+        dst() = output/count; 
+    }
+};
+</pre>
+
+<div id="Blank (Template) Blinkscript-Adding More Control Parameters"><h4 id="Adding More Control Parameters" class="header"><a href="#Blank (Template) Blinkscript-Adding More Control Parameters">Adding More Control Parameters</a></h4></div>
+
+<p>
+Including the new parameters into the calculations:
+</p>
+
+<pre C++>
+kernel GodraysKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap; // the first distortion input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMapB; // the second distortion input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+      int count;
+      float4 fromColor;
+      float4 toColor;
+      float4 gamma;
+      
+    local:
+      // This local variable is not exposed to the user.
+      float2 UV;
+      int2 resolution;
+      float4 output;
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    resolution.x = src.bounds.width();
+    resolution.y = src.bounds.height();
+    
+    }
+    
+    void process(int2 pos) {
+        
+        for(int i = 0; i &lt; count; i++) {
+        
+    
+            UV.x = (STMap().x + (STMapB().x-STMap().x) * (float(i)/count)) * resolution.x - 0.5f;
+            UV.y = (STMap().y + (STMapB().y-STMap().y) * (float(i)/count)) * resolution.y - 0.5f;
+            
+            
+            
+            
+            // add the result to the previous iteration till end:
+            output += bilinear(src, UV.x, UV.y) * pow((fromColor + (toColor - fromColor) * (float(i)/count)), (float4(1.0f)/gamma));
+        
+        }
+        
+        // Write the result to the output image
+        // Average output by dividing by the number of iterations:
+        dst() = output/count; 
+    }
+};
+</pre>
+<div id="Blank (Template) Blinkscript-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#Blank (Template) Blinkscript-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+<div id="Blank (Template) Blinkscript-[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#Blank (Template) Blinkscript-[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
