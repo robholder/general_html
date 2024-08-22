@@ -59,6 +59,7 @@
 </ul>
 </ul>
 <div id="Nuke - Blinkscript - Replicating A Grade Node-Blank Blinkscript"><h4 id="Blank Blinkscript" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-Blank Blinkscript">Blank Blinkscript</a></h4></div>
+
 <pre C++>
 kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
 {
@@ -274,43 +275,20 @@ kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
         
         output = src();
         
-        output = (((((output-blackpoint) / (whitepoint-blackpoint)) * ((gain * multiply) - lift)) + lift) + offset);
+        output = pow ((((((output-blackpoint) / (whitepoint-blackpoint)) * ((gain * multiply) - lift)) + lift) + offset), (1.0f/gamma)) ;
         
-        // Power and gamma pre-compute (for rgbw
-        
-        if(output.x &gt;= 0.0f) {
-        
-            pow(output.x, (1.0f/gamma.x));
-        
-        }
-        
-        if(output.y &gt;= 0.0f) {
-        
-            pow(output.y, (1.0f/gamma.y));
-        
-        }
-        
-        if(output.z &gt;= 0.0f) {
-        
-            pow(output.z, (1.0f/gamma.z));
-        
-        }
-        
-        if(output.w &gt;= 0.0f) {
-        
-            pow(output.w, (1.0f/gamma.w));
         
         }
         
         if(whiteclamp == 1) {
             
-            min(float4(1.0f), output);
+            output = min(float4(1.0f), output);
        
         }
        
         if(blackclamp) == 1) {
        
-            max(float4(0.0f), output);
+            output = max(float4(0.0f), output);
         
         }
         
@@ -367,73 +345,9 @@ kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
         
         output = src();
         
-        output = pow ((((((output-blackpoint) / (whitepoint-blackpoint)) * ((gain * multiply) - lift)) + lift) + offset), (1.0f/gamma)) ;
-       
-        if(whiteclamp == 1) {
-            
-            min(float4(1.0f), output);
-       
-        }
-       
-        if(blackclamp) == 1) {
-       
-            max(float4(0.0f), output);
-        
-        }
-        
-        
-        dst() = output;
-    }
-};
-</pre>
-
-
-<div id="Nuke - Blinkscript - Replicating A Grade Node-Grade Node Blinkscript-Setting Default Values"><h5 id="Setting Default Values" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-Grade Node Blinkscript-Setting Default Values">Setting Default Values</a></h5></div>
-
-<pre C++>
-kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
-{
-    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
-    Image&lt;eWrite&gt; dst; // the output image
-    
-    
-    param:
-      // This parameter is made available to the user.
-      float4 blackpoint;
-      float4 whitepoint;
-      float4 lift;
-      float4 gain;
-      float4 multiply;
-      float4 offset;
-      float4 gamma;
-      bool whiteclamp;
-      bool blackclamp;
-      
-      
-    local:
-      // This local variable is not exposed to the user.
-      float4 output;
-      
-    // In define(), parameters can be given labels and default values.
-    void define() {
-    
-    }
-    
-    // The init() function is run before any calls to process().
-    // Local variables can be initialized here.
-    void init() {
-    
-    }
-    
-    void process() {
-    
-        // Write the result to the output image
-        
-        output = src();
-        
         output = (((((output-blackpoint) / (whitepoint-blackpoint)) * ((gain * multiply) - lift)) + lift) + offset);
         
-        // Power and gamma pre-compute (for rgbw
+        // Power and gamma pre-compute (for rgbw)
         
         if(output.x &gt;= 0.0f) {
         
@@ -457,17 +371,16 @@ kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
         
             pow(output.w, (1.0f/gamma.w));
         
-        }
-        
+       
         if(whiteclamp == 1) {
             
-            min(float4(1.0f), output);
+            output = min(float4(1.0f), output);
        
         }
        
         if(blackclamp) == 1) {
        
-            max(float4(0.0f), output);
+            output = max(float4(0.0f), output);
         
         }
         
@@ -478,13 +391,7 @@ kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
 </pre>
 
 
-<div id="Nuke - Blinkscript - Replicating A Grade Node-Finished Grade Node"><h3 id="Finished Grade Node" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-Finished Grade Node">Finished Grade Node</a></h3></div>
-
-<div id="Nuke - Blinkscript - Replicating A Grade Node-Finished Grade Node-Correcting the Power Application to work Like the Nuke Grade Behavior"><h5 id="Correcting the Power Application to work Like the Nuke Grade Behavior" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-Finished Grade Node-Correcting the Power Application to work Like the Nuke Grade Behavior">Correcting the Power Application to work Like the Nuke Grade Behavior</a></h5></div>
-
-<p>
-The Nuke 'Grade' node has some mathematical workarounds to prevent negative values with the pow/gamma relationship. (void define())
-</p>
+<div id="Nuke - Blinkscript - Replicating A Grade Node-Grade Node Blinkscript-Setting Default Values"><h5 id="Setting Default Values" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-Grade Node Blinkscript-Setting Default Values">Setting Default Values</a></h5></div>
 
 <pre C++>
 kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
@@ -574,13 +481,13 @@ kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
         
         if(whiteclamp == 1) {
             
-            min(float4(1.0f), output);
+            output = min(float4(1.0f), output);
        
         }
        
         if(blackclamp) == 1) {
        
-            max(float4(0.0f), output);
+            output = max(float4(0.0f), output);
         
         }
         
@@ -590,6 +497,124 @@ kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
     }
 };
 </pre>
+
+
+
+
+<div id="Nuke - Blinkscript - Replicating A Grade Node-Finished Grade Node"><h3 id="Finished Grade Node" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-Finished Grade Node">Finished Grade Node</a></h3></div>
+
+
+<pre C++>
+kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+      ///////////////////////////
+      float4 blackpoint;
+      float4 whitepoint;
+      float4 lift;
+      float4 gain;
+      float4 multiply;
+      float4 offset;
+      float4 gamma;
+      bool whiteclamp;
+      bool blackclamp;
+      ///////////////////////////
+      
+      
+    local:
+      // This local variable is not exposed to the user.
+      ///////////////////////////
+      float4 output;
+      ///////////////////////////
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+      ///////////////////////////
+      defineParam(blacpoint, "blackpoint", float4(0.0f));
+      defineParam(whitepoint, "whitepoint", float4(1.0f));
+      defineParam(lift, "lift", float4(0.0f));
+      defineParam(gain, "gain", float4(1.0f));
+      defineParam(multiply, "multiply", float4(1.0f));
+      defineParam(offset, "offset", float4(0.0f));
+      defineParam(gamma, "gamma", float4(0.0f));
+      defineParam(whiteclamp, "whiteclamp", bool(0));
+      defineParam(blackclamp, "blackclamp", bool(1));
+      ///////////////////////////
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    }
+    
+    void process() {
+    
+        // Write the result to the output image
+        
+      ///////////////////////////
+        output = src();
+        
+        output = (((((output-blackpoint) / (whitepoint-blackpoint)) * ((gain * multiply) - lift)) + lift) + offset);
+        
+        // Power and gamma pre-compute (for rgbw)
+        
+        if(output.x &gt;= 0.0f) {
+        
+            pow(output.x, (1.0f/gamma.x));
+        
+        }
+        
+        if(output.y &gt;= 0.0f) {
+        
+            pow(output.y, (1.0f/gamma.y));
+        
+        }
+        
+        if(output.z &gt;= 0.0f) {
+        
+            pow(output.z, (1.0f/gamma.z));
+        
+        }
+        
+        if(output.w &gt;= 0.0f) {
+        
+            pow(output.w, (1.0f/gamma.w));
+        
+        }
+        
+        if(whiteclamp == 1) {
+            
+            output = min(float4(1.0f), output);
+       
+        }
+       
+        if(blackclamp) == 1) {
+       
+            output = max(float4(0.0f), output);
+        
+        }
+        
+        
+        dst() = output;
+      ///////////////////////////
+    }
+};
+</pre>
+
+
+<div id="Nuke - Blinkscript - Replicating A Grade Node-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+<div id="Nuke - Blinkscript - Replicating A Grade Node-[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#Nuke - Blinkscript - Replicating A Grade Node-[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+<p>
+<a href="Index.html">Index</a>
+</p>
 
 </body>
 </html>
