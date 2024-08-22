@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_blinkscript_creating_stmap</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<div id="[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+
+<div id="[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+
+<div id="Nuke - Blinkscript - Creating an STMap"><h2 id="Nuke - Blinkscript - Creating an STMap" class="header"><a href="#Nuke - Blinkscript - Creating an STMap">Nuke - Blinkscript - Creating an STMap</a></h2></div>
+
+<div id="Nuke - Blinkscript - Creating an STMap-Blank Blinkscript"><h4 id="Blank Blinkscript" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-Blank Blinkscript">Blank Blinkscript</a></h4></div>
+<pre C++>
+kernel BlankKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+    local:
+      // This local variable is not exposed to the user.
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    }
+    
+    void process() {
+    
+        // Write the result to the output image
+        dst() = src();
+    }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Creating an STMap-Initial changes to Blank Script"><h4 id="Initial changes to Blank Script" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-Initial changes to Blank Script">Initial changes to Blank Script</a></h4></div>
+
+<ul>
+<li>
+Change eAccess type to eAccessRandom
+
+<li>
+Add 'int2 pos' to void process()
+
+<li>
+Add src(pos.x, pos.y) to the dst (output) line
+
+</ul>
+<p>
+<br>
+</p>
+
+<pre C++>
+kernel STMapKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    //Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+    Image&lt;eRead, eAccessRandom, eEdgeClamped&gt; src; // the input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+    local:
+      // This local variable is not exposed to the user.
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    }
+    
+    //void process() {
+    void process(int2 pos) {
+    
+        // Write the result to the output image
+        //dst() = src();
+        dst() = src(pos.x, pos.y);
+    }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Creating an STMap-Add Another Image Input"><h4 id="Add Another Image Input" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-Add Another Image Input">Add Another Image Input</a></h4></div>
+
+<ul>
+<li>
+The second input doesn't need Random access, it just needs Point.
+
+<li>
+We can give this input a variable name, 'displacement'.
+
+<li>
+We need to update the output formula to use displacement input.
+
+</ul>
+<p>
+<br>
+</p>
+
+<pre C++>
+kernel STMapKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    //Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+    Image&lt;eRead, eAccessRandom, eEdgeClamped&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; displacement; // change the variable name for this input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+    local:
+      // This local variable is not exposed to the user.
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    }
+    
+    //void process() {
+    void process(int2 pos) {
+    
+        // Write the result to the output image
+        //dst() = src();
+        // We need a bilinear approach for this due to floating point inputs:
+        dst() = bilinear(src, pos.x + displacement().x, pos.y + displacement().y);
+    }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Creating an STMap-Adding a Scale Dial for Displacement"><h4 id="Adding a Scale Dial for Displacement" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-Adding a Scale Dial for Displacement">Adding a Scale Dial for Displacement</a></h4></div>
+
+<ul>
+<li>
+Add a multiplier to amplify the displacement values.
+
+<li>
+Include the multiplier to the output (dst formula).
+
+</ul>
+<p>
+<br>
+</p>
+<pre C++>
+kernel STMapKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    //Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+    Image&lt;eRead, eAccessRandom, eEdgeClamped&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeConstant&gt; displacement; // change the variable name for this input image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      float2 scale;
+      
+    local:
+      // This local variable is not exposed to the user.
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    }
+    
+    //void process() {
+    void process(int2 pos) {
+    
+        // Write the result to the output image
+        //dst() = src();
+        // We need a bilinear approach for this due to floating point inputs:
+        dst() = bilinear(src, pos.x + (displacement().x * scale.x), pos.y + (displacement().y * scale.y));
+    }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Creating an STMap-STMap Setup"><h4 id="STMap Setup" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-STMap Setup">STMap Setup</a></h4></div>
+
+
+<ul>
+<li>
+Create the STMap input
+
+<li>
+Add 'int2 resolution' param
+
+<li>
+Add process int2 pos call
+
+<li>
+Add process which multiplies STMap values against resolution (x &amp; y):
+
+<ul>
+<li>
+notice the 0.5 offset for the pixel coordinates so that the calculations come from the center of each pixel.
+
+</ul>
+<li>
+Set output to bilinear.
+
+</ul>
+<p>
+<br>
+</p>
+<pre C++>
+kernel STMapKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap; // the second (displacement) image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+      // resolution (x, y of image size to mult against STMap's 0 to 1 scale)
+      int2 resolution;
+      
+    local:
+      // This local variable is not exposed to the user.
+      float2 UV;
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+    }
+    
+    //void process() {
+    void process(int2 pos) {
+    
+        UV.x = STMap().x * resolution.x - 0.5f;
+        UV.y = STMap().y * resolution.y - 0.5f;
+        
+        
+        // Write the result to the output image
+        dst() = bilinear(src, UV.x, UV.y);
+        
+    }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Creating an STMap-Cleaning up Resolution Variable"><h4 id="Cleaning up Resolution Variable" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-Cleaning up Resolution Variable">Cleaning up Resolution Variable</a></h4></div>
+
+<p>
+Make the resolution variable pull dimensions from the src image.
+</p>
+
+
+<pre C++>
+kernel STMapKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap; // the second (displacement) image
+    Image&lt;eWrite&gt; dst; // the output image
+    
+    
+    param:
+      // This parameter is made available to the user.
+      
+      // resolution (x, y of image size to mult against STMap's 0 to 1 scale)
+      
+    local:
+      // This local variable is not exposed to the user.
+      float2 UV;
+      int2 resolution; // moved from param
+      
+    // In define(), parameters can be given labels and default values.
+    void define() {
+    
+    }
+    
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init() {
+    
+        resolution.x = src.bounds.width();
+        resoluiton.y = src.bounds.height();
+    
+    }
+    
+    //void process() {
+    void process(int2 pos) {
+    
+        UV.x = STMap().x * resolution.x - 0.5f;
+        UV.y = STMap().y * resolution.y - 0.5f;
+        
+        
+        // Write the result to the output image
+        dst() = bilinear(src, UV.x, UV.y);
+        
+    }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Creating an STMap-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+<div id="Nuke - Blinkscript - Creating an STMap-[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#Nuke - Blinkscript - Creating an STMap-[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
