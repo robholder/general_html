@@ -93,11 +93,13 @@ kernel BlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
     param:
       // This parameter is made available to the user.
       int scale;
+      float exponent;
       
     local:
       // This local variable is not exposed to the user.
       
       float4 output;
+      float4 normalizer;
       
     // In define(), parameters can be given labels and default values.
     void define() {
@@ -117,13 +119,17 @@ kernel BlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
         for(int X = -scale; X &lt;= scale; X++) {
             for(int Y = -scale; Y &lt;= scale; Y++) {
             
-                output += src(X, Y) * (max((scale - (sqrt(pow(X, 2) + pow(Y, 2)))),0.0f) / scale);
+                // max (formula, zero) to get rid of negative values
+                output += src(X, Y) * pow((max((scale - (sqrt(pow(X, 2) + pow(Y, 2)))), 0.0f) / scale), exponent);
+                normalizer += pow((max((scale - (sqrt(pow(X, 2) + pow(Y, 2)))), 0.0f) / scale), exponent);
+                
         
+            }
         }
         
-        output = (output) / ((2 * scale + 1) * (2 * scale + 1));
+        output = (output) / normalizer;
         
-        [[//]] Write the result to the output image
+        // Write the result to the output image
         dst() = output
     }
 };
