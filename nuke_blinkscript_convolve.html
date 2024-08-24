@@ -40,7 +40,7 @@ kernel ConvolveBaseBlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
   local:
 
     float4 output;
-    float4 normaliser;
+    float4 normalizer;
 
   void define() {
    
@@ -59,12 +59,12 @@ kernel ConvolveBaseBlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
       for(int Y = -scale; Y &lt;= scale; Y++){
         
         output += src(X,Y) * pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent) ;
-        normaliser += pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent);
+        normalizer += pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent);
         
       }
     }
     
-  output = (output)/(normaliser);
+  output = (output)/(normalizer);
   
   dst() = output;
   
@@ -78,7 +78,8 @@ kernel ConvolveBaseBlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
 kernel ConvolveBaseBlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
 {
   Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; // the input image
-  Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; bokeh;
+  //Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; bokeh;
+  Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; bokeh;
   Image&lt;eWrite&gt; dst; // the output image
 
   param:
@@ -90,43 +91,105 @@ kernel ConvolveBaseBlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
 
     int2 bokehResolution;
     float4 output;
-    float4 normaliser;
+    float4 normalizer;
+    
+    float4 scaledBokeh;
 
   void define() {
-   
 
   }
 
   void init() {
 
-    src.setRange(-bokehResolution.x, -bokehResolution.y, bokehResolution.x, bokehResolution);
-    
+    // Get x &amp; y resolution of the bokeh input
     bokehResolution.x = bokeh.bounds.width();
     bokehResolution.y = bokeh.bounds.height();
+    
+    // Takes size of effect (bokeh input area on src image):
+    src.setRange(-bokehResolution.x, -bokehResolution.y, bokehResolution.x, bokehResolution.y);
 
   }
 
   void process(int2 pos) {
 
-    for(int X = -scale; X &lt;= scale; X++){
-      for(int Y = -scale; Y &lt;= scale; Y++){
+    scaledBokeh = bilinear(bokeh(pos.x/scale, pos.y/scale));
+    
+    for(int X = -bokehResolution.x/2*scale; X &lt;= bokehResolution.x/2*scale; X++);
+      for(int Y = -bokeResolution.y/2*scale; Y &lt;= bokeResolution.y/2*scale; Y++);
         
-        output += src(X,Y) * pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent) ;
-        normaliser += pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent);
+        //output += src(X, Y) * bokeh((X-bokehResolution.x/2*scale)/scale, (Y-bokehResolution.y/2*scale)/scale);
+        output += src(X, Y) * bilinear(bokeh, (X-bokehResolution.x/2*scale)/scale, (Y-bokehResolution.y/2*scale)/scale);
+        normalizer += bilinear(bokeh, (X+bokehResolution.x/2*scale)/scale, (Y+bokehResolution.y/2*scale)/scale);
         
       }
     }
     
-  output = (output)/(normaliser);
+  output = (output)/(normalizer);
+  
+  dst() = scaledBokeh;
+  
+  }
+};
+</pre>
+
+<div id="Convolve-Adding Size Mask (to attenuate effect)"><h4 id="Adding Size Mask (to attenuate effect)" class="header"><a href="#Convolve-Adding Size Mask (to attenuate effect)">Adding Size Mask (to attenuate effect)</a></h4></div>
+<pre cpp>
+kernel ConvolveKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; // the input image
+  Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; bokeh;
+  Image&lt;eRead, eAccessPoint, eEdgeConstant&gt; sizeMask;
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+
+    float scale;
+    int exponent;
+
+  local:
+
+    int2 bokehResolution;
+
+    float4 output;
+    float4 normalizer;
+
+    float4 scaledBokeh;
+
+  void define() {
+
+  }
+
+  void init() {
+
+    // Get x &amp; y resolution of the bokeh input
+    bokehResolution.x = bokeh.bounds.width();
+    bokehResolution.y = bokeh.bounds.height();
+    
+    // Takes size of effect (bokeh input area on src image):
+    src.setRange(-bokehResolution.x, -bokehResolution.y, bokehResolution.x, bokehResolution.y);
+
+  }
+
+  void process(int2 pos) {
+
+    //scaledBokeh = bilinear(bokeh,pos.x/scale,pos.y/scale);
+
+    for(int X = -bokehResolution.x/2*sizeMask().x; X &lt;= bokehResolution.x/2*sizeMask().x; X++){
+      for(int Y = -bokehResolution.y/2*sizeMask().x; Y &lt;= bokehResolution.y/2*sizeMask().x; Y++){
+        
+        output += src(X,Y) * bilinear(bokeh,(X+bokehResolution.x/2*sizeMask().x )/sizeMask().x  ,(Y+bokehResolution.y/2*sizeMask().x )/sizeMask().x) ;
+        normalizer += bilinear(bokeh,(X+bokehResolution.x/2*sizeMask().x )/sizeMask().x  ,(Y+bokehResolution.y/2*sizeMask().x )/sizeMask().x)  ;
+        
+      }
+    }
+    
+  output = (output)/(normalizer);
   
   dst() = output;
   
   }
 };
 </pre>
-
-
-
 <div id="Convolve-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#Convolve-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
 <div id="Convolve-[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#Convolve-[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
 <p>
