@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_blinkscript_examples</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<div id="[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+
+<div id="[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+
+<div id="Nuke - Blinkscript - Example Scripts"><h2 id="Nuke - Blinkscript - Example Scripts" class="header"><a href="#Nuke - Blinkscript - Example Scripts">Nuke - Blinkscript - Example Scripts</a></h2></div>
+
+
+<div id="Nuke - Blinkscript - Example Scripts-Blank BlinkScript"><h4 id="Blank BlinkScript" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Blank BlinkScript">Blank BlinkScript</a></h4></div>
+
+<pre cpp>
+kernel BlankKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+
+  local:
+    // This local variable is not exposed to the user.
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+  }
+
+  void process() {
+    
+    // Write the result to the output image
+    dst() = src();
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Variable Types"><h4 id="Variable Types" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Variable Types">Variable Types</a></h4></div>
+
+<pre cpp>
+kernel BlankKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+    bool boolean;
+
+    int integer;
+    int2 integer2;
+    int3 integer3;
+    int4 integer4;
+
+    float floating_point;
+    float2 floating_point2;
+    float3 floating_point3;
+    float4 floating_point4;   
+
+    float3x3 three_by_three_matrix;
+    float4x4 four_by_four_matrix;
+
+    
+
+    
+
+  local:
+    // This local variable is not exposed to the user.
+    recti integer_rectangle(int x1, int y1, int x2, int y2);
+    rectf floating_point_rectangle(float x1, float y1, float x2, float y2);
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+  }
+
+  void process() {
+    
+    // Write the result to the output image
+    
+  }
+};
+</pre>
+
+
+<div id="Nuke - Blinkscript - Example Scripts-Creating A Constant"><h4 id="Creating A Constant" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Creating A Constant">Creating A Constant</a></h4></div>
+
+<pre cpp>
+kernel SaturationKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    float saturation; // This parameter is made available to the user.
+
+  local:
+    float3 coefficients;  // This local variable is not exposed to the user.
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    defineParam(saturation, \"Saturation\", 1.2f);
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    // Initialise coefficients according to rec. 709 standard.
+    coefficients.x = 0.2126f;
+    coefficients.y = 0.7152f;
+    coefficients.z = 0.0722f;
+  }
+
+  void process() {
+    // Read the input image
+    SampleType(src) input = src();
+
+    // Isolate the RGB components
+    float3 srcPixel(input.x, input.y, input.z);
+
+    // Calculate luma
+    float luma = srcPixel.x * coefficients.x
+               + srcPixel.y * coefficients.y
+               + srcPixel.z * coefficients.z;
+    // Apply saturation
+    float3 saturatedPixel = (srcPixel - luma) * saturation + luma;
+
+    // Write the result to the output image
+    dst() = float4(saturatedPixel.x, saturatedPixel.y, saturatedPixel.z, input.w);
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Creating A Grade Node"><h4 id="Creating A Grade Node" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Creating A Grade Node">Creating A Grade Node</a></h4></div>
+
+<pre cpp>
+kernel GradeKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+    float4 blackpoint;
+    float4 whitepoint;
+    float4 lift;
+    float4 gain;
+    float4 multiply;
+    float4 offset;
+    float4 gamma;
+    bool whiteclamp;
+    bool blackclamp;
+
+  local:
+    // This local variable is not exposed to the user.
+    float4 output;
+
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+    defineParam(blackpoint, \"blackpoint\", float4(0.0f));
+    defineParam(whitepoint, \"whitepoint\", float4(1.0f));
+    defineParam(lift, \"lift\", float4(0.0f));
+    defineParam(gain, \"gain\", float4(1.0f));
+    defineParam(multiply, \"multiply\", float4(1.0f));
+    defineParam(offset, \"offset\", float4(0.0f));
+    defineParam(gamma, \"gamma\", float4(1.0f));
+    defineParam(whiteclamp, \"whiteclamp\", bool(0));
+    defineParam(blackclamp, \"blackclamp\", bool(1));
+
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+  }
+
+  void process() {
+    
+    // Write the result to the output image
+
+    output = src();
+
+    output =    (((((output-blackpoint) / (whitepoint-blackpoint) ) * ((gain*multiply)-lift)) +lift)+ offset) ;
+
+    if(output.x &gt;= 0.0f){
+
+      output.x = pow(output.x,(1.0f/gamma.x));
+
+    }
+
+    if(output.y &gt;= 0.0f){
+
+        output.y = pow(output.y,(1.0f/gamma.y));
+
+    }
+
+    if(output.z &gt;= 0.0f){
+
+        output.z = pow(output.z,(1.0f/gamma.z));
+
+    }
+
+    if(output.w &gt;= 0.0f){
+
+        output.w = pow(output.w,(1.0f/gamma.w));
+
+    }
+
+
+
+    if(whiteclamp == 1){
+
+      output = min( float4(1.0f), output   );
+
+    }
+
+    if(blackclamp == 1){
+
+      output = max( float4(0.0f), output   );
+
+    }
+
+
+
+    dst() = output;
+
+
+
+
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-MultiChannel Monochrome Operation"><h4 id="MultiChannel Monochrome Operation" class="header"><a href="#Nuke - Blinkscript - Example Scripts-MultiChannel Monochrome Operation">MultiChannel Monochrome Operation</a></h4></div>
+
+<pre cpp>
+kernel BlankKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+
+    float4 weights;
+    float4 sourceColour;
+    float4 targetColour;
+    float4 multiply;
+    bool useWeightedTargets;
+
+  local:
+    // This local variable is not exposed to the user.
+
+    float4 output;
+
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+    defineParam(weights, \"weight\", float4(.2126f,.7152f,.0722f,0.0f));
+    defineParam(sourceColour, \"source\", float4(1.0f));
+    defineParam(targetColour, \"target\", float4(1.0f));
+    defineParam(multiply, \"multiply\", float4(1.0f));
+    defineParam(useWeightedTargets, \"use weighted target as source\", true);
+
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+  }
+
+  void process() {
+
+    output = src().x*weights.x+src().y*weights.y+src().z*weights.z;
+
+    if(useWeightedTargets == 1){
+
+      sourceColour = targetColour.x*weights.x+targetColour.y*weights.y+targetColour.z*weights.z;
+
+    }
+
+    output = (output/sourceColour)*targetColour*multiply;
+    
+    
+    // Write the result to the output image
+    dst() = output;
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Transforming The Image"><h4 id="Transforming The Image" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Transforming The Image">Transforming The Image</a></h4></div>
+
+<div id="Nuke - Blinkscript - Example Scripts-Transforming The Image-1D Kernel"><h5 id="1D Kernel" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Transforming The Image-1D Kernel">1D Kernel</a></h5></div>
+<pre cpp>
+kernel Transform1DKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRanged1D, eEdgeConstant&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+
+    int offset;
+
+  local:
+    // This local variable is not exposed to the user.
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+
+    src.setAxis(eX);
+    //src.setAxis(eY);
+    src.setRange(offset, offset);
+
+    
+  }
+
+  void process() {
+    
+    // Write the result to the output image
+    dst() = src(offset);
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Transforming The Image-2D Kernel"><h5 id="2D Kernel" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Transforming The Image-2D Kernel">2D Kernel</a></h5></div>
+
+<pre cpp>
+kernel Transform2DKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRanged2D, eEdgeConstant&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+
+    int2 offset;
+
+  local:
+    // This local variable is not exposed to the user.
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+
+    
+    src.setRange(offset.x, offset.y, offset.x, offset.y);
+
+    
+  }
+
+  void process() {
+    
+    // Write the result to the output image
+    dst() = src(offset.x, offset.y);
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Transforming The Image-Random Kernel"><h5 id="Random Kernel" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Transforming The Image-Random Kernel">Random Kernel</a></h5></div>
+
+<pre cpp>
+
+kernel TransformRandomKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+
+    int2 offset;
+
+  local:
+    // This local variable is not exposed to the user.
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+
+    
+ 
+
+    
+  }
+
+  void process(int2 pos) {
+    
+    // Write the result to the output image
+    dst() = src(pos.x+offset.x, pos.y+offset.y);
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Transforming The Image-Random Bilinear Kernel"><h5 id="Random Bilinear Kernel" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Transforming The Image-Random Bilinear Kernel">Random Bilinear Kernel</a></h5></div>
+
+<pre cpp>
+kernel TransformRandomBilinearKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+
+    float2 offset;
+
+  local:
+    // This local variable is not exposed to the user.
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+
+    
+ 
+
+    
+  }
+
+  void process(int2 pos) {
+    
+    // Write the result to the output image
+    dst() = bilinear(src,pos.x+offset.x, pos.y+offset.y);
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Creating an STMap"><h4 id="Creating an STMap" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Creating an STMap">Creating an STMap</a></h4></div>
+
+<pre cpp>
+kernel BlankKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap;
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+    
+    
+
+  local:
+    // This local variable is not exposed to the user.
+    float2 UV;
+    int2 resolution;
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+    resolution.x = src.bounds.width();
+    resolution.y = src.bounds.height();
+
+  }
+
+  void process(int2 pos) {
+    
+    UV.x = STMap().x*resolution.x-.5f;
+    UV.y = STMap().y*resolution.y-.5f;
+
+    // Write the result to the output image
+    dst() = bilinear(src, UV.x, UV.y);
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Replicating A God-rays Effect"><h4 id="Replicating A God-rays Effect" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Replicating A God-rays Effect">Replicating A God-rays Effect</a></h4></div>
+
+<pre cpp>
+kernel GodRaysSTMapKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap;
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMapB;
+  
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+        
+    int count;
+    float4 fromColour;
+    float4 toColour;
+    float4 gamma;
+
+  local:
+    // This local variable is not exposed to the user.
+    float2 UV;
+    int2 resolution;
+    float4 output;
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+    resolution.x = src.bounds.width();
+    resolution.y = src.bounds.height();
+
+  }
+
+  void process(int2 pos) {
+    
+    for(int i = 0; i &lt; count; i++){
+
+
+      UV.x = (STMap().x+(STMapB().x-STMap().x)*(float(i)/count)  )    *resolution.x-.5f;
+      UV.y = (STMap().y+(STMapB().y-STMap().y)*(float(i)/count)  )    *resolution.y-.5f;
+
+      
+
+
+      output += bilinear(src, UV.x, UV.y)*  pow((fromColour+(toColour-fromColour)*(float(i)/count)), (float4(1.0f)/gamma));
+
+    }
+
+      output = output/count;
+    // Write the result to the output image
+    dst() = output;
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-A Blur Workshop"><h4 id="A Blur Workshop" class="header"><a href="#Nuke - Blinkscript - Example Scripts-A Blur Workshop">A Blur Workshop</a></h4></div>
+
+<pre cpp>
+kernel ExponentialBlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+
+    int scale;
+    float exponent;    
+
+
+  local:
+
+    float4 output;
+    float4 normaliser;
+
+  void define() {
+
+   
+
+  }
+
+  void init() {
+
+    src.setRange(-scale, -scale, scale, scale);
+
+  }
+
+  void process(int2 pos) {
+
+    
+
+    for(int X = -scale; X &lt;= scale; X++){
+      for(int Y = -scale; Y &lt;= scale; Y++){
+
+        
+        output += src(X,Y) * pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent) ;
+        normaliser += pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent);
+
+        
+      }
+    }
+    
+  output = (output)/(normaliser);
+  
+  dst() = output;
+
+  
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Building A Convolve"><h4 id="Building A Convolve" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Building A Convolve">Building A Convolve</a></h4></div>
+
+<pre cpp>
+kernel ExponentialBlurKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+
+    int scale;
+    float exponent;    
+
+
+  local:
+
+    float4 output;
+    float4 normaliser;
+
+  void define() {
+
+   
+
+  }
+
+  void init() {
+
+    src.setRange(-scale, -scale, scale, scale);
+
+  }
+
+  void process(int2 pos) {
+
+    
+
+    for(int X = -scale; X &lt;= scale; X++){
+      for(int Y = -scale; Y &lt;= scale; Y++){
+
+        
+        output += src(X,Y) * pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent) ;
+        normaliser += pow((max((scale - (sqrt(pow(X,2) + pow(Y,2)))),0.0f) /scale),exponent);
+
+        
+      }
+    }
+    
+  output = (output)/(normaliser);
+  
+  dst() = output;
+
+  
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Color Matrixes"><h4 id="Color Matrixes" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Color Matrixes">Color Matrixes</a></h4></div>
+
+<p>
+Three-by-three (3x3)
+</p>
+
+<pre cpp>
+kernel ThreeByThreeColourMatrixKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+    float3x3 matrixInput;
+    bool invert;
+
+  local:
+    // This local variable is not exposed to the user.
+
+    float4 output;
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+  }
+
+  void process() {
+    
+    float3x3 matrix = matrixInput;
+    
+    matrix = invert ?  matrix.invert() : matrix;
+
+    output.x = src().x * matrix\[0]\[0] + src().y * matrix\[0]\[1] + src().z * matrix\[0]\[2];
+    output.y = src().x * matrix\[1]\[0] + src().y * matrix\[1]\[1] + src().z * matrix\[1]\[2];
+    output.z = src().x * matrix\[2]\[0] + src().y * matrix\[2]\[1] + src().z * matrix\[2]\[2];
+
+    // Write the result to the output image
+    dst() = output;
+  }
+};
+</pre>
+
+<p>
+Four-by-Four (4x4)
+</p>
+
+<pre cpp>
+kernel FourByFourColourMatrixKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+  Image&lt;eWrite&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+    float4x4 matrixInput;
+    bool invert;
+
+  local:
+    // This local variable is not exposed to the user.
+
+    float4 output;
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+  }
+
+  void process() {
+    
+    float4x4 matrix = matrixInput;
+    
+    matrix = invert ?  matrix.invert() : matrix;
+
+    output.x = src().x * matrix\[0]\[0] + src().y * matrix\[0]\[1] + src().z * matrix\[0]\[2] + matrix\[0]\[3];
+    output.y = src().x * matrix\[1]\[0] + src().y * matrix\[1]\[1] + src().z * matrix\[1]\[2] + matrix\[1]\[3];
+    output.z = src().x * matrix\[2]\[0] + src().y * matrix\[2]\[1] + src().z * matrix\[2]\[2] + matrix\[2]\[3];
+    output.w = src().x * matrix\[3]\[0] + src().y * matrix\[3]\[1] + src().z * matrix\[3]\[2] + matrix\[3]\[3];
+
+    // Write the result to the output image
+    dst() = output/output.w;
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-A Position Projector"><h4 id="A Position Projector" class="header"><a href="#Nuke - Blinkscript - Example Scripts-A Position Projector">A Position Projector</a></h4></div>
+
+<pre cpp>
+kernel BlinkPositionProject : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRandom, eEdgeClamped&gt; src;
+  Image&lt;eRead, eAccessRandom, eEdgeClamped&gt; pos;
+  
+  Image&lt;eWrite, eAccessRandom, eEdgeClamped&gt; dst;
+
+  param:
+   
+    int iterations;
+    float timeOffsetSlider;
+    float shutter;
+
+    float2 resolution;
+    bool outputSTMap;  
+    bool outputDepth;  
+    int output_type;
+
+    float focal;
+    float haperture;
+    float vaperture;
+    float4x4 matrix;
+
+    float focalAnimated;
+    float hapertureAnimated;
+    float vapertureAnimated;
+    float4x4 matrixAnimated;
+
+    float focalNext;
+    float hapertureNext;
+    float vapertureNext;
+    float4x4 matrixNext;
+
+    float focalPrev;
+    float haperturePrev;
+    float vaperturePrev;
+    float4x4 matrixPrev;
+
+    float vMult;
+  
+
+  void process(int2 position) {  
+
+    float3 output;
+    float4 posDifference;
+   
+    posDifference.x = pos(position.x,position.y).x - matrix\[0]\[3];
+    posDifference.y = pos(position.x,position.y).y - matrix\[1]\[3];
+    posDifference.z = pos(position.x,position.y).z - matrix\[2]\[3]; 
+    posDifference.w = pow(pow(posDifference.x,2)+pow(posDifference.y,2)+pow(posDifference.z,2),0.5f);
+
+    float xCoords = matrix\[0]\[0]*posDifference.x + matrix\[1]\[0]*posDifference.y + matrix\[2]\[0]*posDifference.z;
+    float yCoords = matrix\[0]\[1]*posDifference.x + matrix\[1]\[1]*posDifference.y + matrix\[2]\[1]*posDifference.z;
+    float zCoords = matrix\[0]\[2]*posDifference.x + matrix\[1]\[2]*posDifference.y + matrix\[2]\[2]*posDifference.z;
+
+    float4 uv;
+    uv.x = 0.5f - (xCoords * ((focal/(haperture))/zCoords));
+    uv.y = 0.5f - (yCoords * ((focal/(vaperture*vMult))/zCoords));
+    uv.z = 1;
+
+     
+
+    float4 uvScaled;
+
+    uvScaled.x = uv.x*resolution.x;
+    uvScaled.y = uv.y*resolution.y;
+
+
+
+/////////////////////////////////////////////////////////
+
+    float4 nextPosDifference;
+   
+    nextPosDifference.x = pos(position.x,position.y).x - matrixNext\[0]\[3];
+    nextPosDifference.y = pos(position.x,position.y).y - matrixNext\[1]\[3];
+    nextPosDifference.z = pos(position.x,position.y).z - matrixNext\[2]\[3]; 
+    nextPosDifference.w = pow(pow(nextPosDifference.x,2)+pow(nextPosDifference.y,2)+pow(nextPosDifference.z,2),0.5f);
+
+    float nextXCoords = matrixNext\[0]\[0]*nextPosDifference.x + matrixNext\[1]\[0]*nextPosDifference.y + matrixNext\[2]\[0]*nextPosDifference.z;
+    float nextYCoords = matrixNext\[0]\[1]*nextPosDifference.x + matrixNext\[1]\[1]*nextPosDifference.y + matrixNext\[2]\[1]*nextPosDifference.z;
+    float nextZCoords = matrixNext\[0]\[2]*nextPosDifference.x + matrixNext\[1]\[2]*nextPosDifference.y + matrixNext\[2]\[2]*nextPosDifference.z;
+
+    float4 nextUV;
+    nextUV.x = 0.5f - (nextXCoords * ((focalNext/(hapertureNext))/nextZCoords));
+    nextUV.y = 0.5f - (nextYCoords * ((focalNext/(vapertureNext*vMult))/nextZCoords));
+    nextUV.z = 1;
+
+     
+
+    float4 nextUVScaled;
+
+    nextUVScaled.x = nextUV.x*resolution.x;
+    nextUVScaled.y = nextUV.y*resolution.y;
+    
+///////////////////////////////////////////////////
+
+    float4 prevPosDifference;
+
+    prevPosDifference.x = pos(position.x,position.y).x - matrixPrev\[0]\[3];
+    prevPosDifference.y = pos(position.x,position.y).y - matrixPrev\[1]\[3];
+    prevPosDifference.z = pos(position.x,position.y).z - matrixPrev\[2]\[3]; 
+    prevPosDifference.w = pow(pow(prevPosDifference.x,2)+pow(prevPosDifference.y,2)+pow(prevPosDifference.z,2),0.5f);
+
+    float prevXCoords = matrixPrev\[0]\[0]*prevPosDifference.x + matrixPrev\[1]\[0]*prevPosDifference.y + matrixPrev\[2]\[0]*prevPosDifference.z;
+    float prevYCoords = matrixPrev\[0]\[1]*prevPosDifference.x + matrixPrev\[1]\[1]*prevPosDifference.y + matrixPrev\[2]\[1]*prevPosDifference.z;
+    float prevZCoords = matrixPrev\[0]\[2]*prevPosDifference.x + matrixPrev\[1]\[2]*prevPosDifference.y + matrixPrev\[2]\[2]*prevPosDifference.z;
+
+    float4 prevUV;
+    prevUV.x = 0.5f - (prevXCoords * ((focalPrev/(haperturePrev))/prevZCoords));
+    prevUV.y = 0.5f - (prevYCoords * ((focalPrev/(vaperturePrev*vMult))/prevZCoords));
+    prevUV.z = 1;
+
+     
+
+    float4 prevUVScaled;
+
+    prevUVScaled.x = prevUV.x*resolution.x;
+    prevUVScaled.y = prevUV.y*resolution.y;
+
+///////////////////////////////////////////////////
+
+
+    float4 projectedOutput;
+    projectedOutput = bilinear(src,uv.x*resolution.x,uv.y*resolution.y);
+
+
+
+    if (output_type == 1) {       
+      
+    
+        dst(position.x,position.y)= uv;
+        
+
+    } else if (output_type == 2) {
+
+        dst(position.x,position.y)= posDifference.w;
+        
+    } else if (output_type == 3) {
+
+         float4 moBlurredOutput;
+         float4 currentUV;
+         float4 inverseUV;
+
+        //dst(prevUVScaled.x,prevUVScaled.y) = projectedOutput;
+        //dst(nextUVScaled.x,nextUVScaled.y) = projectedOutput;
+
+        for (float i = 0.0f; i &lt; iterations; i++) {
+
+          
+          currentUV = prevUVScaled-(prevUVScaled-nextUVScaled)*(i/iterations);
+          inverseUV.x = (position.x)+(currentUV.x-position.x+.5f)*(shutter/2);
+          inverseUV.y = (position.y)+(currentUV.y-position.y+.5f)*(shutter/2);
+          
+          dst(inverseUV.x,inverseUV.y) += projectedOutput/iterations;
+          //moBlurredOutput+= dst(position.x,position.y);
+
+        }
+
+        dst(position.x,position.y) = moBlurredOutput;
+
+
+    } else {
+        
+        dst(position.x,position.y)= projectedOutput;
+
+    }
+  }   
+
+  
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-Inverse Transformations"><h4 id="Inverse Transformations" class="header"><a href="#Nuke - Blinkscript - Example Scripts-Inverse Transformations">Inverse Transformations</a></h4></div>
+
+<p>
+2D Transformations
+</p>
+
+<pre cpp>
+kernel BlankKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRandom, eEdgeConstant&gt; src; // the input image
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; STMap;
+  Image&lt;eWrite, eAccessRandom&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+    
+    
+
+  local:
+    // This local variable is not exposed to the user.
+    float2 UV;
+    int2 resolution;
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+    resolution.x = src.bounds.width();
+    resolution.y = src.bounds.height();
+
+  }
+
+  void process(int2 pos) {
+    
+    UV.x = STMap().x*resolution.x-.5f;
+    UV.y = STMap().y*resolution.y-.5f;
+
+    // Write the result to the output image
+    dst(UV.x, UV.y) =  UV.x &gt; 0 || UV.y &gt; 0  ? src(pos.x, pos.y) : float4(0.0f); //bilinear(src, UV.x, UV.y);
+  }
+};
+</pre>
+
+<p>
+3D Transformations
+</p>
+
+<pre cpp>
+ inline float4 matrixTransform(float4 image, float4x4 matrix){
+
+    float4 matrixTransformsOutput;
+
+    matrixTransformsOutput.x = image.x * matrix\[0]\[0] + image.y * matrix\[0]\[1] + image.z * matrix\[0]\[2] + matrix\[0]\[3];
+    matrixTransformsOutput.y = image.x * matrix\[1]\[0] + image.y * matrix\[1]\[1] + image.z * matrix\[1]\[2] + matrix\[1]\[3];
+    matrixTransformsOutput.z = image.x * matrix\[2]\[0] + image.y * matrix\[2]\[1] + image.z * matrix\[2]\[2] + matrix\[2]\[3];
+    matrixTransformsOutput.w = image.x * matrix\[3]\[0] + image.y * matrix\[3]\[1] + image.z * matrix\[3]\[2] + matrix\[3]\[3];
+
+
+    return matrixTransformsOutput;
+
+}
+
+inline float4 matrixToScreenspace(float4 image, float focal, float haperture, float vaperture, int2 resolution){
+
+    image.x = 0.5f - ((image.x) * (focal/haperture))/image.z;
+    image.y = 0.5f - ((image.y) * (focal/vaperture))/image.z;
+    image.z = 0.0f;
+
+    image.x = max(0.0f, min(image.x, 1.0f) )*resolution.x;
+    image.y = max(0.0f, min(image.y, 1.0f) )*resolution.y;
+
+    return image;
+
+
+}
+
+
+
+kernel PosProjKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRandom, eEdgeClamped&gt; projectionImage;
+  Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src; // the input image
+  
+  Image&lt;eWrite, eAccessRandom&gt; dst; // the output image
+
+  param:
+    // This parameter is made available to the user.
+    float4x4 matrixInput;
+
+    float4x4 axisMatrixInput;
+
+    int iterations;
+
+    bool invert;
+
+    float focal;
+    float haperture;
+    float vaperture; 
+
+
+  local:
+    // This local variable is not exposed to the user.
+
+    float4 output;
+    float4 outputTemp;
+    float4 outputTempLoop;
+
+    int2 resolution;
+
+  // In define(), parameters can be given labels and default values.
+  void define() {
+    
+  }
+
+  // The init() function is run before any calls to process().
+  // Local variables can be initialized here.
+  void init() {
+    
+    resolution.x = src.bounds.width();
+    resolution.y = src.bounds.height();
+
+  }
+
+  void process(int2 pos) {
+    
+    float4x4 matrix = matrixInput;
+    
+    matrix = invert ?  matrix.invert() : matrix;    
+
+    // Write the result to the output image
+
+    output = matrixTransform(src(), matrix);
+    outputTemp = matrixTransform(output, axisMatrixInput);
+
+    output = matrixToScreenspace(output, focal, haperture, vaperture, resolution);
+    outputTemp = matrixToScreenspace(outputTemp, focal, haperture, vaperture, resolution);
+    
+    for(int i = 0; i &lt; iterations; i++){      
+
+
+      float ratio = i/float(iterations);
+
+      outputTempLoop = output + (outputTemp-output)*ratio;   
+
+      dst(outputTempLoop.x,outputTempLoop.y) += projectionImage(pos.x, pos.y)/iterations;
+
+
+    }
+
+  }
+};
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-BlinkScript Snippets"><h4 id="BlinkScript Snippets" class="header"><a href="#Nuke - Blinkscript - Example Scripts-BlinkScript Snippets">BlinkScript Snippets</a></h4></div>
+
+<pre cpp>
+// The image specification options. The ones in quotes are the default, if nothing is specified for that category of specification, it will assume this one.
+
+Image&lt;['eRead' | eWrite | eReadWrite], ['eAccessPoint' | eAccessRanged1D | eAccessRanged2D | eAccessRandom], ['eEdgeNone' | eEdgeClamped | eEdgeConstant]&gt; image;
+
+// For example these two lines produce the same result
+
+Image&lt;&gt; src;
+Image&lt;eRead, eAccessPoint, eEdgeNone&gt; src;
+
+
+// for loop that counts up from 0 to iterations-1. This will loop the same amount of times as 'iterations'.
+
+for(int i = 0; i &lt; iterations; i++){
+
+
+
+}
+
+// The same as above, but starting from 1 and ending at iterations. This may be more intuative for you.
+
+for(int i = 1; i &lt;= iterations; i++){
+
+
+
+}
+
+// X/Y for loop. Useful for blurs and other box-based iteration
+
+for(int X = 1; X &lt;= resolution.x; X++){
+	for(int Y = 1; Y &lt;= resolution.y; Y++){
+
+
+
+ }
+}
+
+// Function layout
+
+[inline | blank] [datatype] [functionName]([datatype][inputVariable1], [datatype][inputVariable1], etc...) {
+
+
+	[operations go here]
+
+
+	return [output with same datatype]
+
+}
+
+// for example
+
+inline float4 multiplyer(float4 image, float mult){
+
+	image = image * mult;
+
+
+	return image;
+
+
+}
+
+// matrix transformation function
+
+inline float4 matrixTransform(float4 image, float4x4 matrix){
+
+    float4 matrixTransformsOutput;
+
+    matrixTransformsOutput.x = image.x * matrix[0][0] + image.y * matrix[0][1] + image.z * matrix[0][2] + matrix[0][3];
+    matrixTransformsOutput.y = image.x * matrix[1][0] + image.y * matrix[1][1] + image.z * matrix[1][2] + matrix[1][3];
+    matrixTransformsOutput.z = image.x * matrix[2][0] + image.y * matrix[2][1] + image.z * matrix[2][2] + matrix[2][3];
+    matrixTransformsOutput.w = image.x * matrix[3][0] + image.y * matrix[3][1] + image.z * matrix[3][2] + matrix[3][3];
+
+
+    return matrixTransformsOutput;
+
+}
+
+// matrix to screenspace function
+
+inline float4 matrixToScreenspace(float4 image, float focal, float haperture, float vaperture, int2 resolution){
+
+    image.x = 0.5f - ((image.x) * (focal/haperture))/image.z;
+    image.y = 0.5f - ((image.y) * (focal/vaperture))/image.z;
+    image.z = 0.0f;
+
+    image.x = max(0.0f, min(image.x, 1.0f) )*resolution.x;
+    image.y = max(0.0f, min(image.y, 1.0f) )*resolution.y;
+
+    return image;
+
+
+}
+
+
+//random access bilinear process. This assumes an eAccessPoint dst and an eAccessRandom image
+
+void process(int2 pos){
+
+
+
+
+	dst() = bilinear(imageName, pos.x, pos.y);
+
+}
+</pre>
+
+<div id="Nuke - Blinkscript - Example Scripts-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#Nuke - Blinkscript - Example Scripts-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+<div id="Nuke - Blinkscript - Example Scripts-[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#Nuke - Blinkscript - Example Scripts-[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
