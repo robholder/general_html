@@ -349,15 +349,231 @@ Delete <code>Tommy</code> - he was there as a scale guide.
 </ul>
 <div id="Trees-Prepare Output for Solaris"><h2 id="Prepare Output for Solaris" class="header"><a href="#Trees-Prepare Output for Solaris">Prepare Output for Solaris</a></h2></div>
 
+<p>
+During the tree build, a lot of extraneous attributes and groups have built up in the asset.
+</p>
+
+<p>
+We need to separate the leaves from the tree &amp; branches for material assignment:
+</p>
+<ul>
+<li>
+Add a <code>Split</code> node:
+
+<ul>
+<li>
+<code>Group</code> set to 'leaf' (selected from drop-down at the end of the field)
+
+</ul>
+<li>
+Add a <code>Null</code> and call it 'Leaf_geo' (as first output from the 'split')
+
+<ul>
+<li>
+Add a <code>Name</code> node and change the <code>Name</code> parameter to 'Leaf_geo'
+
+</ul>
+<li>
+Add a <code>Null</code> and call it 'Trunk_geo' (as the second output from the 'split')
+
+<ul>
+<li>
+Add a <code>Name</code> node and change the <code>Name</code> parameter to 'Trunk_geo'
+
+</ul>
+<li>
+<code>Merge</code> these Nulls back together
+
+<li>
+Add an <code>Attribute Delete</code> node:
+
+<ul>
+<li>
+<code>Delete Non Selected</code> checkbox to 'On'
+
+<li>
+Populate just two fields:
+
+<ul>
+<li>
+<code>Vertex Attributes</code> to 'uv'
+
+<li>
+<code>Primitive Attributes</code> to 'name'
+
+</ul>
+</ul>
+<li>
+Add a <code>Group Delete</code> node:
+
+<ul>
+<li>
+In the <code>Group Names</code> field, and an asterisk to delete all groups
+
+</ul>
+<li>
+Plug this entire network's output into the <code>default</code> output node (of the SOPNet)
+
+</ul>
+<p>
+At this point the <code>Scene Graph</code> should look like the following:
+</p>
+<pre>
+
+|_Favorites
+-_/
+ +_*_*__class__
+ --© Tree
+   - 0 geo
+   | |_∆ Leaf_geo
+   | |_∆ Trunk_geo
+   |_0 mtl
+   
+</pre>
+
+<div id="Trees-Create a Proxy Geometry"><h2 id="Create a Proxy Geometry" class="header"><a href="#Trees-Create a Proxy Geometry">Create a Proxy Geometry</a></h2></div>
+
+<p>
+To create a low resolution proxy, you could just add a <code>PolyReduce</code> node and set to 10% or something. However, the leaves get decimated to something non-representative of the silhouette, so the tutorial tries another method.
+</p>
 
 
+<p>
+We can treat the trunk &amp; branches and the leaves as two different parts.
+</p>
+
+<div id="Trees-Create a Proxy Geometry-Trunk &amp; Branches"><h3 id="Trunk &amp; Branches" class="header"><a href="#Trees-Create a Proxy Geometry-Trunk &amp; Branches">Trunk &amp; Branches</a></h3></div>
+
+<p>
+From the <code>Name</code> node on the 'Trunk_geo' section:
+</p>
+<ul>
+<li>
+add a <code>Blast</code> node:
+
+<ul>
+<li>
+Select <code>level0</code> from the <code>Group</code> field's drop-down
+
+<li>
+add <code>level1</code> and <code>level2</code> in the same way.
+
+<li>
+Check the <code>Delete Non Selected</code> checkbox.
+
+</ul>
+<li>
+Add a <code>PolyReduce</code> node and set <code>Percent To Keep</code> to 25 (%)
+
+</ul>
+<div id="Trees-Create a Proxy Geometry-Leaves"><h3 id="Leaves" class="header"><a href="#Trees-Create a Proxy Geometry-Leaves">Leaves</a></h3></div>
+
+<p>
+We can use an <code>SDF</code> to turn the geo into a volume then back. However, we need thickness on the leaves (as they are infinitely slim planes for the render).
+</p>
+
+<p>
+Rather than incur the cost of an extrude on each leaf the tutorial suggests attaching spheres to points on the leaves and converting those into volumes.
+</p>
+
+<p>
+From the <code>Name</code> node on the 'Leaf_geo' section:
+</p>
+<ul>
+<li>
+Add a <code>Connectivity</code> node:
+
+<ul>
+<li>
+This can be 'inline' as it won't damage the 'render' version
+
+<li>
+<code>Connectivity Type</code> should be set to 'Point'
+
+</ul>
+<li>
+From the 'Connectivity' node, fork with an:
+
+<ul>
+<li>
+<code>Extract Centriod</code>:
+
+<ul>
+<li>
+<code>Run Over</code> to 'Pieces'
+
+<li>
+<code>Piece Element</code> to 'Point'
+
+<li>
+<code>Piece Attriubte</code> to 'class' (which should be a drop-down option after setting the 'Piece Element' to Point.
+
+</ul>
+</ul>
+<li>
+From the 'Extract Centroid', add a <code>VDB From Particles</code>:
+
+<ul>
+<li>
+Before connecting to the network:
+
+<ul>
+<li>
+<code>Voxel Size</code> to 0.4 
+
+<li>
+<code>Point Radius Scale</code> to 0.23
+
+<li>
+<code>Minimum Radius in Viewport</code> to zero
+
+</ul>
+</ul>
+<li>
+Add a <code>Convert VDB</code>:
+
+<ul>
+<li>
+<code>Convert To</code> set to 'Polygons'
+
+<li>
+<code>Adaptivity</code> to 0.6
+
+</ul>
+<li>
+Add a <code>PolyReduce</code> node:
+
+<ul>
+<li>
+set to 50%
+
+</ul>
+</ul>
+<p>
+The leaves now have around 14,000 points for their reduced version.
+</p>
+
+<ul>
+<li>
+Now merge the two ends of the fork with a <code>Merge</code>
+
+<li>
+Duplicate the <code>Attribute Delete</code> and <code>Group Delete</code> nodes from the main network and add to the end of the Proxy network to clean up the data.
+
+<li>
+Plug into the <code>proxy</code> output.
+
+</ul>
+<p>
+This tutorial doesn't have any plan to do any simulations, so we can ignore the <code>simproxy</code> option.
+</p>
 
 <p>
 <br>
 <br>
 Jump back to the main page:
 </p>
-<div id="Trees-Prepare Output for Solaris-[[houdini_voxyde_intro_to_solaris_parttwo#Trees|Houdini - Voxyde Intro to Solaris - Part Two]]"><h4 id="[[houdini_voxyde_intro_to_solaris_parttwo#Trees|Houdini - Voxyde Intro to Solaris - Part Two]]" class="header"><a href="#Trees-Prepare Output for Solaris-[[houdini_voxyde_intro_to_solaris_parttwo#Trees|Houdini - Voxyde Intro to Solaris - Part Two]]"><a href="houdini_voxyde_intro_to_solaris_parttwo.html#Trees">Houdini - Voxyde Intro to Solaris - Part Two</a></a></h4></div>
+<div id="Trees-Create a Proxy Geometry-Leaves-[[houdini_voxyde_intro_to_solaris_parttwo#Trees|Houdini - Voxyde Intro to Solaris - Part Two]]"><h4 id="[[houdini_voxyde_intro_to_solaris_parttwo#Trees|Houdini - Voxyde Intro to Solaris - Part Two]]" class="header"><a href="#Trees-Create a Proxy Geometry-Leaves-[[houdini_voxyde_intro_to_solaris_parttwo#Trees|Houdini - Voxyde Intro to Solaris - Part Two]]"><a href="houdini_voxyde_intro_to_solaris_parttwo.html#Trees">Houdini - Voxyde Intro to Solaris - Part Two</a></a></h4></div>
 
 <p>
 <a href="Houdini.html">Houdini</a>
