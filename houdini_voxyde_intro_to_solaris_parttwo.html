@@ -2043,6 +2043,565 @@ Soften the rays by increasing the Sun's <code>Angular Size</code>
 <div id="Particles in Solaris-[[https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=14355s|YouTube - timecode 03:59:15]]"><h4 id="[[https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=14355s|YouTube - timecode 03:59:15]]" class="header"><a href="#Particles in Solaris-[[https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=14355s|YouTube - timecode 03:59:15]]"><a href="https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=14355s">YouTube - timecode 03:59:15</a></a></h4></div>
 
 <p>
+While this isn't the ONLY way to deal with building particles for the scene, we will:
+</p>
+<ul>
+<li>
+Build in the <code>Object</code> context
+
+<li>
+Import into LOPs/Stage to use in Solaris
+
+</ul>
+<div id="Particles in Solaris-Bring the Hero Trees from LOPs to the Objects Context for Reference"><h3 id="Bring the Hero Trees from LOPs to the Objects Context for Reference" class="header"><a href="#Particles in Solaris-Bring the Hero Trees from LOPs to the Objects Context for Reference">Bring the Hero Trees from LOPs to the Objects Context for Reference</a></h3></div>
+
+<p>
+From the <code>Scene Graph Path</code> panel in the <code>Geometry Spreadsheet</code>, select and copy (the path) of the 'hero_trees' (with <code>&lt;cntl&gt; C</code>). You'll have to be looking near or at the end of the scene network to get the whole hierarchy.
+</p>
+
+<p>
+Jump to the Object Context (<code>N</code> in the <code>Network Editor</code> and choose <code>Objects</code>)
+</p>
+<ul>
+<li>
+Create a <code>Geometry</code> container
+
+<li>
+Name as <code>trees_ref</code>
+
+<li>
+Inside, create a <code>LOP Import</code> node:
+
+<ul>
+<li>
+<code>LOP Path</code> set to <code>/stage</code> (and this would be further down if things were nested in other LOP Networks)
+
+<li>
+<code>Primitives</code> set to <code>/Env/trees/hero_trees</code> (you can paste this if you copied the path as in the last step)
+
+<li>
+<code>Purpose</code> gives the choice of 'proxy', 'render' or 'simproxy' for example:
+
+<ul>
+<li>
+The default is 'proxy'.
+
+<li>
+You can list more than one.
+
+<li>
+The tutorial used 'render' only.
+
+</ul>
+<li>
+Looking at the <code>i</code> information on the LOP Import node, you'll see that it comes in as a packed prim:
+
+<ul>
+<li>
+If you wanted to do any operations on the contents, you'd have to unpack the USD prim:
+
+<ul>
+<li>
+<code>Unpack USD</code> to unpack
+
+<li>
+<code>Unpack USD to Polygons</code> to unpack (but with settings already placed to use polygons)
+
+</ul>
+<li>
+We don't need to unpack these for this tutorial.
+
+</ul>
+</ul>
+</ul>
+<div id="Particles in Solaris-Particles Setup"><h2 id="Particles Setup" class="header"><a href="#Particles in Solaris-Particles Setup">Particles Setup</a></h2></div>
+
+<div id="Particles in Solaris-Particles Setup-Setup the initial randomly spinning points"><h3 id="Setup the initial randomly spinning points" class="header"><a href="#Particles in Solaris-Particles Setup-Setup the initial randomly spinning points">Setup the initial randomly spinning points</a></h3></div>
+
+<p>
+In the <code>Objects Context</code>:
+</p>
+<ul>
+<li>
+Create an empty <code>Geometry</code> container:
+
+<ul>
+<li>
+Name it <code>FX_particles</code>
+
+</ul>
+<li>
+Inside:
+
+<ul>
+<li>
+Drop a <code>Sphere</code>:
+
+<ul>
+<li>
+<code>Primitive Type</code> to <code>Polygon Mesh</code>
+
+<li>
+<code>Uniform Scale</code> to 2
+
+</ul>
+<li>
+Drop a <code>Scatter</code> node:
+
+<ul>
+<li>
+Check on <code>Force Total Count</code> and give a value of 6
+
+<li>
+<code>Global Seed</code> to 14
+
+<li>
+Disable <code>Relax Iterations</code>
+
+</ul>
+<li>
+Add an <code>Attribute VOP</code> to rotate the points over the sphere:
+
+<ul>
+<li>
+Rename to <code>rotate_pts</code>:
+
+<ul>
+<li>
+Step inside:
+
+<ul>
+<li>
+Join 'P' to 'P'
+
+<li>
+One method is to use a <code>Transform Matrix</code> node between the 'p' and 'p' (and set rotation values):
+
+<ul>
+<li>
+But we'll try something else
+
+</ul>
+<li>
+onwards...
+
+<li>
+Add a <code>Multiply</code> node between the 'P' out and 'P' in:
+
+<li>
+Next method is using a <code>Rotate</code> function node (plugged into to 'input 2' of the 'Multiply'):
+
+<ul>
+<li>
+<code>Axis</code> determines the axis of rotation given as a vector triplet:
+
+<ul>
+<li>
+The tutorial used a 'straight up' vector, so <code>0, 1, 0</code>
+
+</ul>
+<li>
+<code>Angle</code> is the rotation about the given 'Axis'
+
+</ul>
+<li>
+From the 'ptnum' output on the start node:
+
+<ul>
+<li>
+Add a <code>Gaussian Random</code> node (and plug the input to the <code>seed</code> input).
+
+</ul>
+<li>
+Normalize the output with a <code>Normalize</code> node:
+
+<ul>
+<li>
+Plug the <code>nrand</code> output from the <code>Gaussian Random</code> to the <code>vec</code> input.
+
+</ul>
+<li>
+Plug the <code>nvec</code> output into the <code>axis</code> input on the <code>Rotate</code> node.
+
+</ul>
+<li>
+Now as the <code>Angle</code> is changed on the <code>Rotate</code> node, the particles spin on random axis
+
+<li>
+Plug the <code>Time</code> output on the first node to the <code>angle</code> input on the <code>Rotate</code> node:
+
+<ul>
+<li>
+We could add a <code>Multiply</code> along this chain if we wanted to alter the speed.
+
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<div id="Particles in Solaris-Particles Setup-Create the 'emitting' geometry to connect to these Points"><h3 id="Create the 'emitting' geometry to connect to these Points" class="header"><a href="#Particles in Solaris-Particles Setup-Create the 'emitting' geometry to connect to these Points">Create the 'emitting' geometry to connect to these Points</a></h3></div>
+
+<p>
+After the <code>rotate_pts</code> ('Attribute VOP') node:
+</p>
+<ul>
+<li>
+Add a <code>Copy to Points</code> node:
+
+<ul>
+<li>
+Add a <code>Sphere</code> and plug into the first (left) input of the <code>Copy to Points</code> node:
+
+<ul>
+<li>
+<code>Primitive Type</code> to 'Polygon Mesh'
+
+<li>
+<code>Uniform Scale</code> to 0.20
+
+</ul>
+<li>
+Plug the <code>rotate_pts</code> node into the second (right) input of the <code>Copy to Points</code> node
+
+</ul>
+</ul>
+<div id="Particles in Solaris-Particles Setup-Setup the Particle Emission"><h3 id="Setup the Particle Emission" class="header"><a href="#Particles in Solaris-Particles Setup-Setup the Particle Emission">Setup the Particle Emission</a></h3></div>
+
+<p>
+After the <code>Copy to Points</code>:
+</p>
+<ul>
+<li>
+Add a <code>POP Network</code>, and inside:
+
+<ul>
+<li>
+<code>POP Source</code> ('source_first_input'):
+
+<li>
+<code>Birth</code> Tab:
+
+<ul>
+<li>
+<code>Const. Birth Rate</code> to 500,000 (but don't type the comma!)
+
+<li>
+<code>Life Expectancy</code> to 2 (seconds)
+
+</ul>
+<li>
+Add a wind force - <code>POP Wind</code> node:
+
+<ul>
+<li>
+<code>Amplitude</code> to 1.2
+
+<li>
+<code>Swirl Size</code> to 1.8
+
+</ul>
+<li>
+To preview, you might want to switch from 'points' to 'pixels':
+
+<ul>
+<li>
+On the 'Texture' icon (checker cube) on the right panel of the viewport:
+
+<ul>
+<li>
+<code>RMB</code> and chose <code>pixels</code> for the 'Particles'
+
+</ul>
+</ul>
+</ul>
+</ul>
+<div id="Particles in Solaris-Particles Setup-Setup the Particle Emission-To creating velocity on the particles"><h4 id="To creating velocity on the particles" class="header"><a href="#Particles in Solaris-Particles Setup-Setup the Particle Emission-To creating velocity on the particles">To creating velocity on the particles</a></h4></div>
+
+<p>
+After the <code>rotate_pts</code> ('Attribute VOP'):
+</p>
+<ul>
+<li>
+Add a <code>Trail</code> node:
+
+<ul>
+<li>
+<code>Result Type</code> to <code>Compute Velocity</code>
+
+<li>
+You can activate the 'velocity vector' visibility using the icon on the right-most Viewport panel
+
+<li>
+Now the velocity of the points will be passed onto the emitting spheres and on to the particles
+
+</ul>
+<li>
+After the <code>POP Network</code>:
+
+<ul>
+<li>
+Add an <code>Attribute VOP</code>:
+
+<ul>
+<li>
+Name it <code>set_Cd</code>
+
+<li>
+Inside:
+
+<ul>
+<li>
+Create a freestanding <code>Bind</code> node:
+
+<ul>
+<li>
+The <code>Name</code> parameter to <code>nage</code>
+
+</ul>
+<li>
+Add a <code>Ramp Parameter</code> node:
+
+<ul>
+<li>
+plug the ramp output to the <code>Cd</code> on the 'geometryvopoutput' node 
+
+<li>
+Color the ramp with three parts (or whatever):
+
+<ul>
+<li>
+purple, green and dark blue/green
+
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+Add another <code>Attribute VOP</code>:
+
+<ul>
+<li>
+Name it <code>set_pscale</code>
+
+<li>
+Inside:
+
+<ul>
+<li>
+Create a freestanding <code>Bind</code> node:
+
+<ul>
+<li>
+The <code>Name</code> parameter to <code>nage</code>
+
+</ul>
+<li>
+Add a <code>Ramp Parameter</code> node:
+
+<ul>
+<li>
+Set the <code>Ramp Type</code> to <code>Spline Ramp (float)</code>
+
+</ul>
+<li>
+Add a <code>Bind Export</code> node:
+
+<ul>
+<li>
+<code>ramp</code> output to <code>input</code> on this node
+
+<li>
+<code>Name</code> parameter to <code>pscale</code>
+
+</ul>
+<li>
+Place a <code>Multiply</code> between these last two nodes (Ramp and Bind):
+
+<ul>
+<li>
+Promote 'input 2'
+
+<li>
+<code>Label</code> to <code>Global pscale</code>
+
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+Jump back up to inside the <code>FX_particles</code> level:
+
+<ul>
+<li>
+Select the <code>set_pscale</code> node:
+
+<ul>
+<li>
+Reset the <code>ramp</code> by clicking on it.
+
+<li>
+Reverse the ramp using the 'reverse' icon (this will reduce the size of particles as they get older)
+
+<li>
+Maybe add another point to make it roll off (and convert to <code>B-spline</code> using the interpolation drop-down)
+
+</ul>
+<li>
+<code>Global pscale</code> slider (our custom one!), set to 0.01:
+
+<ul>
+<li>
+You can preview this by <code>RMB</code> on the 'Texture' icon on the right-most of the Viewport menu:
+
+<ul>
+<li>
+Choose <code>Lit Spheres</code> on the <code>Particles</code> section
+
+</ul>
+</ul>
+</ul>
+</ul>
+<div id="Particles in Solaris-Particles Setup-Finishing up setup"><h3 id="Finishing up setup" class="header"><a href="#Particles in Solaris-Particles Setup-Finishing up setup">Finishing up setup</a></h3></div>
+
+<p>
+After the <code>set_pscale</code> node:
+</p>
+<ul>
+<li>
+Add a <code>File Cache</code> node:
+
+<ul>
+<li>
+<code>Base Name</code> to <code>pop_trails</code>
+
+<li>
+<code>Save to Disk</code>
+
+</ul>
+<li>
+Add a <code>Transform</code> to scale the particles from nothing to present on the animation timeline:
+
+<ul>
+<li>
+At frame 1, set the <code>Uniform Scale</code> to zero and keyframe (<code>MMB</code>)
+
+<li>
+At frame 72, set the scale to 1.6 and set a keyframe
+
+</ul>
+<li>
+Add a <code>Transform</code> node to lift the particles off the ground:
+
+<ul>
+<li>
+<code>Translate</code> to about 7 in <code>Y</code>
+
+</ul>
+</ul>
+<div id="Particles in Solaris-Particles Setup-Randomize Particle colors"><h3 id="Randomize Particle colors" class="header"><a href="#Particles in Solaris-Particles Setup-Randomize Particle colors">Randomize Particle colors</a></h3></div>
+
+<p>
+For each of the initial points, we'll need an identifier:
+</p>
+<ul>
+<li>
+After the <code>trail</code> node:
+
+<ul>
+<li>
+Add an <code>Attribute Wrangle</code>:
+
+<ul>
+<li>
+<code>@class = @ptnum;</code>
+
+</ul>
+<li>
+Re-cache the particles (<code>filecache</code> node - <code>Save to Disk</code>)
+
+<li>
+Using the Viewport visualizer, you should be able to preview the attribute by turning on class
+
+</ul>
+</ul>
+<p>
+Jump back into the <code>set_Cd</code> 'Attribute VOP':
+</p>
+<ul>
+<li>
+Add an <code>MtlX Color Correct</code> node between the ramp and the output nodes:
+
+<ul>
+<li>
+Drop a freefloating <code>Bind</code> node:
+
+<ul>
+<li>
+Set the <code>Name</code> parameter to <code>class</code>
+
+</ul>
+<li>
+Drop a <code>Random</code> node
+
+<li>
+From the random node's <code>rand</code> output, add a <code>Fit Range</code> node:
+
+<ul>
+<li>
+Plug the output (<code>shift</code>) to the color correction's <code>Shift</code> input
+
+<li>
+<code>Signature</code> to <code>Float</code>
+
+<li>
+<code>Destination Max</code> to 0.6
+
+</ul>
+</ul>
+</ul>
+<p>
+Back at the <code>FX_particles</code> level:
+</p>
+<ul>
+<li>
+Drop a <code>Null</code> and rename to <code>OUT_pops</code>
+
+<li>
+Between this end null and the previous transform:
+
+<ul>
+<li>
+Drop an <code>Attribute Delete</code>:
+
+<ul>
+<li>
+check 'On' <code>Delete Non Selected</code>:
+
+<ul>
+<li>
+Keep:
+
+<ul>
+<li>
+<code>Point Attributes</code> to <code>Cd v</code> (to keep color and velocity)
+
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+Copy the end null (<code>&lt;cntl&gt; C</code>)
+
+</ul>
+<p>
+Jump to LOPS:
+</p>
+<ul>
+<li>
+<code>N</code> and choose <code>LOPs</code> from the radial menu 
+
+</ul>
+<p>
 <br>
 <br>
 <a href="Houdini.html">Houdini</a>
