@@ -2583,7 +2583,7 @@ Keep:
 
 <ul>
 <li>
-<code>Point Attributes</code> to <code>Cd v</code> (to keep color and velocity)
+<code>Point Attributes</code> to <code>Cd v pscale</code> (to keep color, velocity and pscale)
 
 </ul>
 </ul>
@@ -2593,6 +2593,8 @@ Keep:
 Copy the end null (<code>&lt;cntl&gt; C</code>)
 
 </ul>
+<div id="Particles in Solaris-Bringing the Particles into Stage"><h2 id="Bringing the Particles into Stage" class="header"><a href="#Particles in Solaris-Bringing the Particles into Stage">Bringing the Particles into Stage</a></h2></div>
+
 <p>
 Jump to LOPS:
 </p>
@@ -2600,7 +2602,183 @@ Jump to LOPS:
 <li>
 <code>N</code> and choose <code>LOPs</code> from the radial menu 
 
+<li>
+Add a free-floating <code>SOP Import</code> node (below trees perhaps):
+
+<ul>
+<li>
+Rename it <code>particle_sim</code>
+
+<li>
+If you copied the <code>OUT_pops</code> null, paste in the <code>SOP Path</code> field
+
+<li>
+Else, type the path - <code>/obj/FX_particles/OUT_pops</code>
+
+<li>
+<code>Import Path Prefix</code> to set the location in the USD hierarchy:
+
+<ul>
+<li>
+<code>/FX/particle_sim</code>
+
 </ul>
+</ul>
+<li>
+Add a <code>Merge</code> node below the Trees merge, and pipe-in the <code>particle_sim</code>.
+
+</ul>
+<div id="Particles in Solaris-Applying an Emissive Material (Particles)"><h2 id="Applying an Emissive Material (Particles)" class="header"><a href="#Particles in Solaris-Applying an Emissive Material (Particles)">Applying an Emissive Material (Particles)</a></h2></div>
+
+<p>
+After the <code>particle_sim</code> ('SOP Import') node:
+</p>
+<ul>
+<li>
+Add a <code>Material Library</code> node:
+
+<ul>
+<li>
+Inside drop a <code>Karma Material Builder</code>
+
+<ul>
+<li>
+Rename it to <code>emissive</code>
+
+<li>
+Inside the <code>Karma Material Builder</code>:
+
+<ul>
+<li>
+We need to utilize the color (Cd), so Drop a <code>USD Prim Var Reader</code> node:
+
+<ul>
+<li>
+Set the <code>Signature</code> to <code>Float 3</code>
+
+<li>
+In the Stage context, USD changes from using <code>Cd</code> for color, to <code>displayColor</code>:
+
+<ul>
+<li>
+<code>Var Name</code> to <code>displayColor</code>
+
+</ul>
+<li>
+Plug <code>result</code> into the <code>mtlxstandardsurface</code> node via the <code>Emission Color</code> input.
+
+</ul>
+</ul>
+<li>
+For the <code>mtlxstandardsurface</code> set:
+
+<ul>
+<li>
+<code>Base</code> to 0
+
+<li>
+<code>Emission</code> section:
+
+<ul>
+<li>
+<code>Emission</code> slider to 50
+
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+Return to the Stage level, select the <code>Material Library</code>:
+
+<ul>
+<li>
+<code>Auto-fill Materials</code>
+
+<li>
+<code>Material Path Prefix</code> to <code>/FX/particle_sim/materials/</code>
+
+<li>
+Remove the <code>Material Path</code> contents (leave blank so that it doesn't overwrite the Material path
+
+<li>
+<code>Geometry Path</code> to <code>/FX/particle_sim/points_0</code>:
+
+<ul>
+<li>
+you can do this by dragging the FX/particle_sim/points_0 from the <code>Scene Graph Path</code> to the field.
+
+</ul>
+</ul>
+</ul>
+<p>
+Rendering this in the Viewport with Karma CPU/XPU will result in a lot of noisy results. To help:
+</p>
+<ul>
+<li>
+Add a <code>Render Geometry Settings</code> node after the <code>Material Library</code>:
+
+<ul>
+<li>
+<code>Primitives</code> to <code>/FX/particle_sim/points_0</code> (just like the 'Geometry Path' above)
+
+<li>
+Scroll all the way down to the <code>Light</code> section:
+
+<ul>
+<li>
+Click on the drop-down menu at the head of <code>Treat as Light Source</code> and choose <code>Set or Create</code>
+
+<li>
+Set to <code>Yes</code>
+
+</ul>
+</ul>
+<li>
+To affect the size of the particles:
+
+<li>
+<span id="Particles in Solaris-Applying an Emissive Material (Particles)-NOTE"></span><strong id="NOTE">NOTE</strong>: the <code>pscale</code> variable becomes <code>widths</code> in the USD context:
+
+<ul>
+<li>
+Drop an <code>Attribute Wrangler</code>:
+
+<ul>
+<li>
+Check 'On' <code>Run on Elements of Array Attributes</code>
+
+<li>
+VEXpression <code>@widths *= ch("pscale_adjust");</code> and click on the 'make channel' icon (slider and '+')
+
+<li>
+This gives a slider parameter labelled <code>Pscale Adjust</code>:
+
+<ul>
+<li>
+This is a multiplier for the particle size
+
+</ul>
+</ul>
+</ul>
+</ul>
+<div id="Particles in Solaris-Applying an Emissive Material (Particles)-Denoising the Viewport Karma Rendering"><h3 id="Denoising the Viewport Karma Rendering" class="header"><a href="#Particles in Solaris-Applying an Emissive Material (Particles)-Denoising the Viewport Karma Rendering">Denoising the Viewport Karma Rendering</a></h3></div>
+
+<ul>
+<li>
+<code>D</code> key in the Viewport to bring up the settings:
+
+<ul>
+<li>
+<code>Render</code> &gt; <code>Basic</code> tabs, and check 'On' <code>Enable Denoising</code>
+
+</ul>
+</ul>
+<div id="Render Settings &amp; AOVs"><h1 id="Render Settings &amp; AOVs" class="header"><a href="#Render Settings &amp; AOVs">Render Settings &amp; AOVs</a></h1></div>
+<div id="Render Settings &amp; AOVs-[[https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=15664s|YouTube - timecode 04:21:04]]"><h4 id="[[https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=15664s|YouTube - timecode 04:21:04]]" class="header"><a href="#Render Settings &amp; AOVs-[[https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=15664s|YouTube - timecode 04:21:04]]"><a href="https://www.youtube.com/watch?v=3BX97YIQERE&amp;t=15664s">YouTube - timecode 04:21:04</a></a></h4></div>
+
+
+
+
 <p>
 <br>
 <br>
