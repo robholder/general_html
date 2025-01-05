@@ -298,6 +298,421 @@ The tutorial shows how nodes like the <code>Constant</code> can be substitutes f
 <span id="Voxyde - Intro to Houdini for VFX - Beginner Course-VOPs Operations-TIP"></span><strong id="TIP">TIP</strong>: <code>&lt;shift&gt; R</code> reverses the order of the inputs.
 </p>
 
+<p>
+<span id="Voxyde - Intro to Houdini for VFX - Beginner Course-VOPs Operations-TIP"></span><strong id="TIP">TIP</strong>: <code>MMB</code> on an input parameter and choose <code>Constant</code> to automatically create a <code>Constant</code> node hooked up to the parameter.
+</p>
+
+<p>
+Also, <code>Constant</code> nodes can deliver values of numerous types, not just floats! The <code>Constant Type</code> drop-down will reveal a ton of options (on the <code>Constant</code> node's parameter pane).
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Using the Y value of Position (Y-grad anyone?)"><h2 id="Using the Y value of Position (Y-grad anyone?)" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Using the Y value of Position (Y-grad anyone?)">Using the Y value of Position (Y-grad anyone?)</a></h2></div>
+
+<p>
+Inside the <code>Attribute VOP</code> node:
+</p>
+<ul>
+<li>
+From the Input node (geometryvopglobal):
+
+<ul>
+<li>
+Take the <code>P</code> (position) output
+
+<li>
+Plug into a <code>Vector to Float</code> node (since we need to split the 3 coords from the Vector).
+
+</ul>
+<li>
+The values from the 'P' parameter include negative, so we need to 'fit' to positive numbers:
+
+<ul>
+<li>
+Plug the <code>fval2</code> (y-coord) from the <code>Vector to Float</code>
+
+<li>
+Into a <code>Fit Range</code>:
+
+<ul>
+<li>
+<code>Source Min</code> will be the extent into negative <code>y</code> (so in the tutorial case, <code>-3</code>)
+
+<li>
+<code>Source Max</code> will be 3 (as the highest point on the object is 3 in 'y').
+
+</ul>
+</ul>
+<li>
+You can then 'expose' or promote these to the <code>SOP</code> level (<code>Attribute VOP</code> parameters).
+
+</ul>
+<p>
+This particular set up can replace a set up using <code>Attribute Adjust Float</code> in tandem with an <code>Attribute Noise Vector</code> (another example shown in the tutorial).
+</p>
+
+<p>
+In fact, if you go inside one of the custom Houdini attribute nodes, you'll see how they are constructed and which parameters have been promoted to the node itself.
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Attribute VOP node is like a For each loop"><h2 id="Attribute VOP node is like a For each loop" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Attribute VOP node is like a For each loop">Attribute VOP node is like a For each loop</a></h2></div>
+
+<p>
+The tutorial argues that the contents of an Attribute VOP is like a For/each loop, acting on each elements specified (point, primitive, etc.).
+</p>
+
+<p>
+The <code>Compare</code> node is used as an illustration, with one set to <code>Greater Than</code> and zero as the input value. This node is piped from the <code>Vector to Float</code> from the 'P' value, and piped into the <code>Cd</code> (color) parameter as output. This means, everything under zero in 'Y' is black, and above zero is white.
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-'Attribute VOP' vs 'Attribute Wrangle'"><h2 id="'Attribute VOP' vs 'Attribute Wrangle'" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-'Attribute VOP' vs 'Attribute Wrangle'">'Attribute VOP' vs 'Attribute Wrangle'</a></h2></div>
+
+<p>
+The <code>Attribute VOP</code> and <code>Attribute Wrangle</code> are essentially doing the same thing, but <code>Attribute Wrangle</code> does it using <code>VEX</code> and <code>VEXpression</code> language rather than node based.
+</p>
+
+<p>
+Using <code>VEX</code> to move an object upward 2 units (at point level):
+</p>
+<pre>
+@P += 2;
+</pre>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-DOPs - Dynamic Operators"><h2 id="DOPs - Dynamic Operators" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-DOPs - Dynamic Operators">DOPs - Dynamic Operators</a></h2></div>
+
+<p>
+<code>DOPs</code> are the Dynamics of Houdini.
+</p>
+
+<p>
+The tutorial creates a <code>POP Network</code> to illustration that in fact the network is a <code>DOP Network</code>. (This is apparent when you look at it in the Network Editor. Particles in Houdini are literally just points, so controlling them is a <code>DOP</code> responsibility.
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Inside the DOP Network"><h2 id="Inside the DOP Network" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Inside the DOP Network">Inside the DOP Network</a></h2></div>
+
+<p>
+Initial DOPs setup:
+</p>
+<pre>
+                                ┌────────────────────┐   
+                                │ source_first_input │   
+   ┌───────────┐                └──────────┬─────────┘   
+   │ popobject │                           │             
+   └───┬───────┘                           │             
+       │                        ┌──────────┴──────────┐  
+       │                        │ wire_pops_into_here │  
+       └─────────────┐          │       MERGE         │  
+                     │          └─────────┬───────────┘  
+                     │                    │              
+                     │    ┌───────────────┘              
+                  ┌──┴────┼───┐                          
+                  │ popsolver │                          
+                  └───────────┘                          
+                       │                                 
+                       │                                 
+                   ┌───┴────┐                            
+                   │ output │                            
+                   └────────┘                            
+                                                         
+</pre>
+
+<p>
+The merge can be disregarded when understanding the network.
+</p>
+
+<p>
+The remaining 4 nodes are a basis for understanding most simulations.
+</p>
+<ul>
+<li>
+Pop Object:
+
+<ul>
+<li>
+The points (particles) container.
+
+</ul>
+<li>
+Source Input:
+
+<ul>
+<li>
+The source object or geometry from which the points are scattered.
+
+</ul>
+<li>
+Pop Solver:
+
+<ul>
+<li>
+Engine that tells the points/particles what to do at each frame.
+
+</ul>
+<li>
+Output:
+
+<ul>
+<li>
+The conduit through which the result emerge.
+
+<li>
+The Output works even if other nodes have display focus (unlike a custom Null 'OUT' node for example).
+
+</ul>
+</ul>
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Solvers"><h2 id="Solvers" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Solvers">Solvers</a></h2></div>
+
+<p>
+The <code>Solvers</code> are what makes <code>DOPs</code> or separates <code>DOPs</code> from <code>SOPs</code>.
+</p>
+
+<p>
+There are many varieties of <code>Solvers</code>:
+</p>
+<ul>
+<li>
+Pop solvers:
+
+<ul>
+<li>
+for particle simulations
+
+</ul>
+<li>
+Flip solvers:
+
+<ul>
+<li>
+for fluid simulations
+
+</ul>
+<li>
+Pyro solvers:
+
+<ul>
+<li>
+for smoke simulations
+
+</ul>
+<li>
+Rigid body solvers:
+
+<ul>
+<li>
+for collapsing, destruction, interaction simulations
+
+</ul>
+<li>
+Vellum Solvers:
+
+<ul>
+<li>
+for cloth and fabrics
+
+</ul>
+</ul>
+<p>
+Each solver 'engine' will tell particles to move and behave like the subject of the solver.
+</p>
+
+<p>
+Each solver uses unique algorithms to achieve the specific type of simulations.
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Objects"><h2 id="Objects" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Objects">Objects</a></h2></div>
+
+<p>
+If we look at the first <code>Object</code> node needed to feed into a <code>Solver</code>, we'll see a pattern:
+</p>
+<ul>
+<li>
+Pop:
+
+<ul>
+<li>
+Pop Object
+
+<li>
+Pop Object &gt; Pop Solver &gt; Output
+
+</ul>
+<li>
+Flip:
+
+<ul>
+<li>
+Flip Object
+
+<li>
+Flip Object &gt; Flip Solver &gt; Output
+
+</ul>
+<li>
+Pyro:
+
+<ul>
+<li>
+Smoke Object
+
+<li>
+Smoke Object &gt; Pyro Solver &gt; Output
+
+</ul>
+<li>
+RBD:
+
+<ul>
+<li>
+RBD Packed Object
+
+<li>
+RBD Packed Object &gt; Rigid Body Solver &gt; Output
+
+</ul>
+<li>
+Vellum:
+
+<ul>
+<li>
+Vellum Object
+
+<li>
+Vellum Object &gt; Vellum Solver &gt; Output
+
+</ul>
+</ul>
+<p>
+*These <code>Objects</code> are essentially 'boxes' or 'containers' for the simulation objects.*
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Second Input"><h2 id="Second Input" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Second Input">Second Input</a></h2></div>
+<p>
+The second input is the geometry base.
+</p>
+
+<p>
+The same 'second input' node (<code>Pop Source</code> node) can be used on the <code>Flip</code> simulations. (This is demonstrated in the tutorial using a cube.)
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-SOP Solver"><h2 id="SOP Solver" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-SOP Solver">SOP Solver</a></h2></div>
+
+<p>
+To get to know the functionality of solvers, the tutorial goes to a simple solver, a 'SOP Solver' <code>Solver</code> node.
+</p>
+
+<p>
+Looking inside, we see this setup:
+</p>
+<pre>
+                                                              
+                                                              
+                    ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐   
+                    │input_1│ │input_2│ │input_3│ │input_4│   
+                    └───────┘ └───────┘ └───────┘ └───────┘   
+                                                              
+    ┌────────────┐                                            
+    │ Prev_Frame │                                            
+    └────┬───────┘                                            
+         │                                                    
+         │                                                    
+      ┌──┴──┐                                                 
+      │ OUT │                                                 
+      └─────┘                                                 
+                                                              
+</pre>
+
+<p>
+The <code>Input</code> nodes correspond to the inputs seen on the exterior (<code>Solver</code>) node - the input nodules.
+</p>
+
+<p>
+The Prev_Frame node takes the state of the object input (input 0) as it was on the frame before the current. Adding a <code>Transform</code> node between the <code>Prev_Frame</code> and <code>OUT</code> node, and putting a value in <code>y</code>, will result in an ascending motion in playback, as the transform value is added to each frame.
+</p>
+
+<p>
+We are accumulating changes rather than applying changes.
+</p>
+
+<p>
+<span id="Voxyde - Intro to Houdini for VFX - Beginner Course-SOP Solver-NOTE"></span><strong id="NOTE">NOTE</strong>: to see the effect of the <code>SOP</code> <code>Solver</code> we have to <code>pin</code> the viewport at the upper level while working in the <code>Solver</code>. Other simulation solvers work even when inside the <code>DOP Network</code>.
+</p>
+
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Solver with Noise"><h2 id="Solver with Noise" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Solver with Noise">Solver with Noise</a></h2></div>
+
+<p>
+<span id="Voxyde - Intro to Houdini for VFX - Beginner Course-Solver with Noise-NOTE"></span><strong id="NOTE">NOTE</strong>: when the timeline bar is orange for a simulation, you have to <code>Reset Simulation</code> on the containing node to proceed and ingest any changes you've made.
+</p>
+
+
+<p>
+The tutorial shows several examples of purely <code>Attribute VOP</code> particle effects and then a similar thing in <code>Solver</code>, where the values build on the previous frame's calculation. The <code>Solver</code> version results in more organic morphing motion.
+</p>
+
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Exposing all parameters (promote)"><h2 id="Exposing all parameters (promote)" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Exposing all parameters (promote)">Exposing all parameters (promote)</a></h2></div>
+
+<p>
+To expose all the parameters on a particular <code>VOPs</code> node:
+</p>
+<ul>
+<li>
+Select any VOPs node:
+
+<ul>
+<li>
+<code>RMB</code> &gt; <code>VEX/VOP Options</code> &gt; <code>Create Input Parameters</code>.
+
+</ul>
+</ul>
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-Recreating the POP Solver"><h2 id="Recreating the POP Solver" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-Recreating the POP Solver">Recreating the POP Solver</a></h2></div>
+
+<p>
+In this part, the tutorial adds an <code>Attribute VOP</code> to the network inside a <code>Solver</code> node:
+</p>
+<pre>
+                    ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐     
+                    │input_1│ │input_2│ │input_3│ │input_4│     
+                    └───────┘ └───────┘ └───────┘ └───────┘     
+                                                                
+    ┌────────────┐                                              
+    │ Prev_Frame │                                              
+    └────┬───────┘                                              
+         │                                                      
+         │                                                      
+         │                                                      
+  ┌──────┴─────────┐                                            
+  │ Attribute Vop  │                                            
+  └──────┬─────────┘                                            
+         │                                                      
+         │                                                      
+         │                                                      
+         │                                                      
+      ┌──┴──┐                                                   
+      │ OUT │                                                   
+      └─────┘                                                   
+
+</pre>
+
+<p>
+The tutorial adds a <code>Curl Noise</code> node inside the <code>Attribute VOP</code> node (added to 'P' position) and after altering the <code>Curl Noise</code> parameters gets a smoke like motions. Adding an offset to the 'y' parameter of the <code>Curl Noise</code> offset results in a slight lifting of the particles as it proceeds.
+</p>
+
+<p>
+A transform is also added after the <code>Attribute VOP</code> to add more vertical movement (since we are still pulling from the <code>Prev_Frame</code> at the start).
+</p>
+
+<p>
+The take-away is that this is the basis of the solvers.
+</p>
+
+<div id="Voxyde - Intro to Houdini for VFX - Beginner Course-VOPs in DOPs and Conclusion"><h2 id="VOPs in DOPs and Conclusion" class="header"><a href="#Voxyde - Intro to Houdini for VFX - Beginner Course-VOPs in DOPs and Conclusion">VOPs in DOPs and Conclusion</a></h2></div>
+<p>
+The tutorial introduces the notion of adding a <code>Geometry VOP</code> inside a <code>POP Network</code>. (It's added after the <code>source_first_input</code> (POP Source) node.
+</p>
+
+<p>
+I think the take away is that you can accumulate VOP results, so adding a constant to position for example will result in that constant being added EVERY frame, and not just once.
+</p>
 
 
 <p>
