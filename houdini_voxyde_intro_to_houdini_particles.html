@@ -49,13 +49,249 @@
 </ul>
 <div id="Voxyde - Intro to Houdini Particles-Basics"><h2 id="Basics" class="header"><a href="#Voxyde - Intro to Houdini Particles-Basics">Basics</a></h2></div>
 
+<ul>
+<li>
+<a href="https://www.youtube.com/watch?v94YAomHfMbw&amp;t0s">00:00:00 - 00:13:06 : Basics</a>
 
+</ul>
+<p>
+Most particle systems start with a source (object), piped into a POP Network.
+</p>
 
+<div id="Voxyde - Intro to Houdini Particles-Basics-Basic Setup"><h3 id="Basic Setup" class="header"><a href="#Voxyde - Intro to Houdini Particles-Basics-Basic Setup">Basic Setup</a></h3></div>
 
+<p>
+Inside a Geometry (container) node:
+</p>
+<ul>
+<li>
+Create <code>Sphere</code>
 
+<li>
+Add a <code>POP Network</code>:
+
+<ul>
+<li>
+Connect <code>Sphere</code> into first input
+
+<li>
+Playing the timeline, we'll see the particles spawning.
+
+</ul>
+<li>
+Add a <code>POP Force</code> node (freestanding) and pipe into the <code>Merge</code> node (labeled <code>wire_pops_into_here</code>):
+
+<ul>
+<li>
+In the <code>Force</code> parameter, set to <code>0, 1, 0</code> (for an upward direction - y axis)
+
+<li>
+Playback to see the particles rise
+
+<li>
+Experiment with:
+
+<ul>
+<li>
+<code>Noise</code> tab:
+
+<ul>
+<li>
+<code>Amplitude</code> for example (set to 1 perhaps)
+
+<li>
+Look at others
+
+</ul>
+</ul>
+</ul>
+<li>
+Add a <code>POP Color</code> node (and again, pipe to the <code>Merge</code> node):
+
+<ul>
+<li>
+The default <code>Color Type</code> is <code>Constant</code>
+
+<li>
+You can set the <code>Color</code> parameter and see this color in the Viewport particles.
+
+<li>
+Switch <code>Color Type</code> to <code>Ramp</code>:
+
+<ul>
+<li>
+This is already set with a VEXpression based on the age (<code>@nage</code>) attribute:
+
+<ul>
+<li>
+<code>ramp = @nage;</code> which is 'normalized age'
+
+<li>
+change to <code>ramp = @age;</code> to be just age
+
+</ul>
+<li>
+The <code>Range</code> fields are 'seconds' - 0 to 1 is zero to one second:
+
+<ul>
+<li>
+0 will be the left color on ramp, 1 will become the color on the right (passing through the range as the time moves ahead)
+
+<li>
+change to 0 and 4 and see result
+
+</ul>
+<li>
+On the cog wheel icon to the right of the ramp, there are preset colors to choose from
+
+</ul>
+</ul>
+</ul>
+<p>
+Typical layout of simple Particle system:
+</p>
+<pre>
+                                ┌──────────┐                   
+                                │POP Source│                   
+                                └───┬──────┘                   
+                                    │      ┌─────────┐         
+                                    │      │Pop Force│         
+ ┌─────────────┐                    │      └───┬─────┘         
+ │Source Object│                    │          │               
+ └─────┬───────┘          ┌─────────┘          │    ┌─────────┐
+       │                  │                    │    │POP Color│
+       │                  │       ┌────────────┘    └─────┬───┘
+       │                  │       │                       │    
+       │                  │       │   ┌───────────────────┘    
+       │                  ┼       ┼   │                        
+       │           ┌──────┴───────┴───┼───┐                    
+       │           │         Merge        │                    
+       │           │ write_pops_into_here │                    
+       └────┐     ┌┴──────────────────────┘                    
+            │     │                                            
+         ┌──┴─────┴┐                                           
+         │popsolver│                                           
+         └────┬────┘                                           
+              │                                                
+              │                                                
+         ┌────┴───┐                                            
+         │ output │                                            
+         └────────┘                                            
+</pre>
 
 
 <p>
+Setting the 'life' of the particles:
+</p>
+<ul>
+<li>
+On the <code>POP Source</code> node ('source_first_input') node's parameters:
+
+<ul>
+<li>
+<code>Birth</code> tab:
+
+<ul>
+<li>
+<code>Life Expectancy</code> field set's the age (in seconds): try 2
+
+<li>
+<code>Life Variance</code> gives a variance (in seconds) of the value given: try 0.5
+
+</ul>
+</ul>
+</ul>
+<p>
+Play will the parameters to get a feel for the process and the results.
+</p>
+
+<table>
+<tr>
+<td>
+<span id="Voxyde - Intro to Houdini Particles-Basics-Basic Setup-TIP"></span><strong id="TIP">TIP</strong>: You can close the parameter pane (little arrow on divider) and <code>P</code> key to bring up a floating (but static) Parameter pane over the Network Editor space.
+</td>
+</tr>
+</table>
+
+
+<p>
+Good news - that was simple!
+</p>
+
+<p>
+Bad news - we need to learn to control things ourselves, not rely on pre-built stacked nodes.
+</p>
+
+<div id="Voxyde - Intro to Houdini Particles-Basics-Geometry VOP"><h3 id="Geometry VOP" class="header"><a href="#Voxyde - Intro to Houdini Particles-Basics-Geometry VOP">Geometry VOP</a></h3></div>
+
+<p>
+The main ingredient will be the <code>Geometry VOP</code> node. This is very similar to the <code>Attribute VOP</code> node - and is node based.
+</p>
+
+<p>
+This alternative approach is suggested:
+</p>
+<pre>
+                         ┌──────────┐            
+                         │POP Source│            
+                         └────┬─────┘            
+                              │                  
+                              │                  
+                              │                  
+                       ┌──────┴───────┐          
+ ┌─────────────┐       │ Geometry VOP │          
+ │Source Object│       └──────┬───────┘          
+ └─────┬───────┘              │                  
+       │                      │                  
+       │           ┌──────────┴───────────┐      
+       │           │         Merge        │      
+       │           │ write_pops_into_here │      
+       └────┐     ┌┴──────────────────────┘      
+            │     │                              
+         ┌──┴─────┴┐                             
+         │popsolver│                             
+         └────┬────┘                             
+              │                                  
+              │                                  
+         ┌────┴───┐                              
+         │ output │                              
+         └────────┘                              
+</pre>
+
+<p>
+To illustrate the similar result as with the conventional setup shown in the first section, this setup inside the <code>Geometry VOP</code> node will give similar results:
+</p>
+
+
+<pre>
+                       ┌───────────────┐                       
+                       │   Constant    │                       
+                       │set to 3 Floats│                       
+                       │    0,1,0      │                       
+                       └──────┬────────┘                       
+  ┌─────────────────┐         │               ┌──────────────┐ 
+  │     INPUT       │         │               │    OUTPUT    │ 
+  │geometryvopglobal│         │               │geometryvopout│ 
+  │                 │         │               │              │ 
+  │                 │         │               │ P            │ 
+  │                 │         │               │ v            │ 
+  │                 │         └───────────────┤ force        │ 
+  │                 │                         │ Cd           │ 
+  │                 │                         │ N            │ 
+  └─────────────────┘                         │              │ 
+                                              └──────────────┘ 
+</pre>
+
+<p>
+Look at the result in the Viewport, and see that the particles accelerate upwards from the 'force' input.
+</p>
+
+<p>
+Now plug the constant into the <code>v</code> instead. Now the particles will travel at a constant speed.
+</p>
+
+<p>
+<br>
 <a href="Houdini.html">Houdini</a>
 </p>
 
