@@ -222,7 +222,7 @@ Good news - that was simple!
 Bad news - we need to learn to control things ourselves, not rely on pre-built stacked nodes.
 </p>
 
-<div id="Voxyde - Intro to Houdini Particles-Basics-Geometry VOP"><h3 id="Geometry VOP" class="header"><a href="#Voxyde - Intro to Houdini Particles-Basics-Geometry VOP">Geometry VOP</a></h3></div>
+<div id="Voxyde - Intro to Houdini Particles-Basics-Advocating for the Geometry VOP"><h3 id="Advocating for the Geometry VOP" class="header"><a href="#Voxyde - Intro to Houdini Particles-Basics-Advocating for the Geometry VOP">Advocating for the Geometry VOP</a></h3></div>
 
 <p>
 The main ingredient will be the <code>Geometry VOP</code> node. This is very similar to the <code>Attribute VOP</code> node - and is node based.
@@ -290,6 +290,684 @@ Look at the result in the Viewport, and see that the particles accelerate upward
 Now plug the constant into the <code>v</code> instead. Now the particles will travel at a constant speed.
 </p>
 
+<div id="Voxyde - Intro to Houdini Particles-Basics-Advocating for the Geometry VOP-Physically Accurate vs Art Directed Intentions"><h4 id="Physically Accurate vs Art Directed Intentions" class="header"><a href="#Voxyde - Intro to Houdini Particles-Basics-Advocating for the Geometry VOP-Physically Accurate vs Art Directed Intentions">Physically Accurate vs Art Directed Intentions</a></h4></div>
+
+<p>
+The point is made that although the 'POP Force' type pre-made POP nodes are accurate and 'realistic', they don't necessarily give the control that an art-directed intention requires.
+</p>
+
+<p>
+So we need more control of the behavior of particles, and the many pre-fabricated 'POP' nodes might not be the best option.
+</p>
+
+<p>
+The <code>Geometry VOP</code> may be the gateway in to more control.
+</p>
+
+
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP"><h2 id="Geometry VOP" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP">Geometry VOP</a></h2></div>
+<ul>
+<li>
+<a href="https://www.youtube.com/watch?v94YAomHfMbw&amp;t786s">00:13:06 - 00:35:46 : Geometry VOP</a>
+
+</ul>
+<p>
+One of the differences between a <code>Geometry VOP</code> and an <code>Attribute VOP</code> is in the process of using an <code>OpInput#</code>.
+</p>
+
+<p>
+In the <code>Attribute VOP</code>, the nodules on the outside of the node, take input from pipes from input objects. In the <code>Geometry VOP</code>, the inputs must be referenced via an asset's path.
+</p>
+
+<p>
+Select the <code>Geometry VOP</code> node, and in its parameters:
+</p>
+<ul>
+<li>
+<code>Inputs</code> tab:
+
+<ul>
+<li>
+<code>Input 1</code> (Input 2, Input 3 etc.), select an option from the drop-down:
+
+<ul>
+<li>
+Maybe <code>SOP</code>, then the field will become open to paste or type an asset path:
+
+<ul>
+<li>
+Example: <code>/obj/geo2/goal</code>
+
+</ul>
+</ul>
+</ul>
+<li>
+Now, inside the <code>Geometry VOP</code>, the <code>geometryvopglobal</code> node's <code>OpInput1</code> widget output will reference <code>/obj/geo2/goal</code>
+
+</ul>
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Mini Project"><h4 id="Mini Project" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Mini Project">Mini Project</a></h4></div>
+<p>
+In the example mini-project, our goal is to set a 'target' point in space (<code>Add</code> node), and get the particles to gravitate to that point:
+</p>
+<ul>
+<li>
+<code>Add</code> node is placed in the 'geo' container and set to be a single point.
+
+<li>
+and inside the <code>Geometry VOP</code>:
+
+<ul>
+<li>
+an <code>Import Point Attribute</code> node is dropped and connected to the <code>OpInput1</code> output into its <code>file</code> input.
+
+<li>
+The <code>Attribute</code> field is set to <code>P</code> on the <code>Import Point Attribute</code> node  * The <code>Attribute</code> field is set to <code>P</code> on the <code>Import Point Attribute</code> node.
+
+<li>
+The <code>Signature</code> drop-down is set to <code>Vector 3</code>
+
+<li>
+The <code>ptnum</code> input is set to <code>Constant</code> (<code>MMB</code>) and the value is zero (for the one and only point in the <code>Add</code> node.
+
+</ul>
+<li>
+To get a direction vector, we have to subtract the current particle position from the target position, so we drop a <code>Subtract</code> node:
+
+<ul>
+<li>
+<code>input1</code> takes in the <code>result</code> from the <code>Import Point Attribute</code> node.
+
+<li>
+<code>input2</code> takes in the <code>P</code> position from the <code>geometryvopglobal</code>
+
+</ul>
+<li>
+The output needs to be 'normalized':
+
+<ul>
+<li>
+Drop a <code>Normalize</code> node from the <code>diff</code> output of the <code>Subtract</code> node.
+
+<li>
+From the <code>nvect</code> output of the <code>Normalize</code> node, plug into the <code>force</code> input on the <code>geometryvopoutput</code> node.
+
+</ul>
+</ul>
+<p>
+Layout so far:
+</p>
+<pre>
+                                                 ┌─────────────────┐       ┌──────────────┐                                                
+  ┌─────────────────┐                            │ subtract1       │       │ Normalize    │                      ┌──────────────┐          
+  │     INPUT       │            ┌───────────────┤ input1     diff ├───────┼ vec   nvec   ┼─┐                    │    OUTPUT    │          
+  │geometryvopglobal│            │           ┌───┤ input2          │       └──────────────┘ │  ┌──────────────┐  │geometryvopout│          
+  │                 │            │           │   └─────────────────┘                        │  │  Multiply    │  │ P            │          
+  │                P┼────────────┘           │                                              └──┤ val   scaled ┼──┼ v            │          
+  │                 │      ┌───────────────┐ │                                                 └──────────────┘  │              │          
+  │                 │      │importpoint1   │ │                                                                   │ force        │          
+  │                 │      ┤               │ │                                                                   │ Cd           │          
+  │        OpInput1 ┼──────┤file     result┼─┘                                                                   │ N            │          
+  └─────────────────┘      │               │                                                                     │              │          
+                        ┌──┤ptnum          │      ('Import point' is pulling a point from                        └──────────────┘          
+                        │  └───────────────┘      an 'Add' node with one point up at the                                                                                         
+            ┌────────┐  │                         Geometry container level.)                                                                                         
+            │Constant│  │                                                                                                                  
+            │ ptnum  ├──┘                                                                                                                  
+            │   0    │                                                                                                                     
+            └────────┘                                                                                                                     
+</pre>
+
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Problem"><h4 id="Problem" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Problem">Problem</a></h4></div>
+<ul>
+<li>
+Playing the result, the particles move from the <code>Sphere</code> geometry, towards the <code>Add</code> point, but then overshoot past.
+
+<li>
+Eventually they turn around an move again towards the target point.
+
+</ul>
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Fix"><h4 id="Fix" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Fix">Fix</a></h4></div>
+<ul>
+<li>
+If we plug the <code>nvec</code> into the <code>v</code> (velocity) on the <code>geometryvopoutput</code> instead of the <code>force</code>, the particles behave more like we expected or hoped (honing in on the target point).
+
+</ul>
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Another control"><h4 id="Another control" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Another control">Another control</a></h4></div>
+<ul>
+<li>
+You can add a <code>Multiply Constant</code> node after the <code>Normalize</code> to control the speed.
+
+</ul>
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Quickfix"><h4 id="Quickfix" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Quickfix">Quickfix</a></h4></div>
+<p>
+There is a curious knot at the target point in this simple simulation, and a quick fix is to have the life expectancy to be 1.2 in the demo example. Apparently there are a million 'fixes', but this isn't the point of this demo.
+</p>
+
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Duplicating the 'geometryvopglobal'"><h3 id="Duplicating the 'geometryvopglobal'" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Duplicating the 'geometryvopglobal'">Duplicating the 'geometryvopglobal'</a></h3></div>
+
+<p>
+In the demo, the 'geometryvopglobal' is duplicated, so that you have a fresh output to help keep the schematic 'cleaner'. I looks like duplicating it is just creating another location for the same 'inputs'.
+</p>
+
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Adding Noise to out Simple Setup"><h3 id="Adding Noise to out Simple Setup" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Adding Noise to out Simple Setup">Adding Noise to out Simple Setup</a></h3></div>
+
+<ul>
+<li>
+From the 'P' parameter input node's widgets:
+
+<ul>
+<li>
+Add a <code>Vector to Vector 4</code> node:
+
+<ul>
+<li>
+This is a vector with the added time data.
+
+</ul>
+<li>
+Add a <code>Curl Noise</code> node:
+
+<ul>
+<li>
+Plug from the <code>hvec</code> on the vector node
+
+<li>
+into the <code>pos</code> input on the noise.
+
+</ul>
+<li>
+Set <code>Noise Type</code> to <code>Analytic Fast Simplex Noise</code>
+
+<li>
+(Delete the <code>Multiply Constant</code> after the <code>Normalize</code> if it's there.)
+
+</ul>
+<li>
+From the previous <code>Normalize</code> node add an <code>Add</code> node (before the last output node)
+
+<li>
+Plug in the <code>result</code> from the <code>Curl Noise</code> into the <code>input2</code> on the <code>Add</code> node
+
+</ul>
+<p>
+Now we have some chaotic particle action that seems to gravitate subtly to the target point.
+</p>
+
+<p>
+The demo goes on to show the results when plugging back to <code>force</code> rather than the more predictable <code>v</code> (velocity), and changes <code>Life Expectancy</code> of the particles. The <code>Color</code> node is re-added with the ramp colors.
+</p>
+
+<pre>
+                                                                                                                ┌──────────────┐ 
+                                                                                                                │    OUTPUT    │ 
+                                                                                                                │geometryvopout│ 
+                                                ┌─────────────────┐       ┌──────────────┐   ┌───────────┐      │              │ 
+ ┌─────────────────┐                            │ subtract1       │       │ Normalize    │   │    Add    │      ┼ P            │ 
+ │     INPUT       │            ┌───────────────┤ input1     diff ├───────┼ vec   nvec   ┼───│input1  sum┼──────┼ v            │ 
+ │geometryvopglobal│            │           ┌───┤ input2          │       └──────────────┘   │           │      │ force        │ 
+ │                 │            │           │   └─────────────────┘                    ┌─────┤input2     │      │ Cd           │ 
+ │                P┼────────────┘           │                                          │     └───────────┘      │ N            │ 
+ │                 │      ┌───────────────┐ │                                          │                        │              │ 
+ │                 │      │importpoint1   │ │                                          │                        └──────────────┘ 
+ │                 │      ┤               │ │                                          │                                         
+ │        OpInput1 ┼──────┤file     result┼─┘                                          │                                         
+ └─────────────────┘      │               │                                            │                                         
+                       ┌──┤ptnum          │   ('Import point' is pulling a point from  │                                         
+                       │  └───────────────┘   an 'Add' node with one point up at the   │                                         
+           ┌────────┐  │                      Geometry container level.)               │                                         
+           │Constant│  │                                                               │                                         
+           │ ptnum  ├──┘                                                               │                                         
+           │   0    │                                                                  │                                         
+           └────────┘                                                                  │                                         
+                                                                                       │                                         
+                                                                                       │                                         
+                                                                                       │                                         
+                                                                                       │                                         
+                                                                                       │                                         
+                                                                                       │                                         
+ ┌─────────────────┐                                                                   │                                         
+ │     INPUT       │                                                                   │                                         
+ │geometryvopglobal│    ┌─────────────────┐     ┌──────────────┐                       │                                         
+ │                 │    │ VectorToVector4 │     │  Curl Noise  │                       │                                         
+ │               P ┼────┤ vec             │     │              │                       │                                         
+ │                 │    │            hvec ├─────┼ pos    noise ├───────────────────────┘                                         
+ │            Time ├────┼ fval4           │     └──────────────┘                                                                 
+ │                 │    └─────────────────┘                                                                                      
+ │                 │                                                                                                             
+ └─────────────────┘                                                                                                             
+</pre>
+<p>
+Another experiment is to plug the <code>age</code> from the input node into the <code>amp</code> input of the final node. Now the particles get more agitated as they move towards the goal.
+</p>
+<ul>
+<li>
+To regain some restraint:
+
+<ul>
+<li>
+Plug a <code>Fit Range</code> node between them:
+
+<ul>
+<li>
+Maybe try <code>Destination Max</code> to 0.5 
+
+<li>
+Alternately, reverse the chaos:
+
+<ul>
+<li>
+<code>Source Min</code> 0
+
+<li>
+<code>Source Max</code> 1
+
+<li>
+<code>Destination Min</code> 1
+
+<li>
+<code>Destination Max</code> 0
+
+</ul>
+<li>
+Now the particles start chaotic and calm toward the target point.
+
+</ul>
+<li>
+Try tweaking these values to see the results.
+
+</ul>
+<li>
+Now for more control, reset the <code>Fit Range</code> parameters to the default (0,1,0,1) then:
+
+<ul>
+<li>
+Add a <code>Ramp Parmater</code> node:
+
+<ul>
+<li>
+Set <code>Ramp Type</code> to <code>Spline Ramp (float)</code>
+
+<li>
+Move up a level (<code>U</code> key)
+
+<li>
+The ramp parameters will now be on the parameter panel for the <code>Geometry VOP</code>
+
+<li>
+Expand the ramp visualizer area (little arrow-down icon on the left)
+
+<li>
+<code>&lt;cntl&gt; MMB</code> on the little <code>ramp</code> label to reset
+
+<li>
+At this stage, nothing will change, but by editing the ramp, we can control the motion:
+
+<ul>
+<li>
+Try a ramp up at the start and a slow descent to zero.
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+Here's a combination of elements discussed:
+</p>
+<pre>
+                                                ┌─────────────────┐       ┌──────────────┐                                                              
+ ┌─────────────────┐                            │ subtract1       │       │ Normalize    │   ┌───────────────┐                                          
+ │     INPUT       │            ┌───────────────┤ input1     diff ├───────┼ vec   nvec   ┼───│  Multiply     │                                          
+ │geometryvopglobal│            │           ┌───┤ input2          │       └──────────────┘   │input1         │                        ┌──────────────┐  
+ │                 │            │           │   └─────────────────┘                   ┌──────│input2  product├─┐                      │    OUTPUT    │  
+ │                P┼────────────┘           │                                         │      └───────────────┘ │                      │geometryvopout│  
+ │                 │      ┌───────────────┐ │                                         │                        │   ┌───────────┐      │              │  
+ │                 │      │importpoint1   │ │                                         │                        │   │    Add    │      ┼ P            │  
+ │                 │      ┤               │ │                                         │                        └───┤input1  sum┼──────┼ v            │  
+ │        OpInput1 ┼──────┤file     result┼─┘                                         │                            │           │      │ force        │  
+ └─────────────────┘      │               │                                           │                   ┌────────┤input2     │      │ Cd           │  
+                       ┌──┤ptnum          │                                           │                   │        └───────────┘      │ N            │  
+                       │  └───────────────┘                                           │                   │                           │              │  
+           ┌────────┐  │                                                              │                   │                           └──────────────┘  
+           │Constant│  │                                                              │                   │                                             
+           │ ptnum  ├──┘                                                              │                   │                                             
+           │   0    │                                                                 │                   │                                             
+           └────────┘                                                                 │                   │                                             
+                                                                                      │                   │                                             
+                         ┌───────────┐                                                │                   │                                             
+                         │Fit Range  │                                                │                   │                                             
+                     ┌───┤val  shift ├────────────────────────────────────────────────┘                   │                                             
+                     │   └───────────┘                                                                    │                                             
+                     │a                                                                                   │                                             
+ ┌─────────────────┐ │g                                                                                   │                                             
+ │     INPUT       │ │e                                                                                   │                                             
+ │geometryvopglobal│ │                                                                                    │                                             
+ │             age ├─┤                                                                                    │                                             
+ │                 │ │  ┌─────────────────┐                   ┌──────────────┐                            │                                             
+ │                 │ │  │ VectorToVector4 │                   │  Curl Noise  │                            │                                             
+ │               P ├─ ──┤ vec             │                   │              │                            │                                             
+ │                 │ │  │            hvec ├───────────────────┤ pos    noise─┼────────────────────────────┘                                             
+ │            Time ├─ ──┼ fval4           │                   │              │                                                                          
+ │                 │ │  └─────────────────┘                ┌──┤ amp          │                                                                          
+ │                 ├ │                                     │  │              │                                                                          
+ └─────────────────┘ │                                     │  └──────────────┘                                                                          
+                     │a                                    │                                                                                            
+                     │g                                    │                                                                                            
+                     │e      ┌───────────┐   ┌──────────┐  │                                                                                            
+                     │       │Fit Range  │   │Ramp Parm │  │                                                                                            
+                     └───────┤val  shift ├───┼input ramp├──┘                                                                                            
+                             └───────────┘   └──────────┘                                                                                               
+</pre>
+<p>
+This is later without the ramp:
+</p>
+<pre>
+                                                 ┌─────────────────┐       ┌──────────────┐                                                              
+  ┌─────────────────┐                            │ subtract1       │       │ Normalize    │   ┌───────────────┐                                          
+  │     INPUT       │            ┌───────────────┤ input1     diff ├───────┼ vec   nvec   ┼───│  Multiply     │                                          
+  │geometryvopglobal│            │           ┌───┤ input2          │       └──────────────┘   │input1         │                        ┌──────────────┐  
+  │                 │            │           │   └─────────────────┘                   ┌──────│input2  product├─┐                      │    OUTPUT    │  
+  │                P┼────────────┘           │                                         │      └───────────────┘ │                      │geometryvopout│  
+  │                 │      ┌───────────────┐ │                                         │                        │   ┌───────────┐      │              │  
+  │                 │      │importpoint1   │ │                                         │                        │   │    Add    │      ┼ P            │  
+  │                 │      ┤               │ │                                         │                        └───┤input1  sum┼──────┼ v            │  
+  │        OpInput1 ┼──────┤file     result┼─┘                                         │                            │           │      │ force        │  
+  └─────────────────┘      │               │                                           │                   ┌────────┤input2     │      │ Cd           │  
+                        ┌──┤ptnum          │                                           │                   │        └───────────┘      │ N            │  
+                        │  └───────────────┘                                           │                   │                           │              │  
+            ┌────────┐  │                                                              │                   │                           └──────────────┘  
+            │Constant│  │                    ('Import point' is pulling a point from   │                   │                                             
+            │ ptnum  ├──┘                    an 'Add' node with one point up at the    │                   │                                             
+            │   0    │                       Geometry container level.)                │                   │                                             
+            └────────┘                                                                 │                   │                                             
+                                                                                       │                   │                                             
+                          ┌───────────┐                                                │                   │                                             
+                          │Fit Range  │                                                │                   │                                             
+                      ┌───┤val  shift ├────────────────────────────────────────────────┘                   │                                             
+                      │   └───────────┘                                                                    │                                             
+                      │                                                                                    │                                             
+  ┌─────────────────┐ │                                                                                    │                                             
+  │     INPUT       │ │                                                                                    │                                             
+  │geometryvopglobal│ │                                                                                    │                                             
+  │             age ├─┘                                                                                    │                                             
+  │                 │    ┌─────────────────┐     ┌──────────────┐                                          │                                             
+  │                 │    │ VectorToVector4 │     │  Curl Noise  │                                          │                                             
+  │               P ├────┤ vec             │     │              │                                          │                                             
+  │                 │    │            hvec ├─────┼ pos    noise ├──────────────────────────────────────────┘                                             
+  │            Time ├────┼ fval4           │     └──────────────┘                                                                                        
+  │                 │    └─────────────────┘                                                                                                             
+  │                 ├                                                                                                                                    
+  └─────────────────┘                                                                                                                                    
+</pre>
+
+<div id="Voxyde - Intro to Houdini Particles-Geometry VOP-Conclusion on Geometry VOP vs POP nodes"><h3 id="Conclusion on Geometry VOP vs POP nodes" class="header"><a href="#Voxyde - Intro to Houdini Particles-Geometry VOP-Conclusion on Geometry VOP vs POP nodes">Conclusion on Geometry VOP vs POP nodes</a></h3></div>
+
+<p>
+Examples are shown using the <code>POP &lt;blah&gt;</code> nodes and how tweaking and controlling them is difficult compared to the <code>Geometry VOP</code> node.
+</p>
+
+<p>
+"The dirty secret" is that inside these various pre-built <code>POP &lt;blah&gt;</code> nodes, is that there is a <code>Geometry VOP</code> inside them. Look inside to see how they are wired.
+</p>
+<ul>
+<li>
+<code>RMB</code> and choose <code>Allow Editing of Contents</code>.
+
+</ul>
+<p>
+It was noted that a lot of the inner nodes of the <code>Geometry VOP</code> nodes (inside pre-built <code>POP &lt;blah&gt;</code> nodes) look intimitdating, but many are just links to the parameter controls on the outside.
+</p>
+
+<div id="Voxyde - Intro to Houdini Particles-VOP Examples"><h2 id="VOP Examples" class="header"><a href="#Voxyde - Intro to Houdini Particles-VOP Examples">VOP Examples</a></h2></div>
+<ul>
+<li>
+<a href="https://www.youtube.com/watch?v94YAomHfMbw&amp;t2146s">00:35:46 - 00:50:14 : VOP Examples</a>
+
+</ul>
+<div id="Voxyde - Intro to Houdini Particles-VOP Examples-Tornado Example"><h3 id="Tornado Example" class="header"><a href="#Voxyde - Intro to Houdini Particles-VOP Examples-Tornado Example">Tornado Example</a></h3></div>
+
+<p>
+In a <code>Geometry</code> container:
+</p>
+<ul>
+<li>
+Make a <code>Torus</code>:
+
+<ul>
+<li>
+<code>Radius</code> 2.4 x 0.11
+
+<li>
+<code>Rows</code> 50
+
+<li>
+<code>Columns</code> 50
+
+</ul>
+<li>
+Add a <code>POP Network</code>, and inside:
+
+<ul>
+<li>
+Select the <code>POP Source</code> node ('source_first_input')
+
+<li>
+Deselect or 'check off' the Guide check box at the top of the parameter panel
+
+</ul>
+</ul>
+<p>
+The tutorial shows that you can set up a tornado of sorts quickly with a <code>POP Axis Force</code>, <code>POP Drag</code>, and <code>POP Force</code> node along the network, but it's difficult to have complete control.
+</p>
+
+<div id="Voxyde - Intro to Houdini Particles-VOP Examples-Tornado Example-Back to a Geometry VOP"><h4 id="Back to a Geometry VOP" class="header"><a href="#Voxyde - Intro to Houdini Particles-VOP Examples-Tornado Example-Back to a Geometry VOP">Back to a Geometry VOP</a></h4></div>
+
+<p>
+Start afresh inside the <code>POP Network</code>
+</p>
+
+<p>
+After the <code>POP Source</code> node, add a <code>Geometry VOP</code> node.
+</p>
+<ul>
+<li>
+First we need to generate a direction vector, and add noise on top:
+
+<ul>
+<li>
+The upward vector is easy - it's a constant 0,1,0 vector.
+
+<li>
+The rotation vector needs to be generated by taking a <code>cross product</code> of a plane that cuts through the torus (one edge towards the center, the other straight 'up').
+
+<ul>
+<li>
+Upward vector:
+
+<ul>
+<li>
+<code>0,1,0</code>
+
+</ul>
+<li>
+Center Vector:
+
+<ul>
+<li>
+Position of point minus center location:
+
+<ul>
+<li>
+<code>P(x, y, z)</code> - <code>C(x, y, z)</code> (Center is 0, 0, 0 in our case)
+
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<div id="Voxyde - Intro to Houdini Particles-VOP Examples-Building this calculation inside the 'Geometry VOP'"><h3 id="Building this calculation inside the 'Geometry VOP'" class="header"><a href="#Voxyde - Intro to Houdini Particles-VOP Examples-Building this calculation inside the 'Geometry VOP'">Building this calculation inside the 'Geometry VOP'</a></h3></div>
+
+<p>
+Jump into the <code>Geometry VOP</code>:
+</p>
+<ul>
+<li>
+Find the vector pointing to the center of the Torus:
+
+<ul>
+<li>
+Create a <code>Constant</code>:
+
+<ul>
+<li>
+Set to <code>3 Floats (vector)</code>
+
+<li>
+Leave at zero, zero, zero (since that's the center of our Torus)
+
+</ul>
+<li>
+Out of the Value output add a <code>Subtract</code> node:
+
+<ul>
+<li>
+Plug the <code>P</code> (pos) output from the 'geometryvopglobal1' node into the <code>Subtract</code> 'input2'.
+
+</ul>
+<li>
+Out of the <code>Subtract</code> add a <code>Normalize</code> node
+
+<ul>
+<li>
+This is what we need for the cross-product calculation.
+
+</ul>
+<li>
+From the <code>nvec</code> output from the <code>Normalize</code>:
+
+<ul>
+<li>
+Add a <code>Cross Product</code> node (<code>vec1</code>)
+
+</ul>
+<li>
+Inside the <code>Normalize</code> there is facility to hard code a vector.
+
+<ul>
+<li>
+(Otherwise we could add a Constant, but it's not necessary.)
+
+<li>
+<code>Vector2</code> field to <code>0, 1, 0</code> (for an upward normalized vector)
+
+</ul>
+<li>
+The <code>crossprod</code> output can then be plugged into the <code>v</code> of the <code>geometryvopoutput1</code> node.
+
+</ul>
+</ul>
+<p>
+This is how it might look:
+</p>
+<pre>
+                      ┌──────────────┐                                                                                       
+                      │   Constant   │                                                                                       
+                      │3Float(vector)┼──┐                                                                                    
+                      │    0,0,0     │  │                                                                                    
+                      └──────────────┘  │                                                                                    
+                                        │                                                                                    
+  ┌─────────────────┐                   │                                                                ┌──────────────┐    
+  │     INPUT       │                   │   ┌────────────┐     ┌────────────┐     ┌────────────────┐     │    OUTPUT    │    
+  │geometryvopglobal│                   │   │  Subtract  │     │  Normalize │     │  CrossProduct  │     │geometryvopout│    
+  │                 │                   │   │            │     │            │     │                │     │              │    
+  │                 │                   └───┤input1  diff├─────┼vec     nvec├─────┤vec1   crossprod├─────┼ P            │    
+  │               P ┼───────────────────────┤input2      │     └────────────┘     └────────────────┘     │ v            │    
+  │                 │                       └────────────┘                                               │ force        │    
+  │                 │                                                                                    │ Cd           │    
+  │                 │                                                                                    │ N            │    
+  │                 │                                                                                    │              │    
+  │                 │                                                                                    └──────────────┘    
+  └─────────────────┘                                                                                                        
+</pre>
+
+<p>
+The next step is to add the Vertical motion using an 'up' vector:
+</p>
+<ul>
+<li>
+Add a <code>Constant</code> node:
+
+<ul>
+<li>
+<code>Constant Type</code> to <code>3Float (vector)</code>
+
+<li>
+set to <code>0, 1, 0</code>
+
+</ul>
+<li>
+Create an <code>Add</code> node between the <code>Cross Product</code> and the output node:
+
+<ul>
+<li>
+<code>Cross Product</code> into input1
+
+<li>
+<code>Constant</code> into input2
+
+<li>
+Output from <code>sum</code> to the output <code>P</code>
+
+</ul>
+</ul>
+<p>
+This is the network:
+</p>
+<pre>
+                      ┌──────────────┐                                                                                                          
+                      │   Constant   │                                                                                                          
+                      │3Float(vector)┼──┐                                                                                                       
+                      │    0,0,0     │  │                                                                                                       
+                      └──────────────┘  │                                                                                                       
+                                        │                                                                                                       
+  ┌─────────────────┐    (center)       │                                                                                    ┌──────────────┐   
+  │     INPUT       │                   │   ┌────────────┐     ┌────────────┐     ┌────────────────┐     ┌────────────┐      │    OUTPUT    │   
+  │geometryvopglobal│                   │   │  Subtract  │     │  Normalize │     │  CrossProduct  │     │    Add     │      │geometryvopout│   
+  │                 │                   │   │            │     │            │     │                │     │            │      │              │   
+  │                 │                   └───┤input1  diff├─────┼vec     nvec├─────┤vec1   crossprod├─────┤input1   sum├──────┼ P            │   
+  │               P ┼───────────────────────┤input2      │     └────────────┘     └────────────────┘     │            │      │ v            │   
+  │                 │                       └────────────┘                                          ┌────┤input2      │      │ force        │   
+  │                 │                                                                               │    └────────────┘      │ Cd           │   
+  │                 │                                                                               │                        │ N            │   
+  │                 │                                                           ┌──────────────┐    │                        │              │   
+  │                 │                                                           │   Constant   │    │                        └──────────────┘   
+  └─────────────────┘                                                           │3Float(vector)┼────┘                                           
+                                                                                │    0,1,0     │                                                
+                                                                                └──────────────┘                                                
+                                                                                                                                                
+                                                                                (upwards vector)                                                
+</pre>
+
+
+<p>
+Playback should show the particles traveling around the Torus shape and rising in <code>Y</code>.
+</p>
+
+<ul>
+<li>
+You can control the speed of the particle ascension by adjusting the vector on the <code>Constant</code> node. (Maybe <code>3 Float</code> fields to 0, 2, 0.)
+
+<li>
+You can control the spinning motion with a <code>Multiply</code> node after the <code>Cross Product</code> node:
+
+<ul>
+<li>
+<code>Signature</code> to <code>3D Vector</code> by the way.
+
+<li>
+Perhaps a value of <code>2</code> for twice as fast.
+
+</ul>
+</ul>
 <p>
 <br>
 <a href="Houdini.html">Houdini</a>
