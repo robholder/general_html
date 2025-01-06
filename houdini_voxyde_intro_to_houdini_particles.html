@@ -967,6 +967,168 @@ You can control the spinning motion with a <code>Multiply</code> node after the 
 Perhaps a value of <code>2</code> for twice as fast.
 
 </ul>
+<li>
+If you want the particles to speed up as they go up:
+
+<ul>
+<li>
+You could pipe the INPUT <code>age</code> parameter into a <code>Multiply</code> node (after the <code>Cross Product</code>)
+
+<li>
+The vector will be multiplied by the age and speed up.
+
+</ul>
+</ul>
+<p>
+Here's a schematic of some of the additions above:
+</p>
+<pre>
+                      ┌──────────────┐                                                                                                                                    
+                      │   Constant   │                                                                                                                                    
+                      │3Float(vector)┼──┐                                                                                                                                 
+                      │    0,0,0     │  │                                                                                                                                 
+                      └──────────────┘  │                                                                                                                                 
+                                        │                                                                                                                                 
+  ┌─────────────────┐    (center)       │                                                                                                          ┌──────────────┐       
+  │     INPUT       │                   │   ┌────────────┐     ┌────────────┐     ┌────────────────┐    ┌────────────────┐     ┌────────────┐      │    OUTPUT    │       
+  │geometryvopglobal│                   │   │  Subtract  │     │  Normalize │     │  CrossProduct  │    │   Multiply     │     │    Add     │      │geometryvopout│       
+  │                 │                   │   │            │     │            │     │                │    │                │     │            │      │              │       
+  │                 │                   └───┤input1  diff├─────┼vec     nvec├─────┤vec1   crossprod├────┤ input1 product ├─────┤input1   sum├──────┼ P            │       
+  │               P ┼───────────────────────┤input2      │     └────────────┘     └────────────────┘    │                │     │            │      │ v            │       
+  │                 │                       └────────────┘                                   ┌──────────┤ input2         │ ┌───┤input2      │      │ force        │       
+  │                 │                                                                        │          └────────────────┘ │   └────────────┘      │ Cd           │       
+  │                 │                                                                        │                             │                       │ N            │       
+  │             age ├────────────────────────────────────────────────────────────────────────┘                             │                       │              │       
+  │                 │                                                                                  ┌──────────────┐    │                       └──────────────┘       
+  └─────────────────┘                                                                                  │   Constant   │    │                                              
+                                                                                                       │3Float(vector)┼────┘                                              
+                                                                                                       │    0,1,0     │                                                   
+                                                                                                       └──────────────┘                                                   
+                                                                                                                                                                          
+                                                                                                       (upwards vector)                                                   
+</pre>
+
+<p>
+The tutorial then shows the result of adding the <code>Curl Noise</code> setup we created earlier:
+</p>
+<pre>
+                        ┌──────────────┐                                                                                                                                 
+                        │   Constant   │                                                                                                                                 
+                        │3Float(vector)┼──┐                                                                                                                              
+                        │    0,0,0     │  │                                                                                                                              
+                        └──────────────┘  │                                                                                                                              
+                                          │                                                                                                                              
+    ┌─────────────────┐    (center)       │                                                                                                          ┌──────────────┐    
+    │     INPUT       │                   │   ┌────────────┐     ┌────────────┐     ┌────────────────┐    ┌────────────────┐     ┌────────────┐      │    OUTPUT    │    
+    │geometryvopglobal│                   │   │  Subtract  │     │  Normalize │     │  CrossProduct  │    │   Multiply     │     │    Add     │      │geometryvopout│    
+    │                 │                   │   │            │     │            │     │                │    │                │     │            │      │              │    
+    │                 │                   └───┤input1  diff├─────┼vec     nvec├─────┤vec1   crossprod├────┤ input1 product ├─────┤input1   sum├──────┼ P            │    
+    │               P ┼───────────────────────┤input2      │     └────────────┘     └────────────────┘    │                │     │            │      │ v            │    
+    │                 │                       └────────────┘                                   ┌──────────┤ input2         │ ┌───┤input2      │      │ force        │    
+    │                 │                                                                        │          └────────────────┘ │   │            │      │ Cd           │    
+    │                 │                                                                        │                             │   │            │      │ N            │    
+    │             age ├────────────────────────────────────────────────────────────────────────┘                             │ ┌─┤input3      │      │              │    
+    │                 │                                                                          ┌──────────────┐            │ │ │            │      └──────────────┘    
+    │                 │                                                                          │   Constant   │            │ │ │            │                          
+    │                 │                                                                          │3Float(vector)┼────────────┘ │ │            │                          
+    │                 │                                                                          │    0,1,0     │              │ └────────────┘                          
+    │                 │                                                                          └──────────────┘              │                                         
+    │                 │                                                                                                        │                                         
+    └─────────────────┘                                                                          (upwards vector)              │                                         
+    ┌─────────────────┐                                                                                                        │                                         
+    │     INPUT       │                                                                                                        │                                         
+    │geometryvopglobal│                                                                                                        │                                         
+    │             age │                                                                                                        │                                         
+    │                 │    ┌─────────────────┐     ┌──────────────┐                                                            │                                         
+    │                 │    │ VectorToVector4 │     │  Curl Noise  │                                                            │                                         
+    │               P ├────┤ vec             │     │              │                                                            │                                         
+    │                 │    │            hvec ├─────┼ pos    noise ├────────────────────────────────────────────────────────────┘                                         
+    │            Time ├────┼ fval4           │     └──────────────┘                                                                                                      
+    │                 │    └─────────────────┘                                                                                                                           
+    │                 ├                                                                                                                                                  
+    └─────────────────┘                                                                                                                                                  
+        Duplicated                                                                                                                                                       
+           for                                                                                                                                                           
+       Organization                                                                                                                                                      
+</pre>
+
+<p>
+Building on the technique above, we can create levels of noise:
+</p>
+<ul>
+<li>
+Duplicate the <code>Curl Noise</code>
+
+<li>
+Adjust the <code>Frequency</code> and <code>Amplitude</code>
+
+<li>
+Plug this into the next input on the final <code>Add</code> node as 'input4'
+
+</ul>
+<p>
+To introduce a 'suction' effect of the particles being drawn into the center 'pole' of the rotation, you could take advantage of the normalized vector pointing to the center:
+</p>
+<ul>
+<li>
+Add a <code>Multiply Constant</code> node (forking off from the <code>Normalize</code>) and set to <code>Signature</code> of <code>3D Normal</code>
+
+<li>
+and plug this directly into the last <code>Add</code> as 'input5'.
+
+<li>
+Adjust the slider LESS THAN one, and the particles will get lured to the central pole.
+
+</ul>
+<p>
+This is a rough layout of where we are at!
+</p>
+<pre>
+                         ┌──────────────┐                                                                                                                                
+                         │   Constant   │                                                                                                                                
+                         │3Float(vector)┼──┐                                                                                                                             
+                         │    0,0,0     │  │                                                                                                                             
+                         └──────────────┘  │                                                                                                                             
+                                           │                                                                                                                             
+     ┌─────────────────┐    (center)       │                                                                                                          ┌──────────────┐   
+     │     INPUT       │                   │   ┌────────────┐     ┌────────────┐     ┌────────────────┐    ┌────────────────┐         ┌────────────┐  │    OUTPUT    │   
+     │geometryvopglobal│                   │   │  Subtract  │     │  Normalize │     │  CrossProduct  │    │   Multiply     │         │    Add     │  │geometryvopout│   
+     │                 │                   │   │            │     │            │     │                │    │                │         │            │  │              │   
+     │                 │                   └───┤input1  diff├─────┼vec     nvec├─┬───┤vec1   crossprod├────┤ input1 product ├─────────┤input1   sum├──┼ P            │   
+     │               P ┼───────────────────────┤input2      │     └────────────┘ │   └────────────────┘    │                │         │            │  │ v            │   
+     │                 │                       └────────────┘                    │              ┌──────────┤ input2         │ ┌───────┤input2      │  │ force        │   
+     │                 │                                                         │              │          └────────────────┘ │       │            │  │ Cd           │   
+     │                 │                                                         │              │                             │       │            │  │ N            │   
+     │             age ├─────────────────────────────────────────────────────────┼──────────────┘                             │ ┌─────┤input3      │  │              │   
+     │                 │                                                         │                ┌──────────────┐            │ │     │            │  └──────────────┘   
+     │                 │                                                         │                │   Constant   │            │ │  ┌──┤input4      │                     
+     │                 │                                                         │                │3Float(vector)┼────────────┘ │  │  │            │                     
+     │                 │                                                         │                │    0,1,0     │          ┌───┼──┼──┤input5      │                     
+     │                 │                                                         │                └──────────────┘          │   │  │  │            │                     
+     │                 │                                                         │                                          │   │  │  └────────────┘                     
+     └─────────────────┘                                                         │                (upwards vector)          │   │  │                                     
+     ┌─────────────────┐                                                         │   ┌────────────────────┐                 │   │  │                                     
+     │     INPUT       │                                                         │   │ Multiply Constant  │                 │   │  │                                     
+     │geometryvopglobal│                                                         │   │                    │                 │   │  │                                     
+     │             age │                                                         └───┤ val         result ├─────────────────┘   │  │                                     
+     │                 │    ┌─────────────────┐     ┌──────────────┐                 └────────────────────┘                     │  │                                     
+     │                 │    │ VectorToVector4 │     │  Curl Noise  │                                                            │  │                                     
+     │               P ├────┤ vec             │     │              │                                                            │  │                                     
+     │                 │    │            hvec ├─┬───┼ pos    noise ├────────────────────────────────────────────────────────────┘  │                                     
+     │            Time ├────┼ fval4           │ │   └──────────────┘                                                               │                                     
+     │                 │    └─────────────────┘ │                                                                                  │                                     
+     │                 ├                        │   ┌──────────────┐                                                               │                                     
+     └─────────────────┘                        │   │  Curl Noise  │                                                               │                                     
+         Duplicated                             │   │              │                                                               │                                     
+            for                                 └───┼ pos    noise ├───────────────────────────────────────────────────────────────┘                                     
+        Organization                                └──────────────┘                                                                                                     
+</pre>
+
+<div id="Sourcing"><h1 id="Sourcing" class="header"><a href="#Sourcing">Sourcing</a></h1></div>
+<ul>
+<li>
+<a href="https://www.youtube.com/watch?v94YAomHfMbw&amp;t3014s">00:50:14 - 01:15:50 : Sourcing</a>
+
 </ul>
 <p>
 <br>
