@@ -398,8 +398,33 @@ a <code>Standard Volume</code> will be a teal color.
 <a href="https://www.youtube.com/watch?v=wR0SDptfygg&amp;t=751s">SDF Distance Volume</a>
 
 </ul>
+<div id="Voxyde - Intro to Houdini Volumes-SDF Distance Volume-What is a Sign Distance Field?"><h3 id="What is a Sign Distance Field?" class="header"><a href="#Voxyde - Intro to Houdini Volumes-SDF Distance Volume-What is a Sign Distance Field?">What is a Sign Distance Field?</a></h3></div>
+
 <p>
-A type of <code>VDB</code> volume is the <code>Sign Distance Field</code> Volume, or <code>SDF</code>.
+<code>SDF</code> stands for <code>Sign Distance Field</code>. 
+</p>
+
+<p>
+The sign distance is two concepts:
+</p>
+<ul>
+<li>
+a <code>distance</code> from the surface of the input geometry,
+
+<li>
+and a <code>sign</code> (negative or positive) where:
+
+<ul>
+<li>
+negative <code>-</code> is interior to the surface boundary
+
+<li>
+positive <code>+</code> is exterior to the surface
+
+</ul>
+</ul>
+<p>
+There are two options for the VDB volumes: <code>Fog VDB</code> and a <code>Distance VDB</code> Volume. It seems that the <code>Fog VDB</code> stores data with 0 outside the fog geometry boundary and 1 inside, and the <code>Distance VDB</code> option stores a <code>Sign Distance Field</code> (with zero being the boundary, and positive values increasing outwards, and negative inwards. As far as I can tell, each data format has benefits for various uses.
 </p>
 
 <p>
@@ -415,32 +440,11 @@ Maybe with a <code>surface</code> attribute label.
 
 </ul>
 <li>
-Activate the <code>Fog VDB</code> checkbox for <code>Regular</code>:
+Activate the <code>Fog VDB</code> checkbox:
 
 <ul>
 <li>
 Maybe with a <code>density</code> attribute label. 
-
-</ul>
-</ul>
-<div id="Voxyde - Intro to Houdini Volumes-SDF Distance Volume-What is Sign Distance?"><h3 id="What is Sign Distance?" class="header"><a href="#Voxyde - Intro to Houdini Volumes-SDF Distance Volume-What is Sign Distance?">What is Sign Distance?</a></h3></div>
-
-<p>
-The sign distance is two concepts:
-</p>
-<ul>
-<li>
-a <code>distance</code> in units from the surface of the input geometry,
-
-<li>
-and a <code>sign</code> (negative or positive) where:
-
-<ul>
-<li>
-negative <code>-</code> is interior to the surface boundary
-
-<li>
-positive <code>+</code> is exterior to the surface
 
 </ul>
 </ul>
@@ -484,12 +488,442 @@ The advantage is that world unit values don't change in relation to any <code>Vo
 <a href="https://www.youtube.com/watch?v=wR0SDptfygg&amp;t=1014s">Volume VOP</a>
 
 </ul>
+<p>
+The <code>Volume VOP</code> is a VOP much like the Attribute and Geometry VOP nodes, in that the interior is an node based network.
+</p>
+
+<p>
+It differs from an <code>Attribute VOP</code> in that it doesn't offer a drop-down to work on specific/different components. It's only for Volumes.
+</p>
+
+<p>
+Another difference is the <code>Volume VOP</code> OUTPUT node (volumevopoutput), only has one input slot by default - <code>density</code>. (We can export multiple fields however when necessary.)
+</p>
+
+<p>
+On closer examination of the INPUT node (volumevopglobal) in the <code>Volume VOP</code>, even though we have multiple outputs, they aren't the same in entirety to that of the <code>Attribute VOP</code>.
+</p>
+
+<p>
+A number of output slots on the INPUT node of the <code>Volume VOP</code> are semi-redundant, as a lot of them can be derived using common nodes available in most VOPs. For example, <code>BB</code> (bounding box) can be extracted from the <code>P</code> output using the <code>Relative to Bounding Box</code> node.
+</p>
+
+<p>
+The <code>P</code> attribute refers to the position of the center of the voxel, and NOT the density as shown in the Viewport.
+</p>
+
+<p>
+The <code>Volume VOP</code> works on both:
+</p>
+<ul>
+<li>
+<code>Distance VDB</code>
+
+<li>
+<code>Fog VDB</code>
+
+</ul>
+<div id="Voxyde - Intro to Houdini Volumes-Volume VOP-Demo"><h3 id="Demo" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Volume VOP-Demo">Demo</a></h3></div>
+<p>
+We'll work on the <code>Fog VDB</code> variant.
+Building on our <code>Rubber Toy</code> geometry, with a <code>VDB from Polygons</code> node (set to <code>Fog VDB</code>):
+</p>
+<ul>
+<li>
+Add a <code>Volume VOP</code>:
+
+<ul>
+<li>
+Jump inside.
+
+<li>
+One of the most common things to do in a <code>Volume VOP</code> is to break up the volume with noise to resemble smoke.
+
+<li>
+Drop a <code>Turbulent Noise</code> node (from the <code>P</code> output):
+
+<li>
+Plug the output into the OUTPUT node's <code>density</code> input:
+
+<ul>
+<li>
+Notice the appearance.
+
+<li>
+(As an aside, the tutorial shows a scatter of points on the same Rubber Toy geo, and in an Attribute VOP connected to the scatter, the turbulence is pasted. The two examples - points and volume - are strikingly similar.)
+
+</ul>
+<li>
+One thing we see on the volume after adding the <code>Turbulent Noise</code> is that the edge of the volume mass is jagged.
+
+<ul>
+<li>
+The fix is to multiply the noise against the ordinal density - so a bit of re-wiring.
+
+<li>
+(Another aside: if this Volume VOP network were instead applied to a standard Houdini <code>Volume</code>, the result when the <code>Turbulent Noise</code> is plugged directly into the <code>density</code> slot - with no <code>Multiply</code> - it would completely fill the bounding box with noise, regardless of input geometry shape.)
+
+</ul>
+</ul>
+</ul>
+<p>
+This is the layout inside the Volume VOP:
+</p>
+<pre>
+                        ┌──────────────────┐                                                       
+                        │  turbulentnoise  │                                                       
+                        │                  │                                                       
+                        │                  │                                                       
+                      ┌─┤  pos      noise  ├─┐                                                     
+                      │ └──────────────────┘ │                                                     
+                      │                      │                                                     
+                      │                      │                                                     
+ ┌──────────────────┐ │                      │                            ┌──────────────────────┐ 
+ │volumevopglobal1  │ │                      │ ┌───────────────────┐      │ Volumevopoutput      │ 
+ │                  │ │                      │ │    Multiply       │      │                      │ 
+ │                P |─┘                      │ │                   │      │                      │ 
+ │          density ├────────────────────────┼─┤  input1   product ├──────┤ density              │ 
+ │                  │                        └─┤  input2           │      └──────────────────────┘ 
+ └──────────────────┘                          └───────────────────┘                               
+</pre>
+
+<table>
+<tr>
+<td>
+The big take-away from the above, is that we normally want to process the density using <code>Multiply</code>, <code>Add</code>, <code>Subtract</code>, <code>Divide</code> or generally affect the existing density, and feed back into the <code>density</code> output.
+</td>
+</tr>
+</table>
+
 <div id="Voxyde - Intro to Houdini Volumes-Fog Volume VOP examples"><h2 id="Fog Volume VOP examples" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Fog Volume VOP examples">Fog Volume VOP examples</a></h2></div>
 <ul>
 <li>
 <a href="https://www.youtube.com/watch?v=wR0SDptfygg&amp;t=1531s">Fog Volume VOP examples</a>
 
 </ul>
+<div id="Voxyde - Intro to Houdini Volumes-Fog Volume VOP examples-Demo"><h3 id="Demo" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Fog Volume VOP examples-Demo">Demo</a></h3></div>
+
+<p>
+Another Demo, with the <code>Rubber Toy</code> geometry into a <code>VDB from Polygons</code> node (set to <code>Fog VDB</code>).
+</p>
+<ul>
+<li>
+Add a <code>Volume VOP</code>.
+
+</ul>
+<p>
+Let's try to fade the density along the height of the volume. (More density at base, less at the top.)
+</p>
+<ul>
+<li>
+From the <code>P</code> output, add a <code>Relative to Bounding Box</code> node:
+
+<ul>
+<li>
+Use the <code>P</code> input.
+
+<li>
+This Bounding Box gives a zero to one value in each of the x, y and z axis.
+
+<li>
+We want to grab the <code>y</code> component, so:
+
+<ul>
+<li>
+Add a <code>Vector to Float</code> node (connected to the <code>bbdelta</code> output)
+
+<li>
+From <code>fval2</code> (which is the <code>y</code> component):
+
+<ul>
+<li>
+Add a <code>Multiply</code> and plug into the <code>input2</code>
+
+<li>
+Into <code>input1</code> connect the original <code>density</code>
+
+<li>
+Then continue and plug the <code>product</code> into the OUTPUT node's <code>density</code> input.
+
+</ul>
+</ul>
+<li>
+Now for finer control:
+
+<ul>
+<li>
+between the <code>Vector to Float</code> and the <code>Multiply</code>:
+
+<ul>
+<li>
+Add a <code>Ramp Parameter</code> node:
+
+<ul>
+<li>
+Set the <code>Ramp Type</code> to <code>Spline Ramp</code>
+
+<li>
+Now do the same song &amp; dance of going up a level and working with the SOP level of the <code>Volume VOP</code>:
+
+<ul>
+<li>
+Expand with the little down arrow
+
+<li>
+Reset the ramp by <code>&lt;cntl&gt; MMB</code> clicking on the <code>ramp</code> label.
+
+<li>
+Reverse the ramp by clicking on the complement ramp button (top right)
+
+<li>
+Now by tweaking the ramp we can control the fall-off and cut-off of the volume density.
+
+</ul>
+<li>
+If we add an <code>Add</code> node before the ramp (and promote the <code>input2</code>), we can slide the fall-off up and down from the SOP level.
+
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+Let's add some noise:
+
+<ul>
+<li>
+From the first <code>P</code> output from the INPUT node:
+
+<ul>
+<li>
+Add an <code>Anti-Aliased Flow Noise</code> (not 'in network'):
+
+<ul>
+<li>
+<code>Signature</code> to <code>3D Input, 3D Noise</code>
+
+</ul>
+<li>
+Between the INPUT and the <code>Relative to Bounding Box</code> node:
+
+<ul>
+<li>
+Create and <code>Add</code> node:
+
+<ul>
+<li>
+<code>input1</code> from the INPUT node
+
+<li>
+<code>input2</code> from the noise node.
+
+</ul>
+</ul>
+<li>
+<code>RMB</code> on the noise node, and choose <code>VEX/VOP Option</code>:
+
+<ul>
+<li>
+<code>Create Input Parameters</code>
+
+<li>
+Now at the SOP level we have all the nose controls (enabling animation and keyframes):
+
+<ul>
+<li>
+Tweak the <code>Frequency</code> and the <code>Amplitude</code>
+
+<li>
+By animating the <code>Offset</code> vector fields (<code>y</code> value perhaps) we can have the illusion of traveling smoke:
+
+<ul>
+<li>
+Maybe use an expression:
+
+<ul>
+<li>
+<code>$T</code> which will return <code>Time</code> - and of course you can mult, add or anything to manipulate.
+
+</ul>
+<li>
+Playing the timeline will show the volume appear as traveling smoke - which it isn't.
+
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+Replacing the <code>Rubber Toy</code> input geometry with a simple <code>Box</code> geometry, will give the illusion of some fairly nice ground fog. 
+</p>
+<ul>
+<li>
+Scale the box with the handle tool - to a ground area,
+
+<li>
+<code>&lt;shift&gt; W</code> to hide the bounding box.
+
+</ul>
+<p>
+Move the <code>Volume VOP</code> to the left, and rename it <code>gradient_fade</code>.
+</p>
+
+<div id="Voxyde - Intro to Houdini Volumes-Fog Volume VOP examples-Demo"><h3 id="Demo" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Fog Volume VOP examples-Demo">Demo</a></h3></div>
+
+<p>
+Instead of the <code>Rubber Toy</code> or <code>Box</code>, start with the <code>Pig Head</code> geometry.
+</p>
+
+<p>
+From the existing <code>VDB from Polygons</code> node, fork the network and:
+</p>
+<ul>
+<li>
+Drop a new <code>Volume VOP</code> and rename it (<code>F2</code>) to <code>position_fade</code>.
+
+<li>
+Drop a free-standing <code>Sphere</code> (not connected to the network yet):
+
+<ul>
+<li>
+<code>Uniform Scale</code> to 0.35
+
+<li>
+Set <code>Primitive Type</code> to <code>Primitive</code>:
+
+<ul>
+<li>
+The sphere will now be treated as a single point.
+
+<li>
+This will be easily referenced as 'point zero'.
+
+</ul>
+<li>
+Append a <code>Transform</code> node:
+
+<ul>
+<li>
+So we can move it easily.
+
+<li>
+Move to the side:
+
+<ul>
+<li>
+Translate:  0.2, 0.6, -0.1
+
+</ul>
+</ul>
+<li>
+Plug this into the 2nd input of the <code>position_fade</code> Volume VOP.
+
+</ul>
+</ul>
+<p>
+Inside the <code>position_fade</code> (Volume VOP):
+</p>
+<ul>
+<li>
+Add and <code>Import Point Attribute</code> node:
+
+<ul>
+<li>
+<code>Signature</code> to <code>Vector 3</code>
+
+<li>
+<code>Input</code> to <code>Second Input</code>
+
+<li>
+<code>Attribute</code> field should be <code>P</code>
+
+</ul>
+<li>
+We have to specify a point number (and we only have one!):
+
+<ul>
+<li>
+<code>MMB</code> on the <code>ptnum</code> input, and select <code>Constant</code>:
+
+<ul>
+<li>
+Leave with default value of <code>0</code>
+
+<li>
+and <code>Constant Name</code> as <code>ptnum</code>.
+
+</ul>
+</ul>
+<li>
+Now drop a <code>Distance</code> node (from the INPUT's <code>p</code> attribute):
+
+<ul>
+<li>
+Plug the <code>result</code> output of the <code>Import Point Attribute</code> node into the <code>Distance</code> input, <code>p2</code>.
+
+<li>
+Plug the <code>dist</code> from the <code>Distance</code> node into the OUTPUT's <code>density</code> input for now.
+
+<li>
+From the output <code>dist</code>, add a <code>Fit Range</code> node to remap the values:
+
+<ul>
+<li>
+Increase the <code>Source Max</code> value to see more influence from the sphere location.
+
+<li>
+Reverse the Destination values:
+
+<ul>
+<li>
+<code>Destination Min</code> to 0
+
+<li>
+<code>Destination Max</code> to 1
+
+</ul>
+</ul>
+<li>
+This can all be refined by plugging INPUT's <code>density</code> to that of the OUTPUT:
+
+<ul>
+<li>
+Then add a <code>Multiply</code> to combine our point location to the <code>density</code>,
+
+<li>
+Plug the original <code>density</code> into <code>input1</code>
+
+<li>
+and the <code>Fit Range</code> output <code>shift</code> into <code>input2</code> of the multiply.
+
+</ul>
+<li>
+Promote the inputs of the <code>Fit Range</code>:
+
+<ul>
+<li>
+<code>RMB</code> on the <code>Fit Range</code> node:
+
+<ul>
+<li>
+VEX/VOP Options &gt; <code>Create Input Parameters</code>
+
+</ul>
+</ul>
+</ul>
+<li>
+Move up to the SOP level, and select the <code>Transform</code> node and <code>&lt;enter&gt;</code> to use the Sphere's handle:
+
+<ul>
+<li>
+Move it around to see the influence.
+
+</ul>
+</ul>
+<p>
+This kind of thing can be used (with a reverse fade-off) with a camera, to fade volumes next to the camera so it doesn't get fogged out.
+</p>
+
 <div id="Voxyde - Intro to Houdini Volumes-Multiple Volumes"><h2 id="Multiple Volumes" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Multiple Volumes">Multiple Volumes</a></h2></div>
 <ul>
 <li>
