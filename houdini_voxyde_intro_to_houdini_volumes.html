@@ -1243,11 +1243,11 @@ Let's add a <code>Volume VOP</code> <em><span id="Voxyde - Intro to Houdini Volu
 
 <ul>
 <li>
-Inside, let's perform some changes on the <code>temperature</code> attribute: 
+Inside, let's perform some changes on the <code>temperature</code> attribute:
 
 <ul>
 <li>
-Drop a <code>Bind</code> node, and edit the <code>Name</code> field to <code>temperature</code> 
+Drop a <code>Bind</code> node, and edit the <code>Name</code> field to <code>temperature</code>
 
 <li>
 From the INPUT's <code>P</code> output, add a <code>Relative to Bounding Box</code> node
@@ -1879,12 +1879,172 @@ Change the <code>Offet</code> field to see numerous variations of 'rocks'
 </ul>
 </ul>
 </ul>
+<div id="Voxyde - Intro to Houdini Volumes-SDF VOP Examples-Another example"><h3 id="Another example" class="header"><a href="#Voxyde - Intro to Houdini Volumes-SDF VOP Examples-Another example">Another example</a></h3></div>
+
+<p>
+Let's try another example. This time use an axis gradient to 'cut off' or slice the volume/geometry.
+</p>
+
+<p>
+Start again with the <code>Rubber Toy</code> inside a geometry container.
+</p>
+
+<p>
+We need to use the <code>VDB from Polygons</code> node from the last exercise (duplicate?):
+</p>
+<ul>
+<li>
+Adjust the <code>Voxel Size</code> to 0.01
+
+</ul>
+<p>
+We need a <code>Volume VOP</code> too - and if we duplicate the one from the last exercise:
+</p>
+<ul>
+<li>
+Delete all except the INPUT and the bind nodes.
+
+</ul>
+<p>
+Now we can begin inside the <code>Volume VOP</code>:
+</p>
+<ul>
+<li>
+From the <code>P</code> output of the INPUT:
+
+<ul>
+<li>
+Add a <code>Relative to Bounding Box</code> node
+
+<li>
+Add a <code>Vector to Float</code>:
+
+<ul>
+<li>
+Plug the <code>fval3</code> (z-axis) into a <code>Compare</code> node's <code>input1</code>:
+
+<ul>
+<li>
+Set the <code>Test</code> to <code>Greater Than</code>
+
+</ul>
+</ul>
+<li>
+Now create and <code>Add</code> between the two <code>Bind</code> nodes:
+
+<ul>
+<li>
+<code>input1</code> from the <code>Bind</code> (in)
+
+<li>
+<code>input2</code> takes the <code>bool</code> from the <code>Compare</code>
+
+</ul>
+</ul>
+<li>
+Sliding the <code>Compare to Float</code> parameter up and down should result in the volume being chopped along the bounding box.
+
+</ul>
+<p>
+Adding noise:
+</p>
+<ul>
+<li>
+Fork a <code>Turbulent Noise</code> from the <code>P</code> parameter (into its <code>pos</code> input):
+
+<ul>
+<li>
+Switch the <code>Signature</code> to <code>3D Noise</code>
+
+<li>
+Set <code>Noise Type</code> to <code>Simplex Noise</code>
+
+</ul>
+<li>
+Now add this into an <code>Add</code> node before the <code>Relative to Bounding Box</code> node.
+
+</ul>
+<p>
+Convert this to geometry to see the result.
+</p>
+<ul>
+<li>
+At the SOP level:
+
+<ul>
+<li>
+Add a <code>Convert VDB</code> after the <code>Volume VDB</code>:
+
+<ul>
+<li>
+<code>Convert to Polygons</code>
+
+</ul>
+</ul>
+<li>
+Jump back into the <code>Volume VOP</code> to push the <code>Compare to Float</code> values around and see the effect.
+
+<li>
+Observation: Back on the <code>VDB from Polygons</code>, adjusting the <code>Exterior Band</code> will affect the size of the bounding box, so alter the cut off point (since it's the proportion of the bounding box axis).
+
+</ul>
+<p>
+<span class="todo">TODO</span>: Look into this:<br><br>
+"@williamsli3745
+3 months ago
+At 1:16:29,  [T]the "add" Node is order-sensitive?  If "compare bool" go[es into] input1, [the] view port won't show any thing.  3+4 =4+3?  Am I missing som[e]thing?"
+</p>
+
+
 <div id="Voxyde - Intro to Houdini Volumes-Velocity Field"><h2 id="Velocity Field" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Velocity Field">Velocity Field</a></h2></div>
 <ul>
 <li>
 <a href="https://www.youtube.com/watch?v=wR0SDptfygg&amp;t=4724s">Velocity Field</a>
 
 </ul>
+<p>
+Voxels for Volumes have contained just scalar or 'float' values to define their density up till now in the tutorial.
+</p>
+
+<p>
+However, to have motion in a volume, we need to specify the motion vectors. So, the voxels will need some reference to vector values.
+</p>
+
+<p>
+To use vector values, we'll need to use the <code>Fog VDB</code> type it seems. A schematic in the tutorial shows the levels of choice to get to volumes with vectors (for color, vector or whatever needs to be stored in a vector format).
+</p>
+
+<p>
+This is a Decision Tree to get to the volumes with Vectors (motion, color etc.):
+</p>
+<pre>
+                    ┌────────┐
+                    │ VOLUME │
+                    └────┬───┘
+                         │
+              ┌──────────┴─────────┐
+           ┌──┴──┐              ┌──┴──┐
+           │ FOG │              │ SDF │
+           └──┬──┘              └─────┘
+       ┌──────┴─────┐
+       │            │
+   ┌───┴───┐   ┌────┴───┐
+   │ FLOAT │   │ VECTOR │
+   └───────┘   └───┬────┘
+                   │
+              ┌────┴──────┐
+              │           │
+          ┌───┴───┐  ┌────┴───┐
+          │ COLOR │  │VELOCITY│
+          └───────┘  └────────┘
+</pre>
+
+<p>
+Both <code>Distance VDB</code> and <code>Fog VDB</code> types can store floats, but only <code>Fog VDB</code> volumes can store vectors.
+</p>
+
+
+
 <div id="Voxyde - Intro to Houdini Volumes-Velocity Field VOP Examples"><h2 id="Velocity Field VOP Examples" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Velocity Field VOP Examples">Velocity Field VOP Examples</a></h2></div>
 <ul>
 <li>
