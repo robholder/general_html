@@ -2834,8 +2834,209 @@ Go back to the <code>Point Cloud Open</code> parameters:
 <li>
 Adjust the <code>Search radius</code> and <code>Search radius</code> to see the effect.
 
+<li>
+Increase the <code>Search radius</code> enough to capture the geometry data.
+
 </ul>
 </ul>
+</ul>
+<div id="Voxyde - Intro to Houdini Volumes-Custom Velocity Field-Combining with the Sphere POP Network for earlier"><h3 id="Combining with the Sphere POP Network for earlier" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Custom Velocity Field-Combining with the Sphere POP Network for earlier">Combining with the Sphere POP Network for earlier</a></h3></div>
+
+<ul>
+<li>
+Template the <code>Volume Trail</code> and <code>R</code> on the <code>Sphere</code> node to see its location.
+
+<li>
+Move the <code>Sphere</code> if necessary to be inside the flow of the <code>Vector Field</code> (preferably at the start end!)
+
+<li>
+Adjust the size of the <code>Sphere</code> if needed.
+
+<li>
+Now we need to apply the new <code>Velocity Field</code> to the POP Network:
+
+<ul>
+<li>
+Copy the <code>vel</code> null (to put the path on the clipboard)
+
+<li>
+Inside the <code>POP Network</code>:
+
+<ul>
+<li>
+Go to the <code>POP Advect Volumes</code> node:
+
+<ul>
+<li>
+In the <code>SOP</code> field, paste the <code>vel</code> null path
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+If you see the points instantly shoot out he wrong end of the tube:
+</p>
+<ul>
+<li>
+Reverse the direction of the <code>Velocity Field</code>:
+
+<ul>
+<li>
+Inside the <code>Volume VOP</code>:
+
+<ul>
+<li>
+Add a <code>Negate</code> node between the <code>Point Cloud Filter</code> and the <code>Bind Export</code>:
+
+<ul>
+<li>
+This multiplies the value by negative one (-1)
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+The particles should be travelling along the curved <code>Velocity Field</code> at this stage.
+</p>
+
+<p>
+The particles just stop when they get to the end of the tube:
+</p>
+<ul>
+<li>
+This can be fixed to some extent by making the particles 'die off' using <code>Life expectancy</code> in the <code>POP Network</code>.
+
+<li>
+Or we can introduce logic to remove the particles when they reach a certain point.
+
+</ul>
+<p>
+Let's add some noise to the <code>Velocity Field</code>.
+</p>
+<ul>
+<li>
+From the <code>P</code> output of the INPUT node:
+
+<ul>
+<li>
+Add a <code>Vector to Vector 4</code> node:
+
+<ul>
+<li>
+To add the fourth element, join <code>Time</code> from the INPUT to the <code>fval4</code> input.
+
+</ul>
+</ul>
+<li>
+From the <code>hvec</code> add a <code>Curl Noise</code> node:
+
+<ul>
+<li>
+Switch the <code>Noise Type</code> to <code>Simplex Noise</code>
+
+</ul>
+<li>
+Create an <code>Add</code> node, after the <code>Point Cloud Filter</code> (or the <code>Negate</code> if you have one):
+
+<ul>
+<li>
+Connect the <code>noise</code> output from the <code>Curl Noise</code> to the <code>input2</code> of the <code>Add</code> node.
+
+</ul>
+<li>
+Promote all the parameters on the <code>Curl Noise</code> (so they can be animated):
+
+<ul>
+<li>
+Select the node, <code>RMB</code> and choose:
+
+<ul>
+<li>
+<code>VEX/VOP Options</code> &gt; <code>Create Input Parameters</code>
+
+</ul>
+</ul>
+<li>
+You can preview the <code>Volume Trails</code> node (to see all the vector lines):
+
+<ul>
+<li>
+Play to see the noise motion.
+
+<li>
+The 4th field in the <code>Frequency</code> parameter of the <code>Volume VOP</code> is what controls the speed of noise.
+
+<li>
+Maybe set it to 1, 1, 1, 0.1
+
+<li>
+Increase the <code>Amplitute</code> (<code>Volume VOP</code>) - maybe 0.3 (to keep the particles within the tube!)
+
+<li>
+Try the <code>Offset</code>
+
+</ul>
+</ul>
+<div id="Voxyde - Intro to Houdini Volumes-Custom Velocity Field-Pulling particles to curve"><h3 id="Pulling particles to curve" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Custom Velocity Field-Pulling particles to curve">Pulling particles to curve</a></h3></div>
+
+<p>
+The next challenge set by the tutorial is to make the particles more chaotic as they progress, and to be drawn nearer the curve as they travel.
+</p>
+
+<ul>
+<li>
+To draw the particles to the curve, we can use the location/position of the points on the curve
+
+<li>
+Back in the <code>Volume VOP</code>, from the <code>Point Cloud Open</code> node:
+
+<ul>
+<li>
+<code>&lt;alt&gt; LMB</code> drag the <code>Point Could Filter</code> node to duplicate
+
+<li>
+Set the <code>Channel</code> field to <code>P</code>
+
+<li>
+We can use this location vector to subtract from the particle location to have the vector direction point to the curve.
+
+<li>
+Now subtract by dropping a <code>Subract</code> node:
+
+<ul>
+<li>
+<code>input2</code> will take the <code>P</code> from the INPUT
+
+<li>
+<code>input</code><code> will take the </code>P<code> channel from the </code>Point Cloud Filter` node.
+
+<li>
+<span id="Voxyde - Intro to Houdini Volumes-Custom Velocity Field-Pulling particles to curve-NOTE"></span><strong id="NOTE">NOTE</strong>: if this is the wrong way (particles being pushed out), use <code>&lt;shift&gt; R</code> to swap the inputs.
+
+<li>
+The <code>diff</code> output from the <code>Subtract</code> can be plugged into <code>input3</code> of the later <code>Add</code> node.
+
+<li>
+Add a <code>Multiply</code> node between the <code>Subtract</code> and the last <code>Add</code> for scale control:
+
+<ul>
+<li>
+Promote the <code>input2</code> of the <code>Multiply</code>
+
+<li>
+Label it <code>push back</code>
+
+</ul>
+<li>
+Try adjusting the <code>push back</code> slider while looking at the <code>Volume Trail</code> preview.
+
+</ul>
+</ul>
+<li>
+Now we can use this parameter to help avoid hitting the sides of the tube.
+
 </ul>
 <div id="Voxyde - Intro to Houdini Volumes-SDF From Particles"><h2 id="SDF From Particles" class="header"><a href="#Voxyde - Intro to Houdini Volumes-SDF From Particles">SDF From Particles</a></h2></div>
 <ul>
