@@ -2011,7 +2011,11 @@ However, to have motion in a volume, we need to specify the motion vectors. So, 
 </p>
 
 <p>
-To use vector values, we'll need to use the <code>Fog VDB</code> type it seems. A schematic in the tutorial shows the levels of choice to get to volumes with vectors (for color, vector or whatever needs to be stored in a vector format).
+<span id="Voxyde - Intro to Houdini Volumes-Velocity Field-NOTE"></span><strong id="NOTE">NOTE</strong>: These vector values in Volumes are sometimes referred to as <code>Velocity Fields</code>.
+</p>
+
+<p>
+To use vector values, we'll need to use the <code>Fog VDB</code> type it seems. A schematic in the tutorial shows the levels of choice to get to volumes with vectors (for color, vector or whatever needs to be stored in a vector format). See this in the diagram below.
 </p>
 
 <p>
@@ -2037,6 +2041,7 @@ This is a Decision Tree to get to the volumes with Vectors (motion, color etc.):
           ┌───┴───┐  ┌────┴───┐
           │ COLOR │  │VELOCITY│
           └───────┘  └────────┘
+           [R,G,B]    [x,y,z]
 </pre>
 
 <p>
@@ -2045,11 +2050,258 @@ Both <code>Distance VDB</code> and <code>Fog VDB</code> types can store floats, 
 
 
 
+<div id="Voxyde - Intro to Houdini Volumes-Velocity Field-How not to Create a Volume with a Vector Field"><h3 id="How not to Create a Volume with a Vector Field" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Velocity Field-How not to Create a Volume with a Vector Field">How not to Create a Volume with a Vector Field</a></h3></div>
+
+<p>
+As a <em>We don't do it this way</em> example, the following was shown.
+Created a <code>Rubber Toy</code> node inside a geometry container (SOP level).
+</p>
+<ul>
+<li>
+In the tutorial, the <code>VDB from Polygons</code> node is connected, but it's explained that even if we check the <code>Fog VDB</code> option, there's nothing we can set to get the vector fields.
+
+</ul>
+<div id="Voxyde - Intro to Houdini Volumes-Velocity Field-Demo - setup"><h3 id="Demo - setup" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Velocity Field-Demo - setup">Demo - setup</a></h3></div>
+
+<ul>
+<li>
+As an alternative to the 'VDB from Polygons', the <code>VDB</code> node is shown:
+
+<ul>
+<li>
+This offers the <code>Name</code> field (often set as <code>vel</code> for our purposes)
+
+<li>
+The <code>Class</code> field has a dropdown menu, with:
+
+<ul>
+<li>
+<code>Other</code>
+
+<li>
+<code>Fog Volume</code> (This is the one we need for a vector field.)
+
+<li>
+<code>Level Set</code>
+
+<li>
+<code>Staggered Vector Field</code>
+
+</ul>
+<li>
+The <code>Type</code> is another dropdown:
+
+<ul>
+<li>
+<code>Float</code>
+
+<li>
+<code>Integer</code>
+
+<li>
+<code>Bool</code>
+
+<li>
+<code>Vector Float</code> (This is the one we need for a vector field.)
+
+<li>
+<code>Vector Integer</code>
+
+</ul>
+<li>
+The <code>Vector type</code> is yet another dropdown:
+
+<ul>
+<li>
+<code>Tuple/Color/UVW</code> (This would be for our color options)
+
+<li>
+<code>Gradient/Normal</code>
+
+<li>
+<code>Unit Normal</code>
+
+<li>
+<code>Displacement/Velocity/Acceleration</code> (This is the one we need for our vector field.)
+
+<li>
+<code>Position</code>
+
+</ul>
+</ul>
+</ul>
+<p>
+The <code>VDB</code> node in isolation doesn't produce anything visible - it's an empty vdb container, and we set the attribute and types with it.
+</p>
+
+<p>
+Next, to actually use it we need one of two activation nodes:
+</p>
+<ul>
+<li>
+<code>VDB Activate</code>:
+
+<ul>
+<li>
+For <code>Fog VDB</code> (This is the one we need for our vector field.)
+
+</ul>
+<li>
+<code>VDB Activate SDF</code>:
+
+<ul>
+<li>
+for <code>Distance VDB</code> (<code>SDF</code>)
+
+</ul>
+</ul>
+<p>
+The <code>VDB Activate</code> is attached to the <code>VDB</code> node.
+</p>
+<ul>
+<li>
+Not used, but in <a href="the.html">the</a> demo, we are shown the <code>Position</code> tab/radio button:
+
+<ul>
+<li>
+Here it's shown that there's a <code>Center</code> trio of fields for positon and <code>Size</code>, but we aren't going to use this option.
+
+</ul>
+<li>
+Now, create a <code>Box</code> node and connect to the second input of the <code>VDB Activate</code> node
+
+<li>
+Back on the <code>VDB Activate</code> node's parameters:
+
+<ul>
+<li>
+On the <code>Reference</code> tab/radio button:
+
+<li>
+Now the node grabs the bounding box from the <code>Box</code> node (or whatever is in its second input)
+
+<li>
+Editing the input geometry, perhaps scaling or moving will reflect in the volume in the Viewport.
+
+<li>
+If we plug in the <code>Rubber Toy</code> instead of the <code>Box</code> geometry, the result is still a cube of volume from the bounding box of the input geometry.
+
+<ul>
+<li>
+This is essential to enable motion beyond the original input surface.
+
+</ul>
+</ul>
+<li>
+If we want to exapand the available region (beyond the input bounding box):
+
+<ul>
+<li>
+Add another <code>VDB Activate</code> node after the first and select the <code>Expand</code> tab/radio button:
+
+<ul>
+<li>
+This is like the <code>VDB from Polygons</code> node's control for adding voxels:
+
+<ul>
+<li>
+<code>Expand Voxels</code> is an explicit number of voxels to add (but this is regardless of voxel size)
+
+<li>
+<code>Expand Distance</code> which is irrespective of voxel size, and states a distance of expansion.
+
+</ul>
+</ul>
+<li>
+In the demo, this node isn't required and is deleted.
+
+</ul>
+<li>
+Switch back to the <code>Box</code> input geometry to the <code>VDB Activate</code>.
+
+</ul>
+<p>
+It's explained that right now the Viewport shows just a cuboid of volume, not vectors. To achieve vector representation:
+</p>
+<ul>
+<li>
+From the <code>Box</code> node (fork, not 'inline'):
+
+<ul>
+<li>
+Add a <code>Points from Volume</code> node:
+
+<ul>
+<li>
+Set the <code>Point Separation</code> to 0.3
+
+</ul>
+<li>
+Add to this a <code>Volume Trail</code> node:
+
+<ul>
+<li>
+Attach input 2 back to the <code>VDB Activate</code> node
+
+<li>
+This should give us a preview of the trail of the points that go in the direction of the <code>velocity</code> on the points
+
+</ul>
+</ul>
+</ul>
+<p>
+The network should look something like this at this point:
+</p>
+<pre>
+  ┌─────┐               ┌─────┐
+  │ VDB │               │ Box │
+  └───┬─┘               └──┬──┘
+      └──┐      ┌──────────┤
+         │      │          │
+     ┌───┴──────┴─┐        │
+     │VDB Activate│        │
+     └─────┬──────┘        │
+           │               │
+           │       ┌───────┴──────────┐
+           │       │Points from Volume│
+           │       └───────┬──────────┘
+           │               │
+           │  ┌────────────┘
+           └──┼────────┐
+              │        │
+            ┌─┴────────┴─┐
+            │Volume Trail│
+            └────────────┘
+</pre>
+
+
 <div id="Voxyde - Intro to Houdini Volumes-Velocity Field VOP Examples"><h2 id="Velocity Field VOP Examples" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Velocity Field VOP Examples">Velocity Field VOP Examples</a></h2></div>
 <ul>
 <li>
 <a href="https://www.youtube.com/watch?v=wR0SDptfygg&amp;t=5400s">Velocity Field VOP Examples</a>
 
+</ul>
+<p>
+Next we will see how to use a <code>Volume VOP</code> to manipulate our <code>Velocity Fields</code>.
+</p>
+
+<ul>
+<li>
+First, to organize a bit more, add a <code>Null</code> node below the <code>VDB Activate</code> node:
+
+<ul>
+<li>
+Rename to <code>vel_field</code>
+
+</ul>
+<li>
+ABOVE this null, add a <code>Volume VOP</code> node, and inside:
+
+<ul>
+<li>
+
+
+</ul>
 </ul>
 <div id="Voxyde - Intro to Houdini Volumes-Custom Velocity Field"><h2 id="Custom Velocity Field" class="header"><a href="#Voxyde - Intro to Houdini Volumes-Custom Velocity Field">Custom Velocity Field</a></h2></div>
 <ul>
