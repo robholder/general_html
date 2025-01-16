@@ -956,10 +956,355 @@ To enhance this effect, you can up the value in the <code>Total [[Number]]</code
 The problem with the Boolean fracture result is the inconsistent range of chunk sizes and the lack of predictability. Combining Boolean and Voronoi is a mitigating technique.
 </p>
 
+<div id="Voxyde - Fracture Setups-Boolean and Voronoi-New Demo"><h3 id="New Demo" class="header"><a href="#Voxyde - Fracture Setups-Boolean and Voronoi-New Demo">New Demo</a></h3></div>
+
+<p>
+Start by duplicating the <code>Object Merge</code> node.
+</p>
+<ul>
+<li>
+To keep organized, drop a <code>Null</code> node after the <code>Object Merge</code> node.
+
+<li>
+Add a <code>VDB from Polygons</code> node:
+
+<ul>
+<li>
+Switch to <code>Fog VDB</code> with <code>denisity</code> as the attribute.
+
+</ul>
+<li>
+Add a <code>Scatter</code> to scatter points:
+
+<ul>
+<li>
+<code>Relax Iterations</code> off
+
+<li>
+<code>Force Total Count</code> to 60
+
+</ul>
+<li>
+Fork a <code>Voronoi Fracture</code> from the <code>Null</code>:
+
+<ul>
+<li>
+Plug the <code>Scatter</code> into input 2
+
+</ul>
+<li>
+Now drop a <code>Blast</code> node after everything from the <code>Voronoi Fracture</code> node:
+
+<ul>
+<li>
+Set the <code>Group</code> field to <code>inside</code> (and you can get this from the dropdown menu at the end of the field).
+
+<li>
+Set to <code>Delete Non Selected</code>
+
+</ul>
+</ul>
+<p>
+This produces a series of geometry elements that define the inside edges, and we can manipulate these to 'cut' through the original geometry using the Boolean method.
+</p>
+
+<p>
+The issue we have, is that the cutter geometry has to be <em>BIGGER</em> than the subject geometry. (Recall that if the cutter doesn't completely dissect the geo, it'll just leave artifacts.)
+</p>
+
+<p>
+To extend the inside edge geo:
+</p>
+<ul>
+<li>
+Between the <code>Object Merge</code> and the <code>Null</code> add a <code>Bound</code> node:
+
+<ul>
+<li>
+The scale and size will depend on the project, but for this demo:
+
+<ul>
+<li>
+Up the <code>Lower Padding</code> to 1 in all fields
+
+<li>
+Up the <code>Upper Padding</code> to 1 in all fields.
+
+</ul>
+</ul>
+<li>
+At this stage, we have a lot of doubled polygons (edge face polygons):
+
+<ul>
+<li>
+We need to fuse all of these points:
+
+<ul>
+<li>
+Drop a <code>Fuse</code> node after the <code>Blast</code>:
+
+<ul>
+<li>
+Default settings should be fine.o
+
+</ul>
+<li>
+Drop a <code>Clean</code> node after the <code>Fuse</code>:
+
+<ul>
+<li>
+Check 'On' the <code>Fix Overlaps</code> checkbox.
+
+<li>
+Un-check the <code>Delete Overlap Pairs</code> option.
+
+</ul>
+</ul>
+</ul>
+<li>
+Now the Viewport should be flicker free.
+
+</ul>
+<p>
+The next task is to add noise to the cutter geometry:
+</p>
+<ul>
+<li>
+Add a <code>Remesh</code> node:
+
+<ul>
+<li>
+Try to match the sort of polygon size of the geometry that will be cut (the <code>Object Merge</code> in our case).
+
+<li>
+<code>Target Size</code> of 0.4
+
+</ul>
+<li>
+Add a <code>Mountain</code> node to distort the cutter geo:
+
+<ul>
+<li>
+Disable the <code>Noise Along Vector</code>
+
+<li>
+Increase the <code>Element Size</code> to around 2
+
+<li>
+<code>Amplitude</code> to about 0.48
+
+<li>
+For <code>Amplitude Scale</code>, click on the <code>xyz</code> icon, to make three fields: Set to <code>1, 0, 1</code> so that the 'y' direction doesn't get distorted.
+
+</ul>
+</ul>
+<p>
+At this stage, we have to visually inspect the situation, and ensure that the cutter geo is encompassing the target geometry (the <code>Object Merge</code> in our case).
+</p>
+
+<p>
+You can adjust settings to improve if there are any coverage issues:
+</p>
+<ul>
+<li>
+<code>Amplitude</code> on the <code>Mountian</code> node
+
+<li>
+<code>Lower Padding</code> and <code>Upper Padding</code> on the <code>Bound</code> node.
+
+</ul>
+<p>
+Now we are in good shape to actually apply the Boolean procedure:
+</p>
+<ul>
+<li>
+Fork a <code>Boolean Fracture</code> from the <code>Object Merge</code>:
+
+<ul>
+<li>
+Plug the edge geo into <code>input 2</code> (this would be the last <code>Mountain</code> node)
+
+</ul>
+</ul>
+<p>
+The result is a nice combination of the <code>Voronoi Fracture</code> and the <code>Boolean Fracture</code> examples. We have consistent yet random blocks, and relatively clean geometry after the fracturing.
+</p>
+
+<p>
+The Demo increases the <code>Force Total Count</code> parameter to 80 to make push the affect a little more.
+</p>
+
+<p>
+We can also add the 'grout' or edge breakage trick here.
+</p>
+<ul>
+<li>
+Add a <code>Copy and Transform</code> node after the <code>Remesh</code>:
+
+<ul>
+<li>
+Set the <code>Total Number</code> to 3
+
+</ul>
+<li>
+Add a <code>Connectivity</code> node:
+
+<ul>
+<li>
+This will provide us with a <code>class</code> attribute
+
+</ul>
+<li>
+Now, on the existing <code>Mountain</code> node:
+
+<ul>
+<li>
+In the <code>Noise Pattern</code> secion:
+
+<ul>
+<li>
+Check on the <code>Use VEXpression</code> option.
+
+<li>
+Add the expression <code>offset = @class * 3:</code>
+
+</ul>
+</ul>
+<li>
+Add an <code>Exploded View</code> node, and take a look at the results.
+
+</ul>
+<p>
+The demo tweaks the <code>Amplitude</code> of the cutter again to 0.8 to get even more complexity.
+</p>
+
+<div id="Voxyde - Fracture Setups-Boolean and Voronoi-Combining fractures"><h3 id="Combining fractures" class="header"><a href="#Voxyde - Fracture Setups-Boolean and Voronoi-Combining fractures">Combining fractures</a></h3></div>
+
+<p>
+For even more fractures, the demo grabs the cutter forming nodes from the previous (Boolean Fracture) demo, and with a <code>Merge</code> node at the end of the cutter setup to combine, (but disabling the <code>Copy and Transform</code> on the reused <code>Boolean Fracture</code> cutter example).
+</p>
+
+<p>
+The result is a really busy random fracture result, but with some consistency even with randomness.
+</p>
+
+<div id="Voxyde - Fracture Setups-Boolean and Voronoi-Try on Different Geometry"><h3 id="Try on Different Geometry" class="header"><a href="#Voxyde - Fracture Setups-Boolean and Voronoi-Try on Different Geometry">Try on Different Geometry</a></h3></div>
+
+<p>
+The demo takes the basic <code>Voronoi Fracture</code> and <code>Boolean</code> setup (removing our extra combo stuff at the tail end of the demo) and swaps our terrain (from the <code>Object Merge</code>) and substitutes for a <code>Sphere</code> (Polygon) that's re-sized with the <code>Uniform Scale</code> parameter.
+</p>
 
 
 <div id="Voxyde - Fracture Setups-Art Direct Voronoi"><h2 id="Art Direct Voronoi" class="header"><a href="#Voxyde - Fracture Setups-Art Direct Voronoi">Art Direct Voronoi</a></h2></div>
 <div id="Voxyde - Fracture Setups-Art Direct Voronoi-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2595s|YouTube - Art Direct Voronoi]]"><h4 id="[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2595s|YouTube - Art Direct Voronoi]]" class="header"><a href="#Voxyde - Fracture Setups-Art Direct Voronoi-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2595s|YouTube - Art Direct Voronoi]]"><a href="https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2595s">YouTube - Art Direct Voronoi</a></a></h4></div>
+
+<p>
+For this variation on the previous combo demo (where we art-direct the fracture locations), we use the main part of the <code>Voronoi Fracture</code> and <code>Boolean Fracture</code> example (with out the additional cutter network).
+</p>
+
+<div id="Voxyde - Fracture Setups-Art Direct Voronoi-Demo"><h3 id="Demo" class="header"><a href="#Voxyde - Fracture Setups-Art Direct Voronoi-Demo">Demo</a></h3></div>
+
+<p>
+The basis for this combo method, builds on the use of points to generate Voronoi cells (by allowing us to augment the scatter points and add our own points).
+</p>
+
+<p>
+We can use a line to set the position of new points, then, the Voronoi technique will fragment using these points in addition to the more random points we already have.
+</p>
+
+<div id="Voxyde - Fracture Setups-Art Direct Voronoi-In Practice"><h3 id="In Practice" class="header"><a href="#Voxyde - Fracture Setups-Art Direct Voronoi-In Practice">In Practice</a></h3></div>
+
+<ul>
+<li>
+Duplicate the previous network (without extras, and delete the redundant <code>Merge</code>).
+
+<li>
+Add a free-standing line from the chosen center point of a fracture:
+
+<ul>
+<li>
+draw beyond the edge of the terrain as defined by the <code>Object Merge</code>.
+
+</ul>
+<li>
+To make the radial nature of the fracture:
+
+<ul>
+<li>
+Add a <code>Copy and Transform</code> node:
+
+<ul>
+<li>
+In the <code>Rotate</code> 'y' parameter, add an expression:
+
+<ul>
+<li>
+<code>RMB</code> click on the label of the <code>Total Number</code> parameter and choose <code>Copy Parameter</code>
+
+<li>
+Insert the cursor in the <code>Rotate</code> <code>y</code> cell, and type <code>360/</code> and then <code>RMB</code> and choose <code>Paste Relative References</code>
+
+<li>
+Now when you increase the <code>Total Number</code> slider, the diverging lines should be evenly spaced around the center point.
+
+</ul>
+<li>
+Set the <code>Total Number</code> to 5
+
+<li>
+Check that all the lines extend beyond the bounds of the <code>Object Merge</code> geometry:
+
+<ul>
+<li>
+If not, adjust the <code>Length</code> parameter on the <code>Line</code> node.
+
+</ul>
+</ul>
+<li>
+Add a <code>Scatter</code> to make radial points:
+
+<ul>
+<li>
+<code>Relax Iterations</code> off
+
+<li>
+<code>Force Total Count</code> to 200
+
+</ul>
+<li>
+Add a <code>Point Jitter</code> to randomize the points:
+
+<ul>
+<li>
+We only want to jitter on the X &amp; Z axis, so <code>Axis Scale</code> to <code>1, 0, 1</code>
+
+<li>
+Increase the <code>Scale</code> to 2.3
+
+</ul>
+</ul>
+</ul>
+<p>
+These new 'art-directed' fracture seeds can now be combined with our original random scatter points.
+</p>
+
+<ul>
+<li>
+Add a <code>Merge</code> after our original <code>Scatter</code> node (from the last demo) and add the 'line' based points.
+
+</ul>
+<p>
+The result will be more finely cracked radial fractures following our radial dispersing points. (Disable the grout <code>Copy and Transform</code> node to see it more cleanly.)
+</p>
+
+<p>
+Setting the <code>Force Total Count</code> on the radial points (<code>Scatter</code>) will result in a more defined radial crack.
+</p>
+
+<p>
+To have the cracks only near the surface, you could add a <code>Transform</code> node after the <code>Point Jitter</code> to move them up in 'y'.
+</p>
+
 
 <div id="Voxyde - Fracture Setups-UVs setup"><h2 id="UVs setup" class="header"><a href="#Voxyde - Fracture Setups-UVs setup">UVs setup</a></h2></div>
 <div id="Voxyde - Fracture Setups-UVs setup-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2837s|YouTube - UVs setup]]"><h4 id="[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2837s|YouTube - UVs setup]]" class="header"><a href="#Voxyde - Fracture Setups-UVs setup-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2837s|YouTube - UVs setup]]"><a href="https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=2837s">YouTube - UVs setup</a></a></h4></div>
