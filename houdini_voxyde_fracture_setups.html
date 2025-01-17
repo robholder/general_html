@@ -1726,6 +1726,8 @@ If you are happy with just renaming all the 'connected' items at the end:
 Add an additional <code>Assemble</code> node at the end of all the recursive fracturing and
 
 </ul>
+<div id="Voxyde - Fracture Setups-Recursive Fracturing-Renaming all Chunks option-Manual Selection Based Recursive Fracture"><h4 id="Manual Selection Based Recursive Fracture" class="header"><a href="#Voxyde - Fracture Setups-Recursive Fracturing-Renaming all Chunks option-Manual Selection Based Recursive Fracture">Manual Selection Based Recursive Fracture</a></h4></div>
+
 <p>
 Here's where we end up with the <code>Based on manual selection</code> setup:
 </p>
@@ -2012,6 +2014,8 @@ Switch OFF the <code>Single Pass</code> option, so that all the chunks in the sp
 You can use any fracturing technique inside the <code>For-each</code> loop of course.
 </p>
 
+<div id="Voxyde - Fracture Setups-Recursive Fracturing-Using a 'For Each' to work on the chunks-Size Based Recursive Fracture network"><h4 id="Size Based Recursive Fracture network" class="header"><a href="#Voxyde - Fracture Setups-Recursive Fracturing-Using a 'For Each' to work on the chunks-Size Based Recursive Fracture network">Size Based Recursive Fracture network</a></h4></div>
+
 <p>
 Here's how the current <code>Based on Size</code> demo ends up:
 </p>
@@ -2108,7 +2112,7 @@ Here's how the current <code>Based on Size</code> demo ends up:
                └──────────────┘
 </pre>
 
-<div id="Voxyde - Fracture Setups-Recursive Fracturing-Selecting based on Proximity"><h3 id="Selecting based on Proximity" class="header"><a href="#Voxyde - Fracture Setups-Recursive Fracturing-Selecting based on Proximity">Selecting based on Proximity</a></h3></div>
+<div id="Voxyde - Fracture Setups-Recursive Fracturing-Recursive Fracturing based on Random Selection"><h3 id="Recursive Fracturing based on Random Selection" class="header"><a href="#Voxyde - Fracture Setups-Recursive Fracturing-Recursive Fracturing based on Random Selection">Recursive Fracturing based on Random Selection</a></h3></div>
 
 <p>
 Start again from the original <code>Boolean Frature</code> (or <code>Normal</code> node if used):
@@ -2133,13 +2137,343 @@ Drop an <code>Attribute Wrangle</code> (for VEX scriping):
 
 <ul>
 <li>
-line 1: <code>float val = rand(@ptnum + chi("random_seed"));</code>
+Rename to <code>create_selection</code>
 
 <li>
-line 2: <code>if()</code>
+line 1: <code>float val = rand(@ptnum + chi("random_seed"));</code>:
+
+<ul>
+<li>
+This applies a random number to the variable 'val'
+
+<li>
+A parameter labeled <code>Random Seed</code> will be created on the node's parameter panel
+
+</ul>
+<li>
+line 2: <code>if(val&gt; ch("threshold")) i@group_selection = 1;</code>:
+
+<ul>
+<li>
+This compares the random number for each point, and if larger than the 'thresh' parameter (a slider), add the point to a group called 'selection'.
+
+<li>
+A parameter labeled <code>Threshold</code> will be created on the node's parameter panel
 
 </ul>
 </ul>
+<li>
+Add a <code>Split</code> node:
+
+<ul>
+<li>
+In the <code>Group</code> field, add <code>selection</code> (to match all points that were added to our 'selection' group by the VEXpression).
+
+<li>
+Set the <code>Invert Selection</code> to 'On'
+
+</ul>
+<li>
+Add two nulls (just like the last demo):
+
+<ul>
+<li>
+Left - <code>Null</code> (rename to <code>selected</code>)
+
+<li>
+Right - <code>Null</code> (rename to <code>not_selected</code>)
+
+</ul>
+<li>
+At this point, the <code>Threshold</code> slider should affect the selection (as will the <code>Random Seed</code> slider):
+
+<ul>
+<li>
+<code>25</code> on the <code>Threshold</code> will select 25% of the pieces.
+
+<li>
+<code>Random Seed</code> will randomize which are selected.
+
+</ul>
+</ul>
+<p>
+The main take-away is the selection process, but you can copy and paste the <code>For-each</code> setup from the last section's network, and plug it all in accordingly (from the <code>selected</code> null, then <code>Merge</code> to the <code>not_selected</code> group). This will recursively fracture all the chunks on the 'selected' group.
+</p>
+
+<p>
+However, because we used an <code>Assemble</code> node to pack the geometry in this example, we now have to include an <code>Unpack</code> node after each null (<code>selected</code> and <code>not_selected</code>).
+</p>
+
+<div id="Voxyde - Fracture Setups-Recursive Fracturing-Recursive Fracturing based on Random Selection-Random Selection Recursive Fracture network"><h4 id="Random Selection Recursive Fracture network" class="header"><a href="#Voxyde - Fracture Setups-Recursive Fracturing-Recursive Fracturing based on Random Selection-Random Selection Recursive Fracture network">Random Selection Recursive Fracture network</a></h4></div>
+
+<p>
+This is what the setup looks like for random selection based Recursive Fractures:
+</p>
+<pre>
+                   ┌──────────────┐
+                   │ object_merge │
+                   └──────┬───────┘
+                        ┌─┴─────────────────┐
+                        │               ┌───┴───┐
+                        │               │ bound │
+                        │               └───┬───┘
+                        │                ┌──┴───┐
+                        │                │ null │
+                        │                └──┬───┴───────────────┐
+                        │                   │          ┌────────┴────────┐
+                        │                   │          │ vdbfrompolygons │
+                        │                   │          └────────┬────────┘
+                        │                   │                   │
+                        │                   │             ┌─────┴──┐
+                        │                   │             │scatter │
+                        │                   │             └─────┬──┘
+                        │                   │                   │
+                        │                   │    ┌──────────────┘
+                        │                   │    │
+                        │           ┌───────┴────┴────┐
+                        │           │ volonoifracture │
+                        │           └───────┬─────────┘
+                        │                   │
+                        │                ┌──┴────┐
+                        │                │ blast │
+                        │                └──┬────┘
+                        │                ┌──┴───┐
+                        │                │ fuse │
+                        │                └──┬───┘
+                        │                ┌──┴────┐
+                        │                │ clean │
+                        │                └──┬────┘
+                        │                   │
+                        │                ┌──┴─────┐
+                        │                │ remesh │
+                        │                └──┬─────┘
+                        │                   │
+                        │               ┌───┴──────┐
+                        │               │ mountain │
+                        │               └───┬──────┘
+                        │       ┌───────────┘
+                        │       │
+                   ┌────┴───────┴───┐
+                   │ booleanfracture│
+                   └──────┬─────────┘
+                      ┌───┴───┐
+                      │normal │   &lt;-- Start next demo section from here.
+                      └───┬───┘
+                          │
+                    ┌─────┴───────┐
+                    │  assemble   │
+                    └─────┬───────┘
+                          │
+                 ┌────────┴─────────┐
+                 │ attributewrangle │                float val = rand(@ptnum + chi("random_seed"));
+                 └─┬───────────────┬┘                if(val&gt; ch("threshold")) i@group_selection = 1;
+                   │               │
+           ┌───────┴──┐          ┌─┴──────────┐
+           │ selected │          │not_selected│
+           └───────┬──┘          └──────┬─────┘
+                   │                    │
+            ┌──────┴─┐              ┌───┴────┐
+            │ unpack │              │ unpack │
+            └──────┬─┘              └────┬───┘
+                   │                     │
+    ┌──────────────┼─────────────────┐   │
+    │  ┌───────────┴─┐               │   │
+    │  │foreach_begin├───────┐       │   │
+    │  └────┬────────┘       │       │   │
+    │       │                │       │   │
+    │       │           ┌────┴────┐  │   │
+    │       │           │ scatter │  │   │
+    │       │           └────┬────┘  │   │
+    │       │                │       │   │
+    │  ┌────┴──────────┐     │       │   │
+    │  │voronoifracture├─────┘       │   │
+    │  └───────┬───────┘             │   │
+    │          │                     │   │
+    │          │                     │   │
+    │    ┌─────┴─────┐               │   │
+    │    │foreach_end│               │   │
+    │    └───────┬───┘               │   │
+    └────────────┼───────────────────┘   │
+                 │   ┌───────────────────┘
+                 │   │
+               ┌─┴───┴─┐
+               │ Merge │
+               └───────┘
+</pre>
+
+
+<p>
+float val = rand(@ptnum + chi("random_seed"));
+if(val&gt; ch("threshold")) i@group_selection = 1;
+</p>
+
+<div id="Voxyde - Fracture Setups-Recursive Fracturing-Selecting based on Proximity"><h3 id="Selecting based on Proximity" class="header"><a href="#Voxyde - Fracture Setups-Recursive Fracturing-Selecting based on Proximity">Selecting based on Proximity</a></h3></div>
+
+<p>
+For this demo, we can start from the same stage as the late few demos (at the original <code>Boolean Fracture</code> or the <code>Normal</code> node that follows if present).
+</p>
+
+<ul>
+<li>
+Copy and paste the <code>Line</code> node and the <code>Copy and Transform</code> that we setup for the art-directed fractures earlier (where we used a star formation of 5 lines radiating from the center of the Terrain). These can be free-floating for now.
+
+</ul>
+<p>
+Now lets continue with building the rest of the network:
+</p>
+
+<ul>
+<li>
+Add a <code>Assemble</code> node after the <code>Boolean Fracture</code> or <code>Normal</code> if present:
+
+<ul>
+<li>
+Don't forget to turn off <code>Create Name Attribute</code>
+
+<li>
+Turn on <code>Create Packed Primitives</code>
+
+</ul>
+<li>
+Drop an <code>Attribute Wrangle</code> after the <code>Assemble</code>:
+
+<ul>
+<li>
+Connect the <code>Copy and Tranform</code> that we copied an pasted earlier into input 2
+
+<li>
+We want to create an attribute the records the distance from the lines to the closest points representing the chunks.
+
+<li>
+In the <code>VEXpression</code> field:
+
+<ul>
+<li>
+line 1 <code>float dist = xyzdist(1, @P);</code>:
+
+<ul>
+<li>
+Measures and stored the distance ('dist' is an arbitrary name) from input 2 from each point's current position <code>P</code>
+
+</ul>
+<li>
+line 2 <code>if(dist&gt;ch("threshold")) i@group_selection = 1;</code>:
+
+<ul>
+<li>
+Creates a "Threshold" slide, and if the value of the distance is greater than the "Threshold", the point gets included in a group called <code>selection</code>.
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+To complete this setup, we can just duplicate the ending from the last demo example (from the two <code>Null</code> nodes down). We need to unpack and put through the <code>For-each</code> network, just as before. (The main take-away is the selection process.)
+</p>
+
+<div id="Voxyde - Fracture Setups-Recursive Fracturing-Selecting based on Proximity-Network for Proximity Selection for Recursive Fracture"><h4 id="Network for Proximity Selection for Recursive Fracture" class="header"><a href="#Voxyde - Fracture Setups-Recursive Fracturing-Selecting based on Proximity-Network for Proximity Selection for Recursive Fracture">Network for Proximity Selection for Recursive Fracture</a></h4></div>
+
+<p>
+This is the status of the network with the facility to make chunk selections based on proximity to 'lines' in this case:
+</p>
+<pre>
+                   ┌──────────────┐
+                   │ object_merge │
+                   └──────┬───────┘
+                        ┌─┴─────────────────┐
+                        │               ┌───┴───┐
+                        │               │ bound │
+                        │               └───┬───┘
+                        │                ┌──┴───┐
+                        │                │ null │
+                        │                └──┬───┴───────────────┐
+                        │                   │          ┌────────┴────────┐
+                        │                   │          │ vdbfrompolygons │
+                        │                   │          └────────┬────────┘
+                        │                   │                   │
+                        │                   │             ┌─────┴──┐
+                        │                   │             │scatter │
+                        │                   │             └─────┬──┘
+                        │                   │                   │
+                        │                   │    ┌──────────────┘
+                        │                   │    │
+                        │           ┌───────┴────┴────┐
+                        │           │ volonoifracture │
+                        │           └───────┬─────────┘
+                        │                   │
+                        │                ┌──┴────┐
+                        │                │ blast │
+                        │                └──┬────┘
+                        │                ┌──┴───┐
+                        │                │ fuse │
+                        │                └──┬───┘
+                        │                ┌──┴────┐
+                        │                │ clean │
+                        │                └──┬────┘
+                        │                   │
+                        │                ┌──┴─────┐
+                        │                │ remesh │
+                        │                └──┬─────┘
+                        │                   │
+                        │               ┌───┴──────┐
+                        │               │ mountain │
+                        │               └───┬──────┘
+                        │       ┌───────────┘
+                        │       │
+                   ┌────┴───────┴───┐
+                   │ booleanfracture│
+                   └──────┬─────────┘
+                      ┌───┴───┐
+                      │normal │   &lt;-- Start next demo section from here.
+                      └───┬───┘
+                          │
+                          │                    ┌─────────┐
+                    ┌─────┴───────┐            │  line   │
+                    │  assemble   │            └───┬─────┘
+                    └─────┬───────┘                │
+                          │                ┌───────┴───────────┐
+                 ┌────────┴─────────┐      │ copyandtransform  │
+                 │ attributewrangle │      └───────┬───────────┘   float dist = xyzdist(1, @P);
+                 └─┬───────────────┬┘     ┌────────┘               if(dist&gt;ch("threshold")) i@group_selection = 1
+                   │               │      │
+           ┌───────┴──┐          ┌─┴──────┴───┐
+           │ selected │          │not_selected│
+           └───────┬──┘          └──────┬─────┘
+                   │                    │
+            ┌──────┴─┐              ┌───┴────┐
+            │ unpack │              │ unpack │
+            └──────┬─┘              └────┬───┘
+                   │                     │
+    ┌──────────────┼─────────────────┐   │
+    │  ┌───────────┴─┐               │   │
+    │  │foreach_begin├───────┐       │   │
+    │  └────┬────────┘       │       │   │
+    │       │                │       │   │
+    │       │           ┌────┴────┐  │   │
+    │       │           │ scatter │  │   │
+    │       │           └────┬────┘  │   │
+    │       │                │       │   │
+    │  ┌────┴──────────┐     │       │   │
+    │  │voronoifracture├─────┘       │   │
+    │  └───────┬───────┘             │   │
+    │          │                     │   │
+    │          │                     │   │
+    │    ┌─────┴─────┐               │   │
+    │    │foreach_end│               │   │
+    │    └───────┬───┘               │   │
+    └────────────┼───────────────────┘   │
+                 │   ┌───────────────────┘
+                 │   │
+               ┌─┴───┴─┐
+               │ Merge │
+               └───────┘
+</pre>
+
+<p>
+float dist = xyzdist(1, @P);
+if(dist&gt;ch("threshold")) i@group_selection = 1;
+</p>
+
 <div id="Voxyde - Fracture Setups-Chipping"><h2 id="Chipping" class="header"><a href="#Voxyde - Fracture Setups-Chipping">Chipping</a></h2></div>
 <div id="Voxyde - Fracture Setups-Chipping-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=4048s|YouTube - Chipping]]"><h4 id="[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=4048s|YouTube - Chipping]]" class="header"><a href="#Voxyde - Fracture Setups-Chipping-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=4048s|YouTube - Chipping]]"><a href="https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=4048s">YouTube - Chipping</a></a></h4></div>
 
