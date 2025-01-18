@@ -2581,7 +2581,7 @@ We want to look through all the edges of the chunk next:
 
 <ul>
 <li>
-Add a <code>Group</code> node:
+Within the 'Foreach' block, add a forked <code>Group</code> node:
 
 <ul>
 <li>
@@ -2657,10 +2657,10 @@ This returns an array, but we only want the number of items in a return array fo
 line 1 <code>int primcount = len(pointprims(0, @ptnum));</code>
 
 <li>
-line 2 (DOESN'T WORK) <code>if (primcount&gt;1) @Cd = 1;</code>
+line 2 (DOES WORK) <code>@Cd = primcount&gt;1;</code>
 
 <li>
-line 2 (DOES WORK) <code>@Cd = primcount&gt;1;</code>
+Alternative line 1 <code>if (primcount&gt;1){@Cd = 1;} else {@Cd = 0;}</code>
 
 </ul>
 </ul>
@@ -2751,6 +2751,17 @@ Input 1 from the <code>foreach_begin</code> node
 Input 2 from the <code>Copy to Points</code> node.
 
 <li>
+Remember to account for the <code>Name Attribute</code>:
+
+<ul>
+<li>
+<code>Name Attribute</code> to <code>Append</code> (not overwrite)
+
+<li>
+<code>Piece Prefix</code> to something logical - in our case we used <code>-</code>
+
+</ul>
+<li>
 Set the <code>Boolean Settings</code> &gt; <code>Treat Cutting Geometry As</code>:
 
 <ul>
@@ -2759,7 +2770,15 @@ to <code>Solid</code> (since the original item is a solid enclosed geometry.
 
 </ul>
 <li>
-And plug this <code>Boolean Fracture</code> node into the <code>foreach_end</code> node.
+And plug this <code>Boolean Fracture</code> node into the <code>foreach_end</code> node (input 1).
+
+</ul>
+<li>
+In the <code>foreach_end</code> node, disable the <code>Single Pass</code> checkbox to affect all the chunks:
+
+<ul>
+<li>
+(This was really slow for my machine to catch up!!)
 
 </ul>
 </ul>
@@ -2832,62 +2851,71 @@ Play with <code>Amplitude</code> and <code>Element Size</code> to get a nice sha
       ┌───┴───┐
       │normal │   &lt;-- Start next demo section from here.
       └───┬───┘
-          │                        ┌──────┐     
-          │                        │ line │     
-          │                        └───┬──┘     
-          │                            │        
-    ┌─────┴────┐              ┌────────┴───────┐
-    │ assemble │              │copyandtransform│
-    └────┬─────┘              └────────┬───────┘
-         │    ┌────────────────────────┘        
-         │    │                                 
- ┌───────┴────┴───┐                             
- │attributewrangle│                             
- └───────┬────────┘                             
-         │                                      
-     ┌───┴───┐                                   
-     │ split │                                   
-     └───┬──┬┘                                   
-         │  └─────────────────────────┐         
-         │                            │         
-         │                            │         
-    ┌────┴─────┐                ┌─────┴────────┐ 
-    │ selected │                │ not_selected │ 
-    └────┬─────┘                └─────┬────────┘ 
-         │                            │         
-    ┌────┴───┐                    ┌───┴────┐    
-    │ unpack │                    │ unpack │    
-    └────┬───┘                    └───┬────┘    
-         │                            │         
-         │                            │         
-┌───────────────────────────┐         │         
-│ ┌──────┴────────┐         │         │         
-│ │ foreach_begin │         │         │         
-│ └──────┬───┬────┘         │         │         
-│        │   │              │         │         
-│        │   └────────┐     │         │         
-│        │        ┌───┼───┐ │         │         
-│        │        │scatter│ │         │         
-│        │        └───┬───┘ │         │         
-│        │            │     │         │         
-│        │   ┌────────┘     │         │         
-│ ┌──────┴───┼────┐         │         │         
-│ │voronoifracture│         │         │         
-│ └──────┬────────┘         │         │         
-└───────────────────────────┘         │         
-         │                            │         
-  ┌──────┴───────┐                    │         
-  │ foreach_end  │                    │         
-  └──────┬───────┘                    │         
-         └────────────────────────────┤         
-                                 ┌────┴───┐     
-                                 │  merge │     
-                                 └────┬───┘     
-                                      │         
-                                      │         
-                              ┌───────┴──────┐  
-                              │ explodedview │  
-                              └──────────────┘  
+          │
+          │
+          │
+   ┌──────┼──────────────────────────────────────────────────┐
+   │   ┌──┴──────────┐                                       │
+   │   │foreach_begin│                                       │
+   │   └──┬──────┬───┘                                       │
+   │      │      └────────────────────────────┐              │
+   │      │                                   │              │
+   │      │                            ┌──────┴───┐          │
+   │      │                            │  group   │          │
+   │      │                            └──────┬───┘          │
+   │      │                                   │              │
+   │      │                     ┌─────────────┴───────────┐  │
+   │      │                     │ labs_edgegroup_to_curve │  │
+   │      │                     └─────────────┬───────────┘  │
+   │      │                                   │              │
+   │      │                                   │              │
+   │      │                             ┌─────┴────┐         │
+   │      │                             │ resample │         │
+   │      │                             └─────┬────┘         │
+   │      │                                   │              │
+   │      │                                   │              │
+   │      │                             ┌─────┴───┐          │
+   │      │                             │  fuse   │          │
+   │      │                             └─────┬───┘          │
+   │      │                                   │              │
+   │      │        ┌────────┐       ┌─────────┴─────────┐    │
+   │      │        │ sphere │       │  attributewrangle │    │
+   │      │        └───┬────┘       └─────────┬─────────┘    │
+   │      │            │                      │              │
+   │      │            │                      │              │
+   │      │      ┌─────┴─────┐       ┌────────┴───────┐      │
+   │      │      │  mountain │       │  attributeblur │      │
+   │      │      └─────┬─────┘       └────────┬───────┘      │
+   │      │            │                      │              │
+   │      │            │                      │              │
+   │      │            │                  ┌───┴───┐          │
+   │      │            │                  │scatter│          │
+   │      │            │                  └───┬───┘          │
+   │      │            └────┐       ┌─────────┘              │
+   │      │                 │       │                        │
+   │      │               ┌─┴───────┴──┐                     │
+   │      │               │copytopoints│                     │
+   │      │               └────┬───────┘                     │
+   │      │                    │                             │
+   │      │               ┌────┴────┐                        │
+   │      │               │ boolean │                        │
+   │      │               └────┬────┘                        │
+   │      │    ┌───────────────┘                             │
+   │  ┌───┴────┴──────┐                                      │
+   │  │booleanfracture│                                      │
+   │  └───┬───────────┘                                      │
+   │      │                                                  │
+   │      │                                                  │
+   │      │                                                  │
+   │   ┌──┴────────┐                                         │
+   │   │foreach_end│                                         │
+   │   └──┬────────┘                                         │
+   └─────────────────────────────────────────────────────────┘
+          │
+          │
+      ┌───┴─────────┐
+      │ explodeview │
+      └─────────────┘
 </pre>
 
 <div id="Voxyde - Fracture Setups-Glass Boolean Fracture"><h2 id="Glass Boolean Fracture" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture">Glass Boolean Fracture</a></h2></div>
