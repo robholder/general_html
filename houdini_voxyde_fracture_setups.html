@@ -4018,6 +4018,9 @@ Turn off the <code>Create Interior Surfaces</code> checkbox on the <code>Voronoi
 <li>
 Glitch should be gone.
 
+<li>
+For color cells in the Viewport, switch on the 'name' attribute in the <code>i</code> panel for the <code>Voronoi Fracture</code> node
+
 </ul>
 </ul>
 </ul>
@@ -4109,6 +4112,9 @@ Set the <code>Constant Type</code> to <code>3 Floats (vector)</code>
 <li>
 If you plug the <code>diff</code> output into the OUTPUT's <code>N</code> input, you'll see the normals all pointing away from the center point.
 
+<li>
+You can unplug this from the <code>N</code> input once you've seen the normals do their thing.
+
 </ul>
 <li>
 Add a <code>Normalize</code> node after the <code>Subract</code>
@@ -4173,7 +4179,71 @@ This is because when we stretch, there a huge polygon in the center, and there a
 
 </ul>
 </ul>
-<div id="Voxyde - Fracture Setups-Glass Voronoi Fracture-Controling the inner stretch in VOPs"><h3 id="Controling the inner stretch in VOPs" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture-Controling the inner stretch in VOPs">Controling the inner stretch in VOPs</a></h3></div>
+<div id="Voxyde - Fracture Setups-Glass Voronoi Fracture-Back to the build-Diagram - Attribute VOP - Stretch"><h4 id="Diagram - Attribute VOP - Stretch" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture-Back to the build-Diagram - Attribute VOP - Stretch">Diagram - Attribute VOP - Stretch</a></h4></div>
+
+<pre>
+                                                                           ┌───────────────┐          ┌───────────────────┐
+                                                                           │      add      │          │geometryvopoutput1 │
+                                                                           │               │          │                   │
+                       ┌───────────────────────────────────────────────────┤input1     sum ├──────────│P                  │
+                       │                                             ┌─────┤input2         │          │                   │
+                       │                                             │     └───────────────┘          │                   │
+                       │                                             │                                │                   │
+                       │                                             │                                │                   │
+                       │                                             │                                └───────────────────┘
+                       │                                             │
+                       │                                             └──────────────────────────────────────┐
+                       │                                                                                    │
+                       │                                                                                    │
+  ┌──────────────────┐ │                 ┌──────────────┐       ┌─────────────┐     ┌──────────────────┐    │
+  │geometryvopglobal1│ │                 │   subtract   │       │  normalize  │     │     multiply     │    │
+  │                  │ │                 │              │       │             │     │                  │    │
+  │                P ├─┴─────────────────┤input1   diff ├───────┤ vec    nvec ├─────┤input1    product ├────┘
+  │                  │                 ┌─┤input2        │       │             │     │                  │
+  │                  │     ┌────────┐  │ └──────────────┘       └─────────────┘     │input2            │
+  │                  │     │constant│  │                                            │(promoted)        │
+  │                  │     │0,0,0   ├──┘                                            └──────────────────┘
+  │                  │     └────────┘
+  │                  │
+  │                  │
+  │                  │
+  │                  │
+  │                  │
+  │                  │
+  │                  │
+  └──────────────────┘
+</pre>
+<div id="Voxyde - Fracture Setups-Glass Voronoi Fracture-What's happening in the VOP?"><h3 id="What's happening in the VOP?" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture-What's happening in the VOP?">What's happening in the VOP?</a></h3></div>
+
+<ul>
+<li>
+The position of each point is having the <em>constant</em> vector <em>subtracted</em> from it:
+
+<ul>
+<li>
+Result - their position becomes a vector pointing away from the <em>constant</em> vector (center)
+
+</ul>
+<li>
+This vector is <em>normalized</em>.
+
+<li>
+The vector is then user <em>multiplied</em> (more or less magnitude).
+
+<li>
+The result is <em>added</em> back onto the current position of each point:
+
+<ul>
+<li>
+Result - each point moves in the direction and magnitude of the vector value.
+
+</ul>
+</ul>
+<p>
+<span id="Voxyde - Fracture Setups-Glass Voronoi Fracture-What's happening in the VOP?-NOTE"></span><strong id="NOTE">NOTE</strong>: Temporarily plugging into the <code>N</code> (normals) slot allows a visual assessment of the value.
+</p>
+
+<div id="Voxyde - Fracture Setups-Glass Voronoi Fracture-Controlling the inner stretch in VOPs"><h3 id="Controlling the inner stretch in VOPs" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture-Controlling the inner stretch in VOPs">Controlling the inner stretch in VOPs</a></h3></div>
 
 <ul>
 <li>
@@ -4188,14 +4258,17 @@ Fork a <code>Distance</code> node from the <code>P</code> output of the INPUT no
 Plug the <code>Constant</code> node directly into input 2 of the Distance node (center)
 
 <li>
-Temporarily disable (<code>Q</code>) the <code>Add</code> node to see the undistorted <code>Grid</code>
+Temporarily disable (<code>Q</code>) the <code>Add</code> node to see the undistorted <code>Grid</code> if you are viewing before the second <code>Rest Position</code>.
+
+<li>
+(Switch off the <code>Visualizer</code> icon in the Viewport if you have the shards colored by the 'name' attribute.)
 
 <li>
 If we plug the Distance output into the <code>Cd</code> of the OUTPUT node, we'll see what's happening as a grayscale radial ramp:
 
 <ul>
 <li>
-To control this ramp of values, add a <code>Fit Range</code> node:
+To control this ramp of values, add a <code>Fit Range</code> node after the <code>Distance</code> node:
 
 <ul>
 <li>
@@ -4215,7 +4288,10 @@ Go up to the SOP level, and on the <code>stretch</code> node, fix the ramp:
 
 <ul>
 <li>
-Reset the <code>ramp</code> label
+Reset the <code>ramp</code> (<code>&lt;cntl&gt; MMB</code> on the <code>ramp</code> label)
+
+<li>
+A steep humpy shape seems best.
 
 </ul>
 <li>
@@ -4230,9 +4306,6 @@ Plug the output from the <code>Ramp Parameter</code> to the existing <code>Multi
 Cut the link to the <code>Cd</code>
 
 <li>
-Join the <code>Ramp Parameter</code> with a fork to the OUTPUT's <code>P</code> input
-
-<li>
 Turn the <code>Add</code> back on.
 
 </ul>
@@ -4245,10 +4318,24 @@ To add even more control of the shards, promote the <code>Source Max</code> para
 
 <ul>
 <li>
+<span id="Voxyde - Fracture Setups-Glass Voronoi Fracture-Controlling the inner stretch in VOPs-NOTE"></span><strong id="NOTE">NOTE</strong>: I had to move the promoted <code>Source Max</code> slider to get it to register. (The slider is labeled <code>Maximum Value In Source Range</code>.)
+
+<li>
 Lower numbers here, make sharper shards.
 
 <li>
 Set to a value of <code>5</code> 
+
+</ul>
+<li>
+We now have two controls to adjust the expansion:
+
+<ul>
+<li>
+<code>Stretch</code>
+
+<li>
+<code>Source Max</code>
 
 </ul>
 </ul>
@@ -4266,6 +4353,49 @@ Push the <code>Force Total Count</code> to 250
 
 </ul>
 </ul>
+<div id="Voxyde - Fracture Setups-Glass Voronoi Fracture-Controlling the inner stretch in VOPs-Diagram - Attribute VOP - Stretch - More control"><h4 id="Diagram - Attribute VOP - Stretch - More control" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture-Controlling the inner stretch in VOPs-Diagram - Attribute VOP - Stretch - More control">Diagram - Attribute VOP - Stretch - More control</a></h4></div>
+
+<pre>
+                             ┌─────────────┐  ┌──────────────┐    ┌────────────┐
+                             │   distance  │  │     fit      │    │    ramp    │
+                             │             │  │              │    │            │
+                        ┌────┤ p1     dist │  │  val  shift  │    │input  ramp ├────┐
+                        │ ┌──┤ p2          │  │              │    │            │    │
+                        │ │  │             │  │  srcmax      │    └────────────┘    │
+                        │ │  └─────────────┘  └──────────────┘                      │
+                        │ └─────────────┐                           ┌───────────────┘
+                        │               │                           │            ┌───────────────┐          ┌───────────────────┐
+                        │               │                           │            │      add      │          │geometryvopoutput1 │
+                        │               │                           │            │               │          │                   │
+                        │    ┌──────────┼───────────────────────────┼────────────┤input1     sum ├──────────│P                  │
+                        │    │          │                           │      ┌─────┤input2         │          │                   │
+                        │    │          │                           │      │     └───────────────┘          │                   │
+                        │    │          │                           │      │                                │                   │
+                        │    │          │                           │      │                                │                   │
+                        │    │          │                           │      │                                └───────────────────┘
+                        │    │          │                           │      │
+                        │    │          │                           │      └──────────────────────────────────────┐
+                        │    │          │                           └─────────────────┐                           │
+                        │    │          │                                             │                           │
+ ┌──────────────────┐   │    │          │      ┌──────────────┐       ┌─────────────┐ │   ┌──────────────────┐    │
+ │geometryvopglobal1│   │    │          │      │   subtract   │       │  normalize  │ │   │     multiply     │    │
+ │                  │   │    │          │      │              │       │             │ │   │                  │    │
+ │                P ├───┴────┴──────────┼──────┤input1   diff ├───────┤ vec    nvec ├─┼───│input1    product │────┘
+ │                  │                   │    ┌─┤input2        │       │             │ │   │                  │
+ │                  │        ┌────────┐ │    │ └──────────────┘       └─────────────┘ │   │input2            │
+ │                  │        │constant│ │    │                                        │   │(promoted)        │
+ │                  │        │0,0,0   ├─┴────┘                                        │   │                  │
+ │                  │        └────────┘                                               └───┤input3            │
+ │                  │                                                                     └──────────────────┘
+ │                  │
+ │                  │
+ │                  │
+ │                  │
+ │                  │
+ │                  │
+ └──────────────────┘
+</pre>
+
 <div id="Voxyde - Fracture Setups-Glass Voronoi Fracture-Removing unwanted points"><h3 id="Removing unwanted points" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture-Removing unwanted points">Removing unwanted points</a></h3></div>
 
 <p>
@@ -4286,7 +4416,7 @@ Set the <code>Group Type</code> to <code>Points</code> on the dropdown.
 Check 'off' the <code>Base Group</code>
 
 <li>
-Check 'on' the <code>Keep in Bounds</code> &gt; <code>Enable</code> checkbox:
+Check 'on' the <code>Keep in Bounding Regions</code> &gt; <code>Enable</code> checkbox:
 
 <ul>
 <li>
@@ -4463,7 +4593,7 @@ and rename the attribute to <code>inside</code>
 </ul>
 </ul>
 <p>
-To see if it is working, add an <code>RBD Connected Faces</code> node after the <code>RBD Connected Faces</code> node:
+To see if it is working, add an <code>RBD Disconnected Faces</code> node after the <code>RBD Connected Faces</code> node:
 </p>
 <ul>
 <li>
@@ -4474,8 +4604,13 @@ Set <code>Mode</code> (above the <code>Disconnected Attribute</code> field) to <
 In the exploded view, you should see those edges (faces) are gone.
 
 <li>
-You might have to adjust the <code>Distance Threshold</code> to finesse the result.
+You might have to adjust the <code>Distance Threshold</code> to finesse the result:
 
+<ul>
+<li>
+I got rid of all the <code>inside</code> faces with a value of <code>0.842</code>.
+
+</ul>
 </ul>
 </ul>
 <div id="Google's NotebookLM Study Guide"><h1 id="Google's NotebookLM Study Guide" class="header"><a href="#Google's NotebookLM Study Guide">Google's NotebookLM Study Guide</a></h1></div>
