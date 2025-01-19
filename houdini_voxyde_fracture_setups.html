@@ -2957,6 +2957,8 @@ Create a <code>Grid</code>:
 
 </ul>
 </ul>
+<div id="Voxyde - Fracture Setups-Glass Boolean Fracture-Creating Initial Fracture Lines"><h3 id="Creating Initial Fracture Lines" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture-Creating Initial Fracture Lines">Creating Initial Fracture Lines</a></h3></div>
+
 <p>
 We need to create some lines focused on a central fracture point. We'll do this with 'lines':
 </p>
@@ -3016,7 +3018,7 @@ Increase the <code>Total Number</code> slider, and each new copy will be rotated
 
 <ul>
 <li>
-Set to <code>20</code>
+Set to <code>29</code>
 
 </ul>
 </ul>
@@ -3074,7 +3076,7 @@ Add a <code>Resample</code> node after the <code>Line</code> node:
 
 <ul>
 <li>
-Activate the <code>Curve U Attribute</code> to add the 'length' attribute (zero to one).
+Activate the <code>Curve U Attribute</code> to add the 'length' attribute (zero to one) via the <code>curveu</code> attribute.
 
 </ul>
 </ul>
@@ -3145,9 +3147,721 @@ Set the <code>3 Float Default</code> to <code>1, 1, 0</code>
 </ul>
 </ul>
 </ul>
+<li>
+Return to the SOP level, and adjust the parameters on the <code>Attribute VOP</code> (<code>add_noise</code>):
+
+<ul>
+<li>
+Switch to <code>Sparse Convolution Noise</code>
+
+<li>
+<code>Frequency</code> to 1.2
+
+<li>
+<code>Amplitude</code> to 0.6
+
+<li>
+<code>Roughness</code> to 0.34
+
 </ul>
+</ul>
+<p>
+The noise is distorting the central point where all the fractures join too much. To control this we'll use the <code>curveu</code> attribute.
+</p>
+<ul>
+<li>
+Jump back into the <code>add_noise</code> node and create a <code>Bind</code> node:
+
+<ul>
+<li>
+<code>Name</code> to <code>curveu</code> attribute
+
+</ul>
+<li>
+Double click the <code>amp</code> input on the <code>Turbulent Noise</code> node (and you should have an <code>amp</code> node appear):
+
+<li>
+After this amp node, add a <code>Multiply</code> node between:
+
+<ul>
+<li>
+Plug the <code>curveu</code> output from the <code>Bind</code> to the <code>Multilpy</code> node's input 2
+
+</ul>
+<li>
+To give more control, drop a <code>Ramp Parameter</code> node after the <code>Bind</code>:
+
+<ul>
+<li>
+Set <code>Ramp Type</code> to <code>Spline Ramp (float)</code>
+
+<li>
+Set <code>Name</code> to <code>ramp_curveu</code>
+
+<li>
+Set <code>Label</code> to <code>ramp_curveu</code>
+
+<li>
+Move up to the SOP level and adjust the <code>Ramp</code>
+
+<ul>
+<li>
+make the ramp curved like a right-wards arc (so more distortion with noise as the curve moves out) 
+
+</ul>
+</ul>
+</ul>
+<p>
+The next requirement is to adjust the noise per line.
+</p>
+<ul>
+<li>
+We can assign attributes to the points:
+
+<ul>
+<li>
+Add an <code>Attribute Wrangle</code> node AFTER the <code>Attribute Randomize</code> (after the <code>Copy and Transform</code>) node:
+
+<ul>
+<li>
+Rename to <code>add_id</code>
+
+<li>
+Set the VEXpression as follows:
+
+<ul>
+<li>
+<code>@id = @ptnum;</code>
+
+</ul>
+</ul>
+</ul>
+<li>
+While viewing the <code>add_noise</code>, we can activate the <code>id</code> attribute in the <code>i</code> panel:
+
+<ul>
+<li>
+The lines should preview with different colors (mess with the visualizer icon if not).
+
+</ul>
+<li>
+Back inside the <code>add_noise</code> VOP, double-click on the <code>offset</code> input of the <code>Turbulent Noise</code> node:
+
+<ul>
+<li>
+Between this and the <code>Turbulent Noise</code> node, add an <code>Add</code> node
+
+<li>
+Then create a <code>Float to Vector</code> node from the <code>id</code> output of the INPUT node:
+
+<ul>
+<li>
+This should be connected via the <code>fval1</code> input
+
+<li>
+Connect the <code>vec</code> output to the <code>Add</code> after the <code>offset</code>
+
+</ul>
+<li>
+To accentuate the difference between the lines and the <code>id</code>, drop a <code>Multiply Constant</code> between the INPUT and the <code>Float to Vector</code> nodes:
+
+<ul>
+<li>
+Adjust the <code>Multiplier</code> to about 3
+
+</ul>
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Glass Boolean Fracture-Extrude"><h3 id="Extrude" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture-Extrude">Extrude</a></h3></div>
+
+<p>
+Next we make the lines template into an extruded 'cutter' element.
+</p>
+<ul>
+<li>
+Add a <code>PolyExtrude</code> node after the <code>add_noise</code> node:
+
+<ul>
+<li>
+Check on the <code>Transfrom Extruded Front</code> option
+
+<li>
+<code>Transform Space</code> to <code>Global</code>
+
+<li>
+Set the <code>Translate</code> fields to <code>0, 0, 0.9</code>
+
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Glass Boolean Fracture-The Boolean"><h3 id="The Boolean" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture-The Boolean">The Boolean</a></h3></div>
+
+<ul>
+<li>
+Drop a <code>Boolean Fracture</code> (with the original <code>Grid</code> as input 1):
+
+<ul>
+<li>
+Set the <code>Treat Geometry As</code> option to <code>Surface</code>
+
+<li>
+Plug the <code>PolyExtrude</code> into input 2
+
+<li>
+Add an <code>Exploded View</code> node to see the progress thus far.
+
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Glass Boolean Fracture-Give Glass Thickness"><h3 id="Give Glass Thickness" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture-Give Glass Thickness">Give Glass Thickness</a></h3></div>
+
+<p>
+Add a <code>PolyExtrude</code> after the <code>Boolean Fracture</code> to give some thickness to the glass shards.
+</p>
+<ul>
+<li>
+Check on the <code>Transfrom Extruded Front</code> option
+
+<li>
+<code>Transform Space</code> to <code>Global</code>
+
+<li>
+Set the <code>Translate</code> fields to <code>0, 0, 1</code>
+
+<li>
+Check 'On' the <code>Output Back</code> option.
+
+</ul>
+<p>
+At this stage, the <code>name</code> attribute should come through, and if you check it on in the Visualizer icon in the Viewport, the shards should be colored to indicate the different names.
+</p>
+
+<p>
+If you get some really small slivers at the center, you can adjust the ramp in the <code>add_noise</code> (to be zero on the left of the curve).
+</p>
+
+<div id="Voxyde - Fracture Setups-Glass Boolean Fracture-Recursive Fractures on the Shards"><h3 id="Recursive Fractures on the Shards" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture-Recursive Fractures on the Shards">Recursive Fractures on the Shards</a></h3></div>
+
+<p>
+We'll work on a shard-by-shard approach next.
+</p>
+
+<ul>
+<li>
+Drop a <code>For-each Named Primitive</code>:
+
+<ul>
+<li>
+To set up the fracture, we can turn on <code>Single Pass</code> to see only one chunk as we work. 
+
+</ul>
+</ul>
+<p>
+To make the 'cutter' surfaces, we'll spawn concentric circles from a point.
+</p>
+<ul>
+<li>
+Create a free-floating <code>Add</code> node:
+
+<ul>
+<li>
+Check 'On' to activate a single point at <code>0, 0, 0</code>
+
+</ul>
+<li>
+Add a <code>Point Replicate</code>:
+
+<ul>
+<li>
+<code>Points per Point</code> to 2
+
+<li>
+<code>Uniform Scale</code> to zero
+
+</ul>
+<li>
+Add an <code>Attribute Wrangle</code> to add a <code>pscale</code> attribute to each point (to drive the size of the derived geometry):
+
+<ul>
+<li>
+Rename to <code>set_pscale</code>
+
+<li>
+VEXpression:
+
+<ul>
+<li>
+<code>@pscale = @ptnum + 1;</code>
+
+<li>
+Now each point has a pscale attribute, each ascends from the last:
+
+<ul>
+<li>
+point 0 + 1, point 1 + 1 and point 2 + 1
+
+<li>
+1, 2, 3
+
+</ul>
+</ul>
+</ul>
+<li>
+Drop a free-floating <code>Tube</code> node:
+
+<ul>
+<li>
+<code>Orientation</code> to <code>Z Axis</code>
+
+<li>
+<code>Radius</code> to 1.4 x 1.4
+
+<li>
+<code>Height</code> to 0.55
+
+<li>
+<code>Columns</code> to 50
+
+</ul>
+<li>
+Add a <code>Copy to Points</code> with the <code>Tube</code> as input 1:
+
+<ul>
+<li>
+Plug the <code>Attribute Wrangle</code> into input 2
+
+</ul>
+</ul>
+<p>
+The <code>pscale</code> of the origin points is passed onto the tubes, and they appear as concentric rings.
+</p>
+
+<p>
+Let's distort these 'cutter' rings:
+</p>
+<ul>
+<li>
+Add a <code>Remesh</code> node after the <code>Copy to Points</code> node (default settings)
+
+<li>
+Add a <code>Mountian</code> node after the <code>Remesh</code> node:
+
+<ul>
+<li>
+Turn off <code>Noise Along Vector</code>
+
+<li>
+<code>Range Values</code> to <code>Zero Centered</code>
+
+<li>
+<code>Noise Pattern</code> &gt; <code>Noise Type</code> to <code>Simplex</code>
+
+<li>
+Split the <code>Amplitude</code> field (by clicking the <code>XYZ</code> icon):
+
+<ul>
+<li>
+Set the <code>Amplitude</code> slider to 0.5
+
+<li>
+Set the <code>Amplitude Scale</code> fields to 1, 1, 0 (now distortion on the <code>Z</code> axis)
+
+</ul>
+<li>
+<code>Element Size</code> to <code>1.34</code>
+
+</ul>
+</ul>
+<p>
+To Randomize the noise between the three concentric rings:
+</p>
+<ul>
+<li>
+Copy the <code>add_id</code> wrangler node from earlier (after the point creation):
+
+<ul>
+<li>
+Paste the <code>add_id</code> just before the points get plugged into the <code>Copy to Points</code> node:
+
+<ul>
+<li>
+(It will be auto-renamed to <code>add_id1</code>)
+
+</ul>
+</ul>
+<li>
+On the <code>Mountain</code> node:
+
+<ul>
+<li>
+In the <code>Noise Pattern</code> section, in the <code>VEXpression</code> window:
+
+<ul>
+<li>
+<code>offset = @id * 3:</code>
+
+</ul>
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Glass Boolean Fracture-Randomize the sizes of the 'Cutter' rings"><h3 id="Randomize the sizes of the 'Cutter' rings" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture-Randomize the sizes of the 'Cutter' rings">Randomize the sizes of the 'Cutter' rings</a></h3></div>
+
+<ul>
+<li>
+After the <code>set_pscale</code> (attribute wrangle) add an <code>Attribute Randomize</code> node:
+
+<ul>
+<li>
+<code>Attribute Scale</code> to <code>pscale</code>
+
+<li>
+<code>Global Scale</code> to 0.3
+
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Glass Boolean Fracture-Add cutters to For-each loop"><h3 id="Add cutters to For-each loop" class="header"><a href="#Voxyde - Fracture Setups-Glass Boolean Fracture-Add cutters to For-each loop">Add cutters to For-each loop</a></h3></div>
+
+<ul>
+<li>
+Inside the For-each loop:
+
+<ul>
+<li>
+Add a <code>Boolean Fracture</code> node:
+
+<ul>
+<li>
+<code>Name Attribute</code> to <code>Append</code> on the dropdown:
+
+<ul>
+<li>
+<code>Piece Prefix</code> to <code>-</code>
+
+<li>
+If this stage is skipped the surfaces look messed up.
+
+</ul>
+<li>
+<code>foreach_begin</code> into input 1
+
+<li>
+Our <code>Mountain</code> node from our cutter setup into input 2
+
+<li>
+<code>Treat Geometry As</code> to <code>Surface</code>
+
+</ul>
+</ul>
+<li>
+Connect an <code>Exploded View</code> to the <code>Boolean Fracture</code> to see the result.
+
+</ul>
+<p>
+On the <code>Boolean Fracture</code> un-check the <code>Single Pass</code> to see all shards with the treatment.
+</p>
+
+<p>
+<span id="Voxyde - Fracture Setups-Glass Boolean Fracture-Add cutters to For-each loop-NOTE"></span><strong id="NOTE">NOTE</strong>: <em>If the 'Name Attribute' is set to 'Overwrite' the surfaces will seem broken. To fix, either set the correct 'name' treatement, or just add an 'Assemble' node with 'Create Name Attribute' checked to create a brand-new 'name' attribute across all pieces.</em>
+</p>
+
+<p>
+At this stage, we have centrally fractured lines radiating out of a point, and we have concentric rings of fracturing. However, it doesn't look natural - we need more randomized characteristics. The next section builds on this...
+</p>
+
+
 <div id="Voxyde - Fracture Setups-Compiled Block"><h2 id="Compiled Block" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block">Compiled Block</a></h2></div>
 <div id="Voxyde - Fracture Setups-Compiled Block-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5421s|YouTube - Compiled Block]]"><h4 id="[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5421s|YouTube - Compiled Block]]" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5421s|YouTube - Compiled Block]]"><a href="https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5421s">YouTube - Compiled Block</a></a></h4></div>
+
+<p>
+Speeding up the process with a <span id="Voxyde - Fracture Setups-Compiled Block-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5421s|YouTube - Compiled Block]]-Compiled Block"></span><strong id="Compiled Block">Compiled Block</strong>.
+</p>
+
+<div id="Voxyde - Fracture Setups-Compiled Block-Block Begin"><h3 id="Block Begin" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block-Block Begin">Block Begin</a></h3></div>
+
+<p>
+We need the cutter logic to be run for each run of the <code>for each</code> loop to be able to randomize the generation of cutter features to get truly organic shatter patterns.
+</p>
+
+<p>
+The <code>Add</code> node that generated the 3 points doesn't need to be iterated over, so that can stay outside of the foreach loop, but all the other nodes should be part of the iteration.
+</p>
+
+<ul>
+<li>
+Create a <code>Block Begin</code> node as the second node (after the point-generating <code>Add</code> node):
+
+<ul>
+<li>
+<code>Method</code> to <code>Fetch Input</code> (to always start from the <code>Add</code> node)
+
+<li>
+The <code>Block Path</code> needs to point to the <code>foreach_end</code> node:
+
+<ul>
+<li>
+You can drag the node from the <code>Network Editor</code> into the field to harvest the path:
+
+<ul>
+<li>
+<code>../foreach_end7</code> or whatever it is in your scene.
+
+</ul>
+</ul>
+<li>
+Now all the nodes between the <code>Block Begin</code> node (inclusive) and the <code>foreach_end</code> node will be included and encompassed within the visual group or area of the For Loop. It's all encapsulated with the foreach loop.
+
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Compiled Block-Block Begin Compile"><h3 id="Block Begin Compile" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block-Block Begin Compile">Block Begin Compile</a></h3></div>
+
+<ul>
+<li>
+<em>Before</em> the <code>foreach_begin</code> node, drop a <code>Block Begin Compile</code> node.
+
+<li>
+<em>After</em> the <code>foreach_end</code> node, drop a <code>Block End Compile</code> node.
+
+</ul>
+<p>
+There will be another graphic representation of the whole foreach loop and the Block Compile nodes being grouped.
+</p>
+
+<ul>
+<li>
+To make this all work:
+
+<ul>
+<li>
+In the <code>Block Begin Compile</code> node:
+
+<ul>
+<li>
+<code>Block Path</code> field should 'point' to the corresponding <code>Block End Compile</code> node:
+
+<ul>
+<li>
+Drag the end node onto this field:
+
+<ul>
+<li>
+<code>../compile_end2</code> or whatever it is in your scene.
+
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+On the <code>foreach_end</code> node:
+
+<ul>
+<li>
+Check 'On' the <code>Multithread when Compiled</code> checkbox
+
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Compiled Block-Capturing the current iteration to use as a random seed"><h3 id="Capturing the current iteration to use as a random seed" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block-Capturing the current iteration to use as a random seed">Capturing the current iteration to use as a random seed</a></h3></div>
+
+<p>
+To access the iteration number through the loop, select the <code>foreach_begin</code> node:
+</p>
+<ul>
+<li>
+Click on the <code>Create Meta Import Node</code> on the parameter panel:
+
+<ul>
+<li>
+This will create a <code>foreach_begin_metadata</code> node ('metadata'):
+
+<ul>
+<li>
+This node keeps track of the iteration number.
+
+<li>
+We can reference this node within our parameters throughout the network.
+
+</ul>
+</ul>
+</ul>
+<p>
+To reference the <code>metadata</code> node on another node, we have to add it to the parameter interface.
+</p>
+<ul>
+<li>
+For a node to use this metadata, it has to be included via the 'parameter interface':
+
+<ul>
+<li>
+Click on the 'cog wheel' icon on a parameter panel:
+
+<ul>
+<li>
+Select the <code>Add Spare Input</code> option.
+
+<li>
+This will add a field at the base of the parameters.
+
+<li>
+In the field we need to add the path to the 'metadata' node:
+
+<ul>
+<li>
+Drag the node into the field to get the path:
+
+<li>
+or
+
+<li>
+<code>../foreach_begin7_metadata1</code> or whatever the correct path is for your node.
+
+<li>
+You'll see a dotted connection line from the metadata node to the node it was added to.
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+Let's implement this on our <code>Point Replicate</code> node:
+</p>
+<ul>
+<li>
+Cog-wheel and select <code>Add Spare Input</code>:
+
+<ul>
+<li>
+Enter the path to our <code>foreach_begin_metadata</code> node
+
+</ul>
+<li>
+In the <code>Points per Point</code> field:
+
+<ul>
+<li>
+<code>detail(-1, "iteration", 0)</code>
+
+<li>
+This will now evaluate to the piece or loop number (and you can go through the <code>Single Pass</code> slider on the <code>foreach_end</code> node to see this in action).
+
+</ul>
+</ul>
+<p>
+Let's edit that to not just have the iteration number, but to use that number as a random seed:
+</p>
+<ul>
+<li>
+Back in the <code>Point Replicate</code> node's <code>Points per Point</code> field, edit our expression to:
+
+<ul>
+<li>
+<code>rand(detail(-1, "iteration", 0))</code>
+
+</ul>
+<li>
+This would generate random numbers, but let's confine between 2 and 5. Edit again to:
+
+<ul>
+<li>
+<code>fit01(rand(detail(-1, "iteration", 0)),1, 5)</code>
+
+</ul>
+<li>
+And to ensure we get an integer (as this is the point generation amount number):
+
+<ul>
+<li>
+<code>round(fit01(rand(detail(-1, "iteration", 0)),1, 5))</code>
+
+</ul>
+<li>
+<em>EXTRA PARAMETER</em>: Add this to give more options to look through if you want to choose a good layout:
+
+<ul>
+<li>
+In this updated expression, you can change the 50 value to anything to get different configurations (even float values): 
+
+<ul>
+<li>
+<code>round(fit01(rand(detail(-1, "iteration", 0)+50),1, 5))</code>
+
+</ul>
+</ul>
+</ul>
+<div id="Voxyde - Fracture Setups-Compiled Block-Editing the 'pscale' to be limited in value"><h3 id="Editing the 'pscale' to be limited in value" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block-Editing the 'pscale' to be limited in value">Editing the 'pscale' to be limited in value</a></h3></div>
+
+<ul>
+<li>
+Go to the <code>set_pscale</code> node (<code>Attribute Wrangle</code>):
+
+<ul>
+<li>
+Adjust the expression to:
+
+<ul>
+<li>
+<code>@pcale = (@ptnum+1) * ch("pscale_mult");</code>
+
+<li>
+This creates a slider called <code>Pscale Mult</code> and multiplies the result.
+
+<li>
+Set the slider to 0.65
+
+</ul>
+</ul>
+<li>
+Now the shards are only shattered by concentric circles in closer proximity to the center.
+
+</ul>
+<div id="Voxyde - Fracture Setups-Compiled Block-Using the 'metadata' iteration count to change the Attribute Randomize"><h3 id="Using the 'metadata' iteration count to change the Attribute Randomize" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block-Using the 'metadata' iteration count to change the Attribute Randomize">Using the 'metadata' iteration count to change the Attribute Randomize</a></h3></div>
+
+<ul>
+<li>
+On the <code>Attribute Randomize</code> node:
+
+<ul>
+<li>
+Cog-wheel and select <code>Add Spare Input</code>:
+
+<ul>
+<li>
+<a href="Enter.html">Enter</a> the path to our <code>foreach_begin_metadata</code> node
+
+</ul>
+</ul>
+<li>
+Go to the <code>Options</code> tab:
+
+<ul>
+<li>
+In the <code>Global Seed</code> field:
+
+<ul>
+<li>
+<code>detail(-1, "iteration", 0)</code>
+
+</ul>
+</ul>
+</ul>
+<p>
+This gives the concentric breaks a real random location on each shard.
+</p>
+
+<div id="Voxyde - Fracture Setups-Compiled Block-Repeat of 'metadata' iteration count to change the 'Mountain' noise"><h3 id="Repeat of 'metadata' iteration count to change the 'Mountain' noise" class="header"><a href="#Voxyde - Fracture Setups-Compiled Block-Repeat of 'metadata' iteration count to change the 'Mountain' noise">Repeat of 'metadata' iteration count to change the 'Mountain' noise</a></h3></div>
+
+<ul>
+<li>
+On the <code>Mountain</code> node, edit the <code>Offset</code> parameter:
+
+<ul>
+<li>
+<code>detail(-1, "iteration", 0)</code>
+
+<li>
+Disable the previous expression by un-checking the <code>Use VEXpression</code> checkbox.
+
+</ul>
+</ul>
+ 
+<p>
+Now the actual cutter route will be less consistent and more natural.
+</p>
 
 <div id="Voxyde - Fracture Setups-Glass Voronoi Fracture"><h2 id="Glass Voronoi Fracture" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture">Glass Voronoi Fracture</a></h2></div>
 <div id="Voxyde - Fracture Setups-Glass Voronoi Fracture-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5909s|YouTube - Glass Voronoi Fracture]]"><h4 id="[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5909s|YouTube - Glass Voronoi Fracture]]" class="header"><a href="#Voxyde - Fracture Setups-Glass Voronoi Fracture-[[https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5909s|YouTube - Glass Voronoi Fracture]]"><a href="https://www.youtube.com/watch?v=0vqRqKpI-LY&amp;t=5909s">YouTube - Glass Voronoi Fracture</a></a></h4></div>
