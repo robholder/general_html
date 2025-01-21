@@ -223,11 +223,11 @@ Add a <code>Null</code> to keep things organized:
 
 <ul>
 <li>
-Rename to <code>SOURCE</code>
+Rename to <code>density_source</code>
 
 </ul>
 <li>
-Plug the <code>SOURCE</code> null into the <code>Pyrosolver</code> (input 1)
+Plug the <code>density_source</code> null into the <code>Pyrosolver</code> (input 1)
 
 </ul>
 <p>
@@ -436,7 +436,7 @@ Look at the fields on the Source panel:
 <code>Operation</code> has <code>Add</code> by default (adds source each frame), and <code>Scalar</code> for densities (or <code>Vector</code> for velocities)
 
 <li>
-<code>Source Volume</code> is <code>density</code> grabbed from our <code>SOURCE</code> which is piped into the solver. (Can be named anything.)
+<code>Source Volume</code> is <code>density</code> grabbed from our <code>density_source</code> which is piped into the solver. (Can be named anything.)
 
 <li>
 <code>Source Scale</code> is a multiplier. Setting to 0.1 will only use 10% of the source at a time in the case of <code>Add</code>
@@ -463,7 +463,7 @@ Remember: <code>density</code> in the <code>Target Field</code> HAS to be <code>
 </ul>
 </ul>
 <li>
-Now return the <code>SOURCE</code> name back to <code>density</code> from <code>source</code>.
+Now return the <code>density_source</code> name back to <code>density</code> from <code>source</code>.
 
 <li>
 Change the <code>Source Volume</code> back to <code>density</code> also.
@@ -498,6 +498,313 @@ Target Field - fixed internal names
 </ul>
 <div id="Voxyde - Intro to Pyro-Velocity Field"><h2 id="Velocity Field" class="header"><a href="#Voxyde - Intro to Pyro-Velocity Field">Velocity Field</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Velocity Field-[[|YouTube - Velocity Field]]"><h4 id="[[|YouTube - Velocity Field]]" class="header"><a href="#Voxyde - Intro to Pyro-Velocity Field-[[|YouTube - Velocity Field]]"><a href="">YouTube - Velocity Field</a></a></h4></div>
+
+<p>
+<span id="Voxyde - Intro to Pyro-Velocity Field-[[|YouTube - Velocity Field]]-TIP"></span><strong id="TIP">TIP</strong>: In the Viewport display options (<code>d</code> key), activate the <code>Guide</code> &gt; <code>Draw Time (FPS)</code> option and set <code>Geometry information</code> to <code>Always On</code>. This will give us feedback as to how efficient our setups are.
+</p>
+
+<div id="Voxyde - Intro to Pyro-Velocity Field-Diagram - Pyro - Starting setup"><h4 id="Diagram - Pyro - Starting setup" class="header"><a href="#Voxyde - Intro to Pyro-Velocity Field-Diagram - Pyro - Starting setup">Diagram - Pyro - Starting setup</a></h4></div>
+<pre>
+     ┌────────┐
+     │ sphere │ sphere (polygon)
+     └────┬───┘
+          │
+  ┌───────┴───────┐
+  │vdbfrompolygons│
+  └───────┬───────┘
+          │
+   ┌──────┴───────┐
+   │density_source│ (null)
+   └──────┬───────┘
+          │
+   ┌──────┴─────┐
+   │ pyrosolver │
+   └────────────┘
+</pre>
+
+<p>
+Using a velocity field instead of starting with numerous microsolvers is a more controllable strategy, and can get you 70% of the way to an art-directed result alone.
+</p>
+
+<ul>
+<li>
+Drop a free-floating <code>Box</code> node:
+
+<ul>
+<li>
+With this box 'templated', use the <code>Handle</code> tool (<code>&lt;enter&gt;</code> in the Viewport) scale the box to surround our volume, allowing space to develop a rising smoke simulation.
+
+<li>
+Something like:
+
+<ul>
+<li>
+<code>Size</code> to 1.3 x 1.3
+
+<li>
+<code>Uniform Scale</code> of <code>10</code>
+
+<li>
+<code>Center</code> to 1.6
+
+</ul>
+</ul>
+<li>
+Drop a <code>VDB</code> node (generic volume):
+
+<ul>
+<li>
+<code>Enable</code> on
+
+<li>
+<code>Name</code> to <code>v</code>
+
+<li>
+<code>Class</code> to <code>Fog Volume</code>
+
+<li>
+<code>Type</code> to <code>Vector Float</code>
+
+<li>
+<code>Vector type</code> to <code>Displacement/Velocity/Acceleration</code>
+
+<li>
+<code>Voxel Size</code> to 0.1
+
+</ul>
+<li>
+Plug the <code>VDB</code> node into a new <code>VDB Activate</code> node:
+
+<ul>
+<li>
+Plug in the <code>Box</code> as a second input.
+
+<li>
+Set the tab to <code>Reference</code>
+
+</ul>
+<li>
+Add a <code>Volume VOP</code> after the <code>VDB Activate</code> node:
+
+<ul>
+<li>
+Inside:
+
+<ul>
+<li>
+Create a simple noise:
+
+<ul>
+<li>
+From the <code>P</code> output on the INPUT node:
+
+<ul>
+<li>
+Add a <code>Vector to Vector4</code> node
+
+<li>
+<code>Time</code> output to the <code>fval4</code> input on the <code>Vector to Vector4</code> node
+
+<li>
+Drop a <code>Curl Noise</code> node from the <code>hvec</code> of the <code>Vector to Vector4</code> node:
+
+<ul>
+<li>
+<code>Noise Type</code> to <code>Simplex Noise</code>
+
+</ul>
+<li>
+Add a <code>Bind Export</code> node:
+
+<ul>
+<li>
+<code>Name</code> to <code>v</code> 
+
+<li>
+<code>Type</code> to <code>3 Floats (vector)</code>
+
+<li>
+Plug the <code>noise</code> output on the <code>Curl Noise</code> to the <code>input</code> on the <code>Bind Export</code> node.
+
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+Go up to the SOP level again:
+
+<ul>
+<li>
+Add a <code>Null</code> after the <code>Volume VOP</code>:
+
+<ul>
+<li>
+Rename to <code>V_source</code>
+
+</ul>
+</ul>
+</ul>
+<p>
+To bring this new 'Velocity volume' into our pyro:
+</p>
+<ul>
+<li>
+Add a <code>Merge</code> node:
+
+<ul>
+<li>
+<code>density_source</code> as first input
+
+<li>
+<code>V_source</code> as second input
+
+</ul>
+<li>
+Plug this <code>Merge</code> node's output into the first input on the <code>pyrosolver</code>
+
+</ul>
+<p>
+Now we need to use the <code>velocity</code> volume in the <code>pyrosolver</code>:
+</p>
+<ul>
+<li>
+On the <code>pyrosolver</code> parameter panel:
+
+<ul>
+<li>
+On the <code>Sourcing</code> tab:
+
+<ul>
+<li>
+Add another <code>Source Volume</code>:
+
+<ul>
+<li>
+Click the <code>+</code> button on the <code>Number of Sources</code> field to add another source pane
+
+<li>
+<code>Source Volume</code> to <code>v</code> (from our <code>V_source</code> setup)
+
+<li>
+<code>Target Field</code> to <code>vel</code> (remember the internal attribute names that must be 'correct'):
+
+<ul>
+<li>
+Look at the diagram of names above.
+
+</ul>
+<li>
+Set the <code>Operation</code> to <code>Add</code> and <code>Vector</code> (since we are dealing with velocity)
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+If we press 'play' on the timeline, we see the smoke simulation seeming to occupy the volume design of the <code>VDB</code> we setup with the <code>Volume VOP</code>.
+</p>
+
+<p>
+You can now jump back into the <code>Volume VOP</code> and play with the settings on the <code>Curl Noise</code> node to influence the simulation.
+</p>
+
+<div id="Voxyde - Intro to Pyro-Velocity Field-Visualizing our Vector Volume"><h3 id="Visualizing our Vector Volume" class="header"><a href="#Voxyde - Intro to Pyro-Velocity Field-Visualizing our Vector Volume">Visualizing our Vector Volume</a></h3></div>
+
+<p>
+To see more clearly what's going on with the <code>V_source</code>:
+</p>
+<ul>
+<li>
+Fork a <code>Volume Slice</code> node from the <code>V_source</code> node
+
+<li>
+Add a <code>Volume Trail</code> node after that:
+
+<ul>
+<li>
+Plug the <code>V_source</code> into the second input to complete
+
+</ul>
+</ul>
+<p>
+Viewing this node in the Viewport will show the vectors and will give a guild of what's driving the smoke. It's a velocity field shown as vectors.
+</p>
+
+<div id="Voxyde - Intro to Pyro-Velocity Field-Slowness"><h3 id="Slowness" class="header"><a href="#Voxyde - Intro to Pyro-Velocity Field-Slowness">Slowness</a></h3></div>
+
+<p>
+The issue with this <code>V_source</code> is that the Viewport is running much slower than our microsolver solution earlier.
+</p>
+<ul>
+<li>
+Detaching the <code>V_source</code> from the <code>Merge</code> and re-activating the <code>Turbolence</code> on the <code>Shape</code> tab of the <code>pyrosolver</code> will reveal a much faster simulation (frames per second) than that of the velocity volume technique.
+
+</ul>
+<p>
+This is largely due to the size of the velocity volume. It's a large cuboid-container of voxels:
+</p>
+<ul>
+<li>
+in the tutorial, inspecting the <code>i</code> panel of the <code>V_source</code> reveals that is over 2 million voxels to evaluate every frame.
+
+<li>
+Even previewing just the <code>V_source</code> the fps is low. (Before the simulation-proper!)
+
+<li>
+<span id="Voxyde - Intro to Pyro-Velocity Field-Slowness-NOTE"></span><strong id="NOTE">NOTE</strong>: <em>Slow sources are always going to slow the solver.</em>
+
+</ul>
+<p>
+To speed up the <code>V_source</code>:
+</p>
+<ul>
+<li>
+Go to the <code>VDB</code> node, and set the <code>Voxel Size</code> from 0.1 to 0.5
+
+<li>
+Re-merge
+
+<li>
+Reactivate the velocity volume as a source in the <code>Sourcing</code> tab on the pyrosolver
+
+<li>
+Deactivate the <code>Turbulence</code> on the <code>Shape</code> tab.
+
+</ul>
+<p>
+Now it'll be faster. While the voxel definition of the <code>V_source</code> is much less, it doesn't change the simulation <em>that</em> much. (We retain a lot of the details from the hi-resolution voxel size version.) Even a voxel size of '1' isn't such a reduction in quality.
+</p>
+
+<table>
+<tr>
+<td>
+Take-away: we don't need fine voxel resolution for velocity fields.
+</td>
+</tr>
+</table>
+
+
+<div id="Voxyde - Intro to Pyro-Velocity Field-Adding Microsolvers to a Velocity Field"><h3 id="Adding Microsolvers to a Velocity Field" class="header"><a href="#Voxyde - Intro to Pyro-Velocity Field-Adding Microsolvers to a Velocity Field">Adding Microsolvers to a Velocity Field</a></h3></div>
+
+<p>
+It's a good strategy to get the overall behavior and shape of the simulation from a Velocity Field, and then add microsolver detail in addition.
+</p>
+
+<p>
+In this tutorial, the <code>pyrosolver</code> was duplicated, and merged. One <code>pyrosolver</code> was proceeded by a <code>Transform</code> to nudge it over in the viewport.
+</p>
+<ul>
+<li>
+Set one <code>pyrosolver</code> to have only the <code>V_source</code> velocity field
+
+<li>
+Set the other to have both the <code>V_source</code> and also the <code>Shape</code> tab's <code>Turbulence</code> activated.
+
+</ul>
+<p>
+Play the timeline to see how the overall shape is retained, but the one with the <code>Turbulance</code> has added details within the general shape.
+</p>
 
 
 
