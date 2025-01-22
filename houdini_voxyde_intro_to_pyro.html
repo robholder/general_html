@@ -1934,6 +1934,11 @@ If you recall, and SDF volume (Sign Distance) has positive values on the outside
 <li>
 Go to the <code>Divergence</code> network and change the <code>VDB from Polygons</code> from <code>Fog VDB</code> to <code>Distance VDB</code> (and update the field to be <code>divergence</code>.
 
+<ul>
+<li>
+And switch on the <code>Fill Interior</code> for the <code>Distance VDB</code>
+
+</ul>
 <li>
 Switch off the <code>Volume Noise Fog</code> node
 
@@ -1952,6 +1957,35 @@ Now the negative values inside the SDF volume is contracting the smoke into the 
 This technique is probably a better strategy than using a negative <code>Source Scale</code> with a regular <code>Fog VDB</code>.
 </p>
 
+
+<p>
+We need to revert our tests back before moving on with the next source:
+</p>
+<ul>
+<li>
+<code>Divergence</code> version of the <code>VDB from Polygons</code> needs to be reverted to <code>Fog VDB</code>
+
+<ul>
+<li>
+And turn off <code>Fill Interior</code> checkbox.
+
+</ul>
+<li>
+All the <code>Sources</code> need to be 'on' in the <code>pyrosolver</code> parameters (<code>Sourcing</code> tab).
+
+<li>
+The <code>Acceleration Strength</code> on the <code>temperature</code> on the <code>Sourcing</code> tab needs to be 10
+
+<li>
+The <code>Source Scale</code> for <code>divergence</code> on the <code>Sourcing</code> tab needs to be 5
+
+<li>
+Remove the <code>Transform</code> from the <code>divergence</code> network
+
+<li>
+Turn the <code>Volume Noise</code> node on the <code>divergence</code> network.
+
+</ul>
 <div id="Voxyde - Intro to Pyro-Flame"><h2 id="Flame" class="header"><a href="#Voxyde - Intro to Pyro-Flame">Flame</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Flame-[[|YouTube - Flame]]"><h4 id="[[|YouTube - Flame]]" class="header"><a href="#Voxyde - Intro to Pyro-Flame-[[|YouTube - Flame]]"><a href="">YouTube - Flame</a></a></h4></div>
 
@@ -1959,9 +1993,16 @@ This technique is probably a better strategy than using a negative <code>Source 
 Let's do the same routine we've done for the last two volume types:
 </p>
 
+<p>
+Sometimes for legacy reasons, the 'user' name used for the flame volume is <code>burn</code>, but we can call it <code>flame</code> or <code>burn</code> (as long as the output is <code>flame</code>).
+</p>
+
 <ul>
 <li>
-Duplicate the <code>divergence</code> arm of the example (<code>&lt;alt&gt; drag</code>):
+Duplicate the <code>temperature</code> arm of the example (<code>&lt;alt&gt; drag</code>):
+
+<li>
+Then rename things:
 
 <ul>
 <li>
@@ -1969,7 +2010,7 @@ Duplicate the <code>divergence</code> arm of the example (<code>&lt;alt&gt; drag
 
 <ul>
 <li>
-<code>Fog VDB</code> field to <code>flame</code>
+<code>Fog VDB</code> field to <code>burn</code>
 
 </ul>
 <li>
@@ -1977,19 +2018,219 @@ Duplicate the <code>divergence</code> arm of the example (<code>&lt;alt&gt; drag
 
 <ul>
 <li>
-<code>Fog Volume Name</code> to <code>flame</code>
+<code>Fog Volume Name</code> to <code>burn</code>
 
 <li>
-<code>Offset</code> to something other than what we've used for <code>density</code>, <code>temperature</code> and <code>divergence</code> (15 perhaps)
+<code>Offset</code> to something other than what we've used for <code>density</code>, <code>temperature</code> and <code>temperature</code> (15 perhaps)
 
 </ul>
 <li>
-Rename our null to <code>flame_source</code>
+Rename our null to <code>burn_source</code>
+
+</ul>
+</ul>
+<p>
+Merge this to the rest of the setup:
+</p>
+<ul>
+<li>
+Plug into the <code>Merge</code> node.
+
+<li>
+In the <code>Sourcing</code> tab:
+
+<ul>
+<li>
+Add another source - <code>Number of Sources</code> to 4 
+
+<li>
+<code>Source Volume</code> to <code>burn</code>
+
+<li>
+<code>Target Field</code> to <code>flame</code> (this is the correct internal attribute name for this volume)
+
+</ul>
+</ul>
+<p>
+On playback, we don't see anything new on the simulation.
+</p>
+
+<p>
+To see some preview effect, go to the <code>Look</code> tab on the <code>pyrosolver</code> and:
+</p>
+<ul>
+<li>
+<code>Fire Intensity Volume</code> to <code>flame</code>
+
+<li>
+<code>Fire Color Volume</code> to <code>flame</code>
+
+</ul>
+<p>
+So far we still don't see any change in the shape of our simulation.
+</p>
+
+
+<p>
+On the <code>Fields</code> tab of the <code>pyrosolver</code>:
+</p>
+<ul>
+<li>
+Make sure <code>Flame</code> is checked on:
+
+<ul>
+<li>
+Set the <code>Flame Lifespan</code> to <code>2</code>:
+
+<ul>
+<li>
+A value of 1 will take 1 second to dissipate a flame value of 1
+
+<li>
+Our frame is currently in <code>Add</code> operation, so the value goes up (so the flame just keeps on going!)
+
+<li>
+If we set the <code>Source</code> <code>Operation</code> to <code>Maximum</code>, it should behave better.
+
+<li>
+If our <code>Source Scale</code> is set to <code>1</code>, it will take 2 seconds (48 frames) to dissipate (based on a lifespan of 2)
+
+</ul>
+<li>
+The flame will now die down way before the smoke and we'll see where it is.
+
+<li>
+(The <code>Flame Lifespan</code> to <code>flame</code> is like the <code>Dissipation</code> for <code>density</code>)
+
+</ul>
+</ul>
+<p>
+<span id="Voxyde - Intro to Pyro-Flame-[[|YouTube - Flame]]-NOTE"></span><strong id="NOTE">NOTE</strong>: <code>Maximum</code> is the usual <code>Operation</code> for <code>burn</code> or <code>flame</code> sources.
+</p>
+
+<p>
+We still haven't changed the behavior of the simulation with the <code>burn</code> volume. Right now we are only seeing the color changes.
+</p>
+
+<div id="Voxyde - Intro to Pyro-Flame-Flame Expansion"><h3 id="Flame Expansion" class="header"><a href="#Voxyde - Intro to Pyro-Flame-Flame Expansion">Flame Expansion</a></h3></div>
+
+<p>
+If we want to influence the shape of the simulation with the <code>flame</code>, we have to use the <code>Flame Expansion</code> microsolver no the <code>Shape</code> tab of the <code>pyrosolver</code>:
+</p>
+<ul>
+<li>
+<code>Expansion Rate</code> is a multiplier for the two fields below:
+
+<ul>
+<li>
+<code>Flame Range</code> has a range of <code>0</code> to <code>1</code>
+
+<li>
+So an <code>Expansion Rate</code> of 0.7 will multiply these values.
+
+</ul>
+</ul>
+<p>
+Next to the <code>Flame Range</code> is a <code>Compute Range</code> button:
+</p>
+<ul>
+<li>
+Pressing this will find the range in the simulatoin of <code>flame</code> values (and the second field will be the high-point).
+
+<li>
+This allow you to adjust those fields to affect the expansion (perhaps by dropping the value in the max (2nd) field.
+
+</ul>
+<p>
+With expansion based on flame, the large areas of flame will output more smoke based on the expansion.
+</p>
+
+<p>
+There is a <code>Remap Flame Range</code> checkbox, that when activated will provide a ramp to alter the input range to a new output range based on the ramp shape.
+</p>
+
+<div id="Voxyde - Intro to Pyro-Flame-Density and Flame influence"><h3 id="Density and Flame influence" class="header"><a href="#Voxyde - Intro to Pyro-Flame-Density and Flame influence">Density and Flame influence</a></h3></div>
+
+<p>
+If you look at the <code>Fields</code> tab on the <code>pyrosolver</code> node:
+</p>
+<ul>
+<li>
+look at the <code>Density</code> section:
+
+<ul>
+<li>
+There is an option below called <code>Emit From Flame</code>:
+
+<ul>
+<li>
+This is to enable smoke density from the <code>flame</code> volume.
+
+<li>
+This would emit more smoke from the flame in addition to the normal source emission.
+
+</ul>
+<li>
+There are a few more options that should be familiar by now.
+
+</ul>
+</ul>
+<p>
+If you turn OFF the <code>Density</code> in the <code>Sourcing</code> tab, and just use the <code>Emit From Flame</code> field (<code>Fields</code> tab), you will still get smoke generated from this option alone.
+</p>
+<ul>
+<li>
+This option can be very convincing, and by setting the <code>Operation</code> to <code>Add</code> the smoke will get very dense, very quickly.
+
+<li>
+<code>Remap Flame Range</code> ramp is a bell curve by default.
+
+</ul>
+<div id="Voxyde - Intro to Pyro-Flame-Emit From Flame"><h3 id="Emit From Flame" class="header"><a href="#Voxyde - Intro to Pyro-Flame-Emit From Flame">Emit From Flame</a></h3></div>
+
+<p>
+Just as with Density, there is a similar option for <code>Temperature</code> on the <code>Fields</code> tab:
+</p>
+<ul>
+<li>
+<code>Emit From Flame</code> has all the familiar options and does the same thing
+
+<li>
+This just adds magnitude to the <code>temperature</code> fields.
+
+<li>
+With this setting, the smoke in our case will rise quicker where there are flames due to heat.
+
+<li>
+As with Density, we can even switch off the <code>Temperature</code> source and let the flames generate the <code>temperature</code> field.
+
+</ul>
+<div id="Voxyde - Intro to Pyro-Flame-Flame conclusion"><h3 id="Flame conclusion" class="header"><a href="#Voxyde - Intro to Pyro-Flame-Flame conclusion">Flame conclusion</a></h3></div>
+
+<p>
+So the <code>flame</code> volume is a way of mapping where the flame is,
+</p>
+<ul>
+<li>
+Add more Divergence
+
+<ul>
+<li>
+driving an expansion of the simulation based on the magnitude of the flame value.
+
+</ul>
+<li>
+Add more smoke:
+
+<ul>
+<li>
+emitting or boosting smoke from flame
 
 </ul>
 </ul>
 <div id="Voxyde - Intro to Pyro-Wind &amp; Disturbance"><h2 id="Wind &amp; Disturbance" class="header"><a href="#Voxyde - Intro to Pyro-Wind &amp; Disturbance">Wind &amp; Disturbance</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Wind &amp; Disturbance-[[|YouTube - Wind &amp; Disturbance]]"><h4 id="[[|YouTube - Wind &amp; Disturbance]]" class="header"><a href="#Voxyde - Intro to Pyro-Wind &amp; Disturbance-[[|YouTube - Wind &amp; Disturbance]]"><a href="">YouTube - Wind &amp; Disturbance</a></a></h4></div>
+
 
 <div id="Voxyde - Intro to Pyro-Shredding &amp; Gas Damp"><h2 id="Shredding &amp; Gas Damp" class="header"><a href="#Voxyde - Intro to Pyro-Shredding &amp; Gas Damp">Shredding &amp; Gas Damp</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Shredding &amp; Gas Damp-[[|YouTube - Shredding &amp; Gas Damp]]"><h4 id="[[|YouTube - Shredding &amp; Gas Damp]]" class="header"><a href="#Voxyde - Intro to Pyro-Shredding &amp; Gas Damp-[[|YouTube - Shredding &amp; Gas Damp]]"><a href="">YouTube - Shredding &amp; Gas Damp</a></a></h4></div>
