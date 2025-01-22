@@ -1782,6 +1782,174 @@ The <code>Viscosity</code> microsolver option is very similar in effect.
 <div id="Voxyde - Intro to Pyro-Divergence"><h2 id="Divergence" class="header"><a href="#Voxyde - Intro to Pyro-Divergence">Divergence</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Divergence-[[|YouTube - Divergence]]"><h4 id="[[|YouTube - Divergence]]" class="header"><a href="#Voxyde - Intro to Pyro-Divergence-[[|YouTube - Divergence]]"><a href="">YouTube - Divergence</a></a></h4></div>
 
+<p>
+At this stage, we only want <code>Buoyancy</code> activated, and not other microsolvers.
+</p>
+
+
+<p>
+Let's continue the demo example by adding a <code>Divergence</code> network.
+</p>
+
+<ul>
+<li>
+Duplicate the <code>temperature</code> arm of the example (<code>&lt;alt&gt; drag</code>):
+
+<ul>
+<li>
+<code>VDB from Polygons</code> node:
+
+<ul>
+<li>
+<code>Fog VDB</code> field to <code>divergence</code>
+
+</ul>
+<li>
+<code>Volume Noise Fog</code> node:
+
+<ul>
+<li>
+<code>Fog Volume Name</code> to <code>divergence</code>
+
+<li>
+<code>Offset</code> to something other than what we've used for <code>density</code> and <code>temperature</code> (12 perhaps)
+
+</ul>
+<li>
+Rename our null to <code>divergence_null</code>
+
+</ul>
+</ul>
+<p>
+Diagram - Divergence added to the example
+</p>
+<pre>
+     ┌──────┐             ┌──────┐            ┌──────┐
+     │sphere│             │sphere│            │sphere│
+     └───┬──┘             └───┬──┘            └───┬──┘
+         │                    │                   │
+  ┌──────┴───────┐     ┌──────┴───────┐    ┌──────┴───────┐
+  │vdbfrompolygon│     │vdbfrompolygon│    │vdbfrompolygon│
+  │   density    │     │ temperature  │    │  divergence  │
+  └──────┬───────┘     └──────┬───────┘    └──────┬───────┘
+         │                    │                   │
+  ┌──────┴───────┐     ┌──────┴───────┐    ┌──────┴───────┐
+  │volumenoisefog│     │volumenoisefog│    │volumenoisefog│
+  │   density    │     │ temperature  │    │  divergence  │
+  └──────┬───────┘     └──────┬───────┘    └──────┬───────┘
+         │                    │                   │
+         │                    │                   │
+  ┌──────┴───────┐     ┌──────┴───────┐    ┌──────┴───────┐
+  │density_source│    temperature_source  divergence_source
+  │   (null)     │     │   (null)     │    │   (null)     │
+  └──────┬───────┘     └──────┬───────┘    └──────┬───────┘
+         │                    │                   │
+         │                    │                   │
+         └────────────────────┼───────────────────┘
+                              │
+                          ┌───┴───┐
+                          │ MERGE │
+                          └───┬───┘
+                              │
+                              │
+                       ┌──────┴──────┐
+                       │  pyrosolver │
+                       └─────────────┘
+</pre>
+
+<div id="Voxyde - Intro to Pyro-Divergence-Add Divergence as a Source"><h3 id="Add Divergence as a Source" class="header"><a href="#Voxyde - Intro to Pyro-Divergence-Add Divergence as a Source">Add Divergence as a Source</a></h3></div>
+
+<p>
+In the <code>pyrosolver</code> parameter panel:
+</p>
+<ul>
+<li>
+Add another source on the <code>Sourcing</code> tab (by clicking the <code>+</code> on the <code>Number of Sources</code> field.
+
+<li>
+In <code>Source 3</code>:
+
+<ul>
+<li>
+<code>Source Volume</code> to <code>divergence</code>
+
+<li>
+<code>Target Field</code> to <code>divergence</code> (and remember, whatever the name of our source, this one has to be <code>divergence</code>).
+
+</ul>
+</ul>
+<p>
+Not much changes on a play through of the simulation.
+</p>
+<ul>
+<li>
+Now increase the <code>Source Scale</code> on the <code>Sourcing</code> tab (<code>Source 3</code>); maybe to 10
+
+<li>
+You might see a slight pulse at the start:
+
+<ul>
+<li>
+This is typically what you would see in an explosion.
+
+</ul>
+<li>
+Try <code>100</code> in the <code>Source Scale</code>:
+
+<ul>
+<li>
+Now you should really see the effect. It pumps the smoke outwards at the start.
+
+</ul>
+<li>
+Negative numbers in the <code>Source Scale</code> field will actually 'contract' the smoke.
+
+</ul>
+<p>
+The <code>divergence</code> doesn't keep expanding throughout the simulation - there is a tail off of expansion:
+</p>
+<ul>
+<li>
+If we look at the <code>divergence_source</code> null, we'll see the volume expand and then stop (not on MacOS unfortunately - thanks OpenGL)
+
+<li>
+This demands high values in the <code>Source Scale</code> to be 'seen'.
+
+<li>
+You can scale the sphere, but the effect is very unnatural.
+
+</ul>
+<div id="Voxyde - Intro to Pyro-Divergence-SDF Volume in Divergence"><h3 id="SDF Volume in Divergence" class="header"><a href="#Voxyde - Intro to Pyro-Divergence-SDF Volume in Divergence">SDF Volume in Divergence</a></h3></div>
+
+<p>
+So far, we've been using regular volumes from our source objects (sphere).
+</p>
+
+<p>
+If you recall, and SDF volume (Sign Distance) has positive values on the outside and negative on the inside. We can use that to contract our simulation too!
+</p>
+<ul>
+<li>
+Go to the <code>Divergence</code> network and change the <code>VDB from Polygons</code> from <code>Fog VDB</code> to <code>Distance VDB</code> (and update the field to be <code>divergence</code>.
+
+<li>
+Switch off the <code>Volume Noise Fog</code> node
+
+<li>
+Add a <code>Tranform</code> to move the sphere volume up a bit.
+
+<li>
+Set the <code>Source 3</code> <code>Source Scale</code> to 5
+
+</ul>
+<p>
+Now the negative values inside the SDF volume is contracting the smoke into the sphere center.
+</p>
+
+<p>
+This technique is probably a better strategy than using a negative <code>Source Scale</code> with a regular <code>Fog VDB</code>.
+</p>
+
 <div id="Voxyde - Intro to Pyro-Flame"><h2 id="Flame" class="header"><a href="#Voxyde - Intro to Pyro-Flame">Flame</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Flame-[[|YouTube - Flame]]"><h4 id="[[|YouTube - Flame]]" class="header"><a href="#Voxyde - Intro to Pyro-Flame-[[|YouTube - Flame]]"><a href="">YouTube - Flame</a></a></h4></div>
 
