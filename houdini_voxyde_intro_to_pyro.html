@@ -2693,6 +2693,475 @@ After the limit is reached, the sources no longer emit.
 <div id="Voxyde - Intro to Pyro-Collisions"><h2 id="Collisions" class="header"><a href="#Voxyde - Intro to Pyro-Collisions">Collisions</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Collisions-[[|YouTube - Collisions]]"><h4 id="[[|YouTube - Collisions]]" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-[[|YouTube - Collisions]]"><a href="">YouTube - Collisions</a></a></h4></div>
 
+<p>
+Collisions involve inhibiting or blocking the simulation with geometry.
+</p>
+
+<p>
+Internally, geometry is converted to a volume to compute the results. The geometry is fed into the <code>pyrosolver</code> via the secondary inputs.
+</p>
+
+<ul>
+<li>
+The <code>Collision</code> Tab on the <code>pyrosolver</code> node:
+
+<ul>
+<li>
+<code>Collision Type</code>:
+
+<ul>
+<li>
+<code>Collision Geometry</code>
+
+<li>
+<code>SDF + Volume Velocity</code>
+
+</ul>
+</ul>
+</ul>
+<div id="Voxyde - Intro to Pyro-Collisions-Continuing with the Demo"><h3 id="Continuing with the Demo" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-Continuing with the Demo">Continuing with the Demo</a></h3></div>
+
+<ul>
+<li>
+Turn off the <code>Divergence</code> and <code>Flame</code> microsolvers to keep it simple.
+
+<li>
+Dial up the <code>Buoyancy</code> to 0.5
+
+<li>
+Drop a <code>Box</code> node and make it big enough to theoretically block the transition of the smoke:
+
+<ul>
+<li>
+Use a Transform to move it into place
+
+<li>
+Add a <code>Null</code> for cleanliness:
+
+<ul>
+<li>
+Rename to <code>collision</code>
+
+</ul>
+<li>
+Plug it into input2 on the <code>pyrosolver</code> node.
+
+</ul>
+</ul>
+<p>
+We could use it 'as is':
+</p>
+<ul>
+<li>
+In the <code>Collision</code> tab:
+
+<ul>
+<li>
+The <code>Collision Type</code> has two options:
+
+<ul>
+<li>
+It is set to <code>Collision Geometry</code> by default:
+
+<ul>
+<li>
+This is a misnomer, as internally, this is converted to a volume for calculations
+
+</ul>
+<li>
+<code>SDF + Volume Velocity</code> is the other option (which we'll use shortly):
+
+<ul>
+<li>
+Here we can use our own Volume.
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+Play the simulation, and we should see the smoke being blocked and inhibited by the box.
+</p>
+
+<div id="Voxyde - Intro to Pyro-Collisions-SDF Collision Option"><h3 id="SDF Collision Option" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-SDF Collision Option">SDF Collision Option</a></h3></div>
+
+<p>
+Given that this is converted to a volume anyway, we could convert it to a volume prior to the setup, and have control over the parameters to make it more efficient or more accurate (or appropriate).
+</p>
+<ul>
+<li>
+If we flip the <code>Collision Type</code> to <code>SDF + Volume Velocity</code>, the parameter options will change:
+
+<ul>
+<li>
+The <code>Collision SDF</code> field is looking for a <code>collision</code> volume field by default.
+
+<li>
+It also looks for <code>Velocity Volume</code> in the name of <code>v</code>
+
+<li>
+Let's create our <code>collision</code> field:
+
+<ul>
+<li>
+Before our <code>collsion</code> null, drop a <code>VDB from Polygons</code> node:
+
+<ul>
+<li>
+We'll use the <code>Distance VDB</code> for the properties of an SDF volume:
+
+<li>
+However, we need to change the name field to <code>collision</code> (to match the name in the <code>Collision SDF</code> field.
+
+<li>
+On the <code>VDB from Polygons</code> we have a few options to look at:
+
+<ul>
+<li>
+The <code>Exterior Band Voxels</code> and <code>Interior Band Voxels</code> are there to add a band of extra buffer voxels around the collision shape, and prevents miscalculations, whereby the edge of the SDF volume is missed and the simulation passes through the object.
+
+<li>
+The <code>Fill Interior</code> is another way of ensuring that the simulation doesn't enter the volume shape.
+
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+With this setup, we have complete control of the collision volume:
+</p>
+<ul>
+<li>
+We can set the <code>Voxel Size</code>:
+
+<ul>
+<li>
+That being said, it's advisable to use the same voxel size as the overall pyrosolver simulation settings.
+
+</ul>
+</ul>
+<div id="Voxyde - Intro to Pyro-Collisions-Velocity Option"><h3 id="Velocity Option" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-Velocity Option">Velocity Option</a></h3></div>
+
+<p>
+If we have moving collision geometry, we can transfer the movement to a Velocity Field which can effect the simulation as if the moving geometry were interacting with the turbulence in addition to the inhibiting nature of the blocking object.
+</p>
+
+<p>
+To the demo:
+</p>
+<ul>
+<li>
+Boost the resolution for the <code>Box</code>:
+
+<ul>
+<li>
+Increase the <code>Axis Divisions</code> to around 16
+
+<li>
+This is to have more points for the trails (see below)
+
+</ul>
+<li>
+On the <code>Transform</code> of the <code>Box</code> network:
+
+<ul>
+<li>
+Keyframe short burst of motion from left to right:
+
+<ul>
+<li>
+Maybe stationary for a while, a short burst over about 4 frames, then static again
+
+</ul>
+</ul>
+<li>
+Next we need to extract the velocity:
+
+<ul>
+<li>
+Drop a <code>Trail</code> node after the <code>Transform</code>:
+
+<ul>
+<li>
+Set the <code>Result Type</code> to <code>Compute Velocity</code> 
+
+<li>
+Turn on the point trails on the Viewport's icon on the right to see the trails.
+
+<li>
+This is where the extra divisions on the <code>Box</code> helps record the data
+
+</ul>
+<li>
+To harvest the velocity:
+
+<ul>
+<li>
+In the <code>VDB from Polygons</code> node:
+
+<ul>
+<li>
+On the <code>Surface Attributes</code> parameter, click the <code>+</code> to add an attribute:
+
+<ul>
+<li>
+The <code>Attribute</code> can be found in the dropdown:
+
+<ul>
+<li>
+The <code>point.v</code> attribute should be available from the <code>Trail</code> node.
+
+</ul>
+<li>
+The <code>VDB Name</code> should match the name expected by the Collision section:
+
+<ul>
+<li>
+<code>v</code> is the expected name
+
+</ul>
+<li>
+<code>Vector Type</code> should be set to <code>Displacement/Velocity/Acceleration</code>
+
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+Playing the simulation on the timeline, should show a convincing collision with inertia in the smoke.
+</p>
+
+
+<div id="Voxyde - Intro to Pyro-Collisions-Field Name Caution"><h3 id="Field Name Caution" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-Field Name Caution">Field Name Caution</a></h3></div>
+
+<p>
+We've used the name <code>v</code> for Velocity Fields throughout this exploration of Pyro, so you have to be careful not to confuse the simulation with multiple fields named the same.
+</p>
+
+<ul>
+<li>
+Name your source velocities to something that doesn't collide with the velocities for collisions.
+
+</ul>
+<div id="Voxyde - Intro to Pyro-Collisions-Ground Plane"><h3 id="Ground Plane" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-Ground Plane">Ground Plane</a></h3></div>
+
+<p>
+The last section of the <code>Collision</code> tab in the <code>pyrosolver</code> is the <code>Ground Plane</code> options.
+</p>
+
+<p>
+There are three items:
+</p>
+<ul>
+<li>
+<code>X Ground Plane</code>
+
+<li>
+<code>Y Ground Plane</code>
+
+<li>
+<code>Z Ground Plane</code>
+
+</ul>
+<p>
+These are infinite planes perpendicular to the axis that act like collision objects. The default is <code>Open</code> meaning there is not inhibiting by the plane, but there are options to activate:
+</p>
+<ul>
+<li>
+<code>Open</code>: not used in the simulation (Off)
+
+<li>
+<code>Closed Below</code>: stops the volumes passing below this plane
+
+<li>
+<code>Closed Above</code>: stops a volume passing above this plane
+
+</ul>
+<p>
+Each of these items has a slider to adjust with an offset along the axis. This allows for offsetting from the center of the scene.
+</p>
+
+<p>
+<span id="Voxyde - Intro to Pyro-Collisions-Ground Plane-TIP"></span><strong id="TIP">TIP</strong>: This is a good way of creating shockwaves. The plane will direct the explosion along a plane.
+</p>
+
+<div id="Voxyde - Intro to Pyro-Collisions-Heightfields"><h3 id="Heightfields" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-Heightfields">Heightfields</a></h3></div>
+
+<p>
+The next option is a <code>Heightfield</code> option:
+</p>
+<ul>
+<li>
+You can paste the path to a node in the attribute, and the heightfield will act as a collision object.
+
+<li>
+If you have an animated heightfield, turn this option on.
+
+</ul>
+<p>
+To create a heightfield:
+</p>
+<ul>
+<li>
+Drop a <code>Heightfield</code> node:
+
+<ul>
+<li>
+For our demo make is smaller (maybe 10 x 10)
+
+</ul>
+<li>
+Drop a <code>Heightfield Noise</code> node:
+
+<ul>
+<li>
+adjust
+
+</ul>
+<li>
+Add a <code>Null</code> and rename to <code>heightfield_collision</code>.
+
+</ul>
+<p>
+Back in the <code>Collision</code> tab of the <code>pyrosolver</code>:
+</p>
+<ul>
+<li>
+Check 'On' the <code>Heightfield</code> checkbox:
+
+<ul>
+<li>
+Add the path to the heightfield:
+
+<ul>
+<li>
+Drag the node onto the field or type it in:
+
+<ul>
+<li>
+It should be something like <code>/obj/geo1/heightfield_collision</code>
+
+</ul>
+</ul>
+</ul>
+</ul>
+<div id="Voxyde - Intro to Pyro-Collisions-Advanced Tab"><h3 id="Advanced Tab" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-Advanced Tab">Advanced Tab</a></h3></div>
+
+<p>
+The <code>Advanced</code> tab on the <code>pyrosolver</code> is not used much according to the author of the tutorial.
+</p>
+
+<p>
+Most settings here are very specialized settings for particular use-cases.
+</p>
+
+
+<div id="Voxyde - Intro to Pyro-Collisions-Output Tab"><h3 id="Output Tab" class="header"><a href="#Voxyde - Intro to Pyro-Collisions-Output Tab">Output Tab</a></h3></div>
+
+<p>
+The <code>Output</code> tab has the controls for exporting the various element fields.
+</p>
+
+<p>
+<code>Export Fields</code> section:
+</p>
+
+<p>
+We usually need these for shading:
+</p>
+<ul>
+<li>
+<code>density</code>
+
+<li>
+<code>temperature</code>
+
+<li>
+<code>flame</code>
+
+</ul>
+<p>
+This is useful for motion blur or for affecting particles by smoke:
+</p>
+<ul>
+<li>
+<code>vel</code>
+
+</ul>
+<p>
+The color is used for renders with color:
+</p>
+<ul>
+<li>
+<code>Cd</code>
+
+</ul>
+<p>
+<code>Post-Process</code> section:
+</p>
+
+<p>
+Checkboxes:
+</p>
+<ul>
+<li>
+<code>Add Wind to Velocity Field</code> (which we already mentioned in the microsolver discussion)
+
+<li>
+<code>Compute Min/Max Values</code>
+
+<li>
+<code>Convert to VDB</code>:
+
+<ul>
+<li>
+By default the volumes are exported as Houdini standard volumes.
+
+<li>
+VDB is more efficient (as discussed in the Volumes course) so this should be checked 'On'.
+
+<li>
+Advisable in most cases.
+
+</ul>
+<li>
+<code>Use 16bit Float</code>:
+
+<ul>
+<li>
+Advisable in most cases.
+
+<li>
+This is a space-saver (as they are stored as 32bit normally).
+
+</ul>
+</ul>
+<p>
+Grayed-Out checkboxes:
+</p>
+<ul>
+<li>
+These are largely optimizing options:
+
+<ul>
+<li>
+<code>Cull Volumes</code>
+
+<li>
+<code>Resample Volumes</code>:
+
+<ul>
+<li>
+<code>Voxel Size Scale</code>: this is a resample option (Velocity for example doesn't need excessive resolution).
+
+</ul>
+<li>
+<code>Flame Density</code>
+
+</ul>
+</ul>
 <div id="Voxyde - Intro to Pyro-Pyro source &amp; Scatter"><h2 id="Pyro source &amp; Scatter" class="header"><a href="#Voxyde - Intro to Pyro-Pyro source &amp; Scatter">Pyro source &amp; Scatter</a></h2></div>
 <div id="Voxyde - Intro to Pyro-Pyro source &amp; Scatter-[[|YouTube - Pyro source &amp; Scatter]]"><h4 id="[[|YouTube - Pyro source &amp; Scatter]]" class="header"><a href="#Voxyde - Intro to Pyro-Pyro source &amp; Scatter-[[|YouTube - Pyro source &amp; Scatter]]"><a href="">YouTube - Pyro source &amp; Scatter</a></a></h4></div>
 
