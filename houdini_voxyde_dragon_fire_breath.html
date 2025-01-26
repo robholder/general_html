@@ -606,7 +606,7 @@ Go back up to the <code>Attribute VOP</code> ('set_V'), and drop a <code>Point V
 <code>Add Curl Noise</code> to 'on'
 
 <li>
-<code>Scale</code> to 0.13
+<code>Scale</code> to 0.1
 
 <li>
 <code>Pulse Duration</code> to 0.4
@@ -784,12 +784,453 @@ At the end of our network:
 <li>
 Drop a <code>Pyro Solver</code> node:
 
+<ul>
+<li>
+Let's connect the <code>Voxel Size</code> to all the various related parameters on the other nodes:
+
+<ul>
+<li>
+<code>RMB</code> on the <code>Voxel Size</code> on the <code>Pyro Solver</code>:
+
+<ul>
+<li>
+On the <code>Volume Rasterize Attributes</code> nodes:
+
+<ul>
+<li>
+<code>RMB</code> on the <code>Voxel Size</code> parameter and <code>Paste Relative Values</code>
+
+</ul>
+</ul>
+</ul>
+</ul>
+<li>
+<code>Setup</code> tab of the <code>Pyro Solver</code>:
+
+<ul>
+<li>
+<code>Max Substeps</code> to 3 (since this is a fast moving animation - and 3 is probably max in any situation).
+
+<li>
+Set <code>Advection-Reflection</code> to <code>Single-Project</code>:
+
+<ul>
+<li>
+This is a good option with fast moving smoke (as fast moving smoke tends to lose density very quickly).
+
+<li>
+However, it does slow down the simulation.
+
+</ul>
+</ul>
+<li>
+<code>Bounds</code> tab: nothing yet
+
+<li>
+<code>Collisions</code>: nothing yet
+
+<li>
+<code>Sourcing</code> tab:
+
+<ul>
+<li>
+Delete all the sources to start from scratch:
+
+<ul>
+<li>
+Start with <code>Source 1</code>:
+
+<ul>
+<li>
+<code>Operation</code> <code>Maximum</code> <code>Scalar</code>
+
+<li>
+<code>Source Volume</code> to <code>burn</code>
+
+<li>
+<code>Target Field</code> to <code>flame</code>
+
+</ul>
+<li>
+<code>Source 2</code>:
+
+<ul>
+<li>
+<code>Operation</code> <code>Maximum</code> <code>Scalar</code>
+
+<li>
+<code>Source Volume</code> to <code>temperature</code>
+
+<li>
+<code>Target Field</code> to <code>temperature</code>
+
+</ul>
+<li>
+<code>Source 3</code>:
+
+<ul>
+<li>
+<code>Operation</code> <code>Add</code> <code>Vector</code> (temporarily)
+
+<li>
+<code>Source Volume</code> to <code>v</code>
+
+<li>
+<code>Target Field</code> to <code>vel</code>
+
+</ul>
+</ul>
+</ul>
+</ul>
+<p>
+Play the timeline. We have something! The breakup is from the <code>Point Velocity</code>, as we don't have any microsolvers yet.
+</p>
+
+<p>
+After the <code>Pyro Solver</code>, drop a <code>Pyro Bake Volume</code> node. We'll use this to do the actual render, so it's useful to see the result at this stage:
+</p>
+<ul>
+<li>
+Turn off the <code>Assign Material</code> checkbox
+
+<li>
+<code>Smoke</code> tab:
+
+<ul>
+<li>
+..is OK
+
+</ul>
+<li>
+<code>Scatter</code> tab:
+
+<ul>
+<li>
+Turn on the <code>Scatter</code> checkbox.
+
+</ul>
+<li>
+<code>Fire</code> tab:
+
+<ul>
+<li>
+Turn on the <code>Fire</code> checkbox.
+
+</ul>
+</ul>
+<p>
+Now we don't see anything in the Viewport. This is because we don't have a density field.
+</p>
+
+<p>
+Go to the <code>Bindings</code> tab:
+</p>
+<ul>
+<li>
+On the <code>Scatter</code> section, we have <code>Mask Volume</code> mapped to <code>density</code> and we don't have any:
+
+<ul>
+<li>
+For now turn 'off' the <code>Scatter</code> checkbox again.
+
+</ul>
+</ul>
+<p>
+Now we have a visible simulation (very bright in the tutorial version).
+</p>
+
+<p>
+The density is a useful component for the various masks, so instead of creating a density attribute we'll derive it from the flames:
+</p>
+<ul>
+<li>
+On the <code>Pyro Solver</code>:
+
+<ul>
+<li>
+<code>Fields</code> tab:
+
+<ul>
+<li>
+In the <code>Density</code> section:
+
+<ul>
+<li>
+Turn on <code>Emit From Flame</code>:
+
+<ul>
+<li>
+Open the widget:
+
+<ul>
+<li>
+<code>Operation</code> to <code>Add</code> (to accumulate density)
+
+<li>
+<code>Flame Range</code>:
+
+<ul>
+<li>
+First field - We won't have density until this value.
+
+<li>
+Second field - We won't generate MORE density after this ceiling value.
+
+</ul>
+<li>
+Once you've simulated a couple of frames on the timeline:
+
+<ul>
+<li>
+Click the <code>Compute Range</code> button to furnish the fields with numbers tailored to our case.
+
+<li>
+Adjust to taste (the tutorial used 0.2 &amp; 0.5)
+
+</ul>
+<li>
+Also we can turn on the <code>Remap Flame Range</code> for a smoother transition
+
+</ul>
+</ul>
+</ul>
+<li>
+In the <code>Temperature</code> section:
+
+<ul>
+<li>
+<code>Cooling Rate</code> to 0.1
+
+<li>
+Turn on <code>Emit From Flame</code> (to get more temperature from flame):
+
+<ul>
+<li>
+<code>Operation</code> to <code>Add</code> 
+
+<li>
+<code>Flame Range</code> to <code>0.2</code> and <code>0.5</code>
+
+</ul>
+</ul>
+<li>
+Turn on the <code>Speed</code> checkbox:
+
+<ul>
+<li>
+This allows us to map microsolvers to the speed.
+
+</ul>
+</ul>
+</ul>
 </ul>
 <div id="Voxyde - Dragon Fire Breath-Cull by camera sink"><h2 id="Cull by camera sink" class="header"><a href="#Voxyde - Dragon Fire Breath-Cull by camera sink">Cull by camera sink</a></h2></div>
 <div id="Voxyde - Dragon Fire Breath-Cull by camera sink-[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=1755s|YouTube - Cull by camera sink]]"><h4 id="[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=1755s|YouTube - Cull by camera sink]]" class="header"><a href="#Voxyde - Dragon Fire Breath-Cull by camera sink-[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=1755s|YouTube - Cull by camera sink]]"><a href="https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=1755s">YouTube - Cull by camera sink</a></a></h4></div>
 
+<p>
+Next we'll optimize our setup in relation to the camera.
+</p>
+
+<p>
+Create a free-floating <code>Frustum_Camera</code> node (<span id="Voxyde - Dragon Fire Breath-Cull by camera sink-[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=1755s|YouTube - Cull by camera sink]]-NOTE"></span><strong id="NOTE">NOTE</strong>: <em>This is a custom node, made by the author of the tutorial and is available for download from the course website.</em>)
+</p>
+<ul>
+<li>
+<code>Cam</code>:
+
+<ul>
+<li>
+Point to the scene camera via a path field.
+
+</ul>
+<li>
+<code>Size</code>:
+
+<ul>
+<li>
+Increase the <code>Z</code> field (tutorial uses 26)
+
+<li>
+Add a bit to <code>X</code> and <code>Y</code> for some padding.
+
+<li>
+<code>1.2, 1.2, 26</code>
+
+</ul>
+</ul>
+<p>
+Template the <code>Frustum_Camera</code> node, and take a look at the fire positions.
+</p>
+
+<p>
+After the <code>Frustum_Camera</code>:
+</p>
+<ul>
+<li>
+Add a <code>VDB from Polygons</code>:
+
+<ul>
+<li>
+This should be an SDF:
+
+<ul>
+<li>
+Check 'On' <code>Distance VDB</code>
+
+<li>
+<code>Voxel Size</code> doesn't need much resolution:
+
+<ul>
+<li>
+Leave at 0.1
+
+</ul>
+<li>
+Switch 'On' <code>Use World Space Units for Narrow Band</code>
+
+<li>
+Increase the <code>Exterior Band</code> (switch to wireframe in the viewport to see the voxel result):
+
+<ul>
+<li>
+Try 2.5
+
+</ul>
+</ul>
+</ul>
+<li>
+Drop a <code>Null</code>:
+
+<ul>
+<li>
+Rename <code>sdf</code>
+
+<li>
+Copy the node (to paste as a parameter)
+
+</ul>
+</ul>
+<p>
+Go inside the <code>Pyro Solver</code>:
+</p>
+<ul>
+<li>
+Create a <code>Gas Field VOP</code>:
+
+<ul>
+<li>
+Plug this into the <code>force_output</code> node
+
+<li>
+On the parameter panel, <code>Inputs</code> tab:
+
+<ul>
+<li>
+<code>Input 1</code> to <code>SOP</code>
+
+<li>
+<code>SOP Path</code> to <code>/obj/FX_fire/sdf</code> (or whatever your path is - paste it in the field).
+
+</ul>
+<li>
+Inside the <code>Gas Field VOP</code>;
+
+<ul>
+<li>
+From the <code>OpInput 1</code>:
+
+<ul>
+<li>
+Drop a <code>Volume Sampe</code> node
+
+<li>
+Plug the <code>P</code> output from the INPUT node into the <code>samplepos</code> input on the <code>Volume Sample</code> node 
+
+<li>
+Add a <code>Compare</code> node from the <code>volumevalue</code> output of the <code>Volume Sample</code> node:
+
+<ul>
+<li>
+Since our frustum volume is an SDF, everything inside the cone of vision is a negative value, and everything outside is positive.
+
+<li>
+Set the Compare to:
+
+<ul>
+<li>
+<code>Test</code> to <code>Greater Than</code>
+
+<li>
+<code>Compare to Float</code> to zero 
+
+<li>
+Now it's filtering everything outside the cone of vision of the camera.
+
+</ul>
+</ul>
+</ul>
+<li>
+Create a free-floating <code>Bind</code> node, and a <code>Bind Export</code> for our <code>flame</code> (not burn, which is the source):
+
+<ul>
+<li>
+Set the <code>Name</code> field to <code>flame</code> on the bind nodes.
+
+<li>
+Remember you can <code>&lt;alt&gt;</code> drag the <code>Bind</code> to duplicate then set the <code>Use This Node To Set Parameter Attributes</code> checkbox, and switch <code>Export</code> to <code>Always</code>.
+
+<li>
+Join the binds.
+
+</ul>
+<li>
+After the <code>Compare</code> node, drop a <code>Complement</code> node to reverse the negative/positive polarity.
+
+<li>
+Between the bind nodes, drop a <code>Multiply</code>:
+
+<ul>
+<li>
+Plug the <code>complem</code> output from the <code>Complement</code> node to <code>input 2</code> of the <code>Multiply</code>.
+
+</ul>
+</ul>
+<li>
+Repeat this setup for <code>density</code> and then <code>temperature</code>:
+
+<ul>
+<li>
+Two binds and the multiply, and plug the same <code>Complement</code> into the new multiply.
+
+</ul>
+</ul>
+</ul>
+<p>
+In the tutorial, the <code>Voxel Size</code> is adjusted to allow for quicker previews (to 0.1). We want to see the simulation escaping the bounds of the frustum area.
+</p>
+
+<p>
+At this stage however, the <code>Voxel Size</code> is reduce to 0.05
+</p>
+
+<p>
+In the tutorial, the <code>Time Scale</code> is set to 1.5.
+</p>
+
+<p>
+To help with feedback, a <code>File Cache</code> node is dropped between the <code>Pyro Solver</code> and the <code>Pyro Bake Volume</code>:
+</p>
+<ul>
+<li>
+Renamed to <code>pyro_test</code>
+
+<li>
+<code>Save to Disk</code>
+
+</ul>
 <div id="Voxyde - Dragon Fire Breath-Microsolvers &amp; velocity"><h2 id="Microsolvers &amp; velocity" class="header"><a href="#Voxyde - Dragon Fire Breath-Microsolvers &amp; velocity">Microsolvers &amp; velocity</a></h2></div>
 <div id="Voxyde - Dragon Fire Breath-Microsolvers &amp; velocity-[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2180s|YouTube - Microsolvers &amp; velocity]]"><h4 id="[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2180s|YouTube - Microsolvers &amp; velocity]]" class="header"><a href="#Voxyde - Dragon Fire Breath-Microsolvers &amp; velocity-[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2180s|YouTube - Microsolvers &amp; velocity]]"><a href="https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2180s">YouTube - Microsolvers &amp; velocity</a></a></h4></div>
+
 
 <div id="Voxyde - Dragon Fire Breath-Finish &amp; Compositing"><h2 id="Finish &amp; Compositing" class="header"><a href="#Voxyde - Dragon Fire Breath-Finish &amp; Compositing">Finish &amp; Compositing</a></h2></div>
 <div id="Voxyde - Dragon Fire Breath-Finish &amp; Compositing-[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2675s|YouTube - Finish &amp; Compositing]]"><h4 id="[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2675s|YouTube - Finish &amp; Compositing]]" class="header"><a href="#Voxyde - Dragon Fire Breath-Finish &amp; Compositing-[[https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2675s|YouTube - Finish &amp; Compositing]]"><a href="https://www.youtube.com/watch?v=Ogzm2gnkMTU&amp;t=2675s">YouTube - Finish &amp; Compositing</a></a></h4></div>
