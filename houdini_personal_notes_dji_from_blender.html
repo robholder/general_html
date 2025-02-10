@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>houdini_personal_notes_dji_from_blender</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Houdini.html">Houdini</a>
+</p>
+
+
+<div id="Personal Notes"><h2 id="Personal Notes" class="header"><a href="#Personal Notes">Personal Notes</a></h2></div>
+
+<p>
+Copilot's advice on getting the piece numbers (items) from an assemble node:
+</p>
+
+
+<pre>
+#####################################################################################
+# Description:
+# Specifically for re-building the DJI Inspire model as built in Blender and
+# imported to Houdini as a USDImport.
+#
+# Created by Rob Holder
+#
+## ## Add to shelf button:
+## import importlib
+## import assemble_parts
+##
+## importlib.reload(assemble_parts)
+## assemble_parts.main()
+#
+
+
+__author__ = "Rob Holder"
+__date__ = "25/02/09"
+__version__ = "0.0.1"
+
+
+import hou
+import re
+
+
+# Function to extract the numerical part of the string for sorting
+def sort_key(s):
+    match = re.match(r'([a-zA-Z]+)(\d+)', s)
+    if match:
+        stem, num = match.groups()
+        return (stem, int(num))
+    return (s, 0)
+
+def main():
+    # Get the assemble node
+    assemble_node = hou.node('/obj/geo1/assemble1')
+    # Get the parent network where you want to create the nodes
+    parent_container = assemble_node.parent()
+
+
+    # Check if the node exists
+    if not assemble_node:
+        print("Node not found")
+    else:
+        # Get the output geometry
+        output_geo = assemble_node.geometry()
+
+        # Check if the geometry exists
+        if not output_geo:
+            print("Geometry not found")
+        else:
+            # Get the 'name' attribute values
+            name_values = output_geo.primStringAttribValues('name')
+            print(name_values)
+            # Check if the 'name' attribute values exist
+            if not name_values:
+                print("No 'name' values found")
+
+            else:
+                # Convert the tuple of values to a set to remove duplicates
+                unique_values = set(name_values)
+
+                # Sort the list using the custom sort key
+                sorted_values = sorted(unique_values, key=sort_key)
+                print(sorted_values)
+                print(len(sorted_values))
+
+                stash_nodes = list()
+
+                for value in sorted_values:
+
+                    # Create a 'blast' node
+                    blast_node = parent_container.createNode('blast', node_name=f'blast_{value}')
+                    # Connect the blast node to the assemble node
+                    blast_node.setInput(0, assemble_node)
+                    # Set the 'Group' parameter
+                    blast_node.parm('group').set(value)
+                    blast_node.parm('negate').set(True)
+                    print("blast_node created")
+
+                    # Create a 'clean' node
+                    clean_node = parent_container.createNode('clean', node_name=f'clean_{value}')
+                    # Connect the clean node to the blast node
+                    clean_node.setInput(0, blast_node)
+                    # Check the 'Reverse Winding' option
+                    clean_node.parm('reversewinding').set(True)
+                    # Set 'bypass' to off
+                    clean_node.bypass(True)
+                    print(f'clean node created')
+
+                    # Evaluate the geometry of the blast node to get the 'part' attribute value
+                    blast_geo = blast_node.geometry()
+                    part_attrib = blast_geo.findPrimAttrib('part')
+                    if not part_attrib:
+                        print("No 'part' values found")
+                        break
+
+                    else:
+                        part_value = blast_geo.prim(0).stringAttribValue(part_attrib.name())
+
+                        # Create a 'stash' node
+                        stash_node = parent_container.createNode('stash', node_name=f'stash_{part_value}')
+                        # Connect the clean node to the stash node
+                        stash_node.setInput(0, clean_node)
+                        # Activate the 'Stash Input' button
+                        stash_node.parm('stashinput').pressButton()
+
+                        # Add the stash node to the list
+                        stash_nodes.append(stash_node)
+
+                        # Layout the nodes for better visibility
+                        #parent_container.layoutChildren()
+
+                # Create a 'merge' node
+                merge_node = parent_container.createNode('merge', node_name='merge_all_stash_nodes')
+
+                # Connect all stash nodes to the merge node
+                for i, stash_node in enumerate(stash_nodes):
+                    merge_node.setInput(i, stash_node)
+
+
+                # Layout the parent network nodes for better visibility
+                parent_container.layoutChildren()
+
+
+#print("LOADED")
+
+if __name__ == "__main__":
+    main()
+
+</pre>
+
+<div id="Personal Notes-A lot of my meshes had flipped normals"><h4 id="A lot of my meshes had flipped normals" class="header"><a href="#Personal Notes-A lot of my meshes had flipped normals">A lot of my meshes had flipped normals</a></h4></div>
+<p>
+<a href="https://www.youtube.com/watch?v=ICZv_u65hH8">YouTube - Houdini - Reversing &amp; Correcting Normals in Houdini</a>
+</p>
+
+
+
+<div id="Personal Notes-Directly from Copilot"><h4 id="Directly from Copilot" class="header"><a href="#Personal Notes-Directly from Copilot">Directly from Copilot</a></h4></div>
+<pre>
+import hou
+import re
+
+# Function to extract the numerical part of the string for sorting
+def sort_key(s):
+    match = re.match(r'([a-zA-Z]+)(\d+)', s)
+    if match:
+        stem, num = match.groups()
+        return (stem, int(num))
+    return (s, 0)
+
+# List of 'name' attributes from the assemble node
+name_values = ['value1', 'value20', 'value3', 'value100', 'value2']
+
+# Sort the list using the custom sort key
+sorted_values = sorted(name_values, key=sort_key)
+
+# Get the parent container of the assemble node
+assemble_node = hou.node('/obj/your_assemble_node')
+parent_network = assemble_node.parent()
+
+# Loop through the sorted values and create nodes
+for value in sorted_values:
+    # Create a 'blast' node
+    blast_node = parent_network.createNode('blast', node_name=f'blast_{value}')
+    # Set the 'Group' parameter
+    blast_node.parm('group').set(value)
+    
+    # Create a 'clean' node
+    clean_node = parent_network.createNode('clean', node_name=f'clean_{value}')
+    # Connect the blast node to the clean node
+    clean_node.setInput(0, blast_node)
+    # Check the 'Reverse Winding' option
+    clean_node.parm('reversewinding').set(True)
+    # Set 'bypass' flag to off
+    clean_node.bypass(True)
+    
+    # Evaluate the geometry of the blast node to get the 'part' attribute value
+    blast_geo = blast_node.geometry()
+    part_attrib = blast_geo.findPrimAttrib('part')
+    part_value = blast_geo.prim(0).stringAttribValue(part_attrib.name())
+    
+    # Create a 'stash' node with the 'part' attribute value as the suffix
+    stash_node = parent_network.createNode('stash', node_name=f'stash_{part_value}')
+    # Connect the clean node to the stash node
+    stash_node.setInput(0, clean_node)
+    # Activate the 'Stash Input' button
+    stash_node.parm('stashinput').pressButton()
+    
+    # Add the stash node to the list
+    stash_nodes.append(stash_node)
+    
+    # Layout the nodes for better visibility
+    parent_network.layoutChildren()
+
+# Create a 'merge' node
+merge_node = parent_network.createNode('merge', node_name='merge_all_stash_nodes')
+
+# Connect all stash nodes to the merge node
+for i, stash_node in enumerate(stash_nodes):
+    merge_node.setInput(i, stash_node)
+
+# Layout the parent network nodes for better visibility
+parent_network.layoutChildren()
+</pre>
+
+</body>
+</html>
