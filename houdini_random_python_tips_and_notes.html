@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>houdini_random_python_tips_and_notes</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Houdini.html">Houdini</a>
+</p>
+
+<div id="Random Notes &amp; Tips - PYTHON"><h2 id="Random Notes &amp; Tips - PYTHON" class="header"><a href="#Random Notes &amp; Tips - PYTHON">Random Notes &amp; Tips - PYTHON</a></h2></div>
+
+<div id="Contents" class="toc"><h1 id="Contents" class="header"><a href="#Contents">Contents</a></h1></div>
+<ul>
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Random Notes &amp; Tips - PYTHON">#Random Notes &amp; Tips - PYTHON</a>
+
+</ul>
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Node Cook">#Node Cook</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Walking up a Chain of Nodes">#Walking up a Chain of Nodes</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Using Regex or Wildcards in Searches (Dialog or Python)">#Using Regex or Wildcards in Searches (Dialog or Python)</a>
+
+<ul>
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Wildcard Search in the 'Find' dialog">#Wildcard Search in the 'Find' dialog</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Regex Search">#Regex Search</a>
+
+</ul>
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Checking if Nodes Exist (and Creating if they don't)">#Checking if Nodes Exist (and Creating if they don't)</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Isolating the Last Section of a Path (in Houdini's node paths)">#Isolating the Last Section of a Path (in Houdini's node paths)</a>
+
+<ul>
+<li>
+<a href="houdini_random_python_tips_and_notes.html#os Module">#os Module</a>
+
+</ul>
+<li>
+<a href="houdini_random_python_tips_and_notes.html#String Manipulation to Extract the Last Part of a Path">#String Manipulation to Extract the Last Part of a Path</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#How to get the Parent Node of a Node">#How to get the Parent Node of a Node</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Moving Nodes to another location">#Moving Nodes to another location</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#How to Access a Node from the Node-Name">#How to Access a Node from the Node-Name</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Create A Merge Node In A Container And Hook It Up To The Existing Nodes">#Create A Merge Node In A Container And Hook It Up To The Existing Nodes</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Setting the Display and Render Flags on a Node">#Setting the Display and Render Flags on a Node</a>
+
+<li>
+<a href="houdini_random_python_tips_and_notes.html#Set a Variable For a Module Name">#Set a Variable For a Module Name</a>
+
+<div id="Node Cook"><h1 id="Node Cook" class="header"><a href="#Node Cook">Node Cook</a></h1></div>
+
+<p>
+<code>node.cook()</code>
+</p>
+
+<p>
+I used Python to 'click' the 'Stash' node's 'Stash Input' button, but it skipped past most of the iterations on multiple nodes. The solution was to 'cook' the process (wait for the node to complete the process):
+</p>
+
+<pre python>
+# List of stash nodes
+stash_nodes = [hou.node('/obj/geo1/stash1'), hou.node('/obj/geo1/stash2'), hou.node('/obj/geo1/stash3')]
+
+for node in stash_nodes:
+    # Trigger the 'Stash Input' process
+    node.parm('stashinput').pressButton()
+    # Wait for the node to finish cooking
+    node.cook()
+</pre>
+
+<div id="Walking up a Chain of Nodes"><h1 id="Walking up a Chain of Nodes" class="header"><a href="#Walking up a Chain of Nodes">Walking up a Chain of Nodes</a></h1></div>
+
+<p>
+I wanted to move up a few nodes to perform a bypass toggle on them with <code>node.bypass(True)</code>:
+</p>
+
+<pre>
+import hou
+ 
+# Get the selected node
+selected_node = hou.selectedNodes()[0] # Assuming only one node is selected
+ 
+# Function to find the nth input node
+def find_nth_input_node(node, n):
+    current_node = node
+    for _ in range(n):
+        # Get the first input of the current node
+        inputs = current_node.inputs()
+        if not inputs:
+            return None # If there are no inputs, return None
+        current_node = inputs[0] # Move to the first input node
+    return current_node
+    
+# Find the third node up from the selected node
+third_node_up = find_nth_input_node(selected_node, 3)
+
+# Print the result
+if third_node_up:
+    print("The third node up is:", third_node_up.path())
+else:
+    print("There is no third node up from the selected node.")
+</pre>
+
+
+<div id="Using Regex or Wildcards in Searches (Dialog or Python)"><h1 id="Using Regex or Wildcards in Searches (Dialog or Python)" class="header"><a href="#Using Regex or Wildcards in Searches (Dialog or Python)">Using Regex or Wildcards in Searches (Dialog or Python)</a></h1></div>
+
+<div id="Using Regex or Wildcards in Searches (Dialog or Python)-Wildcard Search in the 'Find' dialog"><h2 id="Wildcard Search in the 'Find' dialog" class="header"><a href="#Using Regex or Wildcards in Searches (Dialog or Python)-Wildcard Search in the 'Find' dialog">Wildcard Search in the 'Find' dialog</a></h2></div>
+
+<p>
+You can use wildcards to match node names or parameter values. Here are some common wildcard
+characters:
+• * matches any string.
+• ? matches any single character.
+• [chars] matches any of the characters between the square brackets.
+</p>
+
+<p>
+For example:
+• geo* matches everything beginning with "geo".
+• [gG]eo* matches everything beginning with "geo" or "Geo".
+• ?eo* matches everything that has any character followed by "eo" and then any number of characters.
+</p>
+
+<div id="Using Regex or Wildcards in Searches (Dialog or Python)-Regex Search"><h2 id="Regex Search" class="header"><a href="#Using Regex or Wildcards in Searches (Dialog or Python)-Regex Search">Regex Search</a></h2></div>
+
+<p>
+Houdini also allows you to use more complex search patterns using the nodesearch package. You
+can create matchers to find nodes based on specific criteria.
+</p>
+
+<p>
+Here's an example of how to use the nodesearch package to find nodes whose name starts with "time_" and whose X translation is
+greater than 1:
+</p>
+
+<pre python>
+import hou
+from nodesearch import parser
+ 
+# Create a matcher that finds nodes whose name starts with time_ and whose X translation is &gt; 1
+matcher = parser.parse_query("time_* tx:&gt;1")
+
+network = hou.node("/obj/")
+for node in matcher.nodes(network, recursive=True):
+    print(node.path())
+</pre>
+
+<p>
+This script parses a query string into a matcher and searches for matching nodes in the specified
+network.
+</p>
+
+<div id="Checking if Nodes Exist (and Creating if they don't)"><h1 id="Checking if Nodes Exist (and Creating if they don't)" class="header"><a href="#Checking if Nodes Exist (and Creating if they don't)">Checking if Nodes Exist (and Creating if they don't)</a></h1></div>
+
+<p>
+You can use Houdini's Python API to check if a geometry node exists and create it if it doesn't. Here's an example of how you can achieve this:
+</p>
+
+<pre python>
+import hou
+# 
+# Define the path of the geometry node
+node_path = "/obj/geo1/my_geo"
+ 
+# Check if the node exists
+node = hou.node(node_path)
+ 
+# If the node doesn't exist, create it
+if node is None:
+    parent = hou.node("/obj/geo1") # Adjust the parent path as needed
+    node = parent.createNode("geo", "my_geo")
+ 
+# Print the result
+if node:
+    print(f"Node '{node.path()}' exists or has been created.")
+else:
+    print("Failed to create the node.")
+</pre>
+
+<p>
+In this script:
+</p>
+<ol>
+<li>
+Define the path of the geometry node you want to check.
+
+<li>
+Use hou.node() to see if the node exists.
+
+<li>
+If the node doesn't exist (node specified parent is None), use createNode() to create it under the
+
+<li>
+Print the result to confirm if the node exists or was successfully created.
+
+</ol>
+<p>
+This way, you can ensure that the geometry node you need is present in your Houdini scene.
+</p>
+
+<div id="Isolating the Last Section of a Path (in Houdini's node paths)"><h1 id="Isolating the Last Section of a Path (in Houdini's node paths)" class="header"><a href="#Isolating the Last Section of a Path (in Houdini's node paths)">Isolating the Last Section of a Path (in Houdini's node paths)</a></h1></div>
+
+<p>
+To isolate the last part of a path string in Python, you can use the os.path module, which provides useful functions for handling file paths.
+</p>
+
+<div id="Isolating the Last Section of a Path (in Houdini's node paths)-os Module"><h2 id="os Module" class="header"><a href="#Isolating the Last Section of a Path (in Houdini's node paths)-os Module">os Module</a></h2></div>
+
+<p>
+Specifically, the os.path.basename() function will help you get the last part of the path. Here's an example:
+</p>
+
+<pre python>
+import os
+
+# Path string
+path = "/path/to/your/file.txt"
+ 
+# Get the last part of the path
+basename = os.path.basename(path)
+
+print(basename) # Output: file.txt
+</pre>
+
+<div id="String Manipulation to Extract the Last Part of a Path"><h1 id="String Manipulation to Extract the Last Part of a Path" class="header"><a href="#String Manipulation to Extract the Last Part of a Path">String Manipulation to Extract the Last Part of a Path</a></h1></div>
+
+<p>
+If you don't want to use the os.path module, you can also achieve this with string manipulation:
+</p>
+
+<pre python>
+# Path string
+path = "/path/to/your/file.txt"
+
+# Get the last part of the path using rsplit
+basename = path.rsplit('/', 1)[-1]
+print(basename) # Output: file.txt
+</pre>
+
+<p>
+In the rsplit('/', 1) method, the '1' specifies the maximum number of splits to perform, starting from the right side of the string.
+</p>
+
+<p>
+Here’s a breakdown:
+• '/'.rsplit('/', splitting at most once.
+</p>
+<pre><code>• '1' means: split the string at the last occurrence of '/', and do this
+</code></pre>
+<p>
+• The method returns a list with the parts of the string.
+</p>
+
+<p>
+Here's a detailed example:
+</p>
+
+<pre python>
+path = "/path/to/your/file.txt"
+
+parts = path.rsplit('/', 1)
+
+print(parts) # Output: ['/path/to/your', 'file.txt']
+</pre>
+
+<p>
+The list parts contains two elements:
+</p>
+<ol>
+<li>
+'/path/to/your' (everything before the last '/')
+
+<li>
+'file.txt' (the part after the last '/')
+
+</ol>
+<p>
+So, by using rsplit('/', 1), you're effectively isolating the last part of the path (i.e., the file name) after the last '/'. The '1' makes sure that this split happens only once, starting from the right side of the string.
+</p>
+
+
+<div id="How to get the Parent Node of a Node"><h1 id="How to get the Parent Node of a Node" class="header"><a href="#How to get the Parent Node of a Node">How to get the Parent Node of a Node</a></h1></div>
+
+<pre python>
+import hou
+# 
+# Specify the path to the node
+node_path = "/obj/geo1/my_node"
+
+# Get the specified node
+node = hou.node(node_path)
+
+# Get the parent node
+parent_node = node.parent()
+ 
+# Print the result
+if parent_node:
+    print(f"The parent node of '{node.path()}' is '{parent_node.path()}'.")
+else:
+    print("The node has no parent (it might be a top-level node).")
+</pre>
+
+<p>
+In this script:
+</p>
+<ol>
+<li>
+Define the path to your specified node.
+
+<li>
+Use hou.node() to get the node object.
+
+<li>
+Use the parent() method to get the parent node of the specified node.
+
+<li>
+Print the path of the parent node.
+
+</ol>
+<div id="Moving Nodes to another location"><h1 id="Moving Nodes to another location" class="header"><a href="#Moving Nodes to another location">Moving Nodes to another location</a></h1></div>
+
+<p>
+Houdini's Python API does not have a built-in method specifically for moving nodes like copyNodesTo.
+</p>
+
+<p>
+However, you can achieve this by copying the nodes to the desired location and then deleting the original nodes. Here's an example of how you can do this:
+</p>
+
+<pre python>
+import hou
+
+# Source and destination paths
+source_path = "/obj/geo1"
+destination_path = "/obj/geo2"
+ 
+# Get the source and destination parent nodes
+source_node = hou.node(source_path)
+destination_node = hou.node(destination_path)
+
+# Select the nodes you want to move
+nodes_to_move = source_node.children()
+
+# Copy nodes to the destination
+new_nodes = hou.copyNodesTo(nodes_to_move, destination_node)
+
+# Delete the original nodes
+for node in nodes_to_move:
+    node.destroy()
+
+# Print the result
+print("Nodes have been moved to the destination.")
+</pre>
+
+<p>
+In this script:
+</p>
+<ol>
+<li>
+Define the source and destination paths.
+
+<li>
+Get the source and destination parent nodes.
+
+<li>
+Select the nodes you want to move.
+
+<li>
+Use hou.copyNodesTo to copy the selected nodes to the destination.
+
+<li>
+Delete the original nodes using the destroy() method.
+
+<li>
+Print a confirmation message.
+
+</ol>
+<p>
+By following these steps, you can effectively "move" nodes from one location to another.
+</p>
+
+
+<div id="How to Access a Node from the Node-Name"><h1 id="How to Access a Node from the Node-Name" class="header"><a href="#How to Access a Node from the Node-Name">How to Access a Node from the Node-Name</a></h1></div>
+
+<p>
+To get a node in Houdini using its name or path as a string, you can use the hou.node() function.
+</p>
+
+<p>
+This function takes a string representing the path to the node and returns the corresponding node object.
+</p>
+
+<p>
+Here's an example:
+</p>
+
+<pre python>
+import hou
+ 
+# Define the name-string (path) of the node
+node_path = "/obj/geo1/my_node"
+
+# Get the node using the name-string
+node = hou.node(node_path)
+
+# Check if the node exists
+if node is not None:
+    print(f"Node found: {node.path()}")
+else:
+    print("Node not found.")
+</pre>
+
+<p>
+In this script:
+</p>
+<ol>
+<li>
+Define the name-string (path) of the node.
+
+<li>
+Use hou.node() to get the node object using the name-string.
+
+<li>
+Check if the node exists and print the result.
+
+</ol>
+<p>
+This way, you can pass a name-string to Houdini and get the corresponding node.
+</p>
+
+<div id="Create A Merge Node In A Container And Hook It Up To The Existing Nodes"><h1 id="Create A Merge Node In A Container And Hook It Up To The Existing Nodes" class="header"><a href="#Create A Merge Node In A Container And Hook It Up To The Existing Nodes">Create A Merge Node In A Container And Hook It Up To The Existing Nodes</a></h1></div>
+
+<pre python>
+import hou
+
+# Define destination paths
+destination_path = "/obj/destination_geo"
+destination_node = hou.node(destination_path)
+
+# Create a 'Merge' node in the destination Geometry node
+merge_node = destination_node.createNode("merge", "merge1")
+ 
+# get the list of nodes (new_nodes) within the destination node (not featured here)
+
+# Add each copied node to the inputs of the 'Merge' node
+for i, new_node in enumerate(new_nodes):
+    merge_node.setInput(i, new_node)
+
+# Arrange the nodes to avoid overlap
+destination_node.layoutChildren()
+
+print("Nodes have been copied and merged successfully.")
+</pre>
+
+<div id="Setting the Display and Render Flags on a Node"><h1 id="Setting the Display and Render Flags on a Node" class="header"><a href="#Setting the Display and Render Flags on a Node">Setting the Display and Render Flags on a Node</a></h1></div>
+
+<pre python>
+
+# Set the 'display' and 'render' flags on a node
+my_node.setDisplayFlag(True)
+my_node.setRenderFlag(True)
+</pre>
+
+
+<div id="Set a Variable For a Module Name"><h1 id="Set a Variable For a Module Name" class="header"><a href="#Set a Variable For a Module Name">Set a Variable For a Module Name</a></h1></div>
+
+<p>
+To assign a module to a variable, which allows you to change the module in one place and have it reflected throughout your script.
+</p>
+
+<p>
+Here's an example of how you can do this:
+</p>
+
+<pre python>
+# Assign the module to a variable
+my_module = __import__('my_module')
+# 
+# Now you can use 'my_module' throughout your script
+result = my_module.some_function()
+print(result)
+
+# If you need to change the module, you can do it in one place
+my_module = __import__('another_module')
+
+# Use the new module
+result = my_module.some_function()
+print(result)
+</pre>
+
+<p>
+In this example:
+</p>
+<ol>
+<li>
+Use _<em>import</em>_('module_name') to import the module and assign it to a variable
+
+</ol>
+<p>
+(my_module).
+</p>
+<ol>
+<li>
+Use the variable (my_module) to call functions from the module.
+
+<li>
+If you need to change the module, you can reassign the variable to a different module using
+
+</ol>
+<p>
+_<em>import</em>_('another_module').
+</p>
+
+<p>
+This way, you only need to update the module assignment in one place, and the change will be reflected
+throughout your script.
+</p>
+
+</body>
+</html>
