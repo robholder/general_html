@@ -1850,9 +1850,353 @@ If you click the <code>Update Offset</code> button with the <code>object</code> 
 <div id="Path constraint"><h1 id="Path constraint" class="header"><a href="#Path constraint">Path constraint</a></h1></div>
 <div id="Path constraint-[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=481s|YouTube - Path constraint]]"><h4 id="[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=481s|YouTube - Path constraint]]" class="header"><a href="#Path constraint-[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=481s|YouTube - Path constraint]]"><a href="https://www.youtube.com/watch?v=hpigyuZv784&amp;t=481s">YouTube - Path constraint</a></a></h4></div>
 
+<p>
+To start this one, we can duplicate the <code>transforms</code> example. Rename to <code>path_constraint</code>
+</p>
+
+<p>
+Disconnect all the vertical network branches from the second input of the <code>constraints</code> (<code>Rig Attribute VOP</code>) node (the target and control stuff), and move to the right. (We'll use it again in the example following this one.)
+</p>
+
+<p>
+The tutorial selects a <code>Curve</code> tool from the <code>Create</code> shelf, but the tools in my version of Houdini (20.5) are not the same curve tools.
+</p>
+<ul>
+<li>
+Drop a <code>Curve</code> node, and click some points to form the curve. End with a <code>MMB</code> click.
+
+<ul>
+<li>
+Set <code>Primitive</code> to <code>Nurbs Curve</code>.
+
+<li>
+I also checked the <code>Reinterpret Curves as Current Type and Order</code>.
+
+</ul>
+<li>
+Add a <code>Rig Doctor</code> node:
+
+<ul>
+<li>
+This will automatically create the <code>name</code> attribute (<code>point_0, point_1, point_2, etc</code>)
+
+</ul>
+<li>
+Connect this up to the second input of the <code>constraints</code> VOP node.
+
+</ul>
+<div id="Path constraint-Diagram - Path Constraint setup (at obj/geom level)"><h4 id="Diagram - Path Constraint setup (at obj/geom level)" class="header"><a href="#Path constraint-Diagram - Path Constraint setup (at obj/geom level)">Diagram - Path Constraint setup (at obj/geom level)</a></h4></div>
+
+<pre>
+                                ┌────┐
+                                │add │
+                                └─┬──┘
+ ┌──────────────────────┐         │
+ │testgeometry_rubbertoy│      ┌──┴────┐
+ └────┬─────────────────┘      │ color │
+      │                        └──┬────┘
+      │                           │              ┌───────────────┐
+      │                        ┌──┴───┐          │     Curve     │
+      │                        │ name │          │  NURBS Curve  │
+      │                        └──┬───┘          └───────┬───────┘
+      │                           │                      │
+      │                      ┌────┴──────┐       ┌───────┴───────┐
+      │                      │ rigdoctor │       │  rigdoctor    │
+      │                      └────┬──────┘       └───────┬───────┘
+      │                           │                      │
+      │                  ┌────────┴─────────────┐        │
+      │                  │       null           │        │
+      │                  │ REST_OBJECT_SKELETON │        │
+      │                  └──────┬─┬─┬───────────┘        │
+      │      ┌──────────────────┘ │ │                    │
+      │      │                    │ └─────────┐          │
+┌─────┴──────┴──────┐             │           │          │
+│ capturecontrolgeo │             │           │          │
+└─────────┬─────────┘             │           │          │
+          │                       │           │          │
+          │                       │           │          │
+          │                       │           │          │
+          │                       │           │          │
+          │                       │           │          │
+          │                       │           │          │
+          │                       │        ┌──┴──────────┴─────┐
+          │                       │        │ Rig Attribute VOP │
+          │                       │        │   constraints     │
+          │                       │        └─────────┬─────────┘
+          │                       │                  │
+          └────────────────────┐  │  ┌───────────────┘
+                               │  │  │
+                           ┌───┴──┴──┴──┐
+                           │ bonedeform │
+                           └────────────┘
+</pre>
+
+<p>
+Jump inside the <code>constraints</code> VOP node:
+</p>
+<ul>
+<li>
+Delete the <code>target</code> node (the <code>Get Point Transform</code>).
+
+<li>
+Instead, drop a <code>Transform From Path</code> node:
+
+<ul>
+<li>
+Set the <code>File</code> dropdown to <code>Second Input</code>
+
+<li>
+Connect the <code>outxform</code> to the <code>setpointtransform</code> node's <code>xform</code> input.
+
+</ul>
+<li>
+Now, if you adjust the <code>Curve Position</code> slider on the <code>Transform From Path</code> node, you should see our <code>Rubber Toy</code> move along the path.
+
+<ul>
+<li>
+The <code>Primitive Number</code> can stay at 0 since we only have one curve and that first index is 0.
+
+<li>
+This is interesting - If you select <code>Get Look At From</code> <code>Look Along Curve</code>:
+
+<ul>
+<li>
+Add a small offset on the <code>Look At Offset</code>; maybe 0.01.
+
+<li>
+This means the <code>Rubber Toy</code> will look slightly ahead of itself along the curve.
+
+</ul>
+</ul>
+<li>
+You could promote the <code>Curve Position</code>, but I've been getting crashes whenever I use a promoted value.
+
+<li>
+Another observation: The up-vector was flipping on my own example. The <code>Rubber Toy</code> flipped along the path. This could be tweaked with the up-vector options.
+
+</ul>
+<div id="Path constraint-Diagram - Path Constraint - Rig Attribute VOP (constraints)"><h4 id="Diagram - Path Constraint - Rig Attribute VOP (constraints)" class="header"><a href="#Path constraint-Diagram - Path Constraint - Rig Attribute VOP (constraints)">Diagram - Path Constraint - Rig Attribute VOP (constraints)</a></h4></div>
+
+<pre>
+ ┌─────────────────────┐
+ │ Get Point Transform │
+ │                     │            ┌────────────────────┐
+ │ object              │            │ setpointtransform  │
+ │                     │            │                    │
+ │               ptnum ├────────────┤ pt                 │
+ │                     │            │                    │
+ └─────────────────────┘            │                    │
+                            ┌───────┤ xform              │
+                            │       └────────────────────┘
+  ┌────────────────────┐    │
+  │ Transform From Path│    │
+  │  transformfrompath1│    │
+  │                    │    │
+  │           outxform ├────┘
+  │                    │
+  └────────────────────┘
+</pre>
 
 <div id="Path constraint with custom look at vector"><h1 id="Path constraint with custom look at vector" class="header"><a href="#Path constraint with custom look at vector">Path constraint with custom look at vector</a></h1></div>
 <div id="Path constraint with custom look at vector-[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=672s|YouTube - Path constraint with custom look at vector]]"><h4 id="[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=672s|YouTube - Path constraint with custom look at vector]]" class="header"><a href="#Path constraint with custom look at vector-[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=672s|YouTube - Path constraint with custom look at vector]]"><a href="https://www.youtube.com/watch?v=hpigyuZv784&amp;t=672s">YouTube - Path constraint with custom look at vector</a></a></h4></div>
+
+<p>
+Duplicate the last example (the <code>path_constraint</code> node).
+</p>
+<ul>
+<li>
+Rename to <code>path_constraint_look_at_target</code>.
+
+</ul>
+<p>
+We need a target, so we'll use the disconnected set up from the original <code>transforms</code> setup.
+</p>
+
+<p>
+Connect the target network's <code>rigpose_target</code> node to the Third Input of the <code>constraints</code> node.
+</p>
+
+<div id="Path constraint with custom look at vector-Diagram - Path Constraint with Look At (obj/geometry level)"><h4 id="Diagram - Path Constraint with Look At (obj/geometry level)" class="header"><a href="#Path constraint with custom look at vector-Diagram - Path Constraint with Look At (obj/geometry level)">Diagram - Path Constraint with Look At (obj/geometry level)</a></h4></div>
+<pre>
+                                                                      ┌─────┐            ┌────────┐
+                                                                      │ add │            │ sphere │
+                                                                      └──┬──┘            └─────┬──┘
+                                ┌────┐                                   │                     │
+                                │add │                                   │                     │
+                                └─┬──┘                                   │                     │
+ ┌──────────────────────┐         │                                   ┌──┴───┐            ┌────┴──┐
+ │testgeometry_rubbertoy│      ┌──┴────┐                              │ name │            │ color │
+ └────┬─────────────────┘      │ color │                              └──┬───┘            └────┬──┘
+      │                        └──┬────┘                                 │                     │
+      │                           │          ┌───────────────┐           │                     │
+      │                        ┌──┴───┐      │     Curve     │           │                     │
+      │                        │ name │      │  NURBS Curve  │      ┌────┴──────┐         ┌────┴─┐
+      │                        └──┬───┘      └───────┬───────┘      │ rigdoctor │         │ name │
+      │                           │                  │              └────┬──────┘         └────┬─┘
+      │                      ┌────┴──────┐   ┌───────┴───────┐           │                     │
+      │                      │ rigdoctor │   │  rigdoctor    │    ┌──────┴─────────────┐  ┌────┴────┐
+      │                      └────┬──────┘   └───────┬───────┘    │       null         │  │  null   │ 
+      │                           │                  │            │REST_TARGET_SKELETON│  │ CONTROL │ 
+      │                  ┌────────┴─────────────┐    │            └──────┬─────────────┘  └────┬────┘ 
+      │                  │       null           │    │                   │     ┌───────────────┘
+      │                  │ REST_OBJECT_SKELETON │    │                   │     │
+      │                  └──────┬─┬─┬───────────┘    │             ┌─────┴─────┴──────┐
+      │      ┌──────────────────┘ │ │                │             │ attachcontrolgeo │
+      │      │                    │ └─────────┐      │             └─────┬────────────┘
+┌─────┴──────┴──────┐             │           │      │                   │
+│ capturecontrolgeo │             │           │      │            ┌──────┴─────────┐
+└─────────┬─────────┘             │           │      │            │     rigpose    │
+          │                       │           │      │            │ rigpose_target │
+          │                       │           │      │            └──────┬─────────┘
+          │                       │           │      │                   │
+          │                       │           │      │                   │
+          │                       │           │      │   ┌───────────────┘
+          │                       │           │      │   │
+          │                       │        ┌──┴──────┴───┴─────┐
+          │                       │        │ Rig Attribute VOP │
+          │                       │        │   constraints     │
+          │                       │        └─────────┬─────────┘
+          │                       │                  │
+          └────────────────────┐  │  ┌───────────────┘
+                               │  │  │
+                           ┌───┴──┴──┴──┐
+                           │ bonedeform │
+                           └────────────┘
+</pre>
+
+<p>
+Jump inside the <code>constriants</code> node (the <code>Rig Attribute VOP</code> node):
+</p>
+<ul>
+<li>
+On the <code>Transform From Path</code> node:
+
+<ul>
+<li>
+Set <code>Get Look At From</code> to <code>Vector</code>
+
+</ul>
+<li>
+Drop a <code>Get Point Transform</code> node:
+
+<ul>
+<li>
+Rename to <code>target</code>
+
+<li>
+Set <code>Signature</code> to <code>By Name</code>
+
+<li>
+Set <code>File</code> to <code>Third Input</code>
+
+<li>
+Set <code>Point Name</code> to <code>target</code>
+
+</ul>
+<li>
+Drop an <code>Extract Xform</code> node:
+
+<ul>
+<li>
+Rename to <code>extractxform_target</code>
+
+<li>
+Connect the <code>xform</code> output from the <code>target</code> node to the <code>xform</code> input of the <code>extractxfrom_target</code>
+
+</ul>
+</ul>
+<p>
+The next bit is a little confusing to explain:
+</p>
+<ul>
+<li>
+Drop another freestanding <code>Transform From Path</code> node
+
+<ul>
+<li>
+Set its <code>File</code> to <code>Second Input</code> 
+
+</ul>
+<li>
+This is the tricky bit:
+
+<ul>
+<li>
+On the original <code>Transform From Path</code> node, double-click on the (probably promoted) <code>curvepos</code> attribute input.
+
+<li>
+This should result in a new <code>curvepost</code> <code>Parameter</code> node already connected to the <code>curvepos</code> input.
+
+<li>
+Fork another wire from the <code>parameter</code> node's <code>curvepos</code> output to the <code>curvepos</code> input on the NEW <code>Transform From Path</code> node.
+
+</ul>
+<li>
+Continue from the new <code>Transform From Path</code> node:
+
+<ul>
+<li>
+Add an <code>Extract Xform</code> node:
+
+<ul>
+<li>
+Rename to <code>extractxform_object</code>
+
+<li>
+<code>outxform</code> output from the new <code>Transform From Path</code> to the <code>xform</code> input on the <code>extractxform_object</code>
+
+</ul>
+</ul>
+<li>
+Drop a freestanding <code>Subtract</code> node:
+
+<ul>
+<li>
+Plug the <code>trans</code> from the <code>extractxform_target</code> into the <code>subtract</code> node's <code>input1</code>
+
+<li>
+Plug the <code>trans</code> from the <code>extractxform_object</code> into the <code>subtract</code> node's <code>input2</code>
+
+<li>
+Plug the <code>diff</code> output from the <code>subtract</code> to the <code>lookatvector</code> on the original <code>Transform From Path</code> node
+
+</ul>
+</ul>
+<p>
+Diagram - Path Constraint with Look At - Rig Attribute VOP setup
+</p>
+<pre>
+                                                                                                             ┌─────────────────────┐
+                                                                                                             │ Get Point Transform │
+                      ┌─────────────────────┐                                                                │                     │            ┌────────────────────┐
+                      │                     │   ┌───────────────────────┐                                    │ object              │            │ setpointtransform  │
+                      │  transformfrompath2 │   │  extractxform_object  │                                    │                     │            │                    │
+                      │                     │   │                       │                                    │               ptnum ├────────────┤ pt                 │
+                  ┌───┤curvepos    outxform ├───┤  xform         trans  ┼─┐                                  │                     │            │                    │
+                  │   │                     │   └───────────────────────┘ │    ┌───────────────────┐         └─────────────────────┘            │                    │
+                  │   └─────────────────────┘                             │    │ subtract          │                                    ┌───────┤ xform              │
+                  │                                                       │    │                   │                                    │       └────────────────────┘
+                  │                                                       │    │                   │          ┌────────────────────┐    │
+  ┌────────────┐  │                                                       │ ┌──┼ input1            │          │ Transform From Path│    │
+  │  PARAMETER │  │                                                       │ │  │            diff   ├─────┐    │  transformfrompath1│    │
+  │   curvepos │  │                                                       └─┼──┤ input2            │     │    │                    │    │
+  │            │  │                                                         │  └───────────────────┘     │    │           outxform │────┘
+  │            │  │                                                         │                            │    │                    │
+  │   curvepos ┼──┴─────────────────────────────────────────────────────────┼────────────────────────────┼────┤ curvepos           │
+  └────────────┘                                                            │                            │    │                    │
+                       ┌─────────────────────┐                              │                            │    │                    │
+                       │ Get Point Transform │                              │                            └────┼ lookatvector       │
+                       │                     │                              │                                 │                    │
+                       │ target              │  ┌─────────────────────┐     │                                 └────────────────────┘
+                       │                     │  │ extractxform_target │     │
+                       │                     │  │                     │     │
+                       │             xform   ├──┤ xform       trans   ├─────┘
+                       └─────────────────────┘  └─────────────────────┘
+</pre>
+
+<p>
+As you send the object along the path (with the <code>curve_position</code> slider), it should 'look at' the target joint/point.
+</p>
 
 <div id="Path constraint with roll"><h1 id="Path constraint with roll" class="header"><a href="#Path constraint with roll">Path constraint with roll</a></h1></div>
 <div id="Path constraint with roll-[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=867s|YouTube - Path constraint with roll]]"><h4 id="[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=867s|YouTube - Path constraint with roll]]" class="header"><a href="#Path constraint with roll-[[https://www.youtube.com/watch?v=hpigyuZv784&amp;t=867s|YouTube - Path constraint with roll]]"><a href="https://www.youtube.com/watch?v=hpigyuZv784&amp;t=867s">YouTube - Path constraint with roll</a></a></h4></div>
