@@ -222,7 +222,41 @@ You can define a Vim function that applies the substitution to the current line 
 </p>
 <pre vim>
 function! SurroundWordsWithQuotes()
-  execute "'&lt;,'&gt;s/\\(\\w\\+\\(-\\w\\+\\)*\\)/'&amp;'/g"
+  " Get the start and end positions of the visual selection
+  let start_pos = getpos("'&lt;")
+  let end_pos = getpos("'&gt;")
+
+  " Extract the text within the visual selection
+  let start_line = start_pos[1]
+  let start_col = start_pos[2]
+  let end_line = end_pos[1]
+  let end_col = end_pos[2]
+
+  " Iterate through each line in the selection
+  for line_num in range(start_line, end_line)
+    let line_text = getline(line_num)
+
+    " Handle partial lines for the start and end of the selection
+    if line_num == start_line &amp;&amp; line_num == end_line
+      let selected_text = line_text[start_col - 1:end_col - 1]
+      let modified_text = substitute(selected_text, '\(\&lt;\w\+\(-\w\+\)*\&gt;\)', "'&amp;'", 'g')
+      let line_text = line_text[:start_col - 2] . modified_text . line_text[end_col:]
+    elseif line_num == start_line
+      let selected_text = line_text[start_col - 1:]
+      let modified_text = substitute(selected_text, '\(\&lt;\w\+\(-\w\+\)*\&gt;\)', "'&amp;'", 'g')
+      let line_text = line_text[:start_col - 2] . modified_text
+    elseif line_num == end_line
+      let selected_text = line_text[:end_col - 1]
+      let modified_text = substitute(selected_text, '\(\&lt;\w\+\(-\w\+\)*\&gt;\)', "'&amp;'", 'g')
+      let line_text = modified_text . line_text[end_col:]
+    else
+      " Modify the whole line for lines in between
+      let line_text = substitute(line_text, '\(\&lt;\w\+\(-\w\+\)*\&gt;\)', "'&amp;'", 'g')
+    endif
+
+    " Update the line in the buffer
+    call setline(line_num, line_text)
+  endfor
 endfunction
 </pre>
 
@@ -238,6 +272,10 @@ vnoremap &lt;Leader&gt;s :call SurroundWordsWithQuotes()&lt;CR&gt;
 
 <div id="Surrounding each word in a list with quotes-Converting a Substitution to a Function-Explanation:"><h4 id="Explanation:" class="header"><a href="#Surrounding each word in a list with quotes-Converting a Substitution to a Function-Explanation:">Explanation:</a></h4></div>
  
+<p>
+Key Features:
+Handles Visual Selection Precisely:
+</p>
 <ul>
 <li>
 Function:
@@ -247,23 +285,80 @@ Function:
 <code>function! SurroundWordsWithQuotes()</code>: Defines a Vim function named SurroundWordsWithQuotes.
 
 <li>
-<code>%s/\(\w\+\(-\w\+\)*\)/\'&amp;\'/g</code>: Substitutes the pattern globally for the entire buffer.
+The <code>getpos()</code> function captures both the starting and ending positions (line and column) of the visual selection.
 
 <li>
-The pattern captures hyphenated words and surrounds them with quotes.
+The logic respects the exact boundaries of the selection, ensuring no unselected text is affected.
 
 </ul>
 <li>
-<code>'&lt; and '&gt;</code> Marks:
+Handles Partial Lines:
 
 <ul>
 <li>
-These represent the start (<code>'&lt;</code>) and end (<code>'&gt;</code>) of the visual selection in Vim.
+On the starting and ending lines, only the selected portion is modified.
 
 <li>
-The substitution (<code>s/</code>) is now limited to the selected range.
+Full lines between the start and end are processed entirely.
 
 </ul>
+<li>
+Line-by-Line Processing:
+
+<ul>
+<li>
+Each line is extracted and updated individually using <code>getline()</code> and <code>setline()</code>.
+
+</ul>
+<li>
+Word Boundaries:
+
+<ul>
+<li>
+The substitution uses <code>\&lt;</code> and <code>\&gt;</code> to ensure that only complete words (and hyphenated words) are affected.
+
+</ul>
+</ul>
+<div id="Surrounding each word in a list with quotes-Converting a Substitution to a Function-Leader Key Mapping:"><h4 id="Leader Key Mapping:" class="header"><a href="#Surrounding each word in a list with quotes-Converting a Substitution to a Function-Leader Key Mapping:">Leader Key Mapping:</a></h4></div>
+
+<p>
+You can map it as follows:
+</p>
+<pre vim>
+vnoremap &lt;Leader&gt;s :call SurroundWordsWithQuotes()&lt;CR&gt;
+</pre>
+
+<div id="Surrounding each word in a list with quotes-Converting a Substitution to a Function-How It Works:"><h4 id="How It Works:" class="header"><a href="#Surrounding each word in a list with quotes-Converting a Substitution to a Function-How It Works:">How It Works:</a></h4></div>
+
+<ul>
+<li>
+Select the text visually (v for character selection or V for line selection).
+
+<li>
+Press &lt;Leader&gt;s (default Leader key is \, so you'd press \s).
+
+<li>
+The function processes only the visually selected text, respecting the exact selection.
+
+</ul>
+<div id="Surrounding each word in a list with quotes-Converting a Substitution to a Function-Test Case:"><h4 id="Test Case:" class="header"><a href="#Surrounding each word in a list with quotes-Converting a Substitution to a Function-Test Case:">Test Case:</a></h4></div>
+
+<p>
+Try this with a line like:
+</p>
+<pre text>
+This-is some-example text-to test-things.
+</pre>
+
+<p>
+If you select only some-example text-to, it should become:
+</p>
+
+<pre text>
+This-is 'some-example' 'text-to' test-things.
+</pre>
+
+<ul>
 <li>
 Shortcut:
 
