@@ -17,22 +17,23 @@
 <a href="vim_learning.html">vim_learning</a>
 </p>
 
+<table>
+<tr>
+<td>
+CAUTION: Not all tested and verified!
+</td>
+</tr>
+</table>
+
 <div id="Working With Structured Scripts"><h1 id="Working With Structured Scripts" class="header"><a href="#Working With Structured Scripts">Working With Structured Scripts</a></h1></div>
 
 <p>
 Below is an overview of ways you can use Vim's scripting and its built‐in commands to analyze, extract, or manipulate multi‐line blocks in a file—such as Nuke scripts—based on node classes or names. These techniques work on any structured text, and you can tailor them to your file’s format.
 </p>
 
-<div id="Working With Structured Scripts-Using Global Commands and Regex"><h3 id="Using Global Commands and Regex" class="header"><a href="#Working With Structured Scripts-Using Global Commands and Regex">Using Global Commands and Regex</a></h3></div>
 
 <p>
-If your Nuke script uses a block–based format (for example, blocks that begin with a keyword like <code>Read {</code> and end with <code>}</code>), you can use Vim’s global (<code>:g</code>) command with a regular expression to jump to and work with those blocks.
-</p>
-
-<div id="Working With Structured Scripts-Using Global Commands and Regex-Example: Marking Blocks"><h4 id="Example: Marking Blocks" class="header"><a href="#Working With Structured Scripts-Using Global Commands and Regex-Example: Marking Blocks">Example: Marking Blocks</a></h4></div>
-
-<p>
-For instance, suppose your Nuke script contains:
+Here is a fake Nuke script with some definition blocks:
 </p>
 
 <pre nuke>
@@ -47,32 +48,106 @@ Write {
 }
 </pre>
 
-<p>
-You might want to quickly find all <code>Read</code> blocks. While Vim’s single-line regular expressions don’t naturally span multiple lines, you can first navigate to the starting lines with:
-</p>
 
-<pre vim>
-:g/^Read\s*{/ normal! V/^\s*}\&lt;CR&gt;
-</pre>
+<div id="Working With Structured Scripts-Writing a Vimscript Function to Select Blocks"><h3 id="Writing a Vimscript Function to Select Blocks" class="header"><a href="#Working With Structured Scripts-Writing a Vimscript Function to Select Blocks">Writing a Vimscript Function to Select Blocks</a></h3></div>
 
 <p>
-This command does the following:
+To reliably select an entire block (from the starting pattern to the closing brace on its own line), you can write a Vimscript function that:
 </p>
+
 <ul>
 <li>
-<code>:g/^Read\s*{/</code> runs a command on every line that starts a Read <code>{</code> block.
+Finds the start line.
 
 <li>
-For each such line, <code>normal! V</code> enters Visual Line mode to select the current line.
+Searches for the next line matching the end pattern.
 
 <li>
-Then <code>/^\s*}\&lt;CR&gt;</code> searches downwards for a line that contains only a closing brace (<code>}</code>), effectively extending the selection to the end of the block.
+Manually sets the visual selection marks to cover the desired range.
 
 </ul>
 <p>
-You could then, for instance, yank that whole visual selection or even pipe it into another command. (Note: For more advanced multi-line matching, Vim’s pattern syntax could be extended using <code>\_</code> constructs, but many users prefer a script-based approach for clarity.)
+Here’s one way to do it:
+</p>
+<pre vim>
+function! VisualSelectBlock()
+  " Record the starting line number.
+  let start_line = line('.')
+  " Search forward for a line that contains only a closing brace.
+  let end_line = search('^\s*}\s*$', 'W')
+  " If we found a closing brace after the start line...
+  if end_line &gt; start_line
+    " Set the beginning and end marks for the Visual selection.
+    call setpos("'&lt;", [0, start_line, 1, 0])
+    call setpos("'&gt;", [0, end_line, 1, 0])
+    " Re-select the visual block from the marks.
+    normal! gv
+  else
+    echo "Closing brace not found."
+  endif
+endfunction
+</pre>
+
+<div id="Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-How the Function Works"><h4 id="How the Function Works" class="header"><a href="#Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-How the Function Works">How the Function Works</a></h4></div>
+
+<ul>
+<li>
+Determine Range: Using <code>line('.')</code> gets the current line number (which should be the <code>Read {</code> line). Then <code>search('^\s*}\s*$', 'W')</code> looks for a line that, possibly after some whitespace, contains only a closing brace—in the whole file.
+
+<li>
+Setting Visual Marks: The function uses <code>setpos("'&lt;", [0, start_line, 1, 0])</code> and <code>setpos("'&gt;", [0, end_line, 1, 0])</code> to define the start and end of the Visual selection.
+
+<li>
+Re-selecting: Finally, <code>normal! gv</code> re-selects the text that lies between those marks, effectively highlighting the entire block.
+
+</ul>
+<div id="Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-Using the Function"><h4 id="Using the Function" class="header"><a href="#Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-Using the Function">Using the Function</a></h4></div>
+
+<ul>
+<li>
+Place your cursor on a line that starts with <code>Read {</code>.
+
+<li>
+Execute the function with:
+
+</ul>
+  
+<pre vim>
+:call VisualSelectBlock()
+</pre>
+
+<ul>
+<li>
+The entire block — from the <code>Read {</code> line down to its matching closing <code>}</code> — should now be visually selected.
+
+</ul>
+<div id="Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-Extending Analysis on Multiple Lines"><h4 id="Extending Analysis on Multiple Lines" class="header"><a href="#Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-Extending Analysis on Multiple Lines">Extending Analysis on Multiple Lines</a></h4></div>
+
+<p>
+This technique can be expanded further. For example, you could:
 </p>
 
+<ul>
+<li>
+Extract Blocks to a Variable: Instead of merely selecting, you could loop over lines (using <code>getline(start_line, end_line)</code>) and process or modify the block.
+
+<li>
+Work on Subdirectories or Complex Paths: Just as we analyzed file paths earlier, you can further refine the selection logic by inspecting and manipulating blocks based on the contents of those lines (like node names or classes in Nuke scripts).
+
+</ul>
+<div id="Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-Summary"><h4 id="Summary" class="header"><a href="#Working With Structured Scripts-Writing a Vimscript Function to Select Blocks-Summary">Summary</a></h4></div>
+
+<ul>
+<li>
+The original one-liner doesn’t work as intended because the search in Visual mode doesn’t extend the selection.
+
+<li>
+A custom function that uses Vim’s internal marks to define a block is a more reliable approach.
+
+<li>
+Once you’ve mastered selecting text blocks, you can analyze or modify them programmatically—ideal for working with something like Nuke scripts where you might need to extract and process blocks based on node classes or names.
+
+</ul>
 <div id="Working With Structured Scripts-Writing a Vimscript Function to Extract Blocks"><h3 id="Writing a Vimscript Function to Extract Blocks" class="header"><a href="#Working With Structured Scripts-Writing a Vimscript Function to Extract Blocks">Writing a Vimscript Function to Extract Blocks</a></h3></div>
 
 <p>
