@@ -42,10 +42,10 @@ Add a Noise:
 
 <ul>
 <li>
-Make it very granular and crunchie
+Make it very granular and crunchy.
 
 <li>
-We want bright sparkly dots to defocus
+We want bright sparkly dots to defocus.
 
 </ul>
 <li>
@@ -59,9 +59,72 @@ Add a blank BlinkScript node.
 <a href="nuke_blinkscript_custom_defocus.html#Explanation of the Circle Formula">Circle Formula; radius - sqrt(x^2 + y^2) &gt; 0</a>
 
 </ul>
-<div id="BlinkScript - Create A Custom Defocus Tool Using BlinkScript-Image&lt;eRead&gt;"><h2 id="Image&lt;eRead&gt;" class="header"><a href="#BlinkScript - Create A Custom Defocus Tool Using BlinkScript-Image&lt;eRead&gt;">Image&lt;eRead&gt;</a></h2></div>
+<div id="The Whole BlinkScript"><h1 id="The Whole BlinkScript" class="header"><a href="#The Whole BlinkScript">The Whole BlinkScript</a></h1></div>
 
-<div id="BlinkScript - Create A Custom Defocus Tool Using BlinkScript-Image&lt;eRead&gt;-Access"><h3 id="Access" class="header"><a href="#BlinkScript - Create A Custom Defocus Tool Using BlinkScript-Image&lt;eRead&gt;-Access">Access</a></h3></div>
+<pre cpp>
+kernel SimpleDefocusKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; defocusMatte;
+    Image&lt;eWrite&gt; dst; // the output image
+
+    param:
+        // This parameter is made available to the user.
+        int defocusSize;
+
+    local:
+        // This local variable is not exposed to the user.
+
+    // In define(), parameters can be given labels and default values.
+    void define() {
+
+        defineParam(defocusSize, "defocus size", 1);
+
+    }
+
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init () {
+
+        src.setRange(-defocusSize, -defocusSize, defocusSize, defocusSize);
+
+    }
+
+    void process() {
+
+    float4 output = 0:
+    int normaliser = 0:
+
+    int scaledDefocusSize = defocusSize * defocusMatte().w;
+
+    if (scaledDefocusSize &gt; 0) {
+
+        for(int Y = -scaledDefocusSize; Y &lt;= scaledDefocusSize; Y++) {
+            for(int X = -scaledDefocusSize; X &lt;= scaledDefocusSize; X++) {
+
+                if(( scaledDefocusSize - sqrt(pow(X, 2) + pow(Y, 2)) ) &gt; 0) {
+
+                    output += src(X, Y);
+                    normaliser += 1;
+                }
+            }
+        }
+
+        output /= normaliser:
+
+        }else{
+
+            output = src(0,0);
+        }
+        // Write the result to the output image
+        dst() = output;
+    }
+};
+</pre>
+
+<div id="The Whole BlinkScript-Image&lt;eRead&gt;"><h2 id="Image&lt;eRead&gt;" class="header"><a href="#The Whole BlinkScript-Image&lt;eRead&gt;">Image&lt;eRead&gt;</a></h2></div>
+
+<div id="The Whole BlinkScript-Image&lt;eRead&gt;-Access"><h3 id="Access" class="header"><a href="#The Whole BlinkScript-Image&lt;eRead&gt;-Access">Access</a></h3></div>
 
 <ul>
 <li>
@@ -117,7 +180,7 @@ Directly access any pixel in image (absolute reference coordinates)
 
 </ul>
 </ul>
-<div id="BlinkScript - Create A Custom Defocus Tool Using BlinkScript-Define a Range"><h2 id="Define a Range" class="header"><a href="#BlinkScript - Create A Custom Defocus Tool Using BlinkScript-Define a Range">Define a Range</a></h2></div>
+<div id="The Whole BlinkScript-Define a Range"><h2 id="Define a Range" class="header"><a href="#The Whole BlinkScript-Define a Range">Define a Range</a></h2></div>
 
 <p>
 In the parameters section:
