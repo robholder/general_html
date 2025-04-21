@@ -212,6 +212,152 @@ The more flexible check for points accommodates natural data entry for multiple 
 This design helps maintain the robustness of the multiplication operation while allowing user input to be somewhat flexible where it makes sense.
 </p>
 
+<div id="Adapted Version with Option for Single Point"><h1 id="Adapted Version with Option for Single Point" class="header"><a href="#Adapted Version with Option for Single Point">Adapted Version with Option for Single Point</a></h1></div>
+<pre python>
+#! /usr/bin/env python3
+
+# Copilot helped with this one!
+import ast
+
+
+def main():
+    # 1. Get the transform matrix from the user.
+    # Expected format: a tuple of two tuples (each tuple is a row), e.g. ((a, b), (c, d))
+    tm_input = input("Enter the transform matrix as a tuple of two tuples (e.g., ((a, b), (c, d))): ")
+
+    try:
+        transform_matrix = ast.literal_eval(tm_input)
+        if not (
+            isinstance(transform_matrix, tuple) and
+            len(transform_matrix) == 2 and
+            all(isinstance(row, tuple) for row in transform_matrix)
+        ):
+            raise ValueError("Transform matrix must be a tuple of two tuples.")
+    except Exception as e:
+        print("Invalid transform matrix input:", e)
+        exit(1)
+
+    # Determine the expected number of columns based on the first row.
+    num_cols = len(transform_matrix[0])
+    if len(transform_matrix[1]) != num_cols:
+        print("Error: Both rows of the transform matrix must have the same number of elements.")
+        exit(1)
+
+    # 2. Get the point coordinates from the user.
+    # Expected formats:
+    #   a. For a single point: (x, y)
+    #   b. For multiple points: ((x1, y1), (x2, y2), ...)
+    points_input = input("Enter point(s) as a tuple of tuples (for a single point, enter (x, y)): ")
+
+    try:
+        points = ast.literal_eval(points_input)
+        # If the evaluated input is a tuple or list that is not a tuple of tuples,
+        # but instead represents a single point (x, y) with numbers inside,
+        # then wrap it in an additional tuple.
+        if isinstance(points, tuple):
+            if not points:  # empty tuple
+                raise ValueError("Empty input provided for points.")
+            # If the first element is not a tuple, assume it's a single point.
+            if not isinstance(points[0], tuple):
+                points = (points,)
+        # Alternatively, if a list was provided and its first element is not a tuple,
+        # wrap it as well.
+        elif isinstance(points, list):
+            if not points:  # empty list
+                raise ValueError("Empty input provided for points.")
+            if not isinstance(points[0], tuple):
+                points = (tuple(points),)
+        else:
+            raise ValueError("Points must be a tuple or list of tuples.")
+    except Exception as e:
+        print("Invalid points input:", e)
+        exit(1)
+
+    # 3. Validate that each point has the correct number of coordinates.
+    for pt in points:
+        if len(pt) != num_cols:
+            print("Error: Each point must have", num_cols, "values (found a point with", len(pt), "values).")
+            exit(1)
+
+    # 4. Multiply the transform matrix (2xN) by each point (an N-vector).
+    # Each point transforms to a new point (new_x, new_y) computed as:
+    #   new_x = sum(transform_matrix[0][j] * pt[j] for j in range(num_cols))
+    #   new_y = sum(transform_matrix[1][j] * pt[j] for j in range(num_cols))
+    transformed_points = []
+    for pt in points:
+        new_x = sum(transform_matrix[0][j] * pt[j] for j in range(num_cols))
+        new_y = sum(transform_matrix[1][j] * pt[j] for j in range(num_cols))
+        transformed_points.append((new_x, new_y))
+
+    # 5. Print the transformed points.
+    print("\nTransformed points:")
+    for index, point in enumerate(transformed_points, start=1):
+        print(f"Point {index}: {point}")
+
+
+if __name__ == "__main__":
+    main()
+
+</pre>
+
+
+<p>
+An adapted version of the code that handles both cases—when the user enters a list of point tuples:
+</p>
+<ul>
+<li>
+<code>((x1, y1), (x2, y2))</code>
+
+</ul>
+<p>
+or just a single point tuple:
+</p>
+<ul>
+<li>
+<code>(x, y)</code>
+
+</ul>
+<p>
+In the case of a single point tuple, the script will wrap it in an outer tuple so that further processing can handle it as a collection of one point.
+</p>
+
+<div id="Adapted Version with Option for Single Point-Explanation"><h4 id="Explanation" class="header"><a href="#Adapted Version with Option for Single Point-Explanation">Explanation</a></h4></div>
+
+<p>
+Input Parsing with <code>ast.literal_eval</code>: Both the transform matrix and the points are parsed safely.
+</p>
+<ul>
+<li>
+The transform matrix must be a tuple of exactly two inner tuples.
+
+<li>
+The points input can be either a tuple/list of point tuples or just a single point tuple.
+
+</ul>
+<p>
+Single Point Handling: For the points, after obtaining the literal value, the script checks:
+</p>
+<ul>
+<li>
+If it's a tuple and its first element isn’t another tuple, then it assumes the input represents a single point.
+
+<li>
+It does a similar check for a list input. Then, it wraps that single point into an outer tuple so that later code can iterate over it as if it were a tuple of points.
+
+</ul>
+<p>
+Multiplication: The transformation is applied by computing the dot product of each row (from the 2×N transform matrix) with the input point (an N-element tuple). This yields a new 2D coordinate.
+</p>
+
+<p>
+Output: All transformed points are printed.
+</p>
+
+<p>
+This adaptation ensures that whether the user types <code>(x, y)</code> or (<code>(x, y), ...</code>), the script will interpret the input correctly and apply the transformation accordingly.
+</p>
+
+
 <p>
 <br><br>
 <a href="math_matrices.html#Transforms">Math - Matrix Transforms</a>
