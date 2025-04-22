@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_blinkscript_dynamic_fog_scattering_copilot</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - BlinkScript Index</a>
+</p>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering"><h1 id="Copilot - BlinkScript - Dynamic Fog Scattering" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering">Copilot - BlinkScript - Dynamic Fog Scattering</a></h1></div>
+
+<p>
+Dynamic fog scattering can be achieved using procedural noise, depth-based modulation, and light absorption simulations in BlinkScript. This effect will softly obscure objects, creating an atmospheric haze that reacts dynamically to the scene.
+</p>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-BlinkScript Code: Dynamic Fog Scattering"><h4 id="BlinkScript Code: Dynamic Fog Scattering" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-BlinkScript Code: Dynamic Fog Scattering">BlinkScript Code: Dynamic Fog Scattering</a></h4></div>
+
+<p>
+This script introduces depth-sensitive fog, fading distant objects into atmospheric haze.
+</p>
+
+<pre cpp>
+kernel DynamicFog : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    ImageParam src;
+    ImageParam depthMap;  // Grayscale depth input
+    
+    param: float fogDensity &lt; min=0.1; max=5.0; default=2.0; &gt;;
+    param: float time &lt; min=0.0; max=10.0; default=0.0; &gt;;
+    param: float lightScattering &lt; min=0.1; max=3.0; default=1.5; &gt;;
+    
+    void process()
+    {
+        float2 uv = getNormalizedCoord();
+        float4 color = src(uv);
+        
+        // Sample depth value (assumes grayscale depth map)
+        float depthValue = depthMap(uv).r; 
+
+        // Simulate procedural fog noise modulation over time
+        float noiseFactor = sin(uv.x * 15.0 + time) * 0.2;
+
+        // Compute atmospheric light scattering effect
+        float scatterEffect = exp(-depthValue * fogDensity) * lightScattering;
+
+        // Blend fog effect into scene
+        float4 fogColor = float4(scatterEffect, scatterEffect, scatterEffect, 1.0);
+        float4 finalColor = mix(color, fogColor, depthValue + noiseFactor);
+        
+        output() = finalColor;
+    }
+};
+</pre>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-How It Works"><h4 id="How It Works" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-How It Works">How It Works</a></h4></div>
+
+<ul>
+<li>
+Uses a depth map to determine where fog is densest (farther areas have more haze).
+
+<li>
+fogDensity slider controls how thick the fog appears.
+
+<li>
+Procedural noise (sin wave) animates subtle atmospheric fluctuations.
+
+<li>
+Light scattering (exp(-depthValue * density)) creates realistic diffusion effects.
+
+<li>
+Fog integrates with depth data, ensuring realistic object fading into mist.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Additional Enhancements"><h4 id="Additional Enhancements" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Additional Enhancements">Additional Enhancements</a></h4></div>
+
+<ul>
+<li>
+Volumetric Fog Expansion: Introduce random noise variation to simulate rolling fog banks.
+
+<li>
+Colorized Fog: Add warm or cold tones based on scene lighting.
+
+<li>
+Directional Light Influence: Fog density reacts to sun direction &amp; brightness.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence"><h2 id="Animated Rolling Fog With Wind Influence" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence">Animated Rolling Fog With Wind Influence</a></h2></div>
+
+<p>
+Now let's upgrade our dynamic fog scattering effect by adding animated rolling fog movement influenced by wind velocity. This will create a natural fog bank effect, perfect for cinematic shots.
+</p>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Animated Rolling Fog with Wind Influence"><h3 id="BlinkScript Code: Animated Rolling Fog with Wind Influence" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Animated Rolling Fog with Wind Influence">BlinkScript Code: Animated Rolling Fog with Wind Influence</a></h3></div>
+
+<pre cpp>
+kernel RollingFogEffect : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    ImageParam src;
+    ImageParam depthMap; // Depth input for distance-based fog effects
+
+    param: float fogDensity &lt; min=0.1; max=5.0; default=2.0; &gt;;
+    param: float time &lt; min=0.0; max=10.0; default=0.0; &gt;;
+    param: float2 windDirection &lt; default=float2(0.2, 0.1); &gt;;
+    param: float turbulence &lt; min=0.1; max=3.0; default=1.0; &gt;;
+
+    void process()
+    {
+        float2 uv = getNormalizedCoord();
+        float4 color = src(uv);
+
+        // Sample depth value (grayscale)
+        float depthValue = depthMap(uv).r;
+
+        // Generate fog noise based on time and wind
+        float noiseFactor = sin(uv.x * 12.0 + time * 3.0) * 0.2;
+        float2 windShift = windDirection * (depthValue * fogDensity * 0.005);
+        
+        // Simulate atmospheric scattering
+        float scatterEffect = exp(-depthValue * fogDensity) * (1.0 + turbulence * noiseFactor);
+
+        // Apply rolling fog shift
+        float4 fogColor = float4(scatterEffect, scatterEffect, scatterEffect, 1.0);
+        float4 finalColor = mix(color, fogColor, depthValue + noiseFactor);
+
+        // Shift fog dynamically
+        output() = src(uv + windShift) * finalColor;
+    }
+};
+</pre>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Animated Rolling Fog with Wind Influence-What’s New in This Version?"><h4 id="What’s New in This Version?" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Animated Rolling Fog with Wind Influence-What’s New in This Version?">What’s New in This Version?</a></h4></div>
+
+
+<ul>
+<li>
+ Rolling Motion: Fog evolves dynamically using sinusoidal waves and time progression. 
+
+<li>
+ Wind Influence: windDirection slider allows movement in X/Y axes, shaping fog flow. 
+
+<li>
+ Turbulence Variation: Adds random shifts for a natural swirling effect. 
+
+<li>
+ Depth-Based Fog: Adjusts density based on scene depth, fading objects realistically.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Animated Rolling Fog with Wind Influence-Ways to Extend It"><h4 id="Ways to Extend It" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Animated Rolling Fog with Wind Influence-Ways to Extend It">Ways to Extend It</a></h4></div>
+
+<ul>
+<li>
+Color-tinted fog: Adjust fog based on scene temperature (cold fog = blue, desert haze = warm tones).
+
+<li>
+Fade effects: Introduce randomized patches where fog density varies naturally.
+
+<li>
+Volumetric lighting: Combine with light ray effects for dynamic beam scattering.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Fog Illuminated by Light Sources"><h3 id="BlinkScript Code: Fog Illuminated by Light Sources" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Fog Illuminated by Light Sources">BlinkScript Code: Fog Illuminated by Light Sources</a></h3></div>
+
+<p>
+This script introduces volumetric lighting where fog brightens near light sources, creating a cinematic glow.
+</p>
+
+<pre cpp>
+kernel FogLightingEffect : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    ImageParam src;
+    ImageParam depthMap; // Depth input for fog fading
+    ImageParam lightMap; // Light source map (grayscale or RGB)
+
+    param: float fogDensity &lt; min=0.1; max=5.0; default=2.0; &gt;;
+    param: float time &lt; min=0.0; max=10.0; default=0.0; &gt;;
+    param: float2 windDirection &lt; default=float2(0.2, 0.1); &gt;;
+    param: float turbulence &lt; min=0.1; max=3.0; default=1.0; &gt;;
+    param: float lightInfluence &lt; min=0.1; max=3.0; default=1.5; &gt;;
+
+    void process()
+    {
+        float2 uv = getNormalizedCoord();
+        float4 color = src(uv);
+
+        // Read depth value (grayscale for fog control)
+        float depthValue = depthMap(uv).r;
+
+        // Sample light influence from the scene
+        float lightIntensity = lightMap(uv).r; // Extract brightness from light source map
+
+        // Generate fog noise modulation over time
+        float noiseFactor = sin(uv.x * 12.0 + time * 3.0) * 0.2;
+        float2 windShift = windDirection * (depthValue * fogDensity * 0.005);
+
+        // Simulate atmospheric scattering based on depth &amp; light influence
+        float scatterEffect = exp(-depthValue * fogDensity) * (1.0 + turbulence * noiseFactor);
+        scatterEffect += lightIntensity * lightInfluence; // Light enhances fog brightness
+
+        // Apply rolling fog shift &amp; illumination effect
+        float4 fogColor = float4(scatterEffect, scatterEffect, scatterEffect, 1.0);
+        float4 finalColor = mix(color, fogColor, depthValue + noiseFactor);
+
+        // Shift fog dynamically &amp; blend lighting
+        output() = src(uv + windShift) * finalColor;
+    }
+};
+</pre>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Fog Illuminated by Light Sources-What’s New in This Version?"><h4 id="What’s New in This Version?" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Fog Illuminated by Light Sources-What’s New in This Version?">What’s New in This Version?</a></h4></div>
+
+<ul>
+<li>
+ Light-Based Fog Brightness: Fog glows more near light sources. 
+
+<li>
+ lightInfluence control: Adjusts how much light affects the fog. 
+
+<li>
+ Light Map Input: Allows real-time volumetric fog illumination based on an image map. 
+
+<li>
+ Works with Wind &amp; Motion: Fog rolls naturally while reacting to scene lighting.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Fog Illuminated by Light Sources-Potential Enhancements"><h4 id="Potential Enhancements" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Animated Rolling Fog With Wind Influence-BlinkScript Code: Fog Illuminated by Light Sources-Potential Enhancements">Potential Enhancements</a></h4></div>
+
+<ul>
+<li>
+Adaptive scattering colors (warm tones for sunset, cool tones for moonlight).
+
+<li>
+Per-channel RGB light influence (fog brightens in different colors based on light intensity).
+
+<li>
+More turbulence effects (randomized fog shifts for more natural movement).
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering"><h2 id="Setting Up Nuke Nodes for Fog &amp; Light Scattering" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering">Setting Up Nuke Nodes for Fog &amp; Light Scattering</a></h2></div>
+
+<p>
+Let's integrate volumetric light shafts into our fog simulation inside Nuke, using BlinkScript for GPU-accelerated dynamic lighting effects.
+</p>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering"><h3 id="Setting Up Nuke Nodes for Fog &amp; Light Scattering" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering">Setting Up Nuke Nodes for Fog &amp; Light Scattering</a></h3></div>
+
+<p>
+You'll need:
+</p>
+<ul>
+<li>
+Depth Map Input – This defines fog density based on object distance.
+
+<li>
+Light Map Input – A grayscale image representing light sources.
+
+<li>
+BlinkScript Node – Runs our custom fog + light shaft effect.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Step-by-Step Setup:"><h4 id="Step-by-Step Setup:" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Step-by-Step Setup:">Step-by-Step Setup:</a></h4></div>
+
+<ul>
+<li>
+Create a depth map (you can use the ZDepth pass from a CG render).
+
+<li>
+Create a light mask (paint areas where light interacts with the fog).
+
+<li>
+Add a BlinkScript node to apply GPU-based fog diffusion and light scattering.
+
+<li>
+Connect depthMap and lightMap inputs to the BlinkScript node.
+
+<li>
+Tweak intensity sliders in the BlinkScript properties for real-time adjustments.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-BlinkScript Code: Light Shafts in Fog"><h4 id="BlinkScript Code: Light Shafts in Fog" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-BlinkScript Code: Light Shafts in Fog">BlinkScript Code: Light Shafts in Fog</a></h4></div>
+
+<p>
+This script generates volumetric light beams that react to scene depth.
+</p>
+
+<pre cpp>
+kernel LightShaftsFog : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    ImageParam src;
+    ImageParam depthMap;
+    ImageParam lightMap;
+
+    param: float fogDensity &lt; min=0.1; max=5.0; default=2.0; &gt;;
+    param: float lightStrength &lt; min=0.1; max=3.0; default=1.5; &gt;;
+    param: float2 lightDirection &lt; default=float2(0.1, 0.3); &gt;;
+    param: float beamTurbulence &lt; min=0.1; max=3.0; default=1.0; &gt;;
+    param: float time &lt; min=0.0; max=10.0; default=0.0; &gt;;
+
+    void process()
+    {
+        float2 uv = getNormalizedCoord();
+        float4 color = src(uv);
+        
+        // Sample depth for fog influence
+        float depthValue = depthMap(uv).r;
+
+        // Sample light strength from the scene
+        float lightIntensity = lightMap(uv).r;
+
+        // Compute directional light shaft effect
+        float2 beamShift = lightDirection * (depthValue * fogDensity * 0.005);
+        float noiseFactor = sin(uv.x * 12.0 + time * 3.0) * beamTurbulence;
+
+        // Enhance light shafts with depth scattering
+        float scatterEffect = exp(-depthValue * fogDensity) * (1.0 + noiseFactor);
+        scatterEffect += lightIntensity * lightStrength;
+
+        // Create the volumetric light effect
+        float4 lightColor = float4(scatterEffect, scatterEffect, scatterEffect, 1.0);
+        float4 finalColor = mix(color, lightColor, depthValue);
+
+        // Apply shifted light shafts
+        output() = src(uv + beamShift) * finalColor;
+    }
+};
+</pre>
+
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-How This Works"><h4 id="How This Works" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-How This Works">How This Works</a></h4></div>
+
+<ul>
+<li>
+ Uses a depth map for fog thickness, ensuring distant areas are more obscured. 
+
+<li>
+ Light shafts evolve dynamically, creating cinematic volumetric lighting. 
+
+<li>
+ Beam turbulence introduces realism, mimicking atmospheric scatter variations. 
+
+<li>
+ Animated shafts move smoothly, controlled via time slider.
+
+</ul>
+<div id="Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Making It Even More Cinematic"><h4 id="Making It Even More Cinematic" class="header"><a href="#Copilot - BlinkScript - Dynamic Fog Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Setting Up Nuke Nodes for Fog &amp; Light Scattering-Making It Even More Cinematic">Making It Even More Cinematic</a></h4></div>
+
+<ul>
+<li>
+Add colored light shafts: Modify lightStrength to tint beams naturally.
+
+<li>
+Boost intensity near bright sources: Fade light rays based on distance.
+
+<li>
+Introduce flicker variations: Use randomized time functions for natural movement.
+
+</ul>
+<p>
+<br><br><br>
+<a href="nuke_blinkscript_index.html">Nuke - BlinkScript Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
