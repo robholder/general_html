@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_blinkscript_aperture_defocus_copilot</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - BlinkScript Index</a>
+</p>
+
+<div id="BlinkScript - Defocus with Aperture Shape"><h1 id="BlinkScript - Defocus with Aperture Shape" class="header"><a href="#BlinkScript - Defocus with Aperture Shape">BlinkScript - Defocus with Aperture Shape</a></h1></div>
+
+<ul>
+<li>
+<a href="nuke_aperture_and_defocus.html">Nuke - How Aperture Affects Defocus</a>
+
+</ul>
+<p>
+BlinkScript is powerful for GPU-accelerated effects, and Nuke’s native nodes also provide ways to simulate aperture-based blur.
+</p>
+
+<div id="BlinkScript - Defocus with Aperture Shape-Example 1: Nuke ZDefocus with Custom Aperture Shape"><h2 id="Example 1: Nuke ZDefocus with Custom Aperture Shape" class="header"><a href="#BlinkScript - Defocus with Aperture Shape-Example 1: Nuke ZDefocus with Custom Aperture Shape">Example 1: Nuke ZDefocus with Custom Aperture Shape</a></h2></div>
+
+<p>
+Nuke's ZDefocus node allows you to define an aperture shape when applying blur effects.
+</p>
+
+<div id="BlinkScript - Defocus with Aperture Shape-Example 1: Nuke ZDefocus with Custom Aperture Shape-Steps in Nuke:"><h3 id="Steps in Nuke:" class="header"><a href="#BlinkScript - Defocus with Aperture Shape-Example 1: Nuke ZDefocus with Custom Aperture Shape-Steps in Nuke:">Steps in Nuke:</a></h3></div>
+
+<ul>
+<li>
+Add a ZDefocus node.
+
+<li>
+Connect an image to it.
+
+<li>
+In the Aperture Shape settings, choose:
+
+<li>
+Circle: Ideal for smooth blur.
+
+<li>
+Hexagon: Mimics a camera lens with 6 aperture blades.
+
+<li>
+Custom Shape: You can input a custom image mask to simulate unique aperture patterns (e.g., heart-shaped bokeh).
+
+<li>
+Adjust the size and depth values to control the blur intensity.
+
+</ul>
+<p>
+This method accurately simulates real-world defocus behavior based on aperture shape.
+</p>
+
+<div id="BlinkScript - Defocus with Aperture Shape-Example 2: BlinkScript Custom Aperture Blur"><h2 id="Example 2: BlinkScript Custom Aperture Blur" class="header"><a href="#BlinkScript - Defocus with Aperture Shape-Example 2: BlinkScript Custom Aperture Blur">Example 2: BlinkScript Custom Aperture Blur</a></h2></div>
+
+<p>
+If you want a fully customizable GPU-based approach, BlinkScript can apply a kernel-based blur with a defined aperture shape.
+</p>
+
+<pre cpp>
+kernel ApertureBlur : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    ImageParam src;
+    ImageParam apertureMask; // Aperture shape input
+
+    param:
+        float blurIntensity;
+
+    void process()
+    {
+        float4 color = src(); // Get current pixel color
+        float apertureEffect = apertureMask(); // Get aperture mask influence
+
+        // Apply blur using aperture shape influence
+        color.rgb *= apertureEffect * blurIntensity;
+
+        output() = color;
+    }
+};
+</pre>
+
+<div id="BlinkScript - Defocus with Aperture Shape-Example 2: BlinkScript Custom Aperture Blur-How This Works:"><h4 id="How This Works:" class="header"><a href="#BlinkScript - Defocus with Aperture Shape-Example 2: BlinkScript Custom Aperture Blur-How This Works:">How This Works:</a></h4></div>
+
+<ul>
+<li>
+Reads the source image (src).
+
+<li>
+Reads an aperture mask (apertureMask).
+
+<li>
+Adjusts the blur based on aperture shape influence.
+
+<li>
+Applies an intensity multiplier to control the blur strength.
+
+</ul>
+<p>
+You can modify the apertureMask input to load different aperture shapes, allowing custom defocus behaviors!
+</p>
+
+<div id="Interactive Aperture Shape Modification (Bokeh Customization)"><h1 id="Interactive Aperture Shape Modification (Bokeh Customization)" class="header"><a href="#Interactive Aperture Shape Modification (Bokeh Customization)">Interactive Aperture Shape Modification (Bokeh Customization)</a></h1></div>
+
+<p>
+Aperture effects determine how bright points appear when defocused. This script lets users modify aperture shape dynamically using UI controls, allowing adjustment of circle, hexagon, and custom polygonal bokeh.
+</p>
+
+<div id="Interactive Aperture Shape Modification (Bokeh Customization)-BlinkScript Code: Aperture Shape Modification"><h4 id="BlinkScript Code: Aperture Shape Modification" class="header"><a href="#Interactive Aperture Shape Modification (Bokeh Customization)-BlinkScript Code: Aperture Shape Modification">BlinkScript Code: Aperture Shape Modification</a></h4></div>
+
+<pre cpp>
+kernel ApertureModification : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    ImageParam src;
+
+    param: float apertureSides &lt; min=3; max=8; default=6; &gt;;
+    param: float intensity &lt; min=0.1; max=2.0; default=1.0; &gt;;
+
+    void process()
+    {
+        float2 uv = getNormalizedCoord();
+        float4 color = src(uv);
+
+        // Compute distance from center (simulating out-of-focus highlights)
+        float2 centeredUV = (uv - 0.5) * 2.0;
+        float r = length(centeredUV);
+
+        // Simulate aperture shape by modifying edges
+        float shapeEffect = sin(apertureSides * atan2(centeredUV.y, centeredUV.x));
+
+        // Apply intensity and shape to affect blur highlights
+        float4 modifiedColor = color * (1.0 + intensity * shapeEffect);
+
+        output() = modifiedColor;
+    }
+};
+</pre>
+
+<div id="Interactive Aperture Shape Modification (Bokeh Customization)-How It Works"><h4 id="How It Works" class="header"><a href="#Interactive Aperture Shape Modification (Bokeh Customization)-How It Works">How It Works</a></h4></div>
+
+<ul>
+<li>
+<code>apertureSides</code> slider lets users adjust 3 to 8-sided aperture shapes.
+
+<li>
+<code>intensity</code> slider controls how strong the shape effect is.
+
+<li>
+Uses sinusoidal distortion to mimic polygonal defocusing.
+
+<li>
+Can be extended with custom texture masks for user-defined bokeh.
+
+</ul>
+<div id="Animated Time Control for Aperture Shape"><h1 id="Animated Time Control for Aperture Shape" class="header"><a href="#Animated Time Control for Aperture Shape">Animated Time Control for Aperture Shape</a></h1></div>
+
+<p>
+We can introduce an animation factor (time) to make aperture shapes dynamically shift and simulate real-world imperfections.
+</p>
+
+<div id="Animated Time Control for Aperture Shape-BlinkScript Code: Animated Aperture Modulation"><h4 id="BlinkScript Code: Animated Aperture Modulation" class="header"><a href="#Animated Time Control for Aperture Shape-BlinkScript Code: Animated Aperture Modulation">BlinkScript Code: Animated Aperture Modulation</a></h4></div>
+
+<pre cpp>
+kernel ApertureAnimation : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    ImageParam src;
+
+    param: float apertureSides &lt; min=3; max=8; default=6; &gt;;
+    param: float time &lt; min=0.0; max=10.0; default=0.0; &gt;;
+    param: float intensity &lt; min=0.1; max=2.0; default=1.0; &gt;;
+
+    void process()
+    {
+        float2 uv = getNormalizedCoord();
+        float4 color = src(uv);
+
+        // Compute distance from center
+        float2 centeredUV = (uv - 0.5) * 2.0;
+        float r = length(centeredUV);
+
+        // Modulate aperture shape dynamically based on time
+        float shapeEffect = sin(apertureSides * atan2(centeredUV.y, centeredUV.x) + time * 2.0);
+
+        // Apply animated intensity variation
+        float4 modifiedColor = color * (1.0 + intensity * shapeEffect);
+
+        output() = modifiedColor;
+    }
+};
+</pre>
+
+<div id="Animated Time Control for Aperture Shape-Enhancements"><h4 id="Enhancements" class="header"><a href="#Animated Time Control for Aperture Shape-Enhancements">Enhancements</a></h4></div>
+
+<ul>
+<li>
+<code>time</code> control makes aperture shape pulse dynamically.
+
+<li>
+Sinusoidal modulation applies gradual variation, mimicking real lens imperfections.
+
+<li>
+Can be extended
+
+</ul>
+<p>
+<br><br>
+<a href="nuke_blinkscript_index.html">Nuke - BlinkScript Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
