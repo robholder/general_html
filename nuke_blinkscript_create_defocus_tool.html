@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_blinkscript_create_defocus_tool</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<div id="[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+
+<div id="[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+
+<div id="Create a Custom Defocus Tool Using BlinkScript"><h1 id="Create a Custom Defocus Tool Using BlinkScript" class="header"><a href="#Create a Custom Defocus Tool Using BlinkScript">Create a Custom Defocus Tool Using BlinkScript</a></h1></div>
+
+<ul>
+<li>
+<a href="https://youtu.be/rMHGSoXj4bw?si=eea6pZgO6jrwqZtA">YouTube Link: Create a Custom Defocus Tool</a>
+
+</ul>
+<p>
+This is the code from the video:
+</p>
+<pre cpp>
+kernel SimpleDefocusKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; // the input image
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; defocusMatte;
+    Image&lt;eWrite&gt; dst; // the output image
+
+    param:
+        // This parameter is made available to the user.
+        int defocusSize;
+
+    local:
+        // This local variable is not exposed to the user.
+
+    // In define(), parameters can be given labels and default values.
+    void define() {
+
+        defineParam(defocusSize, "defocus size", 1);
+
+    }
+
+    // The init() function is run before any calls to process().
+    // Local variables can be initialized here.
+    void init () {
+
+        src.setRange(-defocusSize, -defocusSize, defocusSize, defocusSize);
+
+    }
+
+    void process() {
+
+    float4 output = 0;
+    int normaliser = 0;
+
+    // Sample the defocus matte at the current pixel's coordinates
+    float matteValue = defocusMatte().w;
+    int scaledDefocusSize = defocusSize * matteValue;
+
+    if (scaledDefocusSize &gt; 0) {
+
+        for(int Y = -scaledDefocusSize; Y &lt;= scaledDefocusSize; Y++) {
+            for(int X = -scaledDefocusSize; X &lt;= scaledDefocusSize; X++) {
+
+                if(( scaledDefocusSize - sqrt(pow(X, 2) + pow(Y, 2)) ) &gt; 0) {
+
+                    output += src(X, Y);
+                    normaliser += 1;
+
+                }
+            }
+        }
+
+        if (normaliser &gt; 0) { // Avoid division by zero
+            output = output / normaliser;
+        } else {
+            output = src(0, 0); // Fallback if no samples were taken
+        }
+
+        } else {
+
+            output = src(0,0);
+
+        }
+
+        // Write the result to the output image
+        dst()= output;
+
+    }
+};
+</pre>
+
+
+<p>
+I had an error:
+</p>
+<pre cpp>
+kernel: line 65: no viable overloaded '='
+</pre>
+
+<p>
+Google's Gemini found that the likely issue was not a full set of channels available to 'write into'. Sure enough, I looked at the 'Kernel Parameters' tab, and the 'red' channel for the output was somehow unchecked. Switching it on corrected the issue!
+</p>
+
+
+
+
+<div id="Create a Custom Defocus Tool Using BlinkScript-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><h3 id="[[nuke_blinkscript_index|Nuke - Blinkscript]]" class="header"><a href="#Create a Custom Defocus Tool Using BlinkScript-[[nuke_blinkscript_index|Nuke - Blinkscript]]"><a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a></a></h3></div>
+
+<div id="Create a Custom Defocus Tool Using BlinkScript-[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#Create a Custom Defocus Tool Using BlinkScript-[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
