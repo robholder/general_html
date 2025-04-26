@@ -33,67 +33,45 @@ kernel SimpleDefocusKernel : ImageComputationKernel&lt;ePixelWise&gt;
     Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; // the input image
     Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; defocusMatte;
     Image&lt;eWrite&gt; dst; // the output image
-
     param:
         // This parameter is made available to the user.
         int defocusSize;
-
     local:
         // This local variable is not exposed to the user.
-
     // In define(), parameters can be given labels and default values.
     void define() {
-
         defineParam(defocusSize, "defocus size", 1);
-
     }
-
     // The init() function is run before any calls to process().
     // Local variables can be initialized here.
     void init () {
-
         src.setRange(-defocusSize, -defocusSize, defocusSize, defocusSize);
-
     }
-
     void process() {
-
     float4 output = 0;
     int normaliser = 0;
-
     // Sample the defocus matte at the current pixel's coordinates
     float matteValue = defocusMatte().w;
     int scaledDefocusSize = defocusSize * matteValue;
-
     if (scaledDefocusSize &gt; 0) {
-
         for(int Y = -scaledDefocusSize; Y &lt;= scaledDefocusSize; Y++) {
             for(int X = -scaledDefocusSize; X &lt;= scaledDefocusSize; X++) {
-
                 if(( scaledDefocusSize - sqrt(pow(X, 2) + pow(Y, 2)) ) &gt; 0) {
-
                     output += src(X, Y);
                     normaliser += 1;
-
                 }
             }
         }
-
         if (normaliser &gt; 0) { // Avoid division by zero
             output = output / normaliser;
         } else {
             output = src(0, 0); // Fallback if no samples were taken
         }
-
         } else {
-
             output = src(0,0);
-
         }
-
         // Write the result to the output image
         dst()= output;
-
     }
 };
 </pre>
