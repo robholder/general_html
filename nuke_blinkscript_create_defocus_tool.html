@@ -410,12 +410,15 @@ output /= normalizer;
 
 <div id="Adding 'Else' option"><h1 id="Adding 'Else' option" class="header"><a href="#Adding 'Else' option">Adding 'Else' option</a></h1></div>
 
+
 <p>
-In our case, we don't <em>need</em> an else, but we could add one
+Another spoiler, in our case, if we run our defocus using the 'matte' option that we build later on, we'll need to return ONLY the original source pixel value (not the convolve):
 </p>
 <pre cpp>
+if (normalizer &gt; 0) { // Avoid division by zero
+    output = output / normalizer;
 } else {
-output = src(0, 0); // Fallback if no samples were taken
+    output = src(0, 0); // Fallback if no samples were taken
 }
 </pre>
 
@@ -425,6 +428,52 @@ At the base of our code, we specify the <code>dst()</code> (output) as the <code
 <pre cpp>
 dst() = output;
 </pre>
+
+<div id="Adding a Matte Facility (to limit the area of the filter)"><h1 id="Adding a Matte Facility (to limit the area of the filter)" class="header"><a href="#Adding a Matte Facility (to limit the area of the filter)">Adding a Matte Facility (to limit the area of the filter)</a></h1></div>
+
+<p>
+Similar to the matte input of a iDistort node, we'll add a matte facility to our BlinkScript. (Think of a ramp or similar to affect the intensity across an image.)
+</p>
+
+<p>
+We need to define an extra Image:
+</p>
+
+<pre cpp>
+//We only need a single point access, with eAccessPoint:
+Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; defocusMatte;
+</pre>
+
+<p>
+We'll take the grayscale value of this Image, and <em>multiply</em> that against the <code>defocusSize</code>, to attenuate the blur amount based on the matte input.
+</p>
+
+<pre cpp>
+// Define the variables (matte's alpha channel value at 'this' pixel) and
+// calculate the attenuated defocus size (called scaledDefocusSize).
+    float matteValue = defocusMatte().w;
+    int scaledDefocusSize = defocusSize * matteValue;
+</pre>
+
+<p>
+Now that we've effectively renamed our <code>defocusSize</code> result, we need to amend our code to the new variable name of <code>scaledDefocusSize</code>.
+</p>
+
+<div id="Fixing a Nan issue"><h1 id="Fixing a Nan issue" class="header"><a href="#Fixing a Nan issue">Fixing a Nan issue</a></h1></div>
+
+<p>
+If we run the code as we have outlined, we hit an issue, whereby if the alpha matte value is zero, we get a 'nan' result in each channel. To this this we'll need to put a condition to surround the defocus step, to only run if the matte value is above zero.
+</p>
+
+<pre cpp>
+if(scaledDefocusMatte &gt; 0) {
+// run defocus process
+}
+</pre>
+
+
+
+
 
 
 <p>
