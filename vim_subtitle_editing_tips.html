@@ -2,7 +2,6 @@
 <html>
 <head>
 <link rel="Stylesheet" type="text/css" href="style.css">
-<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
 <title>vim_subtitle_editing_tips</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,6 +33,7 @@ vim -O file1.txt file2.txt
 <code>-O</code> opens the files in vertical splits (use <code>-o</code> for horizontal splits).
 
 </ul>
+
 <div id="Opening the Files Side by Side-Locking Scrolling Between the Files"><h4 id="Locking Scrolling Between the Files" class="header"><a href="#Opening the Files Side by Side-Locking Scrolling Between the Files">Locking Scrolling Between the Files</a></h4></div>
 
 <p>
@@ -187,12 +187,77 @@ This whole line concatenates a bunch of strings and expressions. Imagine that th
 <code>w</code> - Saves the updated buffer to the new file name.
 
 </ul>
+
 <p>
 The full string (command) before execution might look something like this:
 </p>
 <pre vim>
 file /path/to/myfile_clean.srt | w
 </pre>
+
+<div id="Delete Empty Lines Between Timecode and Text"><h1 id="Delete Empty Lines Between Timecode and Text" class="header"><a href="#Delete Empty Lines Between Timecode and Text">Delete Empty Lines Between Timecode and Text</a></h1></div>
+
+<p>
+How about another condition - only delete the empty line if the 3rd line does not start with digits!
+Below is one solution using a multi-line substitution that deletes the empty (or whitespace-only) second line only when the third line does not start with a digit:
+</p>
+
+<pre vim>
+:%s/^\(\d\{2}:\d\{2}:\d\{2},\d\{3} --&gt; \d\{2}:\d\{2}:\d\{2},\d\{3}\)\n\s*\n\([^0-9].*\)/\1\r\2/
+</pre>
+
+<div id="Delete Empty Lines Between Timecode and Text-How It Works"><h3 id="How It Works" class="header"><a href="#Delete Empty Lines Between Timecode and Text-How It Works">How It Works</a></h3></div>
+
+<p>
+Matching the First Line (Timestamp):
+</p>
+
+<ul>
+<li>
+<code>^</code> Asserts the beginning of the line.
+
+</ul>
+
+<ul>
+<li>
+<code>\(\d\{2}:\d\{2}:\d\{2},\d\{3} --&gt; \d\{2}:\d\{2}:\d\{2},\d\{3}\)</code> This group (group 1) matches a timestamp line in the exact format with two digits for hours, minutes, seconds and three digits for milliseconds on both sides of <code> --&gt; </code>.
+
+</ul>
+
+<div id="Delete Empty Lines Between Timecode and Text-Matching the Second (Empty) Line:"><h3 id="Matching the Second (Empty) Line:" class="header"><a href="#Delete Empty Lines Between Timecode and Text-Matching the Second (Empty) Line:">Matching the Second (Empty) Line:</a></h3></div>
+
+<ul>
+<li>
+<code>\n\s*\n</code> The first <code>\n</code> ends the first line.
+
+<li>
+<code>\s*</code> matches any whitespace (or none) on the next line (your “empty” line).
+
+<li>
+<code>\n</code> The following <code>\n</code> marks the end of that blank line.
+
+</ul>
+
+<div id="Delete Empty Lines Between Timecode and Text-Matching the Third Line (Conditional Check):"><h3 id="Matching the Third Line (Conditional Check):" class="header"><a href="#Delete Empty Lines Between Timecode and Text-Matching the Third Line (Conditional Check):">Matching the Third Line (Conditional Check):</a></h3></div>
+
+<ul>
+<li>
+<code>\([^0-9].*\)</code> This group (group 2) matches the third line only if its first character is not a digit (i.e. <code>[0-9]</code> is negated via <code>[^0-9]</code>). The rest of the line is matched by <code>.*</code>.
+
+</ul>
+
+<div id="Delete Empty Lines Between Timecode and Text-The Replacement:"><h3 id="The Replacement:" class="header"><a href="#Delete Empty Lines Between Timecode and Text-The Replacement:">The Replacement:</a></h3></div>
+
+<ul>
+<li>
+<code>\1\r\2</code> This puts back the captured timestamp (group 1), then a newline (the <code>\r</code> acts as a newline in Vim’s replacement), and then the third line (group 2). This effectively removes the empty/whitespace-only line that was between the first and third lines.
+
+</ul>
+
+<p>
+In summary, this command only deletes the empty (or whitespace) line if it follows a timestamp line and the next line starts with a non-digit character. If the third line begins with a digit, the pattern won’t match, and nothing is changed.
+</p>
+
 
 <div id="Plugins I Use For SRT Editing"><h1 id="Plugins I Use For SRT Editing" class="header"><a href="#Plugins I Use For SRT Editing">Plugins I Use For SRT Editing</a></h1></div>
 
