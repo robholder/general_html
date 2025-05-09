@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_menu_or_init</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Menu or Init"><h1 id="Menu or Init" class="header"><a href="#Menu or Init">Menu or Init</a></h1></div>
+
+
+<p>
+Here's a structured outline to help you separate what belongs in your init.py versus your <code>menu.py</code> in Nuke, along with some tips to avoid conflicts with your studio tools:
+</p>
+
+<div id="Menu or Init-init.py"><h2 id="init.py" class="header"><a href="#Menu or Init-init.py">init.py</a></h2></div>
+
+<p>
+This file is loaded when Nuke starts up and is intended to establish the overall environment and global settings. In init.py, you typically include:
+</p>
+
+<div id="Menu or Init-init.py-Global Environment and Settings:"><h3 id="Global Environment and Settings:" class="header"><a href="#Menu or Init-init.py-Global Environment and Settings:">Global Environment and Settings:</a></h3></div>
+
+<ul>
+<li>
+Setting environment variables or modifying paths.
+
+<li>
+Establishing global knob defaults using <code>nuke.knobDefault</code>.
+
+<li>
+Registering callbacks (such as pre- or post-render hooks) that affect node behaviors.
+
+<li>
+Loading or importing custom modules that provide functions or classes used elsewhere.
+
+</ul>
+<div id="Menu or Init-init.py-Global Environment and Settings:-Examples:"><h4 id="Examples:" class="header"><a href="#Menu or Init-init.py-Global Environment and Settings:-Examples:">Examples:</a></h4></div>
+
+<pre python>
+import nuke
+import os
+
+# Set global node defaults
+nuke.knobDefault("Write.file_type", "exr")
+nuke.knobDefault("Blur.size", "10")
+
+# Register a callback for Write nodes before rendering
+def add_custom_metadata():
+    node = nuke.thisNode()
+    if "SpecialWrite" in node.name():
+        import time
+        project_name = nuke.root().name()
+        nuke_version = nuke.NUKE_VERSION_STRING
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        custom_meta = "Project: {}\nNuke Version: {}\nRendered at: {}".format(project_name, nuke_version, timestamp)
+        if "exr_custom" in node.knobs():
+            node.knob("exr_custom").setValue(custom_meta)
+            nuke.tprint("Custom metadata added to " + node.name())
+        else:
+            nuke.tprint("No custom metadata knob on " + node.name())
+
+nuke.addBeforeRender(add_custom_metadata, nodeClass="Write")
+</pre>
+
+<ul>
+<li>
+<span id="Menu or Init-init.py-Global Environment and Settings:-Examples:-Note on Conflicts"></span><strong id="Note on Conflicts">Note on Conflicts</strong>: If your studio tools also modify defaults or register callbacks, placing your own settings in <code>init.py</code> may conflict if both scripts alter the same parameters.
+
+<ul>
+<li>
+Tip: Coordinate with the studio tools' documentation or adjust your settings so they don't override or duplicate what the studio tools provide. You might even choose to load your custom configuration later by importing it from a separate file.
+
+</ul>
+</ul>
+<div id="Menu or Init-menu.py"><h2 id="menu.py" class="header"><a href="#Menu or Init-menu.py">menu.py</a></h2></div>
+
+<p>
+This file is intended for building and customizing the Nuke user interface—specifically, the menus and commands. menu.py is executed after init.py and is used for inserting custom menu entries without directly altering the runtime environment.
+</p>
+
+<div id="Menu or Init-menu.py-Common Contents:"><h3 id="Common Contents:" class="header"><a href="#Menu or Init-menu.py-Common Contents:">Common Contents:</a></h3></div>
+
+<ul>
+<li>
+Creating custom menus or submenus within the Nuke interface.
+
+<li>
+Adding custom commands (with shortcuts) corresponding to functions or tools.
+
+<li>
+Integrating custom panels or dialogs that assist your workflow.
+
+</ul>
+<div id="Menu or Init-menu.py-Common Contents:-Example:"><h4 id="Example:" class="header"><a href="#Menu or Init-menu.py-Common Contents:-Example:">Example:</a></h4></div>
+
+<pre python>
+import nuke
+import customTools  # Ensure this module is in your .nuke folder
+
+# Create a custom menu in Nuke's main menu bar
+customMenu = nuke.menu("Nuke").addMenu("Custom Tools")
+
+# Add commands to the custom menu
+customMenu.addCommand("Do Something", "customTools.doSomething()", "ctrl+shift+d")
+customMenu.addCommand("Do Another Thing", "customTools.doAnotherThing()", "ctrl+shift+a")
+</pre>
+
+<div id="Menu or Init-menu.py-Avoiding Collisions:"><h3 id="Avoiding Collisions:" class="header"><a href="#Menu or Init-menu.py-Avoiding Collisions:">Avoiding Collisions:</a></h3></div>
+
+<ul>
+<li>
+Your <code>menu.py</code> should focus solely on UI elements. Avoid including code that alters global node defaults or callbacks.
+
+<li>
+If the studio tools also add menus or override the UI, try to namespace your menu (for example, by using a unique name) so that your additions visually stand apart.
+
+</ul>
+<div id="Menu or Init-Key Takeaways"><h2 id="Key Takeaways" class="header"><a href="#Menu or Init-Key Takeaways">Key Takeaways</a></h2></div>
+
+<div id="Menu or Init-Key Takeaways-init.py:"><h3 id="init.py:" class="header"><a href="#Menu or Init-Key Takeaways-init.py:">init.py:</a></h3></div>
+
+<ul>
+<li>
+Use it for global settings, environment configuration, knob defaults, and node callbacks.
+
+<li>
+Ensure that any changes you make here don’t interfere with studio tools that may use similar features. If conflicts arise, consider modularizing your custom code and loading it conditionally.
+
+</ul>
+<div id="Menu or Init-Key Takeaways-menu.py:"><h3 id="menu.py:" class="header"><a href="#Menu or Init-Key Takeaways-menu.py:">menu.py:</a></h3></div>
+
+<ul>
+<li>
+Use it purely for building custom menus, commands, and UI interfaces.
+
+<li>
+ Keep it free of runtime environment alterations to avoid clashing with the studio tools’ similar UI customizations.
+
+</ul>
+<div id="Menu or Init-Key Takeaways-Load Order:"><h3 id="Load Order:" class="header"><a href="#Menu or Init-Key Takeaways-Load Order:">Load Order:</a></h3></div>
+
+<ul>
+<li>
+Nuke loads <code>init.py</code> first, then menu.py. If the studio tools have their own configurations, review their documentation to see if they expect certain settings to be applied before or after your custom code.
+
+</ul>
+<p>
+By keeping your environment settings and UI customizations separate between <code>init.py</code> and <code>menu.py</code>, you reduce the chance of conflicts with studio tools and maintain a cleaner, more modular configuration.
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
