@@ -115,6 +115,139 @@ nuke.addBeforeRender(add_custom_metadata, nodeClass="Write")
 This strategy lets you leverage Nuke’s scripting capabilities to keep comprehensive records within your files—ideal for tracking render settings or processing history without manual intervention.
 </p>
 
+<div id="Nuke - Python - Adding Metadata-Conditions With Node Name"><h2 id="Conditions With Node Name" class="header"><a href="#Nuke - Python - Adding Metadata-Conditions With Node Name">Conditions With Node Name</a></h2></div>
+
+<p>
+In your callback function you can inspect any property of the node, including its name, and then conditionally apply logic based on it. Nuke nodes expose a number of attributes like their class (via <code>node.Class()</code>) and name (via <code>node.name()</code>), so you can combine both checks.
+</p>
+
+<p>
+Here's an example that uses a before-render callback on Write nodes. In this example, the script checks if the Write node's name contains a specific substring (e.g., <code>"SpecialWrite"</code>) and then applies custom metadata accordingly:
+</p>
+
+<pre python>
+import nuke
+import time
+
+def add_custom_metadata():
+    node = nuke.thisNode()  # The current Write node triggering the callback
+    
+    # Check both the class and the node's name
+    if node.Class() == "Write" and "SpecialWrite" in node.name():
+        # Retrieve dynamic information
+        project_name = nuke.root().name()
+        nuke_version = nuke.NUKE_VERSION_STRING
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Construct a custom metadata string
+        custom_meta = ("Project: {0}\nNuke Version: {1}\nRendered at: {2}"
+                       .format(project_name, nuke_version, timestamp))
+        
+        # Assuming you have a knob named "exr_custom" on your Write node for custom metadata:
+        if "exr_custom" in node.knobs():
+            node.knob("exr_custom").setValue(custom_meta)
+            nuke.tprint("Custom metadata added to node " + node.name())
+        else:
+            nuke.tprint("No custom metadata knob found on node " + node.name())
+
+# Add the callback to Write nodes - this callback will evaluate both the class and the name.
+nuke.addBeforeRender(add_custom_metadata, nodeClass="Write")
+</pre>
+
+
+<div id="Nuke - Python - Adding Metadata-Explanation:"><h2 id="Explanation:" class="header"><a href="#Nuke - Python - Adding Metadata-Explanation:">Explanation:</a></h2></div>
+
+<div id="Nuke - Python - Adding Metadata-Explanation:-Node Inspection:"><h3 id="Node Inspection:" class="header"><a href="#Nuke - Python - Adding Metadata-Explanation:-Node Inspection:">Node Inspection:</a></h3></div>
+
+<ul>
+<li>
+<code>node.Class()</code> confirms that you’re dealing with a Write node.
+
+<li>
+<code>node.name()</code> returns the node’s name, which you can check for a substring or compare to an exact name using standard Python string operations.
+
+</ul>
+<div id="Nuke - Python - Adding Metadata-Explanation:-Dynamic Action:"><h3 id="Dynamic Action:" class="header"><a href="#Nuke - Python - Adding Metadata-Explanation:-Dynamic Action:">Dynamic Action:</a></h3></div>
+
+<ul>
+<li>
+The callback gathers dynamic data such as the project name, Nuke version, and current timestamp, and then sets a custom metadata knob if it exists.
+
+</ul>
+<div id="Nuke - Python - Adding Metadata-Explanation:-Conditional Logic:"><h3 id="Conditional Logic:" class="header"><a href="#Nuke - Python - Adding Metadata-Explanation:-Conditional Logic:">Conditional Logic:</a></h3></div>
+
+<ul>
+<li>
+The condition <code>if node.Class() == "Write" and "SpecialWrite" in node.name()</code>: ensures that only Write nodes with a name containing <code>"SpecialWrite"</code> get the metadata. You could adjust this logic to suit your needs — for instance, checking if the name is equal to a particular value.
+
+</ul>
+<p>
+This approach demonstrates that callbacks in Nuke are very flexible; you can inspect any node attribute and apply logic based on both the node's type and its name.
+</p>
+
+
+<div id="More on Conditional Setups"><h1 id="More on Conditional Setups" class="header"><a href="#More on Conditional Setups">More on Conditional Setups</a></h1></div>
+
+<p>
+Nuke's addBeforeRender function only allows filtering by node class (via the nodeClass parameter) and does not provide a built-in parameter to filter by node name. In other words, you can't specify the node name directly in the addBeforeRender call.
+</p>
+
+<p>
+However, this isn't typically an efficiency issue. Here's the recommended approach:
+</p>
+
+<ul>
+<li>
+<span id="More on Conditional Setups-Register the Callback for a Specific Node Class"></span><strong id="Register the Callback for a Specific Node Class">Register the Callback for a Specific Node Class</strong>: Use nodeClass to restrict the callback to only a certain type of node (e.g., Write nodes).
+
+<li>
+<span id="More on Conditional Setups-Filter by Node Name in the Callback"></span><strong id="Filter by Node Name in the Callback">Filter by Node Name in the Callback</strong>: Inside your callback function, use standard Python logic to check the node's name (using node.name()) and then conditionally run your code.
+
+</ul>
+<p>
+For example, if you want the callback to only affect Write nodes whose names contain <code>"SpecialWrite"</code>, you might write:
+</p>
+
+<pre python>
+import nuke
+import time
+
+def add_custom_metadata():
+    node = nuke.thisNode()  # The current node triggering the callback
+    # Check if this Write node has "SpecialWrite" in its name
+    if "SpecialWrite" in node.name():
+        project_name = nuke.root().name()
+        nuke_version = nuke.NUKE_VERSION_STRING
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        custom_meta = ("Project: {0}\nNuke Version: {1}\nRendered at: {2}"
+                       .format(project_name, nuke_version, timestamp))
+        if "exr_custom" in node.knobs():
+            node.knob("exr_custom").setValue(custom_meta)
+            nuke.tprint("Custom metadata added to node " + node.name())
+        else:
+            nuke.tprint("No custom metadata knob found on node " + node.name())
+
+# Add the callback for all Write nodes; the callback itself will filter by name.
+nuke.addBeforeRender(add_custom_metadata, nodeClass="Write")
+</pre>
+
+<div id="More on Conditional Setups-Summary:"><h3 id="Summary:" class="header"><a href="#More on Conditional Setups-Summary:">Summary:</a></h3></div>
+
+<ul>
+<li>
+<span id="More on Conditional Setups-Summary:-No Direct Name Filter"></span><strong id="No Direct Name Filter">No Direct Name Filter</strong>: You can only filter by node class directly via addBeforeRender.
+
+<li>
+<span id="More on Conditional Setups-Summary:-Internal Filtering"></span><strong id="Internal Filtering">Internal Filtering</strong>: Use an if statement inside your callback to filter further by node name.
+
+<li>
+<span id="More on Conditional Setups-Summary:-Efficiency"></span><strong id="Efficiency">Efficiency</strong>: The slight additional check for the node name inside the callback has minimal impact, and it's the standard pattern for handling more specific conditions.
+
+</ul>
+<p>
+This method gives you the flexibility to run custom logic based on both the node’s type and its name, without any significant performance hit.
+</p>
+
 
 <p>
 <a href="nuke_index.html">Nuke Index</a>
