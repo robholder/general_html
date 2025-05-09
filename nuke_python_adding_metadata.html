@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_adding_metadata</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Nuke - Python - Adding Metadata"><h1 id="Nuke - Python - Adding Metadata" class="header"><a href="#Nuke - Python - Adding Metadata">Nuke - Python - Adding Metadata</a></h1></div>
+
+<p>
+You can embed custom metadata into your EXR files in Nuke to record processing histories, settings, or any other information. While Nuke automatically copies metadata from input images (if enabled), you can also add your own keys and values. Here’s a practical approach:
+</p>
+
+<div id="Nuke - Python - Adding Metadata-Using the Write Node’s Custom Metadata"><h2 id="Using the Write Node’s Custom Metadata" class="header"><a href="#Nuke - Python - Adding Metadata-Using the Write Node’s Custom Metadata">Using the Write Node’s Custom Metadata</a></h2></div>
+
+<ul>
+<li>
+<span id="Nuke - Python - Adding Metadata-Using the Write Node’s Custom Metadata-Write Node Settings"></span><strong id="Write Node Settings">Write Node Settings</strong>: When writing EXR files, Nuke’s Write node provides options (often found in an advanced or metadata tab) for including custom metadata. These custom keys–value pairs are embedded in the EXR header.
+
+<li>
+<span id="Nuke - Python - Adding Metadata-Using the Write Node’s Custom Metadata-Direct Configuration"></span><strong id="Direct Configuration">Direct Configuration</strong>: You can configure these manually in the Write node’s properties by entering your custom keys and values. However, if you want these values to be dynamic or condition-based, you’d use a Python callback.
+
+</ul>
+<div id="Nuke - Python - Adding Metadata-Using a Pre-Render Callback to Set Metadata Dynamically"><h2 id="Using a Pre-Render Callback to Set Metadata Dynamically" class="header"><a href="#Nuke - Python - Adding Metadata-Using a Pre-Render Callback to Set Metadata Dynamically">Using a Pre-Render Callback to Set Metadata Dynamically</a></h2></div>
+
+<p>
+You can add a callback that triggers just before the render begins to populate custom metadata. For example, you might want to record the current project name, the Nuke version, or a timestamp.
+</p>
+
+<p>
+Here's a sample code snippet:
+</p>
+
+<pre python>
+import nuke
+import time  # For a timestamp
+
+def add_custom_metadata():
+    node = nuke.thisNode()  # The current Write node
+    # Retrieve dynamic information:
+    project_name = nuke.root().name()  # can be your project file name
+    nuke_version = nuke.NUKE_VERSION_STRING
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    # Compose a custom metadata string.
+    # NOTE: Check your Write node to see which knob holds custom EXR metadata.
+    # Often this knob is named 'exr_custom' or similar. Replace it with the appropriate name.
+    custom_meta = ("Project: {0}\nNuke Version: {1}\nRendered at: {2}"
+                   .format(project_name, nuke_version, timestamp))
+
+    # Set the custom metadata on the node.
+    # (Replace 'exr_custom' with the correct knob name from your Write node’s properties.)
+    if "exr_custom" in node.knobs():
+        node.knob("exr_custom").setValue(custom_meta)
+    else:
+        nuke.tprint("Custom metadata knob not found on this Write node.")
+
+# Attach the callback to all Write nodes (or a specific one by name/class).
+nuke.addBeforeRender(add_custom_metadata, nodeClass="Write")
+</pre>
+
+<div id="Nuke - Python - Adding Metadata-Using a Pre-Render Callback to Set Metadata Dynamically-Explanation:"><h4 id="Explanation:" class="header"><a href="#Nuke - Python - Adding Metadata-Using a Pre-Render Callback to Set Metadata Dynamically-Explanation:">Explanation:</a></h4></div>
+
+<ul>
+<li>
+*Dynamic Data`: The script gathers dynamic values (like project name, Nuke version, and the current time) from your session.
+
+<li>
+<span id="Nuke - Python - Adding Metadata-Using a Pre-Render Callback to Set Metadata Dynamically-Explanation:-Callback Registration"></span><strong id="Callback Registration">Callback Registration</strong>: By using nuke.addBeforeRender, the function add_custom_metadata() is executed right before rendering, ensuring that your metadata is current.
+
+<li>
+<span id="Nuke - Python - Adding Metadata-Using a Pre-Render Callback to Set Metadata Dynamically-Explanation:-Knob Assignment"></span><strong id="Knob Assignment">Knob Assignment</strong>: It then sets the value on a custom metadata knob (here assumed to be "exr_custom") on the Write node. Tip: Use Nuke’s Node Graph or right-click a Write node and choose “Edit Knobs…” to verify the correct knob name for custom metadata in your version of Nuke.
+
+</ul>
+ 
+<div id="Nuke - Python - Adding Metadata-Benefits of This Approach"><h2 id="Benefits of This Approach" class="header"><a href="#Nuke - Python - Adding Metadata-Benefits of This Approach">Benefits of This Approach</a></h2></div>
+
+<ul>
+<li>
+<span id="Nuke - Python - Adding Metadata-Benefits of This Approach-Dynamic Context"></span><strong id="Dynamic Context">Dynamic Context</strong>: You can record information that is only determined when the render starts (like timestamps or environment-specific settings).
+
+<li>
+<span id="Nuke - Python - Adding Metadata-Benefits of This Approach-Process Tracking"></span><strong id="Process Tracking">Process Tracking</strong>: Embedding details such as processing parameters, project identifiers, or even notes about the compositing pipeline can be very useful for later review or audits.
+
+<li>
+<span id="Nuke - Python - Adding Metadata-Benefits of This Approach-Flexibility"></span><strong id="Flexibility">Flexibility</strong>: You can extend the script to check for more complex conditions (e.g., examine other nodes in the script) and embed different metadata based on that analysis.
+
+</ul>
+<div id="Nuke - Python - Adding Metadata-Considerations / Next Steps"><h2 id="Considerations / Next Steps" class="header"><a href="#Nuke - Python - Adding Metadata-Considerations / Next Steps">Considerations / Next Steps</a></h2></div>
+
+<ul>
+<li>
+<span id="Nuke - Python - Adding Metadata-Considerations / Next Steps-Verify the Knob Name"></span><strong id="Verify the Knob Name">Verify the Knob Name</strong>: Since the exact knob name for custom EXR metadata can vary between Nuke versions or custom setups, check your Write node’s available knobs.
+
+<li>
+<span id="Nuke - Python - Adding Metadata-Considerations / Next Steps-Testing"></span><strong id="Testing">Testing</strong>: Render a test sequence and inspect the EXR header (using an EXR utility or viewing in a tool that reveals metadata) to ensure your information is correctly embedded.
+
+<li>
+<span id="Nuke - Python - Adding Metadata-Considerations / Next Steps-Further Customization"></span><strong id="Further Customization">Further Customization</strong>: Expand the callback to adjust metadata for different output types or based on more refined criteria, if needed.
+
+</ul>
+<p>
+This strategy lets you leverage Nuke’s scripting capabilities to keep comprehensive records within your files—ideal for tracking render settings or processing history without manual intervention.
+</p>
+
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
