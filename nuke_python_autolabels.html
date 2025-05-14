@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_autolabels</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Autolabel"><h1 id="Autolabel" class="header"><a href="#Autolabel">Autolabel</a></h1></div>
+
+<p>
+Below is a detailed breakdown of Nuke’s addAutolabel() method, how it’s commonly used, and how you can pair it with a custom Python function.
+</p>
+
+<div id="Autolabel-What Is nuke.addAutolabel()?"><h2 id="What Is nuke.addAutolabel()?" class="header"><a href="#Autolabel-What Is nuke.addAutolabel()?">What Is nuke.addAutolabel()?</a></h2></div>
+
+<p>
+Nuke’s autolabel feature lets you display dynamic information directly on the nodes in the Node Graph. Instead of (or in addition to) a node’s default label, you can provide custom text that may change based on the node’s parameters or state. The function <code>nuke.addAutolabel()</code> is used to register your custom labeling logic with Nuke.
+</p>
+
+<div id="Autolabel-How It’s Generally Used"><h2 id="How It’s Generally Used" class="header"><a href="#Autolabel-How It’s Generally Used">How It’s Generally Used</a></h2></div>
+
+<p>
+There are two common ways to use autolabels in Nuke:
+</p>
+<ul>
+<li>
+<span id="Autolabel-How It’s Generally Used-Using a Static Expression"></span><strong id="Using a Static Expression">Using a Static Expression</strong>: You can assign a static string or a string that includes placeholders that Nuke interprets at runtime. For example:
+<pre python>
+nuke.addAutolabel("Blur", "[value size]")
+</pre>
+
+</ul>
+<p>
+In this form, every Blur node would display the current value of its “size” knob in the label. The square brackets signal that Nuke should evaluate the enclosed expression when drawing the label.
+</p>
+<ul>
+<li>
+<span id="Autolabel-How It’s Generally Used-Using a Custom Function"></span><strong id="Using a Custom Function">Using a Custom Function</strong>: For more complex logic, you define a Python function that constructs the label dynamically. When Nuke needs the label, it calls your function, and whatever string your function returns becomes the node’s label. This function should not take any parameters because it uses nuke.thisNode() inside to determine which node it is operating on.
+
+</ul>
+<div id="Autolabel-Pairing nuke.addAutolabel() with a Function"><h2 id="Pairing nuke.addAutolabel() with a Function" class="header"><a href="#Autolabel-Pairing nuke.addAutolabel() with a Function">Pairing nuke.addAutolabel() with a Function</a></h2></div>
+
+<div id="Autolabel-Pairing nuke.addAutolabel() with a Function-Define a Custom Function"><h3 id="Define a Custom Function" class="header"><a href="#Autolabel-Pairing nuke.addAutolabel() with a Function-Define a Custom Function">Define a Custom Function</a></h3></div>
+
+<p>
+Your function can perform any logic you need—reading knob values, formatting text, or even setting node indicators. Here’s a simple example:
+</p>
+
+<pre python>
+import nuke
+
+def myAutolabel():
+    # Access the current node
+    node = nuke.thisNode()
+    
+    # Start with the node's name
+    label = node.name()
+    
+    # Check the node’s type and add dynamic information
+    if node.Class() == "Blur":
+        size_value = node['size'].value()  # Could be a single number or list depending on node
+        # Only include size if it is nonzero
+        if size_value != 0 and size_value != [0, 0]:
+            label += "\nSize: " + str(size_value)
+    
+    # Append any custom label the user may have set in the node's "label" knob
+    user_label = node['label'].value()
+    if user_label:
+        label += "\n" + user_label
+    
+    return label
+</pre>
+
+<div id="Autolabel-Pairing nuke.addAutolabel() with a Function-Register the Function with Nuke"><h3 id="Register the Function with Nuke" class="header"><a href="#Autolabel-Pairing nuke.addAutolabel() with a Function-Register the Function with Nuke">Register the Function with Nuke</a></h3></div>
+
+<p>
+Once your function is defined, you register it by calling:
+</p>
+
+<pre python>
+nuke.addAutolabel(myAutolabel)
+</pre>
+
+<p>
+After registration, every time Nuke needs to draw a node’s label (for example, when the node is re-rendered in the Node Graph), it calls your function. The autolabel returned by your function is then displayed on or beneath the node accordingly.
+</p>
+
+<div id="Autolabel-What’s Happening Behind the Scenes"><h2 id="What’s Happening Behind the Scenes" class="header"><a href="#Autolabel-What’s Happening Behind the Scenes">What’s Happening Behind the Scenes</a></h2></div>
+
+<ul>
+<li>
+<span id="Autolabel-What’s Happening Behind the Scenes-Dynamic Evaluation"></span><strong id="Dynamic Evaluation">Dynamic Evaluation</strong>: Instead of a fixed label, your function is executed each time the node’s label might need updating. This is useful if the label should reflect changing values (e.g., parameter adjustments).
+
+<li>
+<span id="Autolabel-What’s Happening Behind the Scenes-Use of nuke.thisNode()"></span><strong id="Use of nuke.thisNode()">Use of nuke.thisNode()</strong>: Since the function receives no parameters, calling nuke.thisNode() lets your code determine which node is being evaluated. This means the function can be generic and work on any node or be conditionally tailored (as shown with the Blur node in our example).
+
+<li>
+<span id="Autolabel-What’s Happening Behind the Scenes-Extended Functionality"></span><strong id="Extended Functionality">Extended Functionality</strong>: Developers often expand on this by setting node indicator flags—by writing to a knob (like "this.indicators")—to provide visual cues directly on the node, which can quickly convey additional state information.
+
+</ul>
+<p>
+Here’s an example that also updates an "indicators" knob:
+</p>
+
+<pre python>
+import nuke
+
+def blurLabel():
+    # Calculate an indicator value based on several conditions
+    ind = nuke.expression("(keys?1:0)+(has_expression?2:0)+(clones?8:0)+(viewsplit?32:0)")
+    if int(nuke.numvalue("maskChannelInput", 0)):
+        ind += 4
+    if int(nuke.numvalue("this.mix", 1)) &lt; 1:
+        ind += 16
+    nuke.knob("this.indicators", str(ind))
+    
+    # Retrieve the current node
+    n = nuke.thisNode()
+    if n.Class() == "Blur":
+        autoLabel = n.name()
+        size_val = n['size'].value()
+        if size_val != 0 and size_val != [0, 0]:
+            autoLabel += "\nSize: " + str(size_val)
+        if n['label'].value():
+            autoLabel += "\n" + n['label'].value()
+        return autoLabel
+
+nuke.addAutolabel(blurLabel)
+</pre>
+
+<p>
+In this enhanced example, the function not only returns a custom label but also calculates and sets an indicator value based on various conditions.
+</p>
+
+<div id="Autolabel-Summary"><h2 id="Summary" class="header"><a href="#Autolabel-Summary">Summary</a></h2></div>
+
+<ul>
+<li>
+<code>nuke.addAutolabel()</code> attaches a custom labeling behavior to nodes.
+
+<li>
+You can pass either a static string with embedded expressions or a custom Python function.
+
+<li>
+When using a function, leverage <code>nuke.thisNode()</code> to get context about the current node.
+
+<li>
+The autolabel function can include logic to display node parameters, custom text, and even update visual indicators.
+
+</ul>
+<p>
+This pattern gives you the flexibility to tailor node labels for clarity and efficiency in your compositing workflow.
+</p>
+
+<div id="Indicators"><h1 id="Indicators" class="header"><a href="#Indicators">Indicators</a></h1></div>
+
+<p>
+Below is an in‐depth explanation of how the indicator technique works in Nuke’s autolabel system and how you can implement it:
+</p>
+
+<div id="Indicators-What Are “Indicators” in This Context?"><h2 id="What Are “Indicators” in This Context?" class="header"><a href="#Indicators-What Are “Indicators” in This Context?">What Are “Indicators” in This Context?</a></h2></div>
+
+<p>
+In Nuke, nodes can display small visual cues—icons or “indicators”—that quickly tell you about certain conditions of the node (for example, whether a knob is keyed, has an expression, or if a particular channel is in use). These cues are encoded in a single numeric value that acts as a bitmask, where each bit (or numerical flag) represents a specific condition.
+</p>
+
+<div id="Indicators-How the Bitmask Is Built"><h2 id="How the Bitmask Is Built" class="header"><a href="#Indicators-How the Bitmask Is Built">How the Bitmask Is Built</a></h2></div>
+
+<p>
+In the sample blurLabel() function, the indicator value (ind) is computed as the sum of several components:
+</p>
+
+<div id="Indicators-How the Bitmask Is Built-Built-in Conditions via a Nuke Expression:"><h3 id="Built-in Conditions via a Nuke Expression:" class="header"><a href="#Indicators-How the Bitmask Is Built-Built-in Conditions via a Nuke Expression:">Built-in Conditions via a Nuke Expression:</a></h3></div>
+
+<pre python>
+ind = nuke.expression("(keys?1:0)+(has_expression?2:0)+(clones?8:0)+(viewsplit?32:0)")
+</pre>
+
+<ul>
+<li>
+<code>keys?1:0</code>
+
+<ul>
+<li>
+Checks if any knob on the node has keyframes (or “keys” are present). If so, it returns 1.
+
+</ul>
+<li>
+<code>has_expression?2:0</code>
+
+<ul>
+<li>
+Checks if any knob is using an expression. If true, it contributes a value of 2.
+
+</ul>
+<li>
+<code>clones?8:0</code>
+
+<ul>
+<li>
+Checks if the node is a clone of another. If yes, it adds 8.
+
+</ul>
+<li>
+<code>viewsplit?32:0</code>
+
+<ul>
+<li>
+Checks if the node is set up for multi-view (view splitting). If active, it adds 32.
+
+</ul>
+</ul>
+<p>
+The expression returns a <span id="Indicators-How the Bitmask Is Built-Built-in Conditions via a Nuke Expression:-summed value"></span><strong id="summed value">summed value</strong> that encodes each of these conditions as separate bits in the final number.
+</p>
+
+<div id="Indicators-How the Bitmask Is Built-Additional Custom Checks:"><h3 id="Additional Custom Checks:" class="header"><a href="#Indicators-How the Bitmask Is Built-Additional Custom Checks:">Additional Custom Checks:</a></h3></div>
+
+<p>
+The following lines add other conditions:
+</p>
+
+<pre python>
+if int(nuke.numvalue("maskChannelInput", 0)):
+    ind += 4
+if int(nuke.numvalue("this.mix", 1)) &lt; 1:
+    ind += 16
+</pre>
+
+<ul>
+<li>
+<code>maskChannelInput</code> Check:
+
+<ul>
+<li>
+If the node’s <code>"maskChannelInput"</code> knob returns a nonzero (truthy) value, add 4. This indicates that a mask channel is being used.
+
+</ul>
+<li>
+<code>mix</code> Check:
+
+<ul>
+<li>
+If the value of <code>"this.mix"</code> is less than 1 (perhaps signifying that a blend is not fully applied), add 16. This might serve as a reminder that the mix is not at full strength.
+
+</ul>
+</ul>
+<div id="Indicators-How the Bitmask Is Built-Setting the Indicator on the Node:"><h3 id="Setting the Indicator on the Node:" class="header"><a href="#Indicators-How the Bitmask Is Built-Setting the Indicator on the Node:">Setting the Indicator on the Node:</a></h3></div>
+
+<pre python>
+nuke.knob("this.indicators", str(ind))
+</pre>
+
+<p>
+This line writes the computed bitmask (converted to a string) into the node’s <code>"indicators"</code> knob. Nuke then interprets this number and displays small icons according to which bits are set.
+</p>
+
+<div id="Indicators-How to Utilize and Implement the Indicators"><h2 id="How to Utilize and Implement the Indicators" class="header"><a href="#Indicators-How to Utilize and Implement the Indicators">How to Utilize and Implement the Indicators</a></h2></div>
+
+<div id="Indicators-How to Utilize and Implement the Indicators-Step 1: Decide on the Conditions"><h3 id="Step 1: Decide on the Conditions" class="header"><a href="#Indicators-How to Utilize and Implement the Indicators-Step 1: Decide on the Conditions">Step 1: Decide on the Conditions</a></h3></div>
+
+<p>
+Before you code, decide which conditions are important for your workflow. In the provided sample, the conditions are:
+</p>
+
+<ul>
+<li>
+Whether the node has keys (bit value 1).
+
+<li>
+Whether the node has an expression on any parameter (bit value 2).
+
+<li>
+Whether a mask input is active (bit value 4, custom-added).
+
+<li>
+Whether the node is cloned (bit value 8).
+
+<li>
+Whether a custom mix parameter is less than 1 (bit value 16, custom-added).
+
+<li>
+Whether multi-view (viewsplit) is enabled (bit value 32).
+
+</ul>
+<p>
+Each condition is assigned a unique power of 2. This way, the final indicator value is a sum where each bit in the binary representation stands for one condition.
+</p>
+
+<div id="Indicators-How to Utilize and Implement the Indicators-Step 2: Compute the Bitmask"><h3 id="Step 2: Compute the Bitmask" class="header"><a href="#Indicators-How to Utilize and Implement the Indicators-Step 2: Compute the Bitmask">Step 2: Compute the Bitmask</a></h3></div>
+
+<p>
+Using either Nuke’s built‑in expression evaluator (as shown) or your own Python code, compute the value:
+</p>
+<ul>
+<li>
+<span id="Indicators-How to Utilize and Implement the Indicators-Step 2: Compute the Bitmask-Built-in Expression"></span><strong id="Built-in Expression">Built-in Expression</strong>: The sample uses <code>nuke.expression()</code> to quickly compute some flags with a ternary-style string. This is handy because it lets you use conditions like <code>keys?1:0</code> where the syntax means “if keys exist, return 1; otherwise, 0.”
+
+<li>
+<span id="Indicators-How to Utilize and Implement the Indicators-Step 2: Compute the Bitmask-Custom Conditions"></span><strong id="Custom Conditions">Custom Conditions</strong>: For conditions that might not be directly available via the expression language (like checking a specific knob’s value), use Python (with <code>nuke.numvalue()</code>) to test the knob value and add the corresponding number to your bitmask.
+
+</ul>
+<div id="Indicators-How to Utilize and Implement the Indicators-Step 3: Set the Indicator Knob"><h3 id="Step 3: Set the Indicator Knob" class="header"><a href="#Indicators-How to Utilize and Implement the Indicators-Step 3: Set the Indicator Knob">Step 3: Set the Indicator Knob</a></h3></div>
+
+<p>
+After computing the bitmask, you write the value into the node’s "this.indicators" knob. Nuke’s internals will then check this knob and display small symbols (or “indicators”) on the node:
+</p>
+<ul>
+<li>
+The idea is that each possible bit has an associated small icon or status indicator.
+
+<li>
+This gives you a quick visual representation of the node’s state. For example, if the node has an expression and a mask input, the indicator might be 2 (expression) + 4 (mask) = 6, and Nuke’s UI could have icons for both the expression and mask conditions.
+
+</ul>
+<div id="Indicators-How to Utilize and Implement the Indicators-Step 4: Integrate with Autolabeling"><h3 id="Step 4: Integrate with Autolabeling" class="header"><a href="#Indicators-How to Utilize and Implement the Indicators-Step 4: Integrate with Autolabeling">Step 4: Integrate with Autolabeling</a></h3></div>
+
+<p>
+If you pair this with an autolabel function, you can both update the indicator status and produce a textual label that shows node parameters. The full function might look like this:
+</p>
+
+<pre python>
+import nuke
+
+def blurLabel():
+    # Compute built-in indicators with a single expression
+    ind = nuke.expression("(keys?1:0)+(has_expression?2:0)+(clones?8:0)+(viewsplit?32:0)")
+    
+    # Add custom conditions for additional status indicators.
+    if int(nuke.numvalue("maskChannelInput", 0)):
+        ind += 4  # Mask input is active
+    if int(nuke.numvalue("this.mix", 1)) &lt; 1:
+        ind += 16  # Mix is incomplete/not fully applied
+    
+    # Set the indicators knob
+    nuke.knob("this.indicators", str(ind))
+    
+    # Get the node being labeled now
+    n = nuke.thisNode()
+    if n.Class() == "Blur":
+        autoLabel = n.name()
+        size_val = n['size'].value()
+        # Add size details if the size is nonzero
+        if size_val != 0 and size_val != [0, 0]:
+            autoLabel += "\nSize: " + str(size_val)
+        # Append any user-provided label information
+        if n['label'].value():
+            autoLabel += "\n" + n['label'].value()
+        return autoLabel
+
+# Pair the function with the autolabel system:
+nuke.addAutolabel(blurLabel)
+</pre>
+
+<p>
+In this example:
+</p>
+<ul>
+<li>
+The function builds the indicator (a combination of several flags) every time it runs.
+
+<li>
+It assigns that numeric status to <code>"this.indicators"</code>.
+
+<li>
+The function then returns a text label that may include dynamic data such as the node’s size value and any label text the user has added manually.
+
+<li>
+Finally, registering the function with <code>nuke.addAutolabel(blurLabel)</code> tells Nuke to execute it when creating or updating the label on Blur nodes.
+
+</ul>
+<div id="Indicators-Recap"><h2 id="Recap" class="header"><a href="#Indicators-Recap">Recap</a></h2></div>
+
+<ul>
+<li>
+<span id="Indicators-Recap-Indicators are bitmask values."></span><strong id="Indicators are bitmask values.">Indicators are bitmask values.</strong> Each condition (keys, expressions, clones, etc.) contributes a number that represents one bit in the bitmask.
+
+<li>
+<span id="Indicators-Recap-Compute the bitmask."></span><strong id="Compute the bitmask.">Compute the bitmask.</strong> Use <code>nuke.expression()</code> for quick, inline ternary evaluations and Python logic for custom tests.
+
+<li>
+<span id="Indicators-Recap-Set and utilize the indicator."></span><strong id="Set and utilize the indicator.">Set and utilize the indicator.</strong> Write the resulting value to the <code>"this.indicators"</code> knob so Nuke’s UI can render the corresponding visual cues.
+
+<li>
+<span id="Indicators-Recap-Combine with autolabel."></span><strong id="Combine with autolabel.">Combine with autolabel.</strong> A custom autolabel function can update indicators and build a dynamic label at the same time—improving node readability in your Node Graph.
+
+</ul>
+<p>
+This technique is very powerful because once you understand the “bits” each condition represents, you can quickly diagnose a node’s state just by its combined indicator value, and you have a scalable way to add new checks in the future.
+</p>
+
+<div id="Why Use the Indicators?"><h1 id="Why Use the Indicators?" class="header"><a href="#Why Use the Indicators?">Why Use the Indicators?</a></h1></div>
+
+<p>
+By default Nuke nodes automatically display built‐in icons for common states—such as a small key icon if a knob is keyed or an expression icon if a knob has an expression attached. These visual cues are meant to quickly communicate each node’s status at a glance.
+</p>
+
+<p>
+That said, the technique of manually setting the <code>"this.indicators"</code> knob (usually via an autolabel function paired with <code>nuke.addAutolabel()</code>) is used when you want to extend or customize that behavior. For example, you might want to include additional states (like whether a mask channel is in use or if a blend/mix parameter is below a certain threshold) that aren’t otherwise represented by Nuke’s standard indicators.
+</p>
+
+<div id="Why Use the Indicators?-How It Works in Practice"><h2 id="How It Works in Practice" class="header"><a href="#Why Use the Indicators?-How It Works in Practice">How It Works in Practice</a></h2></div>
+
+<ul>
+<li>
+<span id="Why Use the Indicators?-How It Works in Practice-Default Behavior"></span><strong id="Default Behavior">Default Behavior</strong>: A node will automatically show:
+
+<ul>
+<li>
+A key symbol if any of its parameters are keyed.
+
+<li>
+An expression icon if any parameters are driven by an expression.
+
+<li>
+Other built-in icons for states like cloning or view splitting.
+
+</ul>
+<li>
+<span id="Why Use the Indicators?-How It Works in Practice-Customizing Indicators"></span><strong id="Customizing Indicators">Customizing Indicators</strong>: When you write a function that computes a bitmask (by summing values representing different conditions), you gain control over what the node’s indicators represent. In the example function:
+
+<ul>
+<li>
+Certain bits (like 1, 2, 8, or 32) are set based on default conditions (keys, expressions, clones, viewsplit).
+
+<li>
+Additional custom checks add bits (like 4 for a nonzero mask input or 16 for when a mix value is less than 1).
+
+</ul>
+<li>
+Why Customize Them? You might want to provide a more consolidated display of information or extend the standard set of indicators with your own conditions. When you update the <code>"this.indicators"</code> knob with your computed value, Nuke reads that bitmask and displays the corresponding icons. The result is that your custom states appear alongside (or override) the standard ones.
+
+</ul>
+<div id="Why Use the Indicators?-In Summary"><h2 id="In Summary" class="header"><a href="#Why Use the Indicators?-In Summary">In Summary</a></h2></div>
+
+<ul>
+<li>
+Yes, nodes already show default icons: Nuke automatically displays visual cues for common conditions (keys, expressions, etc.).
+
+<li>
+Custom indicator bitmask usage: By manually setting the "this.indicators" knob through a custom autolabel function, you can incorporate additional conditions or modify how these cues are visualized.
+
+<li>
+<span id="Why Use the Indicators?-In Summary-Combined Effect"></span><strong id="Combined Effect">Combined Effect</strong>: Even with the default behavior, using an autolabel function with indicator updates gives you the flexibility to tailor node feedback to your specific workflow needs.
+
+</ul>
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
