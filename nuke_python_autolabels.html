@@ -456,6 +456,88 @@ Custom indicator bitmask usage: By manually setting the "this.indicators" knob t
 <span id="Why Use the Indicators?-In Summary-Combined Effect"></span><strong id="Combined Effect">Combined Effect</strong>: Even with the default behavior, using an autolabel function with indicator updates gives you the flexibility to tailor node feedback to your specific workflow needs.
 
 </ul>
+<div id="AutoLabel On/Off"><h1 id="AutoLabel On/Off" class="header"><a href="#AutoLabel On/Off">AutoLabel On/Off</a></h1></div>
+
+<p>
+There's no built-in "switch" in Nuke that lets you toggle autolabel functionality on and off at runtime via a command—you typically register it in your startup scripts (like <code>init.py</code> or <code>menu.py</code>). However, you can simulate a toggle in a couple of ways:
+</p>
+
+<ul>
+<li>
+<span id="AutoLabel On/Off-Conditionally Register the Autolabel Function"></span><strong id="Conditionally Register the Autolabel Function">Conditionally Register the Autolabel Function</strong>: In your init.py  or menu.py, you can decide whether to call <code>nuke.addAutolabel(yourFunction)</code> based on a condition (for example, an environment variable or a custom preference knob). For instance, you might write:
+<pre python>
+import nuke
+import os
+
+if os.environ.get("NUKE_ENABLE_AUTOLABEL", "1") == "1":
+    def customAutolabel():
+        # Your autolabel logic here
+        node = nuke.thisNode()
+        return node.name()  # for example
+    nuke.addAutolabel(customAutolabel)
+else:
+    nuke.tprint("Autolabels disabled.")
+</pre>
+
+</ul>
+<p>
+Then you’d toggle autolabels by setting or unsetting the environment variable before launching Nuke.
+</p>
+
+<ul>
+<li>
+<span id="AutoLabel On/Off-Incorporate a Toggle Within the Autolabel Function"></span><strong id="Incorporate a Toggle Within the Autolabel Function">Incorporate a Toggle Within the Autolabel Function</strong>: You can embed a global flag or check a user-set knob (or even a script preference) inside the autolabel function. If the toggle is off, have the function simply return an empty string (or return the default label). For example:
+<pre python>
+import nuke
+
+# Global toggle flag
+enable_autolabel = True
+
+def customAutolabel():
+    # Check the toggle; if disabled, return an empty label or default behavior.
+    if not enable_autolabel:
+        return ""  # or you might choose to return some default text
+    node = nuke.thisNode()
+    label = node.name()
+    if node.Class() == "Blur":
+        size_val = node['size'].value()
+        if size_val != 0 and size_val != [0, 0]:
+            label += "\nSize: " + str(size_val)
+    if node['label'].value():
+        label += "\n" + node['label'].value()
+    return label
+
+nuke.addAutolabel(customAutolabel)
+</pre>
+
+</ul>
+<p>
+Later on, if you need to toggle the autolabel off, you can set <code>enable_autolabel = False</code> through some user interface (perhaps a custom menu command) and force a reload or update of the node graph. This method gives you runtime control—even though the function remains registered, it essentially “turns off” its custom output.
+</p>
+
+<div id="AutoLabel On/Off-Summary:"><h3 id="Summary:" class="header"><a href="#AutoLabel On/Off-Summary:">Summary:</a></h3></div>
+
+<ul>
+<li>
+<span id="AutoLabel On/Off-Summary:-No direct toggle command"></span><strong id="No direct toggle command">No direct toggle command</strong>: <code>nuke.addAutolabel()</code> is usually invoked during initialization (in your init.py/menu.py).
+
+<li>
+<span id="AutoLabel On/Off-Summary:-Simulated Toggle Options"></span><strong id="Simulated Toggle Options">Simulated Toggle Options</strong>:
+
+<ul>
+<li>
+Conditional Registration: Decide at launch whether to register the autolabel function.
+
+<li>
+Internal Flag: Check a flag or preference inside your autolabel function and return nothing (or default text) if toggled off.
+
+</ul>
+</ul>
+<p>
+Either approach can help you effectively “switch off” the functionality without having a dedicated built-in toggle.
+</p>
+
+
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
