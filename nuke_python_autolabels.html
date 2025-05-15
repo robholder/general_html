@@ -537,6 +537,138 @@ Internal Flag: Check a flag or preference inside your autolabel function and ret
 Either approach can help you effectively “switch off” the functionality without having a dedicated built-in toggle.
 </p>
 
+<div id="Further Interface Integration"><h1 id="Further Interface Integration" class="header"><a href="#Further Interface Integration">Further Interface Integration</a></h1></div>
+
+<table>
+<tr>
+<td>
+NOTE: Untested Copilot Code.
+</td>
+</tr>
+</table>
+
+<p>
+Below is an example of how you can integrate an on/off toggle for your autolabel function into Nuke’s user interface. This example creates a global flag that controls whether your custom autolabel function returns meaningful text or an empty string. It also adds a menu command so you can switch the autolabel on and off at runtime and refresh the node graph display.
+</p>
+
+<div id="Further Interface Integration-Define the Global Toggle and Your Autolabel Function"><h2 id="Define the Global Toggle and Your Autolabel Function" class="header"><a href="#Further Interface Integration-Define the Global Toggle and Your Autolabel Function">Define the Global Toggle and Your Autolabel Function</a></h2></div>
+
+<p>
+In one of your startup scripts (for example in your <code>menu.py</code> or an external Python file sourced at startup), define a global variable (here called <code>enable_autolabel</code>) and write your custom autolabel function so it checks the flag. For example:
+</p>
+
+<pre python>
+<table>
+<tr>
+<td>
+NOTE: Untested Copilot Code.
+</td>
+</tr>
+</table>
+import nuke
+
+# Global flag that controls autolabeling. True = autolabel active; False = off.
+enable_autolabel = True
+
+def customAutolabel():
+    # If the autolabel toggle is off, simply return an empty string or default text.
+    if not enable_autolabel:
+        return ""
+    
+    n = nuke.thisNode()
+    label = n.name()  # You can start with the node's name.
+    
+    # Example for Blur nodes: append the "size" knob value if it's non-zero.
+    if n.Class() == "Blur":
+        size_val = n['size'].value()
+        if size_val != 0 and size_val != [0, 0]:
+            label += "\nSize: " + str(size_val)
+    
+    # Append any custom user label defined on the node.
+    if n['label'].value():
+        label += "\n" + n['label'].value()
+    
+    return label
+
+# Register the autolabel function.
+nuke.addAutolabel(customAutolabel)
+</pre>
+
+<p>
+In this example, when <code>enable_autolabel</code> is <code>False</code>, the autolabel function returns an empty string. When it’s <code>True</code>, it builds a label based on the node’s properties.
+</p>
+
+<div id="Further Interface Integration-Create a Toggle Command"><h2 id="Create a Toggle Command" class="header"><a href="#Further Interface Integration-Create a Toggle Command">Create a Toggle Command</a></h2></div>
+
+<p>
+Now, define a function to flip the value of <code>enable_autolabel</code> and force a refresh of node labels. A common trick to update the node graph is to iterate through nodes (or simply trigger a redraw). For example:
+</p>
+
+<pre python>
+<table>
+<tr>
+<td>
+NOTE: Untested Copilot Code.
+</td>
+</tr>
+</table>
+def toggleAutolabel():
+    global enable_autolabel
+    # Toggle the flag
+    enable_autolabel = not enable_autolabel
+    
+    # Print to the script editor for debugging.
+    status = "enabled" if enable_autolabel else "disabled"
+    nuke.tprint("Custom autolabels are now %s." % status)
+    
+    # Optionally, force the node graph to refresh. One common trick is to re-select nodes.
+    for node in nuke.allNodes():
+        # Toggle the selection state to force an update.
+        node.setSelected(not node.selected())
+        node.setSelected(not node.selected())
+</pre>
+
+<p>
+This function toggles the flag and then “jiggles” each node’s selection state to force the UI to refresh. In some versions of Nuke, there might be a dedicated redraw command, but toggling selection is a practical workaround.
+</p>
+
+<div id="Further Interface Integration-Add a Menu Entry to Toggle Autolabel"><h2 id="Add a Menu Entry to Toggle Autolabel" class="header"><a href="#Further Interface Integration-Add a Menu Entry to Toggle Autolabel">Add a Menu Entry to Toggle Autolabel</a></h2></div>
+
+<p>
+Finally, add a menu command so you can toggle it interactively. For example, add the following to your <code>menu.py</code>:
+</p>
+
+<pre python>
+<table>
+<tr>
+<td>
+NOTE: Untested Copilot Code.
+</td>
+</tr>
+</table>
+nuke.menu("Nuke").addCommand("Custom/Toggle Autolabel", toggleAutolabel, "ctrl+shift+a")
+</pre>
+
+<p>
+This line adds a new menu item under a “Custom” menu (or you can choose any menu title you prefer) and binds it to the <code>toggleAutolabel</code> function. The shortcut here is Control+Shift+A (you can change that to suit your preferences).
+</p>
+
+<div id="Further Interface Integration-Add a Menu Entry to Toggle Autolabel-Recap"><h3 id="Recap" class="header"><a href="#Further Interface Integration-Add a Menu Entry to Toggle Autolabel-Recap">Recap</a></h3></div>
+
+<ul>
+<li>
+<span id="Further Interface Integration-Add a Menu Entry to Toggle Autolabel-Recap-Global Flag and Function"></span><strong id="Global Flag and Function">Global Flag and Function</strong>: Use a global variable (<code>enable_autolabel</code>) to control your autolabel output. Then write your custom function to check this flag before returning a label.
+
+<li>
+<span id="Further Interface Integration-Add a Menu Entry to Toggle Autolabel-Recap-Toggle Function"></span><strong id="Toggle Function">Toggle Function</strong>: Create a function (<code>toggleAutolabel</code>) that toggles the flag and forces the Nuke node graph to refresh so that the change appears immediately.
+
+<li>
+<span id="Further Interface Integration-Add a Menu Entry to Toggle Autolabel-Recap-UI Integration"></span><strong id="UI Integration">UI Integration</strong>: Add a menu command (and optionally a shortcut) that lets you toggle the autolabel behavior at runtime.
+
+</ul>
+<p>
+This setup lets you enable or disable your custom autolabels on the fly without having to restart Nuke or edit your startup scripts again.
+</p>
 
 <p>
 <a href="nuke_index.html">Nuke Index</a>
