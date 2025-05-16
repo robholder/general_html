@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>vim_writing_to_two_files</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="vim_learning.html">Vim Learning</a>
+</p>
+
+<div id="Writing to Duplicate Files"><h1 id="Writing to Duplicate Files" class="header"><a href="#Writing to Duplicate Files">Writing to Duplicate Files</a></h1></div>
+
+<p>
+I find that sometimes, I'm writing 'live' python scripts, but I need to keep duplicates in a git repo in another local location.
+</p>
+
+<div id="Writing to Duplicate Files-Example:"><h4 id="Example:" class="header"><a href="#Writing to Duplicate Files-Example:">Example:</a></h4></div>
+
+<p>
+I used this when writing a Nuke python config file, and had a repo elsewhere on disk:
+</p>
+
+<pre vim>
+:command -buffer WriteBoth execute "w" |  execute "silent !cp % ~/Documents/Projects/Projects_apps/Python/VirtualEnvs/nuke_pipeline/files/.nuke/python/pipeline/renderConfig.py"
+</pre>
+
+
+<p>
+This worked for me! I used the method of adding a 'buffer' custom command.
+</p>
+
+<div id="Writing to Duplicate Files-Two Solutions"><h2 id="Two Solutions" class="header"><a href="#Writing to Duplicate Files-Two Solutions">Two Solutions</a></h2></div>
+
+<p>
+Vim doesn't include a built‑in command to write a single buffer to two files simultaneously. However, you can simulate this behavior by defining a custom command or an autocommand that writes (or “copies”) the file to your secondary location after you save it.
+Below are two common approaches:
+</p>
+
+<div id="Writing to Duplicate Files-Two Solutions-Using an Autocommand"><h3 id="Using an Autocommand" class="header"><a href="#Writing to Duplicate Files-Two Solutions-Using an Autocommand">Using an Autocommand</a></h3></div>
+
+<p>
+You can set up an autocommand that automatically copies the file to your git repository location every time you write the “live” file. For example, if your live file is at a fixed path, add something like this to your ~/.vimrc (or appropriate VimScript file):
+</p>
+
+<pre vim>
+" When writing the live file, copy it to the git repo location.
+autocmd BufWritePost /path/to/live/python_script.py silent! execute '!cp % /path/to/git_repo/python_script.py'
+</pre>
+
+<div id="Writing to Duplicate Files-Two Solutions-Using an Autocommand-How It Works:"><h4 id="How It Works:" class="header"><a href="#Writing to Duplicate Files-Two Solutions-Using an Autocommand-How It Works:">How It Works:</a></h4></div>
+
+<ul>
+<li>
+<code>BufWritePost</code>: This event fires after you successfully write the buffer.
+
+<li>
+<code>%</code>: Represents the current file name.
+
+<li>
+The shell command (<code>!cp ...</code>): Copies the file to your git repository location.
+
+<li>
+<code>silent!</code>: Suppresses any output so it doesn’t interrupt your workflow.
+
+</ul>
+<p>
+With this in place, every time you save the live file, Vim automatically runs the copy command.
+</p>
+
+<div id="Writing to Duplicate Files-Two Solutions-Defining a Custom Command"><h3 id="Defining a Custom Command" class="header"><a href="#Writing to Duplicate Files-Two Solutions-Defining a Custom Command">Defining a Custom Command</a></h3></div>
+
+<p>
+If you prefer to control when both files are updated, you can define a custom Vim command that writes the buffer and then copies it. For instance, add the following to your Vim configuration:
+</p>
+
+<pre vim>
+command! WriteBoth execute "w" | execute "silent !cp % /path/to/git_repo/python_script.py"
+</pre>
+
+<p>
+Now, instead of using <code>:w</code>, you would use:
+</p>
+
+<pre vim>
+:WriteBoth
+</pre>
+
+<div id="Writing to Duplicate Files-Two Solutions-Defining a Custom Command-How It Works:"><h4 id="How It Works:" class="header"><a href="#Writing to Duplicate Files-Two Solutions-Defining a Custom Command-How It Works:">How It Works:</a></h4></div>
+
+<ul>
+<li>
+<code>execute "w"</code>: Saves the current buffer to its file.
+
+<li>
+<code>|:</code> Chains commands.
+
+<li>
+<code>silent !cp % ...</code>: Executes the copy command to duplicate the file into your git repository without displaying shell output.
+
+</ul>
+<p>
+This approach gives you manual control so that you can decide exactly when to update the git repo version.
+</p>
+
+<div id="Writing to Duplicate Files-Two Solutions-Recap"><h3 id="Recap" class="header"><a href="#Writing to Duplicate Files-Two Solutions-Recap">Recap</a></h3></div>
+
+<ul>
+<li>
+No Native Multi-Target Write: Vim doesn't support writing to two distinct files simultaneously via a built-in command.
+
+<li>
+Workarounds: Use an autocommand to automatically copy the file after each write, or define a custom command (:WriteBoth) that writes the file and then copies it.
+
+</ul>
+<p>
+Either method helps maintain a “live” version in one location along with a duplicate in your git repo—without the need for manual copying or juggling two buffers. If you need further customization or encounter any issues setting these up, feel free to ask!
+</p>
+
+<div id="Writing to Duplicate Files-Enter Custom Command When Needed"><h2 id="Enter Custom Command When Needed" class="header"><a href="#Writing to Duplicate Files-Enter Custom Command When Needed">Enter Custom Command When Needed</a></h2></div>
+
+<p>
+One effective approach is to define a buffer-local command that only exists for that session or for a specific file. This way, the command (e.g., <code>:WriteBoth</code>) is only available when you're dealing with this particular file—and you can set it up dynamically or via an autocommand for any file you need.
+</p>
+
+<p>
+Below are a couple of methods to achieve this:
+</p>
+
+<div id="Writing to Duplicate Files-Enter Custom Command When Needed-Defining a Buffer-Local Command Directly"><h3 id="Defining a Buffer-Local Command Directly" class="header"><a href="#Writing to Duplicate Files-Enter Custom Command When Needed-Defining a Buffer-Local Command Directly">Defining a Buffer-Local Command Directly</a></h3></div>
+
+<p>
+When you're editing the file in question, you can define a command that writes and then copies the file. For example, in your Vim session, you could run:
+</p>
+
+<pre vim>
+:command -buffer WriteBoth execute "w" | execute "silent !cp % /path/to/git_repo/python_script.py"
+</pre>
+
+<div id="Writing to Duplicate Files-Enter Custom Command When Needed-Defining a Buffer-Local Command Directly-Explanation:"><h4 id="Explanation:" class="header"><a href="#Writing to Duplicate Files-Enter Custom Command When Needed-Defining a Buffer-Local Command Directly-Explanation:">Explanation:</a></h4></div>
+
+<ul>
+<li>
+<code>:command -buffer WriteBoth ...</code> The <code>-buffer</code> flag makes <code>WriteBoth</code> a buffer-local command, meaning it only exists for the current buffer.
+
+<li>
+<code>execute "w"</code> This command writes (saves) the current buffer.
+
+<li>
+<code>|</code> Chains another command.
+
+<li>
+<code>execute "silent !cp % /path/to/git_repo/python_script.py"</code> The shell command copies the current file (represented by <code>%)</code> to the destination. The <code>silent</code> modifier prevents Vim from showing the output of the shell command.
+
+</ul>
+<p>
+When you're done with that buffer, the <code>:WriteBoth</code> command will disappear from other sessions unless you define it there too.
+</p>
+
+<div id="Writing to Duplicate Files-Enter Custom Command When Needed-Using an Autocommand to Add the Command Conditionally"><h3 id="Using an Autocommand to Add the Command Conditionally" class="header"><a href="#Writing to Duplicate Files-Enter Custom Command When Needed-Using an Autocommand to Add the Command Conditionally">Using an Autocommand to Add the Command Conditionally</a></h3></div>
+
+<p>
+If you often work with files that need this dual-write behavior (for example, whenever a file from a certain directory is opened), you can add an autocommand in your ~/.vimrc that creates the buffer-local command only when editing files in that location:
+</p>
+
+<pre vim>
+" When opening a file in the specific live location, define the WriteBoth command.
+autocmd BufEnter /path/to/live/python_script.py command! -buffer WriteBoth execute "w" | execute "silent !cp % /path/to/git_repo/python_script.py"
+</pre>
+
+<div id="Writing to Duplicate Files-Enter Custom Command When Needed-Using an Autocommand to Add the Command Conditionally-Explanation:"><h4 id="Explanation:" class="header"><a href="#Writing to Duplicate Files-Enter Custom Command When Needed-Using an Autocommand to Add the Command Conditionally-Explanation:">Explanation:</a></h4></div>
+
+<ul>
+<li>
+<code>autocmd BufEnter /path/to/live/python_script.py ...</code> This autocommand triggers every time a file matching the path pattern is entered.
+
+<li>
+<code>command! -buffer WriteBoth ...</code> This defines the buffer-local command only for that file.
+
+</ul>
+<p>
+This approach is very flexible. You could even adapt it to work with any combination of files by changing the file pattern or the copy command dynamically.
+</p>
+
+<div id="Writing to Duplicate Files-Enter Custom Command When Needed-Recap"><h3 id="Recap" class="header"><a href="#Writing to Duplicate Files-Enter Custom Command When Needed-Recap">Recap</a></h3></div>
+
+<ul>
+<li>
+<span id="Writing to Duplicate Files-Enter Custom Command When Needed-Recap-Buffer-Local Commands"></span><strong id="Buffer-Local Commands">Buffer-Local Commands</strong>: Use the -buffer flag with :command to restrict a command to the current buffer.
+
+<li>
+<span id="Writing to Duplicate Files-Enter Custom Command When Needed-Recap-Autocommands"></span><strong id="Autocommands">Autocommands</strong>: Use autocommands to automatically define such commands only for specific files or directories, giving you the flexibility to use this technique on demand.
+
+</ul>
+<p>
+Using either of these methods, you can ensure that your live file gets saved and then duplicated to your git repository location—all from a single command that's only available in the relevant Vim session or buffer.
+</p>
+
+
+<p>
+<a href="vim_learning.html">Vim Learning</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
