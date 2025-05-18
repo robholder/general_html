@@ -13,7 +13,9 @@
 <a href="Index.html">Index</a>
 </p>
 
-<div id="[[nuke_index|Nuke Index]]"><h3 id="[[nuke_index|Nuke Index]]" class="header"><a href="#[[nuke_index|Nuke Index]]"><a href="nuke_index.html">Nuke Index</a></a></h3></div>
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
 
 <div id="Nuke - Python - Knob Defaults"><h2 id="Nuke - Python - Knob Defaults" class="header"><a href="#Nuke - Python - Knob Defaults">Nuke - Python - Knob Defaults</a></h2></div>
 
@@ -71,6 +73,123 @@ nuke.knobDefault("Read.exr.disable_mmap", "True")
 
 <p>
 <em>Note Knob defaults do not run by default for nodes created using the nuke.nodes.nodename() syntax. It is also important that you add these statements in your init.py file rather than menu.py. This ensures that they are set for command-line start-up as well as the graphical user interface (GUI). If these statements are not processed until menu.py (GUI start-up), then nodes created from the command line NUKE Python prompt (that is, starting as nuke -t) do not have the defaults applied.</em>
+</p>
+
+<div id="Grouping knobDefaults"><h1 id="Grouping knobDefaults" class="header"><a href="#Grouping knobDefaults">Grouping knobDefaults</a></h1></div>
+
+<p>
+It's possible and quite common to group those defaults into a single function, then call that function so the code executes immediately when Nuke starts up. Doing so can improve clarity and organization, grouping the related settings in one neat place. Consider this approach:
+</p>
+
+<pre python>
+def set_knob_defaults():
+    nuke.knobDefault('Copy.bbox', 'B Side')
+    nuke.knobDefault('Reformat.pbb', '1')
+    nuke.knobDefault('Merge2.bbox', 'B')
+    nuke.knobDefault('Keymix.bbox', 'B')
+
+# Call the function immediately so that the defaults are applied.
+set_knob_defaults()
+</pre>
+
+<p>
+This setup behaves essentially the same as listing each line individually at the top level—it ensures that when the <code>menu.py</code> is executed (which happens during Nuke's startup), these knob defaults are applied. Grouping them in a function also makes maintenance easier; if you ever need to update these settings or conditionally apply them, everything is encapsulated in one place.
+</p>
+
+<div id="Using a Dictionary"><h1 id="Using a Dictionary" class="header"><a href="#Using a Dictionary">Using a Dictionary</a></h1></div>
+
+<p>
+Here's one way to do it using a dictionary so that you can loop over the values dynamically:
+</p>
+
+<pre python>
+def set_knob_defaults():
+    knob_defaults = {
+        'Copy.bbox': 'B Side',
+        'Reformat.pbb': '1',
+        'Merge2.bbox': 'B',
+        'Keymix.bbox': 'B'
+    }
+    for knob, default in knob_defaults.items():
+        nuke.knobDefault(knob, default)
+
+set_knob_defaults()
+</pre>
+
+<div id="Using a Dictionary-Explanation"><h2 id="Explanation" class="header"><a href="#Using a Dictionary-Explanation">Explanation</a></h2></div>
+
+<ul>
+<li>
+<span id="Using a Dictionary-Explanation-Dictionary of Defaults"></span><strong id="Dictionary of Defaults">Dictionary of Defaults</strong>: The <code>knob_defaults</code> dictionary maps each knob name to its default value. This allows you to centralize the settings in one place.
+
+<li>
+<span id="Using a Dictionary-Explanation-Loop Over the Dictionary"></span><strong id="Loop Over the Dictionary">Loop Over the Dictionary</strong>: The <code>for</code> loop iterates over the dictionary items and calls <code>nuke.knobDefault(knob, default)</code> for each one. This way you avoid repeating similar code lines.
+
+<li>
+<span id="Using a Dictionary-Explanation-Immediate Execution"></span><strong id="Immediate Execution">Immediate Execution</strong>: By calling <code>set_knob_defaults()</code> immediately after its definition, you ensure that these defaults are set as soon as Nuke loads the <code>menu.py</code>.
+
+</ul>
+<p>
+This approach is both clean and flexible. It makes it easier to add or remove defaults later on, and you can even incorporate conditions if needed. For example, you could determine knob defaults based on environment variables or configuration files before setting them.
+</p>
+
+<div id="Using JSON or YAML"><h1 id="Using JSON or YAML" class="header"><a href="#Using JSON or YAML">Using JSON or YAML</a></h1></div>
+
+<p>
+Using a dictionary makes things both concise and flexible. Once you're comfortable with that pattern, there are additional ways to manage configuration settings dynamically. For example, you might <span id="Using JSON or YAML-read your knob defaults from an external configuration file"></span><strong id="read your knob defaults from an external configuration file">read your knob defaults from an external configuration file</strong> — like a JSON or YAML file—so that you don't have to modify code if you ever want to change the defaults.
+</p>
+
+<p>
+Here's an extended version using a JSON file:
+</p>
+
+<pre python>
+import json
+import os
+import nuke
+
+def set_knob_defaults_from_json(config_path):
+    if not os.path.exists(config_path):
+        print("Configuration file not found:", config_path)
+        return
+
+    with open(config_path, 'r') as f:
+        knob_defaults = json.load(f)
+    
+    for knob, default in knob_defaults.items():
+        nuke.knobDefault(knob, default)
+    print("Knob defaults have been applied.")
+
+# Assuming you have a JSON file with content like:
+# {
+#   "Copy.bbox": "B Side",
+#   "Reformat.pbb": "1",
+#   "Merge2.bbox": "B",
+#   "Keymix.bbox": "B"
+# }
+json_config_file = "/path/to/your/knob_defaults.json"
+set_knob_defaults_from_json(json_config_file)
+</pre>
+
+<div id="Using JSON or YAML-What This Does"><h2 id="What This Does" class="header"><a href="#Using JSON or YAML-What This Does">What This Does</a></h2></div>
+
+<ul>
+<li>
+<span id="Using JSON or YAML-What This Does-External Configuration"></span><strong id="External Configuration">External Configuration</strong>: By using an external file (here JSON), you can update knob defaults without modifying your code. This is especially useful in a production environment or when different projects require different settings.
+
+<li>
+<span id="Using JSON or YAML-What This Does-Flexibility"></span><strong id="Flexibility">Flexibility</strong>: This approach makes it easy to manage, share, or modify settings, and you can even incorporate logic to choose different configuration files based on the project's context or environment variables.
+
+<li>
+<span id="Using JSON or YAML-What This Does-Maintainability"></span><strong id="Maintainability">Maintainability</strong>: Grouping defaults together—whether in a function or a configuration file—keeps your code neat and maintainable, and helps ensure consistency across your projects.
+
+</ul>
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
 </p>
 
 </body>
