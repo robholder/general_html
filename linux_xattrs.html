@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>linux_xattrs</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="linux.html">Linux</a>
+</p>
+
+<div id="Linux - xattrs"><h1 id="Linux - xattrs" class="header"><a href="#Linux - xattrs">Linux - xattrs</a></h1></div>
+
+<p>
+On Linux, extended attributes (xattrs) let you attach extra metadata to files beyond the standard file attributes (permissions, timestamps, etc.). However, there are some Linux-specific tools, namespaces, and usage patterns to be aware of. Here’s a thorough breakdown:
+</p>
+
+<div id="Linux - xattrs-What Are Linux Extended Attributes?"><h2 id="What Are Linux Extended Attributes?" class="header"><a href="#Linux - xattrs-What Are Linux Extended Attributes?">What Are Linux Extended Attributes?</a></h2></div>
+
+<p>
+Extended attributes on Linux are name–value pairs associated with files and directories. They let you store arbitrary metadata such as provenance information, security settings (like SELinux labels), or custom tags. Unlike standard file metadata (which is fixed by the file system), xattrs are a flexible mechanism managed by the kernel and stored in the file’s inode (or in an associated metadata block) on file systems that support them (e.g., ext4, Btrfs, XFS).
+</p>
+
+<p>
+<span id="Linux - xattrs-What Are Linux Extended Attributes?-Namespaces"></span><strong id="Namespaces">Namespaces</strong>: Attributes are organized into namespaces. The most common for user-defined data is the user namespace. For example, if you want to record a file’s source path, you might set an attribute named user.source (note that only users with the proper privileges can modify attributes in some namespaces, such as trusted or security).
+</p>
+
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux"><h2 id="Tools for Managing xattrs on Linux" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux">Tools for Managing xattrs on Linux</a></h2></div>
+
+<p>
+The primary command-line tools for working with extended attributes in Linux are:
+</p>
+
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux-Reading and Listing xattrs"><h3 id="Reading and Listing xattrs" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux-Reading and Listing xattrs">Reading and Listing xattrs</a></h3></div>
+
+<ul>
+<li>
+<code>getfattr</code> This command (usually part of the <code>attr</code> package) is used to read the extended attributes from a file.
+
+<ul>
+<li>
+List All Attributes (with Values):
+
+</ul>
+</ul>
+  
+<pre bash>
+getfattr -d filename.ext
+</pre>
+
+<p>
+This outputs a list of all extended attributes along with their values on <code>filename.ext</code>.
+</p>
+
+<ul>
+<li>
+List Specific Namespace Attributes: Since many distributions use the user namespace for custom attributes, you can also filter:
+
+</ul>
+  
+<pre bash>
+getfattr -n user.source filename.ext
+</pre>
+
+<p>
+This command will show only the attribute named user.source if it exists.
+</p>
+
+<ul>
+<li>
+Alternate Listing with a Regex Match: You can use a pattern to list all attributes:
+
+</ul>
+  
+<pre bash>
+getfattr -d -m '' filename.ext
+</pre>
+
+<p>
+An empty regex ('') matches all attributes.
+</p>
+
+<ul>
+<li>
+<span id="Linux - xattrs-Tools for Managing xattrs on Linux-Reading and Listing xattrs-Note"></span><strong id="Note">Note</strong>: There’s sometimes confusion with the lsattr command—this tool lists file attributes specific to ext filesystems (such as immutable or append-only flags) and is not the same as extended attributes.
+
+</ul>
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux-Setting or Modifying xattrs"><h3 id="Setting or Modifying xattrs" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux-Setting or Modifying xattrs">Setting or Modifying xattrs</a></h3></div>
+
+<ul>
+<li>
+<code>setfattr</code> This command is used to set or update an extended attribute on a file.
+
+</ul>
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux-Setting or Modifying xattrs-Setting an Attribute:"><h4 id="Setting an Attribute:" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux-Setting or Modifying xattrs-Setting an Attribute:">Setting an Attribute:</a></h4></div>
+
+<pre bash>
+setfattr -n user.source -v "/original/path/to/file.ext" filename.ext
+</pre>
+
+<p>
+Here, you define an attribute user.source and assign it a value, such as the file’s source path.
+</p>
+
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux-Setting or Modifying xattrs-Removing an Attribute:"><h4 id="Removing an Attribute:" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux-Setting or Modifying xattrs-Removing an Attribute:">Removing an Attribute:</a></h4></div>
+
+<pre bash>
+setfattr -x user.source filename.ext
+</pre>
+
+<p>
+This will remove the user.source attribute from filename.ext.
+</p>
+
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux-How xattrs Are Handled"><h3 id="How xattrs Are Handled" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux-How xattrs Are Handled">How xattrs Are Handled</a></h3></div>
+
+<ul>
+<li>
+<span id="Linux - xattrs-Tools for Managing xattrs on Linux-How xattrs Are Handled-Storage"></span><strong id="Storage">Storage</strong>: Extended attributes are saved separately from the file’s main data stream. They are stored in the inode (or in associated metadata blocks) by the file system, meaning that they travel with the file if the file system supports their preservation during copy operations.
+
+<li>
+<span id="Linux - xattrs-Tools for Managing xattrs on Linux-How xattrs Are Handled-File System Support"></span><strong id="File System Support">File System Support</strong>: Not every file system supports xattrs. Common Linux file systems like ext4, Btrfs, XFS, and JFS do support them. You can verify support by checking your file system mount options (for example, ensuring user_xattr is enabled for ext filesystems).
+
+<li>
+<span id="Linux - xattrs-Tools for Managing xattrs on Linux-How xattrs Are Handled-Namespace Considerations"></span><strong id="Namespace Considerations">Namespace Considerations</strong>: When designing a workflow that tracks provenance, it’s a good idea to stick to a generic namespace like <code>user</code> (e.g., <code>user.source</code>) to enhance portability across systems and to avoid conflicts with system-reserved namespaces like <code>security</code> or <code>trusted</code>.
+
+</ul>
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux-How xattrs Are Handled-Example Workflow"><h4 id="Example Workflow" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux-How xattrs Are Handled-Example Workflow">Example Workflow</a></h4></div>
+
+<p>
+Let’s say you want to tag every file with its original source path as part of your file management process. In a shell script or manual operation, you might do:
+</p>
+
+<ul>
+<li>
+Set the Attribute:
+
+</ul>
+  
+<pre bash>
+setfattr -n user.source -v "/original/path/to/source_file.ext" myfile.ext
+</pre>
+
+<ul>
+<li>
+Verify the Attribute Is Set:
+
+</ul>
+  
+<pre bash>
+getfattr -d myfile.ext
+</pre>
+
+<p>
+This should display something like:
+</p>
+
+<pre bash>
+# file: myfile.ext
+user.source="/original/path/to/source_file.ext"
+</pre>
+
+<ul>
+<li>
+Removing the Attribute (if needed):
+
+</ul>
+  
+<pre bash>
+setfattr -x user.source myfile.ext
+</pre>
+
+<p>
+This process is fully scriptable, making it easy to integrate into automated backups or provenance tracking within a larger pipeline.
+</p>
+
+<div id="Linux - xattrs-Tools for Managing xattrs on Linux-Summary"><h3 id="Summary" class="header"><a href="#Linux - xattrs-Tools for Managing xattrs on Linux-Summary">Summary</a></h3></div>
+
+<ul>
+<li>
+<span id="Linux - xattrs-Tools for Managing xattrs on Linux-Summary-Extended Attributes (xattrs)"></span><strong id="Extended Attributes (xattrs)">Extended Attributes (xattrs)</strong>: Allow storing custom metadata (key–value pairs) directly with files.
+
+</ul>
+<p>
+Linux Tools:
+</p>
+<ul>
+<li>
+*getfattr for reading and listing all extended attributes.
+
+<li>
+*setfattr for setting, modifying, or removing extended attributes.
+
+<li>
+<span id="Linux - xattrs-Tools for Managing xattrs on Linux-Summary-Namespaces"></span><strong id="Namespaces">Namespaces</strong>: Use the user namespace (user.myattr) for custom metadata to ensure compatibility.
+
+</ul>
+<p>
+Storage: Managed by the file system and stored outside the main file data, ensuring that metadata travels with the file.
+</p>
+
+<p>
+This comprehensive toolset provided by Linux makes it straightforward to attach, read, and modify metadata, which is very useful for tracking file origins, security policies, or other information in your file management pipeline.
+</p>
+
+
+
+
+<p>
+<a href="linux.html">Linux</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
