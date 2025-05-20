@@ -593,6 +593,9 @@ And you can replace all 'horse' instances with 'dog' as follows:
 :%s/My search pattern//ng
 </pre>
 
+
+
+
 <div id="Substitution with Expressions"><h1 id="Substitution with Expressions" class="header"><a href="#Substitution with Expressions">Substitution with Expressions</a></h1></div>
 
 <p>
@@ -863,14 +866,14 @@ NOTE: I don't think you can use other delimiters with this particular trick. The
 </tr>
 </table>
 
-<div id="Using Global To Set A Range-Using Globa to Select Lines for Substitution"><h3 id="Using Globa to Select Lines for Substitution" class="header"><a href="#Using Global To Set A Range-Using Globa to Select Lines for Substitution">Using Globa to Select Lines for Substitution</a></h3></div>
+<div id="Using Global To Set A Range-Using Global to Select Lines for Substitution"><h3 id="Using Global to Select Lines for Substitution" class="header"><a href="#Using Global To Set A Range-Using Global to Select Lines for Substitution">Using Global to Select Lines for Substitution</a></h3></div>
 
 <ul>
 <li>
 <code>:g/pattern/s/old/new/g</code> --&gt; Finds lines with pattern and replaces occurrences of old with new within those lines.o
 
 </ul>
-<div id="Using Global To Set A Range-Using Globa to Select Lines for Substitution-[[vim_global_commands|Vimwiki Link: Global 'g' &amp; 'v']]"><h4 id="[[vim_global_commands|Vimwiki Link: Global 'g' &amp; 'v']]" class="header"><a href="#Using Global To Set A Range-Using Globa to Select Lines for Substitution-[[vim_global_commands|Vimwiki Link: Global 'g' &amp; 'v']]"><a href="vim_global_commands.html">Vimwiki Link: Global 'g' &amp; 'v'</a></a></h4></div>
+<div id="Using Global To Set A Range-Using Global to Select Lines for Substitution-[[vim_global_commands|Vimwiki Link: Global 'g' &amp; 'v']]"><h4 id="[[vim_global_commands|Vimwiki Link: Global 'g' &amp; 'v']]" class="header"><a href="#Using Global To Set A Range-Using Global to Select Lines for Substitution-[[vim_global_commands|Vimwiki Link: Global 'g' &amp; 'v']]"><a href="vim_global_commands.html">Vimwiki Link: Global 'g' &amp; 'v'</a></a></h4></div>
 
 <div id="Using Global To Set A Range-Replacing The Original Search Pattern"><h3 id="Replacing The Original Search Pattern" class="header"><a href="#Using Global To Set A Range-Replacing The Original Search Pattern">Replacing The Original Search Pattern</a></h3></div>
 
@@ -1311,6 +1314,143 @@ Works similarly but may feel simpler in some cases.
 </table>
 
 
+<div id="Uppercase &amp; Lowercase (and capturing camelCase)"><h1 id="Uppercase &amp; Lowercase (and capturing camelCase)" class="header"><a href="#Uppercase &amp; Lowercase (and capturing camelCase)">Uppercase &amp; Lowercase (and capturing camelCase)</a></h1></div>
+
+<p>
+In Vim's regex, you can match a lowercase letter immediately followed by an uppercase letter using either a character class or Vim’s special shorthand:
+</p>
+
+<div id="Uppercase &amp; Lowercase (and capturing camelCase)-Using character classes:"><h3 id="Using character classes:" class="header"><a href="#Uppercase &amp; Lowercase (and capturing camelCase)-Using character classes:">Using character classes:</a></h3></div>
+
+<pre vim>
+/[a-z][A-Z]
+</pre>
+
+<p>
+This pattern matches any lowercase letter (<code>[a-z]</code>) directly next to an uppercase letter (<code>[A-Z]</code>).
+</p>
+
+<div id="Uppercase &amp; Lowercase (and capturing camelCase)-Using Vim’s shorthand:"><h3 id="Using Vim’s shorthand:" class="header"><a href="#Uppercase &amp; Lowercase (and capturing camelCase)-Using Vim’s shorthand:">Using Vim’s shorthand:</a></h3></div>
+
+<pre vim>
+/\l\u
+</pre>
+
+<p>
+Here, <code>\l</code> stands for any lowercase letter and <code>\u</code> for any uppercase letter. This achieves the same result as the character class version.
+</p>
+
+<div id="Uppercase &amp; Lowercase (and capturing camelCase)-Highlighting Only the Uppercase Letter"><h2 id="Highlighting Only the Uppercase Letter" class="header"><a href="#Uppercase &amp; Lowercase (and capturing camelCase)-Highlighting Only the Uppercase Letter">Highlighting Only the Uppercase Letter</a></h2></div>
+
+<p>
+Sometimes, you might want to highlight or work with just the uppercase letter (the “transition” point in camelCase). To do this, you can use the <code>\zs</code> atom, which sets the start of the match:
+</p>
+
+<pre vim>
+/\l\zs\u
+</pre>
+
+<p>
+This works as follows:
+</p>
+
+<ul>
+<li>
+<code>\l</code> matches a lowercase letter.
+
+<li>
+<code>\zs</code> tells Vim to start the match from here.
+
+<li>
+<code>\u</code> then matches an uppercase letter, which becomes the “visible” match.
+
+</ul>
+<p>
+When you search with this pattern, only the uppercase letter is highlighted even though it’s only matched if it directly follows a lowercase letter.
+</p>
+
+<p>
+These patterns are useful not only for searching but also as part of substitution commands—for example, converting camelCase to snake_case using something like:
+</p>
+
+<pre vim>
+:%s/\(\l\)\(\u\)/\1_\L\2/g
+</pre>
+
+<p>
+...which inserts an underscore between a lowercase and an uppercase letter, while converting the uppercase letter to lowercase.
+</p>
+
+<div id="Uppercase &amp; Lowercase (and capturing camelCase)-\L and \E"><h2 id="\L and \E" class="header"><a href="#Uppercase &amp; Lowercase (and capturing camelCase)-\L and \E">\L and \E</a></h2></div>
+
+<p>
+What does the <code>\L</code> do in: <code>:%s/\(\l\)\(\u\)/\1_\L\2/g</code>? Is it forcing a conversion to lowercase? And is there a corollary for uppercase?
+</p>
+
+<p>
+The <code>\L</code> in the replacement text tells Vim to convert everything that follows it to lowercase until an <code>\E</code> is encountered (or until the end of the replacement if no <code>\E</code> is present). In the substitution:
+</p>
+
+<pre vim>
+:%s/\(\l\)\(\u\)/\1_\L\2/g
+</pre>
+
+<p>
+Here's what happens:
+</p>
+
+<ul>
+<li>
+<code>\(\l\)</code> captures a lowercase letter.
+
+<li>
+<code>\(\u\)</code> captures an uppercase letter.
+
+<li>
+In the replacement <code>\1_\L\2</code>, the <code>\1</code> is the first captured lowercase letter, then an underscore is inserted, and then <code>\L\2</code> converts the second captured uppercase letter to lowercase (if it weren't already).
+
+</ul>
+<p>
+For example, if the match is <code>aB</code>, it becomes <code>a_b</code>.
+</p>
+
+<p>
+The corresponding conversion for uppercase in Vim is <code>\U</code>. For example, if you needed to force conversion to uppercase, you could use:
+</p>
+
+<pre vim>
+:%s/\(\l\)\(\u\)/\1_\U\2/g
+</pre>
+
+<p>
+In that case, <code>\U</code> would convert everything following it to uppercase until an <code>\E</code> is encountered. If you want to mix cases in a single replacement, you can combine <code>\U</code> (for uppercase), <code>\L</code> (for lowercase), and <code>\E</code> (to end the conversion).
+</p>
+
+<div id="Uppercase &amp; Lowercase (and capturing camelCase)-What is '\E'?"><h2 id="What is '\E'?" class="header"><a href="#Uppercase &amp; Lowercase (and capturing camelCase)-What is '\E'?">What is '\E'?</a></h2></div>
+
+<p>
+In Vim's substitution command, <code>\L</code> (and similarly <code>\U</code>) starts a case conversion that persists until it's terminated. The <code>\E</code> escape sequence is used to end that conversion mode. In other words, <code>\E</code> stops the conversion initiated by <code>\L</code> (for lowercase) or <code>\U</code> (for uppercase).
+</p>
+
+<p>
+For example, in a substitution like this:
+</p>
+
+<pre vim>
+:%s/\(\l\)\(\u\)/\1_\L\2\E/g
+</pre>
+
+<ul>
+<li>
+<code>\L\2</code> converts the second captured group to lowercase.
+
+<li>
+<code>\E</code> explicitly ends the lowercase conversion so that any text following it is not converted.
+
+</ul>
+<p>
+Without the <code>\E,</code> the conversion continues to the end of the replacement text. You can similarly use <code>\U</code> to make text uppercase until <code>\E</code> is encountered.
+</p>
 
 <div id="Surrounding each word in a list with quotes"><h1 id="Surrounding each word in a list with quotes" class="header"><a href="#Surrounding each word in a list with quotes">Surrounding each word in a list with quotes</a></h1></div>
 
