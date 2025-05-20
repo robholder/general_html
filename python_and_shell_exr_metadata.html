@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>python_and_shell_exr_metadata</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+
+<div id="EXR Metadata"><h1 id="EXR Metadata" class="header"><a href="#EXR Metadata">EXR Metadata</a></h1></div>
+
+<p>
+EXR files are not just image containers—they also hold a header that stores a variety of metadata (like camera settings, color space information, timestamps, custom attributes, etc.) in a key–value dictionary. While high-end DCC packages like Nuke or Houdini handle these tasks behind the scenes, when working at the script level (whether in Bash or Python) there are a few common approaches:
+</p>
+<ol>
+<li>
+Python Approaches
+
+</ol>
+<p>
+The OpenEXR Python Module
+The most common method via scripting is to use the OpenEXR Python module. This module lets you open an EXR file, read its header as a Python dictionary, modify that dictionary, and then write out a new file with the updated header.
+Reading the Header:
+python
+import OpenEXR, Imath
+</p>
+
+<ul>
+<li>
+Open an existing EXR file
+
+</ul>
+<p>
+exr_file = OpenEXR.InputFile("input.exr")
+</p>
+
+<ul>
+<li>
+Read the header containing metadata
+
+</ul>
+<p>
+header = exr_file.header()
+print(header)  # This prints out the key-value pairs in the header.
+Modifying and Writing a New File: Since EXR files aren’t typically editable in place, the standard workflow is to read the data and header, modify the header as needed, and then write a new EXR file:
+python
+import OpenEXR, Imath, array
+import numpy as np
+</p>
+
+<ul>
+<li>
+Modify header by adding a new attribute
+
+</ul>
+<p>
+header["comments"] = "Imported via custom script"
+</p>
+
+<ul>
+<li>
+For simplicity, assume the pixel data is already in a numpy array (or convert it)
+
+<li>
+This is just pseudocode; writing out pixels requires care with channel definitions.
+
+</ul>
+<p>
+channels = exr_file.channels()  # Read pixel data from all channels
+</p>
+
+<ul>
+<li>
+Use the OpenEXR OutputFile API to write new file with the modified header
+
+</ul>
+<p>
+out_exr = OpenEXR.OutputFile("output.exr", header)
+out_exr.writePixels(channels)
+out_exr.close()
+This example shows you can inject your own metadata (here using the key "comments") into the header. In practice you might add provenance details like a source path or revision history.
+Other Python Tools
+OpenImageIO (OIIO): OpenImageIO also provides a Python binding (and a powerful command-line tool, discussed below) for reading, writing, and modifying image metadata. In Python, you’d typically do:
+python
+import OpenImageIO as oiio
+img = oiio.ImageInput.open("input.exr")
+spec = img.spec()
+</p>
+<ul>
+<li>
+Access metadata via spec.attribute("key")
+
+</ul>
+<p>
+print(spec.get_string_attribute("comment", ""))
+img.close()
+Then, when writing, you can copy and augment metadata into a new file.
+</p>
+<ol>
+<li>
+Bash/Command-Line Approaches
+
+</ol>
+<p>
+OpenEXR Utilities
+The OpenEXR distribution (which includes the libraries used by the Python modules) also comes with command-line utilities such as exrheader that let you view the metadata. For instance:
+Show Header Metadata:
+bash
+exrheader input.exr
+This will list every key and its value stored in the file’s header.
+Editing in bash isn’t as straightforward because the OpenEXR command-line tools are primarily for inspection. They typically don’t let you modify the header in situ—you’d use a script to dump the header, modify it, and then rewrite the file (typically via the Python API or using another dedicated tool).
+OpenImageIO’s oiiotool
+For a fully scriptable command-line approach, many studios and technical artists turn to OpenImageIO’s oiiotool, which can work with EXR metadata. For example, you can alter metadata on the command line by:
+Adding/Modifying a Metadata Key:
+bash
+oiiotool input.exr --attrib comment "Backed up via oiiotool" -o output.exr
+This command reads input.exr, sets a new attribute (comment) with your custom string, and writes out output.exr with the updated header.
+oiiotool is very flexible and is used in pipelines to modify attributes without needing a full-blown script.
+</p>
+<ol>
+<li>
+Summary and Considerations
+
+</ol>
+<p>
+Metadata in EXR Files: EXR files store metadata in their header (a dictionary of key–value pairs) which you can read and modify. This metadata often includes technical details as well as custom user data.
+Python Modules: The OpenEXR module (and OpenImageIO bindings) are the most common ways to access and manipulate this metadata programmatically. They let you open a file, inspect and alter its header, and then write out a new file with the updated metadata.
+Command-Line Tools: For file scripts, tools like exrheader are useful for inspection, while oiiotool offers capabilities to modify metadata directly from the command line.
+In-Place Editing vs. Rewriting: Most of these methods involve creating a new file (or rewriting the image stream) rather than editing the file “in place.” This is typical for image formats like EXR, where the header and pixel data are tightly coupled.
+Using these approaches, you can integrate provenance tracking or any other custom metadata modifications into your production pipeline using standard scripting languages and tools.
+Would you like more details on a specific workflow—such as a complete Python script example for ingesting and rewriting EXR metadata, or more about using oiiotool in a bash script?
+I'd like to see examples of both!
+Below are two examples that demonstrate how to work with EXR metadata—one using Python (with the OpenEXR library) and one with a simple bash script using OpenImageIO’s oiiotool.
+Example 1: Python Script Using OpenEXR
+This Python script shows how to read an EXR file, modify its header by adding a custom key (in this case, a simple comment string), and then write out a new EXR file with the updated header. This approach uses the OpenEXR Python bindings along with the Imath library.
+</p>
+<blockquote>
+<p>
+ Note: &gt; EXR files are typically not edited “in place.” Instead, you read the header and pixel data, update the header and then write a new file. Also, this script assumes your image has the common "R", "G", and "B" channels.
+</p></blockquote>
+</pre></code>
+<p>
+python
+#!/usr/bin/env python
+import OpenEXR
+import Imath
+import array
+</p>
+
+<ul>
+<li>
+Input and output file paths
+
+</ul>
+<p>
+infile = "input.exr"
+outfile = "output.exr"
+</p>
+
+<ul>
+<li>
+Open the input EXR file
+
+</ul>
+<p>
+file_in = OpenEXR.InputFile(infile)
+</p>
+
+<ul>
+<li>
+Read the header (a dictionary of metadata)
+
+</ul>
+<p>
+header = file_in.header()
+</p>
+
+<ul>
+<li>
+Print original header keys for reference
+
+</ul>
+<p>
+print("Original header keys:", header.keys())
+</p>
+
+<ul>
+<li>
+--- Modify the metadata ---
+
+<li>
+Add (or update) an entry in the header. Here we add a simple comment.
+
+</ul>
+<p>
+header["comments"] = "Backed up with custom Python script"
+</p>
+
+<ul>
+<li>
+--- Read the image data ---
+
+<li>
+Get the data window (defines the image dimensions)
+
+</ul>
+<p>
+dw = header["dataWindow"]
+width = dw.max.x - dw.min.x + 1
+height = dw.max.y - dw.min.y + 1
+</p>
+
+<ul>
+<li>
+Define the pixel type (FLOAT) for reading channels
+
+</ul>
+<p>
+pt = Imath.PixelType(Imath.PixelType.FLOAT)
+</p>
+
+<ul>
+<li>
+Read channels. (This assumes the file has channels "R", "G", "B".)
+
+</ul>
+<p>
+channels = file_in.channels(["R", "G", "B"], pt)
+</p>
+
+<ul>
+<li>
+Convert channels to a dictionary mapping channel name to pixel data
+
+</ul>
+<p>
+pixels = {"R": channels[0], "G": channels[1], "B": channels[2]}
+</p>
+
+<ul>
+<li>
+Close the input file since we have all the data we need
+
+</ul>
+<p>
+file_in.close()
+</p>
+
+<ul>
+<li>
+--- Write a new EXR file with the updated header ---
+
+</ul>
+<p>
+file_out = OpenEXR.OutputFile(outfile, header)
+file_out.writePixels(pixels)
+file_out.close()
+</p>
+
+<p>
+print("Output written to", outfile)
+Explanation
+Reading the EXR: The script opens input.exr and reads its header (which contains all metadata) and pixel data for the "R," "G," and "B" channels.
+Modifying the Header: A new key (comments) with a string value is added to the header dictionary.
+Writing the New File: A new file (output.exr) is created using the modified header. The pixel data is then written to complete the file.
+This example demonstrates how to add provenance or any other metadata to an EXR image using Python.
+Example 2: Bash Script Using oiiotool
+For many pipelines, a command-line approach is preferable. oiiotool (part of the OpenImageIO suite) can read, modify, and write EXR metadata from the shell. Here’s how you can add a custom attribute using oiiotool.
+bash
+</p>
+<ul>
+<li>
+This command reads input.exr, sets the "comment" attribute,
+
+<li>
+and writes the result to output.exr.
+
+</ul>
+<p>
+oiiotool input.exr --attrib comment "Backed up via oiiotool" -o output.exr
+Explanation
+Reading and Writing in One Go: The command takes input.exr as the source and uses the --attrib flag to set (or replace) the comment attribute in the EXR header.
+Attribute Specification: The syntax --attrib &lt;key&gt; &lt;value&gt; tells oiiotool to attach a metadata key named "comment" with the value "Backed up via oiiotool" to the file.
+Output: The -o output.exr flag designates the output file. The new file output.exr will contain all the original pixel data but with your updated header metadata.
+This single-line command is ideal for use in scripts or for batch processing files.
+Both methods enable you to integrate metadata editing or provenance keeping into your image pipeline. The Python approach offers more flexibility for complex processing (for example, reading, processing, and re-writing pixel data along with metadata), while oiiotool provides a fast and scriptable command-line solution.
+</p>
+  
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
