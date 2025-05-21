@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_source_vs_run</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Shell Scripts - Source vs Run"><h1 id="Shell Scripts - Source vs Run" class="header"><a href="#Shell Scripts - Source vs Run">Shell Scripts - Source vs Run</a></h1></div>
+
+<p>
+Running a shell script is not the same as sourcing a shell config file.
+</p>
+
+<p>
+Running might look like this:
+</p>
+
+<pre bash>
+# Set to executable:
+chmod +x myscript.sh
+# Run script:
+./myscript.sh
+</pre>
+
+<p>
+Sourcing a script within a shell might be like this:
+</p>
+
+<pre bash>
+# Sourcing a config script:
+source myscript.sh
+</pre>
+
+<ul>
+<li>
+Running the script normally (<code>./myscript.sh</code>) starts a new subprocess, which means any changes (like modifying the prompt) are lost when the script exits.
+
+<li>
+By sourcing it (source <code>myscript.sh</code>), you're executing it within your current shell, so all environment modifications persist.
+
+</ul>
+<div id="Shell Scripts - Source vs Run-Deciding How to Access the Script"><h2 id="Deciding How to Access the Script" class="header"><a href="#Shell Scripts - Source vs Run-Deciding How to Access the Script">Deciding How to Access the Script</a></h2></div>
+
+<div id="Shell Scripts - Source vs Run-Deciding How to Access the Script-Sourcing as part of a larger script - issues:"><h4 id="Sourcing as part of a larger script - issues:" class="header"><a href="#Shell Scripts - Source vs Run-Deciding How to Access the Script-Sourcing as part of a larger script - issues:">Sourcing as part of a larger script - issues:</a></h4></div>
+
+<ul>
+<li>
+Question: Is there any way to run a bash or python script to make a shell 'source' a config file?
+
+<li>
+Answer: Yes, but with a catch—when you run a Bash or Python script normally, it executes in a subshell, meaning any environment changes (like sourcing a config file) won’t persist in your current shell session. However, there are ways to work around this.
+
+</ul>
+<div id="Shell Scripts - Source vs Run-Deciding How to Access the Script-Solution 1: Source a Bash Script from Another Bash Script"><h3 id="Solution 1: Source a Bash Script from Another Bash Script" class="header"><a href="#Shell Scripts - Source vs Run-Deciding How to Access the Script-Solution 1: Source a Bash Script from Another Bash Script">Solution 1: Source a Bash Script from Another Bash Script</a></h3></div>
+
+<p>
+If you want a Bash script to source a config file for the current shell, you must source it instead of executing it. You can do this inside your script like this:
+</p>
+
+<pre bash>
+#!/bin/bash
+source /path/to/config.sh
+</pre>
+
+<p>
+Then, instead of running the script normally (./script.sh), source it:
+</p>
+
+<pre bash>
+source script.sh
+</pre>
+
+<p>
+This ensures that any environment changes persist in your current shell.
+</p>
+
+<div id="Shell Scripts - Source vs Run-Deciding How to Access the Script-Solution 2: Using Python to Source a Bash Config File"><h3 id="Solution 2: Using Python to Source a Bash Config File" class="header"><a href="#Shell Scripts - Source vs Run-Deciding How to Access the Script-Solution 2: Using Python to Source a Bash Config File">Solution 2: Using Python to Source a Bash Config File</a></h3></div>
+
+<p>
+Python itself cannot directly modify the parent shell’s environment, but you can have Python execute a Bash command that sources a file and then passes the environment back.
+</p>
+
+<p>
+Approach: Let Bash Handle the Sourcing
+</p>
+
+<p>
+Instead of trying to interpret Bash syntax in Python, let Bash do the work and extract the environment variables:
+</p>
+
+<pre python>
+import os
+import subprocess
+
+# Run Bash, source the config file, and print the environment
+command = "bash -c 'source /path/to/config.sh &amp;&amp; env'"
+proc = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+
+# Read and apply the environment variables
+for line in proc.stdout:
+    key, _, value = line.decode().strip().partition("=")
+    os.environ[key] = value
+
+proc.communicate()
+
+# Now Python has the sourced environment variables
+print(os.environ.get("MY_VARIABLE"))  # Example usage
+</pre>
+
+<p>
+This method ensures that the sourced environment variables are available inside Python, but they won’t persist in the parent shell after Python exits.
+</p>
+
+<div id="Shell Scripts - Source vs Run-Deciding How to Access the Script-Solution 3: Have Bash Source the Config Before Running Python"><h3 id="Solution 3: Have Bash Source the Config Before Running Python" class="header"><a href="#Shell Scripts - Source vs Run-Deciding How to Access the Script-Solution 3: Have Bash Source the Config Before Running Python">Solution 3: Have Bash Source the Config Before Running Python</a></h3></div>
+
+<p>
+If you need Python to inherit the sourced environment, you can source the config in Bash first, then run Python:
+</p>
+
+<pre bash>
+source /path/to/config.sh
+python my_script.py
+</pre>
+
+<p>
+This way, Python starts with the correct environment.
+</p>
+
+<div id="Shell Scripts - Source vs Run-Key Takeaways"><h2 id="Key Takeaways" class="header"><a href="#Shell Scripts - Source vs Run-Key Takeaways">Key Takeaways</a></h2></div>
+
+<ul>
+<li>
+Bash can source a config file, but you must source the script instead of executing it.
+
+<li>
+Python can source a Bash config file indirectly, but changes won’t persist in the parent shell.
+
+<li>
+For persistent changes, source the config in Bash before running Python.
+
+</ul>
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
