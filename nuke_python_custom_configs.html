@@ -164,6 +164,13 @@ You can achieve this by using a wrapper or setup script that temporarily alters 
 
 <li>
 <span id="Repo Setup With Wrapper-Here’s one common approach:-Write a Shell Wrapper Script"></span><strong id="Write a Shell Wrapper Script">Write a Shell Wrapper Script</strong>: Create a shell script in your repository (for example, setup_nuke_custom.sh) that sets necessary environment variables for the desired session. For example:
+<table>
+<tr>
+<td>
+See note on $PWD below.
+</td>
+</tr>
+</table>
 <pre bash>
 #!/bin/bash
 # In this wrapper script, we set the environment so that Nuke uses both the vanilla and custom directories.
@@ -208,6 +215,133 @@ On the other hand, if they open a new shell without running the script, Nuke sim
 <p>
 This method allows for a project-specific “switch” for Nuke without permanently altering the user’s environment. If needed, you can enhance this approach by adding conditional logic in your standard <code>~/.nuke/init.py</code> to check for an environment flag (like <code>NUKE_CUSTOM_CONFIG</code>) and load additional modules or alter settings accordingly.
 </p>
+
+<div id="Repo Setup With Wrapper-Running Commands From An Alias"><h2 id="Running Commands From An Alias" class="header"><a href="#Repo Setup With Wrapper-Running Commands From An Alias">Running Commands From An Alias</a></h2></div>
+
+<p>
+When you use $PWD in an alias or a script, it expands to the current working directory at the time the alias or script is executed—not the location of the script itself.
+</p>
+
+<p>
+For example, if you're in directory <code>/Users/username/project</code> and you run your setup script via an alias that uses <code>\(PWD/nuke_custom</code>, it will resolve to <code>/Users/username/project/nuke_custom</code>. However, if you run the alias from a different directory, the value of \)PWD will change accordingly.
+</p>
+
+<p>
+If your intention is to always reference the directory where the script itself resides (e.g., the repository root), you’ll need a different approach. For example, in a Bash script you can determine the script’s own directory with something like:
+</p>
+
+<pre bash>
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &amp;&amp; pwd )"
+export NUKE_PATH="$HOME/.nuke_custom:$SCRIPT_DIR/nuke_custom"
+</pre>
+
+<p>
+This way, no matter where you call the script from, it will correctly use the script’s directory. But if using <code>$PWD</code> is acceptable for your workflow (i.e., it should always be relative to the current working directory when launching the alias), then it will work as long as you’re aware of that behavior.
+</p>
+
+<div id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line"><h3 id="Let's break down the line" class="header"><a href="#Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line">Let's break down the line</a></h3></div>
+
+<pre bash>
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &amp;&amp; pwd )"
+</pre>
+
+<div id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step."><h4 id="Step-by-step." class="header"><a href="#Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.">Step-by-step.</a></h4></div>
+
+<p>
+This line is a common Bash idiom used to determine the absolute directory in which the current script resides, regardless of where you run the script from. Here’s how it works:
+</p>
+
+<ul>
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-&quot;\({BASH_SOURCE[0]}&quot;"></span><strong id="&quot;\){BASH_SOURCE[0]}&quot;">"${BASH_SOURCE[0]}"</strong>
+
+<ul>
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-What it is"></span><strong id="What it is">What it is</strong>: BASH_SOURCE is an array variable provided by Bash. The first element, ${BASH_SOURCE[0]}, holds the path to the script that is currently being executed.
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-Why use it"></span><strong id="Why use it">Why use it</strong>: Using \({BASH_SOURCE[0]} is more robust than \)0 in some situations (for example, when the script is being sourced instead of executed).
+
+</ul>
+<li>
+<code>dirname "${BASH_SOURCE[0]}"</code>
+
+<ul>
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-What it does"></span><strong id="What it does">What it does</strong>: The <code>dirname</code> command takes a file path and strips off the filename, leaving only the directory part.
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-Result"></span><strong id="Result">Result</strong>: This returns the directory where the current script is located.
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-Example"></span><strong id="Example">Example</strong>: If <code>${BASH_SOURCE[0]}</code> is <code>/Users/username/project/setup_script.sh</code>, then
+
+</ul>
+</ul>
+  
+<pre bash>
+dirname "${BASH_SOURCE[0]}"  # returns "/Users/username/project"
+</pre>
+
+<ul>
+<li>
+cd "\(( dirname "\){BASH_SOURCE[0]}" )"
+
+<ul>
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-What it does"></span><strong id="What it does">What it does</strong>: This changes the current directory to the directory returned by dirname "${BASH_SOURCE[0]}".
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-Why use it"></span><strong id="Why use it">Why use it</strong>: You want to move into the script’s directory so you can determine its absolute path. Often, ${BASH_SOURCE[0]} might be a relative path; changing the directory allows you to get a fully qualified (absolute) path.
+
+</ul>
+<li>
+<code>&amp;&amp; pwd</code>
+
+<ul>
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-What it does"></span><strong id="What it does">What it does</strong>: The &amp;&amp; ensures that the next command (pwd) runs only if the cd command was successful.
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-pwd"></span><strong id="pwd">pwd</strong>: This command prints the current working directory, which is now the directory of your script.
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-Result"></span><strong id="Result">Result</strong>: The output of pwd is the absolute path of the script's directory.
+
+</ul>
+<li>
+<code>SCRIPT_DIR="$( ... )"</code>
+
+<ul>
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-What it does"></span><strong id="What it does">What it does</strong>: The entire command inside the backticks (or $(...), which is the more modern syntax) is captured as a string and assigned to the variable SCRIPT_DIR.
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-Step-by-step.-Result"></span><strong id="Result">Result</strong>: SCRIPT_DIR ends up containing the absolute path to the directory where the script is located.
+
+</ul>
+</ul>
+<div id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-In Summary"><h4 id="In Summary" class="header"><a href="#Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-In Summary">In Summary</a></h4></div>
+
+<ul>
+<li>
+<code>${BASH_SOURCE[0]}</code>: Gets the file path of the current script.
+
+<li>
+<code>dirname</code>: Strips off the file name, producing just the directory path.
+
+<li>
+<code>cd ... &amp;&amp; pwd</code>: Changes into that directory and prints its absolute path.
+
+<li>
+<span id="Repo Setup With Wrapper-Running Commands From An Alias-Let's break down the line-In Summary-Assignment"></span><strong id="Assignment">Assignment</strong>: The output is saved to SCRIPT_DIR.
+
+</ul>
+<p>
+This idiom is widely used when you want your script to refer to files relative to its own location, regardless of the current working directory when the script is executed.
+</p>
+
+
 
 <p>
 <a href="nuke_index.html">Nuke Index</a>
