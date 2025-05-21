@@ -150,6 +150,64 @@ This gives you the flexibility to have a custom, fully configured Nuke session w
 It's really powerful how Nuke's startup scripting can be manipulated to give you that level of control over your environment—just like sourcing a shell config file but for your compositing workflows. If you dive into customizing your init.py  or NUKE_PATH, you can tailor your Nuke sessions to exactly what you need, and then switch back to vanilla effortlessly when you want a clean slate.
 </p>
 
+<div id="Repo Setup With Wrapper Setup"><h1 id="Repo Setup With Wrapper Setup" class="header"><a href="#Repo Setup With Wrapper Setup">Repo Setup With Wrapper Setup</a></h1></div>
+
+<p>
+You can achieve this by using a wrapper or setup script that temporarily alters Nuke’s environment for that session without changing the user’s permanent configuration. The idea is to let your custom repository (which contains a folder like <code>./nuke_custom</code> with its own <code>init.py</code>, <code>menu.py</code>, and plugins) be used only when you explicitly launch Nuke in the “custom” mode.
+</p>
+
+<div id="Repo Setup With Wrapper Setup-Here’s one common approach:"><h2 id="Here’s one common approach:" class="header"><a href="#Repo Setup With Wrapper Setup-Here’s one common approach:">Here’s one common approach:</a></h2></div>
+
+<ul>
+<li>
+<span id="Repo Setup With Wrapper Setup-Here’s one common approach:-Organize Your Custom Config"></span><strong id="Organize Your Custom Config">Organize Your Custom Config</strong>: In your repository, have a directory (say, ./nuke_custom) that contains your custom startup files and plugins. The default user config remains in ~/.nuke.
+
+<li>
+<span id="Repo Setup With Wrapper Setup-Here’s one common approach:-Write a Shell Wrapper Script"></span><strong id="Write a Shell Wrapper Script">Write a Shell Wrapper Script</strong>: Create a shell script in your repository (for example, setup_nuke_custom.sh) that sets necessary environment variables for the desired session. For example:
+<pre bash>
+#!/bin/bash
+# In this wrapper script, we set the environment so that Nuke uses both the vanilla and custom directories.
+#
+# NUKE_PATH is processed in reverse order—directories later in the list have higher priority.
+#
+# In this example, we append our custom configuration after the vanilla configuration so that
+# the custom startup files will override any conflicting settings.
+export NUKE_PATH="$HOME/.nuke:$PWD/nuke_custom"
+
+# Optionally, set a flag the custom scripts can check, e.g.:
+export NUKE_CUSTOM_CONFIG=1
+
+# Launch Nuke (adjust the path to your Nuke installation)
+/Applications/Nuke15.1v7/Nuke15.1v7.app/Contents/MacOS/Nuke
+</pre>
+
+</ul>
+<div id="Repo Setup With Wrapper Setup-Here’s one common approach:-In this setup:"><h4 id="In this setup:" class="header"><a href="#Repo Setup With Wrapper Setup-Here’s one common approach:-In this setup:">In this setup:</a></h4></div>
+
+<ul>
+<li>
+When the script is run, the <code>NUKE_PATH</code> environment variable is temporarily altered—adding your custom configuration directory along with the user’s standard configuration directory.
+
+<li>
+Because Nuke loads startup scripts by scanning directories in the NUKE_PATH in reverse order (i.e., directories later in the list override earlier ones), your custom configuration takes precedence over the vanilla one.
+
+<li>
+Users who launch Nuke by running this script will get the enhanced environment, while launching Nuke directly (or with a “clean” shell that lacks these modifications) will use only the default <code>~/.nuke</code> settings.
+
+</ul>
+<div id="Repo Setup With Wrapper Setup-Here’s one common approach:-Using the Setup Option:"><h3 id="Using the Setup Option:" class="header"><a href="#Repo Setup With Wrapper Setup-Here’s one common approach:-Using the Setup Option:">Using the Setup Option:</a></h3></div>
+
+<ul>
+<li>
+If a collaborator or user clones your repository and runs the provided setup script, they get a session with your project-specific customizations.
+
+<li>
+On the other hand, if they open a new shell without running the script, Nuke simply uses the normal configuration in <code>~/.nuke</code>.
+
+</ul>
+<p>
+This method allows for a project-specific “switch” for Nuke without permanently altering the user’s environment. If needed, you can enhance this approach by adding conditional logic in your standard <code>~/.nuke/init.py</code> to check for an environment flag (like <code>NUKE_CUSTOM_CONFIG</code>) and load additional modules or alter settings accordingly.
+</p>
 
 <p>
 <a href="nuke_index.html">Nuke Index</a>
