@@ -20,6 +20,308 @@
 <div id="Argparse"><h1 id="Argparse" class="header"><a href="#Argparse">Argparse</a></h1></div>
 
 
+<div id="Argparse-Positional Arguments"><h2 id="Positional Arguments" class="header"><a href="#Argparse-Positional Arguments">Positional Arguments</a></h2></div>
+
+<p>
+Below is one way to design your command using positional arguments with Python's <code>argparse</code> module. In this design, the user supplies arguments in a specific left-to-right order. If only the higher-level variable is provided, the lower ones are reset. When more arguments are provided, they fill in the lower levels. For example:
+</p>
+<ul>
+<li>
+<code>your_command ShowName</code> → Sets Show; Sequence and Shot are reset.
+
+<li>
+<code>your_command ShowName SeqName</code> → Sets Show and Sequence; Shot is reset.
+
+<li>
+<code>your_command ShowName SeqName ShotName</code> → Sets all three environment variables.
+
+</ul>
+<p>
+Below is the sample code demonstrating this behavior:
+</p>
+
+<pre python>
+import argparse
+import os
+
+def set_env_variables(show=None, sequence=None, shot=None):
+    """
+    Set hierarchical environment variables.
+    
+    If only a higher-level variable is provided, the ones below it get reset.
+    For example, if only `show` is provided, both SEQ and SHOT are removed.
+    """
+    if show:
+        os.environ["SHOW"] = show
+        # Reset lower levels if set
+        os.environ.pop("SEQ", None)
+        os.environ.pop("SHOT", None)
+    if sequence:
+        os.environ["SEQ"] = sequence
+        # Reset lower level if set
+        os.environ.pop("SHOT", None)
+    if shot:
+        os.environ["SHOT"] = shot
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Set hierarchical environment variables: Show, Sequence, and Shot.")
+
+    # Define three positional arguments. They are optional (nargs="?"), so the user can provide 1, 2, or 3.
+    parser.add_argument("show", nargs="?", default=None,
+                        help="Show name (first hierarchical level)")
+    parser.add_argument("sequence", nargs="?", default=None,
+                        help="Sequence name (second level). If omitted, it will be reset.")
+    parser.add_argument("shot", nargs="?", default=None,
+                        help="Shot name (third level). If omitted, it will be reset.")
+
+    args = parser.parse_args()
+
+    set_env_variables(args.show, args.sequence, args.shot)
+
+    # Display the resulting environment variables
+    print("Environment variables set:")
+    print("SHOW:", os.environ.get("SHOW"))
+    print("SEQ:", os.environ.get("SEQ"))
+    print("SHOT:", os.environ.get("SHOT"))
+
+if __name__ == '__main__':
+    main()
+</pre>
+
+<div id="Argparse-Positional Arguments-How It Works"><h3 id="How It Works" class="header"><a href="#Argparse-Positional Arguments-How It Works">How It Works</a></h3></div>
+
+<ul>
+<li>
+<span id="Argparse-Positional Arguments-How It Works-Argument Parsing with Positionals"></span><strong id="Argument Parsing with Positionals">Argument Parsing with Positionals</strong>: We defined three positional arguments using nargs="?". This makes them optional, and if the user omits any of them, the corresponding variable defaults to None.
+
+<li>
+<span id="Argparse-Positional Arguments-How It Works-Setting Hierarchical Variables"></span><strong id="Setting Hierarchical Variables">Setting Hierarchical Variables</strong>: The set_env_variables function sets the environment variables in order. When show is provided, it sets SHOW and removes any existing SEQ and SHOT values. Similarly, when sequence is provided, it resets SHOT.
+
+<li>
+<span id="Argparse-Positional Arguments-How It Works-Behavior and Reset Mechanism"></span><strong id="Behavior and Reset Mechanism">Behavior and Reset Mechanism</strong>: This ensures that if you only set the higher-level parameter (or change it later), the lower-level parameters are automatically cleared, maintaining the intended hierarchy.
+
+</ul>
+<p>
+This positional design provides a user-friendly, streamlined interface where the intended hierarchy is naturally enforced by ordering the arguments.
+</p>
+
+<div id="Argparse-Positional Arguments-How It Works-os.environ(&quot;SHOW&quot;, None)"><h4 id="os.environ(&quot;SHOW&quot;, None)" class="header"><a href="#Argparse-Positional Arguments-How It Works-os.environ(&quot;SHOW&quot;, None)">os.environ("SHOW", None)</a></h4></div>
+
+<p>
+The os.environ.pop("SHOW", None) line is used to remove an environment variable from the process environment if it exists.
+Breaking It Down:
+os.environ is a dictionary-like object that stores environment variables.
+.pop("SHOW", None) tries to remove "SHOW" from os.environ.
+The second argument (None) prevents errors. If "SHOW" doesn’t exist, it simply returns None instead of throwing a KeyError.
+Why We Use This?
+In the context of your hierarchical setup:
+If the user sets a higher-level variable (SHOW), lower levels (SEQ, SHOT) should reset.
+.pop() is perfect because it removes the variable, ensuring that it's truly cleared rather than just set to an empty string.
+Without .pop(), We Could Do:
+python
+os.environ["SHOW"] = None  # Sets the value to a string 'None' instead of removing it
+del os.environ["SHOW"]  # Would work, but causes an error if "SHOW" isn't set
+Using .pop() ensures safe removal without breaking the script.
+</p>
+
+<div id="Argparse-Using Flagged Arguments"><h2 id="Using Flagged Arguments" class="header"><a href="#Argparse-Using Flagged Arguments">Using Flagged Arguments</a></h2></div>
+
+<pre python>
+import argparse
+import os
+
+def set_env_variables(show=None, sequence=None, shot=None):
+    """Set environment variables based on hierarchy rules."""
+    if show:
+        os.environ["SHOW"] = show
+        os.environ["SEQ"] = None  # Reset lower hierarchy
+        os.environ["SHOT"] = None
+    
+    if sequence:
+        os.environ["SEQ"] = sequence
+        os.environ["SHOT"] = None  # Reset lower hierarchy
+
+    if shot:
+        os.environ["SHOT"] = shot
+    
+    print(f"SHOW: {os.environ.get('SHOW')}, SEQ: {os.environ.get('SEQ')}, SHOT: {os.environ.get('SHOT')}")
+
+parser = argparse.ArgumentParser(description="Set show hierarchy environment variables.")
+parser.add_argument("-s", "--show", help="Set show name")
+parser.add_argument("-sq", "--sequence", help="Set sequence name")
+parser.add_argument("-sh", "--shot", help="Set shot name")
+
+args = parser.parse_args()
+set_env_variables(args.show, args.sequence, args.shot)
+</pre>
+
+<div id="Argparse-Using Flagged Arguments-How This Works:"><h3 id="How This Works:" class="header"><a href="#Argparse-Using Flagged Arguments-How This Works:">How This Works:</a></h3></div>
+
+<ul>
+<li>
+Users call the script with flags (<code>-s</code>, <code>-sq</code>, <code>-sh</code>).
+
+<li>
+If only <code>SHOW</code> is set, lower levels (<code>SEQ</code>, <code>SHOT</code>) reset.
+
+<li>
+If <code>SEQ</code> is set, <code>SHOT</code> resets.
+
+<li>
+If <code>SHOT</code> is set, everything remains unchanged.
+
+<li>
+Environment variables are properly structured.
+
+</ul>
+<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments"><h2 id="Hybrid - Combination of Positional and Flagged Arguments" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments">Hybrid - Combination of Positional and Flagged Arguments</a></h2></div>
+
+<p>
+A hybrid strategy can offer both flexibility and structure, letting users provide essential values in order while using flags for optional additions or overrides.
+</p>
+
+<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-Approach:"><h3 id="Approach:" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-Approach:">Approach:</a></h3></div>
+
+<ul>
+<li>
+Use Positional Arguments for the main hierarchy:
+
+<ul>
+<li>
+<code>ShowName</code> → Required
+
+<li>
+<code>SequenceName</code> → Optional
+
+<li>
+<code>ShotName</code> → Optional
+
+</ul>
+<li>
+Use Flags for Overrides or Additional Options
+
+<li>
+<code>--override-seq SEQUENCE</code> → Explicitly override sequence name
+
+<li>
+<code>--override-shot SHOT</code> → Explicitly override shot name
+
+<li>
+<code>--reset</code> → Clears all hierarchy values
+
+</ul>
+<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-Implementation in Python (argparse)"><h3 id="Implementation in Python (argparse)" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-Implementation in Python (argparse)">Implementation in Python (argparse)</a></h3></div>
+
+<pre python>
+import argparse
+import os
+
+def set_env_variables(show, sequence=None, shot=None, override_seq=None, override_shot=None, reset=False):
+    """Set hierarchical environment variables with support for overrides and resets."""
+    
+    if reset:
+        os.environ.pop("SHOW", None)
+        os.environ.pop("SEQ", None)
+        os.environ.pop("SHOT", None)
+        print("All hierarchy variables have been reset.")
+        return
+
+    # Set the hierarchy from positional args first
+    os.environ["SHOW"] = show
+    os.environ["SEQ"] = sequence if sequence else None
+    os.environ["SHOT"] = shot if shot else None
+
+    # Apply overrides if provided
+    if override_seq:
+        os.environ["SEQ"] = override_seq
+    if override_shot:
+        os.environ["SHOT"] = override_shot
+
+    print("Environment variables set:")
+    print(f"SHOW: {os.environ.get('SHOW')}")
+    print(f"SEQ: {os.environ.get('SEQ')}")
+    print(f"SHOT: {os.environ.get('SHOT')}")
+
+
+parser = argparse.ArgumentParser(description="Set hierarchical environment variables with mixed strategy.")
+
+# Positional arguments (hierarchy-based)
+parser.add_argument("show", help="Show name (required)")
+parser.add_argument("sequence", nargs="?", default=None, help="Sequence name (optional)")
+parser.add_argument("shot", nargs="?", default=None, help="Shot name (optional)")
+
+# Optional flags
+parser.add_argument("--override-seq", help="Explicitly override sequence name")
+parser.add_argument("--override-shot", help="Explicitly override shot name")
+parser.add_argument("--reset", action="store_true", help="Reset all environment variables")
+
+args = parser.parse_args()
+
+# Set environment variables based on parsed arguments
+set_env_variables(args.show, args.sequence, args.shot, args.override_seq, args.override_shot, args.reset)
+</pre>
+
+<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-How This Works"><h3 id="How This Works" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-How This Works">How This Works</a></h3></div>
+
+<p>
+🔹 Basic Usage (Positional Arguments)
+</p>
+
+<pre sh>
+your_command MyShow
+your_command MyShow MySequence
+your_command MyShow MySequence MyShot
+</pre>
+<ul>
+<li>
+Sets <code>SHOW</code>, <code>SEQ</code>, and <code>SHOT</code> in a structured hierarchy.
+
+<li>
+If only <code>SHOW</code> is provided, <code>SEQ</code> and <code>SHOT</code> reset to None.
+
+<li>
+If <code>SHOW</code> and <code>SEQ</code> are set, <code>SHOT</code> resets to None.
+
+</ul>
+<p>
+🔹 Using Flags for Overrides
+</p>
+
+<pre sh>
+your_command MyShow --override-seq OverrideSequence
+your_command MyShow MySequence --override-shot OverrideShot
+</pre>
+
+<p>
+Overrides lower-level values without affecting others.
+</p>
+
+<p>
+🔹 Resetting All Hierarchy Variables
+</p>
+
+<pre sh>
+your_command MyShow --reset
+</pre>
+
+<p>
+Clears all hierarchy variables before exiting.
+</p>
+
+<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-Why This Hybrid Strategy?"><h3 id="Why This Hybrid Strategy?" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-Why This Hybrid Strategy?">Why This Hybrid Strategy?</a></h3></div>
+
+<ul>
+<li>
+✅ Positional Arguments keep it structured for the hierarchy. 
+
+<li>
+✅ Flags provide additional flexibility for edge cases. 
+
+<li>
+✅ Explicit Reset Option allows users to clear everything when needed.
+
+</ul>
 <p>
 <a href="Python.html">Python</a>
 </p>
