@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_shell_scripting_troubleshooting</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+
+<p>
+Here’s a logical breakdown of all the troubleshooting steps and solutions we explored, structured for easy reference. 📖🚀
+Summary: Sourcing Scripts, Aliases, and Environment Variables
+1️⃣ Understanding the Key Problem
+Running bash script.sh executes the script in a subshell, meaning any export commands inside the script don’t persist in the user’s shell.
+To set environment variables for the current shell, you must source the script (source script.sh).
+.zshrc is a Zsh-specific file, so sourcing it incorrectly inside Bash causes errors.
+2️⃣ Ensuring a Script is Properly Sourced
+✔ Prevent running the script incorrectly by checking if it’s being sourced:
+bash
+if [[ "\({BASH_SOURCE[0]}" == "\)0" ]]; then
+</p>
+<pre><code>echo "Error: This script must be sourced, not executed!"
+echo "Use: source script.sh"
+exit 1
+</code></pre>
+<p>
+fi
+🔹 This prevents execution in a subshell and forces sourcing.
+3️⃣ Dynamically Inserting an Alias into .zshrc
+An alias should be automatically inserted into .zshrc with the correct path, depending on where the repo is placed. ✔ To get the script directory dynamically:
+bash
+SCRIPT_DIR="\((cd "\)(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)"
+✔ To add the alias safely to .zshrc:
+bash
+ALIAS_CMD="alias sme='source \"$SCRIPT_DIR/cmds/script_to_source.sh\"'"
+echo "\(ALIAS_CMD" &gt;&gt; "\)HOME/.zshrc"
+✔ Prevent alias duplication by checking before adding:
+bash
+if ! grep -Fxq "\(ALIAS_CMD" "\)HOME/.zshrc"; then
+</p>
+<pre><code>echo "\(ALIAS_CMD" &gt;&gt; "\)HOME/.zshrc"
+</code></pre>
+<p>
+fi
+4️⃣ Ensuring Environment Variables Persist After Sourcing
+If .zshrc is sourced incorrectly, the alias won’t be available immediately. The best approach: ✔ Reload .zshrc manually after modifying it:
+bash
+source "$HOME/.zshrc"
+✔ Or, if .zshrc contains Zsh-specific syntax, use:
+bash
+zsh -c "source \"$HOME/.zshrc\" &amp;&amp; exec zsh"
+🔹 This ensures the alias and exported variables persist properly.
+5️⃣ Fixing read -p Errors in Zsh
+Zsh doesn’t support read -p, so replace:
+bash
+read -p "Do you want to proceed? (y/n): " choice
+✔ With:
+bash
+echo "Do you want to proceed? (y/n): "
+read choice
+🔹 This prevents syntax errors when running in Zsh.
+6️⃣ Preventing Script Re-Sourcing (Tracking If It's Been Run)
+✔ Use an environment variable to track if the script was sourced before:
+bash
+if <a href=" -n &quot;true&quot; .html">-n "$SCRIPT_ALREADY_SOURCED"</a>; then
+</p>
+<pre><code>echo "Script has already been sourced. Skipping..."
+return
+</code></pre>
+<p>
+fi
+export SCRIPT_ALREADY_SOURCED=true
+✔ Use a temporary file to persist tracking across sessions:
+bash
+if <a href=" -f &quot;/tmp/script_sourced.lock&quot; .html">-f "/tmp/script_sourced.lock"</a>; then
+</p>
+<pre><code>echo "Script has already been sourced. Skipping..."
+return
+</code></pre>
+<p>
+fi
+touch "/tmp/script_sourced.lock"
+🔹 This ensures the script isn’t reloaded multiple times.
+7️⃣ Ensuring Correct Path When Sourcing Another Script
+✔ $DIR must be correctly set before sourcing another script. Debug with:
+bash
+echo "DIR is set to: $DIR"
+✔ Source another script only if it exists:
+bash
+if <a href=" -f &quot;/cmds/nuke_env.sh&quot; .html">-f "$DIR/cmds/nuke_env.sh"</a>; then
+</p>
+<pre><code>source "$DIR/cmds/nuke_env.sh"
+</code></pre>
+<p>
+fi
+🔹 Avoid path errors by confirming $DIR resolves correctly.
+8️⃣ Final Debugging Tips
+✔ Enable debug tracing to see script execution details:
+bash
+set -x
+source "$DIR/cmds/nuke_env.sh"
+set +x
+✔ Use realpath to ensure absolute paths are resolved properly:
+bash
+SCRIPT_DIR=\((realpath "\)DIR")
+echo "Resolved path: $SCRIPT_DIR"
+🔹 This helps identify incorrect path assumptions.
+Closing Thoughts
+From alias insertion, sourcing scripts properly, debugging variable expansions, and ensuring persistent environment variables—this was a deep dive into Bash &amp; Zsh scripting best practices. Now, you have a structured reference to avoid pitfalls and streamline your automation! 💡💻
+</p>
+
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
