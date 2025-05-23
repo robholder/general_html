@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_shell_scripts_adding_alias</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Adding Alias to User's .zshrc"><h1 id="Adding Alias to User's .zshrc" class="header"><a href="#Adding Alias to User's .zshrc">Adding Alias to User's .zshrc</a></h1></div>
+
+<div id="Adding Alias to User's .zshrc-Question"><h2 id="Question" class="header"><a href="#Adding Alias to User's .zshrc-Question">Question</a></h2></div>
+
+<p>
+I want to inject an alias line into a User's .zshrc as part of a shell_script.
+</p>
+<ol>
+<li>
+Check to see if .zshrc exists
+
+<li>
+Give the user an opportunity to reject .zshrc creation.
+
+<li>
+I want to check if the alias line is already in the .zshrc to prevent 'doubling up'.
+
+<li>
+I want to allow the user accept or reject.
+
+<li>
+Add a backup or undo option.
+<pre bash>
+#!/bin/bash
+
+# Define the alias command
+ALIAS_CMD='alias sme="source $HOME/scripts/script_to_source.sh"'
+ZSHRC_FILE="$HOME/.zshrc"
+BACKUP_FILE="$HOME/.zshrc.bak"
+
+# Check if alias already exists
+if grep -Fxq "$ALIAS_CMD" "$ZSHRC_FILE"; then
+    echo "Alias already exists in .zshrc. No changes made."
+    exit 0
+fi
+
+# Check if .zshrc exists; if not, prompt the user before creating it
+if [[ ! -f "$ZSHRC_FILE" ]]; then
+    echo ".zshrc does not exist."
+    read -p "Would you like to create a new .zshrc file? (y/n): " create_choice
+    if [[ "$create_choice" != "y" ]]; then
+        echo "Operation canceled. Alias was NOT added."
+        exit 0
+    fi
+    echo "# Created .zshrc file for user" &gt; "$ZSHRC_FILE"
+    echo ".zshrc file has been created."
+fi
+
+# Create a backup before modifying .zshrc
+cp "$ZSHRC_FILE" "$BACKUP_FILE"
+echo "Backup created: $BACKUP_FILE"
+
+# Ask user for confirmation before adding alias
+echo "The following alias will be added to your .zshrc:"
+echo "$ALIAS_CMD"
+read -p "Do you want to proceed? (y/n): " alias_choice
+
+if [[ "$alias_choice" == "y" ]]; then
+    echo "$ALIAS_CMD" &gt;&gt; "$ZSHRC_FILE"
+    echo "Alias successfully added to .zshrc!"
+    echo "Run 'source ~/.zshrc' to apply changes."
+
+    # Ask if user wants an undo option
+    read -p "Would you like to keep the backup or restore it? (keep/undo): " undo_choice
+    if [[ "$undo_choice" == "undo" ]]; then
+        mv "$BACKUP_FILE" "$ZSHRC_FILE"
+        echo "Undo completed. .zshrc has been restored."
+    else
+        echo "Backup kept as $BACKUP_FILE."
+    fi
+else
+    echo "Operation canceled. Alias was NOT added."
+fi
+</pre>
+
+</ol>
+<div id="Adding Alias to User's .zshrc-Question-How It Works"><h3 id="How It Works" class="header"><a href="#Adding Alias to User's .zshrc-Question-How It Works">How It Works</a></h3></div>
+
+<ul>
+<li>
+✔ If .zshrc doesn’t exist, the user gets the option to create it. 
+
+<li>
+✔ If .zshrc exists and doesn’t contain the alias, the user is asked before adding it. 
+
+<li>
+✔ If the alias already exists, the script exits without prompting the user.
+
+</ul>
+<div id="Adding Alias to User's .zshrc-Question-How Undo Works"><h3 id="How Undo Works" class="header"><a href="#Adding Alias to User's .zshrc-Question-How Undo Works">How Undo Works</a></h3></div>
+
+<ul>
+<li>
+✔ Before modifying .zshrc, a backup is created (cp ~/.zshrc ~/.zshrc.bak). 
+
+<li>
+✔ After adding the alias, the user is asked if they want to undo. 
+
+<li>
+✔ If they choose undo, the script restores the backup and removes the changes. 
+
+<li>
+✔ If they choose to keep the backup, it remains saved for future undo.
+
+</ul>
+<div id="Adding Alias to User's .zshrc-Question-How Undo Works-Using Undo Manually Later"><h4 id="Using Undo Manually Later" class="header"><a href="#Adding Alias to User's .zshrc-Question-How Undo Works-Using Undo Manually Later">Using Undo Manually Later</a></h4></div>
+
+<p>
+If the user doesn't undo immediately but wants to later, they can run:
+</p>
+
+<pre sh>
+mv ~/.zshrc.bak ~/.zshrc
+echo "Changes reverted!"
+</pre>
+
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
