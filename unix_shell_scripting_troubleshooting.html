@@ -18,105 +18,201 @@
 </p>
 
 
+<div id="Bash Script Troubleshooting"><h1 id="Bash Script Troubleshooting" class="header"><a href="#Bash Script Troubleshooting">Bash Script Troubleshooting</a></h1></div>
+
 <p>
 Here’s a logical breakdown of all the troubleshooting steps and solutions we explored, structured for easy reference. 📖🚀
-Summary: Sourcing Scripts, Aliases, and Environment Variables
-1️⃣ Understanding the Key Problem
+</p>
+
+<div id="Bash Script Troubleshooting-Summary: Sourcing Scripts, Aliases, and Environment Variables"><h2 id="Summary: Sourcing Scripts, Aliases, and Environment Variables" class="header"><a href="#Bash Script Troubleshooting-Summary: Sourcing Scripts, Aliases, and Environment Variables">Summary: Sourcing Scripts, Aliases, and Environment Variables</a></h2></div>
+
+<div id="Bash Script Troubleshooting-1️⃣ Understanding the Key Problem"><h2 id="1️⃣ Understanding the Key Problem" class="header"><a href="#Bash Script Troubleshooting-1️⃣ Understanding the Key Problem">1️⃣ Understanding the Key Problem</a></h2></div>
+
+<ul>
+<li>
 Running bash script.sh executes the script in a subshell, meaning any export commands inside the script don’t persist in the user’s shell.
+
+<li>
 To set environment variables for the current shell, you must source the script (source script.sh).
-.zshrc is a Zsh-specific file, so sourcing it incorrectly inside Bash causes errors.
-2️⃣ Ensuring a Script is Properly Sourced
+
+<li>
+<code>.zshrc</code> is a Zsh-specific file, so sourcing it incorrectly inside Bash causes errors.
+
+</ul>
+<div id="Bash Script Troubleshooting-2️⃣ Ensuring a Script is Properly Sourced"><h2 id="2️⃣ Ensuring a Script is Properly Sourced" class="header"><a href="#Bash Script Troubleshooting-2️⃣ Ensuring a Script is Properly Sourced">2️⃣ Ensuring a Script is Properly Sourced</a></h2></div>
+
+<p>
 ✔ Prevent running the script incorrectly by checking if it’s being sourced:
-bash
-if [[ "\({BASH_SOURCE[0]}" == "\)0" ]]; then
 </p>
-<pre><code>echo "Error: This script must be sourced, not executed!"
-echo "Use: source script.sh"
-exit 1
-</code></pre>
-<p>
+
+<pre bash>
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    echo "Error: This script must be sourced, not executed!"
+    echo "Use: source script.sh"
+    exit 1
 fi
+</pre>
+
+<p>
 🔹 This prevents execution in a subshell and forces sourcing.
-3️⃣ Dynamically Inserting an Alias into .zshrc
-An alias should be automatically inserted into .zshrc with the correct path, depending on where the repo is placed. ✔ To get the script directory dynamically:
-bash
-SCRIPT_DIR="\((cd "\)(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)"
-✔ To add the alias safely to .zshrc:
-bash
-ALIAS_CMD="alias sme='source \"$SCRIPT_DIR/cmds/script_to_source.sh\"'"
-echo "\(ALIAS_CMD" &gt;&gt; "\)HOME/.zshrc"
-✔ Prevent alias duplication by checking before adding:
-bash
-if ! grep -Fxq "\(ALIAS_CMD" "\)HOME/.zshrc"; then
 </p>
-<pre><code>echo "\(ALIAS_CMD" &gt;&gt; "\)HOME/.zshrc"
-</code></pre>
+
+<div id="Bash Script Troubleshooting-3️⃣ Dynamically Inserting an Alias into .zshrc"><h2 id="3️⃣ Dynamically Inserting an Alias into .zshrc" class="header"><a href="#Bash Script Troubleshooting-3️⃣ Dynamically Inserting an Alias into .zshrc">3️⃣ Dynamically Inserting an Alias into .zshrc</a></h2></div>
+
+<ul>
+<li>
+An alias should be automatically inserted into <code>.zshrc</code> with the correct path, depending on where the repo is placed. ✔ To get the script directory dynamically:
+<pre bash>
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)"
+</pre>
+
+</ul>
 <p>
+✔ To add the alias safely to .zshrc:
+</p>
+
+<pre bash>
+ALIAS_CMD="alias sme='source \"$SCRIPT_DIR/cmds/script_to_source.sh\"'"
+echo "$ALIAS_CMD" &gt;&gt; "$HOME/.zshrc"
+</pre>
+
+<p>
+✔ Prevent alias duplication by checking before adding:
+</p>
+
+<pre bash>
+if ! grep -Fxq "$ALIAS_CMD" "$HOME/.zshrc"; then
+    echo "$ALIAS_CMD" &gt;&gt; "$HOME/.zshrc"
 fi
-4️⃣ Ensuring Environment Variables Persist After Sourcing
-If .zshrc is sourced incorrectly, the alias won’t be available immediately. The best approach: ✔ Reload .zshrc manually after modifying it:
-bash
+</pre>
+
+<div id="Bash Script Troubleshooting-4️⃣ Ensuring Environment Variables Persist After Sourcing"><h2 id="4️⃣ Ensuring Environment Variables Persist After Sourcing" class="header"><a href="#Bash Script Troubleshooting-4️⃣ Ensuring Environment Variables Persist After Sourcing">4️⃣ Ensuring Environment Variables Persist After Sourcing</a></h2></div>
+
+<p>
+If <code>.zshrc</code> is sourced incorrectly, the alias won’t be available immediately. The best approach: ✔ Reload <code>.zshrc</code> manually after modifying it:
+</p>
+
+<pre bash>
 source "$HOME/.zshrc"
+</pre>
+
+<p>
 ✔ Or, if .zshrc contains Zsh-specific syntax, use:
-bash
+</p>
+
+<pre bash>
 zsh -c "source \"$HOME/.zshrc\" &amp;&amp; exec zsh"
+</pre>
+
+<p>
 🔹 This ensures the alias and exported variables persist properly.
-5️⃣ Fixing read -p Errors in Zsh
+</p>
+
+<div id="Bash Script Troubleshooting-5️⃣ Fixing read -p Errors in Zsh"><h2 id="5️⃣ Fixing read -p Errors in Zsh" class="header"><a href="#Bash Script Troubleshooting-5️⃣ Fixing read -p Errors in Zsh">5️⃣ Fixing read -p Errors in Zsh</a></h2></div>
+
+<p>
 Zsh doesn’t support read -p, so replace:
-bash
+</p>
+
+<pre bash>
 read -p "Do you want to proceed? (y/n): " choice
+</pre>
+
+<p>
 ✔ With:
-bash
+</p>
+
+<pre bash>
 echo "Do you want to proceed? (y/n): "
 read choice
-🔹 This prevents syntax errors when running in Zsh.
-6️⃣ Preventing Script Re-Sourcing (Tracking If It's Been Run)
-✔ Use an environment variable to track if the script was sourced before:
-bash
-if <a href=" -n &quot;true&quot; .html">-n "$SCRIPT_ALREADY_SOURCED"</a>; then
-</p>
-<pre><code>echo "Script has already been sourced. Skipping..."
-return
-</code></pre>
+</pre>
+
 <p>
+🔹 This prevents syntax errors when running in Zsh.
+</p>
+
+<div id="Bash Script Troubleshooting-6️⃣ Preventing Script Re-Sourcing (Tracking If It's Been Run)"><h2 id="6️⃣ Preventing Script Re-Sourcing (Tracking If It's Been Run)" class="header"><a href="#Bash Script Troubleshooting-6️⃣ Preventing Script Re-Sourcing (Tracking If It's Been Run)">6️⃣ Preventing Script Re-Sourcing (Tracking If It's Been Run)</a></h2></div>
+
+<p>
+✔ Use an environment variable to track if the script was sourced before:
+</p>
+
+<pre bash>
+if [[ -n "$SCRIPT_ALREADY_SOURCED" ]]; then
+    echo "Script has already been sourced. Skipping..."
+    return
 fi
 export SCRIPT_ALREADY_SOURCED=true
-✔ Use a temporary file to persist tracking across sessions:
-bash
-if <a href=" -f &quot;/tmp/script_sourced.lock&quot; .html">-f "/tmp/script_sourced.lock"</a>; then
-</p>
-<pre><code>echo "Script has already been sourced. Skipping..."
-return
-</code></pre>
+</pre>
+
 <p>
+✔ Use a temporary file to persist tracking across sessions:
+</p>
+
+<pre bash>
+if [[ -f "/tmp/script_sourced.lock" ]]; then
+    echo "Script has already been sourced. Skipping..."
+    return
 fi
 touch "/tmp/script_sourced.lock"
-🔹 This ensures the script isn’t reloaded multiple times.
-7️⃣ Ensuring Correct Path When Sourcing Another Script
-✔ $DIR must be correctly set before sourcing another script. Debug with:
-bash
-echo "DIR is set to: $DIR"
-✔ Source another script only if it exists:
-bash
-if <a href=" -f &quot;/cmds/nuke_env.sh&quot; .html">-f "$DIR/cmds/nuke_env.sh"</a>; then
-</p>
-<pre><code>source "$DIR/cmds/nuke_env.sh"
-</code></pre>
+</pre>
+
 <p>
+🔹 This ensures the script isn’t reloaded multiple times.
+</p>
+
+<div id="Bash Script Troubleshooting-7️⃣ Ensuring Correct Path When Sourcing Another Script"><h2 id="7️⃣ Ensuring Correct Path When Sourcing Another Script" class="header"><a href="#Bash Script Troubleshooting-7️⃣ Ensuring Correct Path When Sourcing Another Script">7️⃣ Ensuring Correct Path When Sourcing Another Script</a></h2></div>
+
+<p>
+✔ $DIR must be correctly set before sourcing another script. Debug with:
+</p>
+
+<pre bash>
+echo "DIR is set to: $DIR"
+</pre>
+
+<p>
+✔ Source another script only if it exists:
+</p>
+
+<pre bash>
+if [[ -f "$DIR/cmds/nuke_env.sh" ]]; then
+    source "$DIR/cmds/nuke_env.sh"
 fi
+</pre>
+
+<p>
 🔹 Avoid path errors by confirming $DIR resolves correctly.
-8️⃣ Final Debugging Tips
+</p>
+
+<div id="Bash Script Troubleshooting-8️⃣ Final Debugging Tips"><h2 id="8️⃣ Final Debugging Tips" class="header"><a href="#Bash Script Troubleshooting-8️⃣ Final Debugging Tips">8️⃣ Final Debugging Tips</a></h2></div>
+
+<p>
 ✔ Enable debug tracing to see script execution details:
-bash
+</p>
+
+<pre bash>
 set -x
 source "$DIR/cmds/nuke_env.sh"
 set +x
+</pre>
+
+<p>
 ✔ Use realpath to ensure absolute paths are resolved properly:
-bash
-SCRIPT_DIR=\((realpath "\)DIR")
+</p>
+
+<pre bash>
+SCRIPT_DIR=$(realpath "$DIR")
 echo "Resolved path: $SCRIPT_DIR"
+</pre>
+
+<p>
 🔹 This helps identify incorrect path assumptions.
-Closing Thoughts
+</p>
+
+<div id="Bash Script Troubleshooting-8️⃣ Final Debugging Tips-Closing Thoughts"><h3 id="Closing Thoughts" class="header"><a href="#Bash Script Troubleshooting-8️⃣ Final Debugging Tips-Closing Thoughts">Closing Thoughts</a></h3></div>
+
+<p>
 From alias insertion, sourcing scripts properly, debugging variable expansions, and ensuring persistent environment variables—this was a deep dive into Bash &amp; Zsh scripting best practices. Now, you have a structured reference to avoid pitfalls and streamline your automation! 💡💻
 </p>
 
