@@ -9,7 +9,6 @@
 </head>
 <body>
 
-
 <p>
 <a href="index.html">index</a>
 </p>
@@ -62,31 +61,6 @@
 <a href="shell_scripts_bash.html#How This Works">How This Works</a>
 
 </ul>
-</ul>
-<li>
-<a href="shell_scripts_bash.html#Conditional Alias (Function)">Conditional Alias (Function)</a>
-
-<ul>
-<li>
-<a href="shell_scripts_bash.html#Solution: Conditional Check Inside an Alias">Solution: Conditional Check Inside an Alias</a>
-
-<li>
-<a href="shell_scripts_bash.html#Solution: Use command -v for External Scripts">Solution: Use command -v for External Scripts</a>
-
-<li>
-<a href="shell_scripts_bash.html#Why Is This Useful?">Why Is This Useful?</a>
-
-</ul>
-<li>
-<a href="shell_scripts_bash.html#If the Script Moves">If the Script Moves</a>
-
-<ul>
-<li>
-<a href="shell_scripts_bash.html#Solution: Store the Last Used Path in a File">Solution: Store the Last Used Path in a File</a>
-
-<li>
-<a href="shell_scripts_bash.html#How This Works">How This Works</a>
-
 </ul>
 <li>
 <a href="shell_scripts_bash.html#Bash Script To Set Environment Variables">Bash Script To Set Environment Variables</a>
@@ -383,162 +357,6 @@ Returns the user to <code>ORIGINAL_DIR</code> at the end.
 Now, no matter where the user calls <code>source script.sh</code>, they will end up back where they started once the script finishes running.
 </p>
 
-<div id="Conditional Alias (Function)"><h1 id="Conditional Alias (Function)" class="header"><a href="#Conditional Alias (Function)">Conditional Alias (Function)</a></h1></div>
-
-<p>
-You can add a conditional to detect whether the script still exists before attempting to run the alias. This helps prevent confusion if the script gets moved or deleted.
-</p>
-
-<div id="Conditional Alias (Function)-Solution: Conditional Check Inside an Alias"><h3 id="Solution: Conditional Check Inside an Alias" class="header"><a href="#Conditional Alias (Function)-Solution: Conditional Check Inside an Alias">Solution: Conditional Check Inside an Alias</a></h3></div>
-
-<p>
-Since aliases are simple command substitutions, they don’t support conditionals directly. However, you can wrap the alias inside a function in <code>.zshrc</code>:
-</p>
-
-<pre zsh>
-sme() {
-    SCRIPT_PATH="$HOME/scripts/my_script.sh"
-
-    if [[ -f "$SCRIPT_PATH" ]]; then
-        source "$SCRIPT_PATH"
-    else
-        echo "Error: Command missing! The script '$SCRIPT_PATH' does not exist."
-    fi
-}
-</pre>
-
-
-<ul>
-<li>
-✔ Defines a function (which behaves like an alias but allows conditionals). 
-
-<li>
-✔ Checks if the file exists before running it. 
-
-<li>
-✔ Displays an error message instead of failing silently.
-
-</ul>
-<div id="Conditional Alias (Function)-Solution: Use command -v for External Scripts"><h3 id="Solution: Use command -v for External Scripts" class="header"><a href="#Conditional Alias (Function)-Solution: Use command -v for External Scripts">Solution: Use command -v for External Scripts</a></h3></div>
-
-<p>
-If the alias points to an executable script (not sourced), use command -v:
-</p>
-
-<pre zsh>
-sme() {
-    SCRIPT_PATH="$HOME/scripts/my_script.sh"
-
-    if command -v "$SCRIPT_PATH" &gt;/dev/null 2&gt;&amp;1; then
-        "$SCRIPT_PATH"
-    else
-        echo "Error: Command missing! '$SCRIPT_PATH' is unavailable."
-    fi
-}
-</pre>
-
-
-<ul>
-<li>
-✔ Detects whether the command exists before running it. 
-
-<li>
-✔ Works well for executable scripts, but not for sourced ones.
-
-</ul>
-<div id="Conditional Alias (Function)-Why Is This Useful?"><h3 id="Why Is This Useful?" class="header"><a href="#Conditional Alias (Function)-Why Is This Useful?">Why Is This Useful?</a></h3></div>
-
-<ul>
-<li>
-✅ Prevents confusion if the script gets moved or deleted.
-
-<li>
-✅ Ensures users get feedback instead of silent failures.
-
-<li>
-✅ Keeps your aliases more robust and user-friendly.
-
-</ul>
-<div id="Conditional Alias (Function)-If the Script Moves"><h2 id="If the Script Moves" class="header"><a href="#Conditional Alias (Function)-If the Script Moves">If the Script Moves</a></h2></div>
-
-<p>
-If the script moves, let's give a user the opportunity to pass in a new path, and have it remembered.
-</p>
-
-<div id="Conditional Alias (Function)-If the Script Moves-Solution: Store the Last Used Path in a File"><h3 id="Solution: Store the Last Used Path in a File" class="header"><a href="#Conditional Alias (Function)-If the Script Moves-Solution: Store the Last Used Path in a File">Solution: Store the Last Used Path in a File</a></h3></div>
-
-<p>
-We'll save the last successful script path in a hidden file (e.g., ~/.last_script_path) so it can be retrieved automatically in future sessions.
-</p>
-
-<pre zsh>
-sme() {
-    SCRIPT_NAME="my_script.sh"
-    SEARCH_DIRS=("$HOME/scripts" "$HOME/bin" "$HOME/.local/bin" "$PWD")
-    LAST_PATH_FILE="$HOME/.last_script_path"
-
-    # Try using the last known path first
-    if [[ -f "$LAST_PATH_FILE" ]]; then
-        LAST_PATH=$(cat "$LAST_PATH_FILE")
-        if [[ -f "$LAST_PATH" ]]; then
-            SCRIPT_PATH="$LAST_PATH"
-        fi
-    fi
-
-    # If the script isn't found via the last path, search predefined directories
-    if [[ -z "$SCRIPT_PATH" ]]; then
-        for dir in "${SEARCH_DIRS[@]}"; do
-            if [[ -f "$dir/$SCRIPT_NAME" ]]; then
-                SCRIPT_PATH="$dir/$SCRIPT_NAME"
-                break
-            fi
-        done
-    fi
-
-    # If script wasn't found, prompt user for input
-    while [[ -z "$SCRIPT_PATH" ]]; do
-        echo "Error: Could not find '$SCRIPT_NAME'."
-        echo "Please enter the correct path or type 'cancel' to abort:"
-        read -r user_path
-
-        if [[ "$user_path" == "cancel" ]]; then
-            echo "Operation canceled."
-            return 1
-        fi
-
-        if [[ -f "$user_path" ]]; then
-            SCRIPT_PATH="$user_path"
-            echo "$SCRIPT_PATH" &gt; "$LAST_PATH_FILE"  # Save the new path for future use
-        else
-            echo "Invalid path: '$user_path' does not exist."
-        fi
-    done
-
-    # If we successfully locate the script, source it
-    echo "Found script at: $SCRIPT_PATH"
-    source "$SCRIPT_PATH"
-}
-</pre>
-
-<div id="Conditional Alias (Function)-If the Script Moves-How This Works"><h3 id="How This Works" class="header"><a href="#Conditional Alias (Function)-If the Script Moves-How This Works">How This Works</a></h3></div>
-
-<ul>
-<li>
-✔ Checks if a last-known path exists (~/.last_script_path). 
-
-<li>
-✔ Uses the saved path automatically if the script is still there. 
-
-<li>
-✔ Searches known directories as a fallback. 
-
-<li>
-✔ Asks the user for input if needed and remembers the new path for next time.
-
-</ul>
-<p>
-Now your function intelligently remembers the script location across sessions, reducing user effort! 🚀
-</p>
 
 <div id="Bash Script To Set Environment Variables"><h1 id="Bash Script To Set Environment Variables" class="header"><a href="#Bash Script To Set Environment Variables">Bash Script To Set Environment Variables</a></h1></div>
 
