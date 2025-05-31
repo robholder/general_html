@@ -221,7 +221,7 @@ This quick overview should give you a strong starting point for using Vim’s qu
 <div id="Persistent Quickfix List-Saving the Quickfix List"><h3 id="Saving the Quickfix List" class="header"><a href="#Persistent Quickfix List-Saving the Quickfix List">Saving the Quickfix List</a></h3></div>
 
 <p>
-You can export your quickfix entries to a file using the :cexpr or by writing out the contents of the quickfix list. One straightforward method is to redirect the output of :clist into a file:
+You can export your quickfix entries to a file using the <code>:cexpr</code> or by writing out the contents of the quickfix list. One straightforward method is to redirect the output of <code>:clist</code> into a file:
 </p>
 
 <pre vim>
@@ -235,7 +235,7 @@ This writes the quickfix list to /path/to/quickfix.txt in a readable format. Not
 </p>
 
 <p>
-Alternatively, if you can generate a quickfix list in a format that Vim understands (such as the errorformat lines produced by a compiler or :vimgrep), then you can save that output.
+Alternatively, if you can generate a quickfix list in a format that Vim understands (such as the errorformat lines produced by a compiler or <code>:vimgrep</code>), then you can save that output.
 </p>
 
 <div id="Persistent Quickfix List-Reloading the Quickfix List"><h3 id="Reloading the Quickfix List" class="header"><a href="#Persistent Quickfix List-Reloading the Quickfix List">Reloading the Quickfix List</a></h3></div>
@@ -293,6 +293,184 @@ For Vim to properly parse the file into the quickfix list, the file’s content 
 </ul>
 <p>
 Using these methods, you can effectively "persist" your quickfix list across sessions.
+</p>
+
+<div id="cexpr"><h1 id="cexpr" class="header"><a href="#cexpr">cexpr</a></h1></div>
+
+<p>
+The <code>:cexpr</code> command is one of Vim’s built-in ways to programmatically populate the quickfix list from the result of an expression. It’s very useful when you want to bypass running an external command (or need to massage its output) and then have Vim treat that output as a list of errors or search results. Here’s a breakdown:
+</p>
+
+<div id="cexpr-What :cexpr Does"><h2 id="What :cexpr Does" class="header"><a href="#cexpr-What :cexpr Does">What :cexpr Does</a></h2></div>
+
+<p>
+Basic Syntax:
+</p>
+
+<pre vim>
+:cexpr {expr}
+</pre>
+
+<p>
+Optionally, you might also encounter the form with !:
+</p>
+
+<pre vim>
+:cexpr! {expr}
+</pre>
+
+<p>
+Input Types: The argument <code>{expr}</code> must evaluate to either:
+</p>
+<ul>
+<li>
+<code>A String</code>: Each newline-separated line in the string is processed using Vim’s 'errorformat' option. This is the same format that many compiler outputs follow. Essentially, Vim splits the string into lines and uses errorformat to parse each line into a quickfix entry.
+
+<li>
+<code>A List</code>: If <code>{expr}</code> is a list, every string element in that list is processed in turn to add an entry to the quickfix list. Non-string values in the list are ignored.
+
+<li>
+<code>What Happens</code>: Once the list is created, Vim automatically makes it the active quickfix list. You can then use commands like <code>:copen</code> to display it, or navigate with <code>:cnext</code>, <code>:cprev</code>, etc.
+
+</ul>
+<div id="cexpr-What :cexpr Does-How to Use :cexpr"><h3 id="How to Use :cexpr" class="header"><a href="#cexpr-What :cexpr Does-How to Use :cexpr">How to Use :cexpr</a></h3></div>
+
+<p>
+Using an External Command via <code>system()</code>:
+</p>
+
+<p>
+Suppose you want to search for <code>TODO</code> across your code. You could run an external command like grep and capture its output as follows:
+</p>
+
+<pre vim>
+:cexpr system('grep -Rn "TODO" .')
+</pre>
+
+<ul>
+<li>
+Here, system(<code>grep -Rn "TODO" .</code>) runs the grep command.
+
+<li>
+The output (which would typically be in the format <code>filename:line:number: matching_line</code>) is returned as a string.
+
+<li>
+Vim processes that string using the current value of <code>errorformat</code> (which often already knows how to parse grep output) and populates the quickfix list with one entry per line.
+
+</ul>
+<div id="cexpr-What :cexpr Does-Using a List Directly:"><h3 id="Using a List Directly:" class="header"><a href="#cexpr-What :cexpr Does-Using a List Directly:">Using a List Directly:</a></h3></div>
+
+<p>
+You might also build a list in Vim script and feed it to :cexpr. For example:
+</p>
+
+<pre vim>
+:let results = [
+      \ 'file1.c:23: error: something went wrong',
+      \ 'file2.c:45: error: another problem'
+      \ ]
+:cexpr results
+</pre>
+
+<ul>
+<li>
+Each string in the results list is processed as if it were a line of compiler output.
+
+<li>
+Ensure your <code>errorformat</code> is set up to correctly interpret the structure of these strings.
+
+</ul>
+<div id="cexpr-What :cexpr Does-Using :cexpr!"><h3 id="Using :cexpr!" class="header"><a href="#cexpr-What :cexpr Does-Using :cexpr!">Using :cexpr!</a></h3></div>
+
+<p>
+The version with the exclamation point (<code>:cexpr!</code>) works similarly, but in some cases it might behave slightly differently regarding jumping to the first error. (Check <code>:help :cexpr</code> for details in your specific version of Vim.)
+</p>
+
+<div id="cexpr-What :cexpr Does-After Populating the Quickfix List"><h3 id="After Populating the Quickfix List" class="header"><a href="#cexpr-What :cexpr Does-After Populating the Quickfix List">After Populating the Quickfix List</a></h3></div>
+
+<p>
+Once you’ve run <code>:cexpr</code>:
+</p>
+
+<ul>
+<li>
+Open the Quickfix Window:
+
+</ul>
+  
+<pre vim>
+:copen
+</pre>
+
+<p>
+This will display the list of entries generated by :cexpr.
+</p>
+
+<ul>
+<li>
+Navigate the Quickfix List:
+
+<ul>
+<li>
+Use <code>:cnext</code> to jump to the next location.
+
+<li>
+Use <code>:cprev</code> to jump to the previous location.
+
+<li>
+Use <code>:cc 3</code> to jump directly to the third entry (replace "3" with the desired index).
+
+</ul>
+</ul>
+<p>
+Close the Quickfix Window:
+</p>
+
+<pre vim>
+:cclose
+</pre>
+
+<div id="cexpr-Example Workflow"><h2 id="Example Workflow" class="header"><a href="#cexpr-Example Workflow">Example Workflow</a></h2></div>
+
+<p>
+Imagine you want to search for the keyword <code>FIXME</code> in all <code>.js</code> files and load the results into your quickfix list:
+</p>
+
+<p>
+Run:
+</p>
+
+<pre vim>
+:cexpr system('grep -Rn "FIXME" *.js')
+</pre>
+
+<p>
+Then, open the quickfix list:
+</p>
+
+<pre vim>
+:copen
+</pre>
+
+<p>
+Navigate through each match with <code>:cnext</code> or select an entry from the quickfix window.
+</p>
+
+<div id="Why Use :cexpr?"><h1 id="Why Use :cexpr?" class="header"><a href="#Why Use :cexpr?">Why Use :cexpr?</a></h1></div>
+
+<ul>
+<li>
+<code>Flexibility</code>: It lets you build or modify the data that gets to the quickfix list. Not only can you capture the output of external commands, but you can also build lists on the fly from within Vim script.
+
+<li>
+<code>Integration</code>: By using the same error parsing (<code>errorformat</code>), it integrates seamlessly with the quickfix features, letting you use Vim’s navigation commands to jump to the exact location of a match or error.
+
+<li>
+<code>Automation</code>: You can incorporate this into your Vim workflow or even create commands/mappings that let you generate custom quickfix lists for things like code review, linting warnings, or any searchable pattern in your files.
+
+</ul>
+<p>
+This breakdown should give you a solid understanding of how :cexpr works and how to put it to use in your Vim workflow.
 </p>
 
 <p>
