@@ -113,6 +113,187 @@ Save Automater the new tool (into default actions directory):
 
 </ul>
 </ul>
+<div id="Example QuickAction"><h1 id="Example QuickAction" class="header"><a href="#Example QuickAction">Example QuickAction</a></h1></div>
+
+<p>
+This involves a script adapted from a regular script.
+</p>
+
+<p>
+It takes a monthly CSV file (transactions all from a single month) and it renames it in the format: <code>250501-250531.csv</code>.
+</p>
+
+<div id="Example QuickAction-Step 1. Python script"><h2 id="Step 1. Python script" class="header"><a href="#Example QuickAction-Step 1. Python script">Step 1. Python script</a></h2></div>
+
+<pre python>
+#!/usr/bin/env python3
+
+import os
+import sys
+import csv
+from datetime import datetime
+import calendar
+
+def get_first_transaction_date(filepath):
+    """
+    Reads the CSV file and returns the first valid transaction date
+    found in the first column (assumes format M/D/YYYY).
+    """
+    try:
+        with open(filepath, newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                # Skip empty rows (or header rows without valid data)
+                if not row or len(row) == 0:
+                    continue
+                try:
+                    date_obj = datetime.strptime(row[0], "%m/%d/%Y")
+                    return date_obj
+                except ValueError:
+                    # Could be a header row or unexpected data
+                    continue
+    except Exception as err:
+        print(f"Error processing {filepath}: {err}")
+    return None
+
+def create_new_filename(date_obj):
+    """
+    Given a date object, constructs a filename in the format:
+    YYMM01-YYMM&lt;last-day&gt;.csv
+
+    For example, for May 2025, returns: '250501-250531.csv'
+    """
+    year_full = date_obj.year
+    month = date_obj.month
+    last_day = calendar.monthrange(year_full, month)[1]
+    # Take the last two digits of the year
+    year_two = year_full % 100
+    new_filename = f"{year_two:02d}{month:02d}01-{year_two:02d}{month:02d}{last_day:02d}.csv"
+    return new_filename
+
+def process_file(filepath):
+    # Deal only with CSV files
+    if not filepath.lower().endswith('.csv'):
+        print(f"Skipping non-CSV file: {filepath}")
+        return
+
+    date_obj = get_first_transaction_date(filepath)
+    if date_obj is None:
+        print(f"Could not determine a valid date in {filepath}")
+        return
+
+    new_filename = create_new_filename(date_obj)
+    directory = os.path.dirname(filepath)
+    new_filepath = os.path.join(directory, new_filename)
+
+    # Avoid overwriting an existing file
+    if os.path.exists(new_filepath):
+        print(f"File {new_filename} already exists. Skipping {filepath}")
+        return
+
+    try:
+        os.rename(filepath, new_filepath)
+        print(f"Renamed:\n  {filepath}\n  -&gt; {new_filepath}")
+    except Exception as e:
+        print(f"Error renaming {filepath}: {e}")
+
+def main(file_list):
+    for filepath in file_list:
+        process_file(filepath)
+
+if __name__ == '__main__':
+    if len(sys.argv) &lt; 2:
+        print("Usage: rename_csv.py file1.csv file2.csv ...")
+        sys.exit(1)
+    main(sys.argv[1:])
+
+</pre>
+
+<div id="Example QuickAction-Step 2. How It Works"><h2 id="Step 2. How It Works" class="header"><a href="#Example QuickAction-Step 2. How It Works">Step 2. How It Works</a></h2></div>
+
+<ul>
+<li>
+<span id="Example QuickAction-Step 2. How It Works-Input from Automator"></span><strong id="Input from Automator">Input from Automator</strong>: Automator will pass the selected file paths as command‑line arguments (i.e. via <code>sys.argv[1:]</code>).
+
+<li>
+<span id="Example QuickAction-Step 2. How It Works-Processing Each File"></span><strong id="Processing Each File">Processing Each File</strong>: The script iterates over each file, confirms it has a <code>.csv</code> extension, then:
+
+<ul>
+<li>
+Opens the CSV and reads rows until it finds one that can be parsed as a date using <code>datetime.strptime()</code> (assuming the date format is <code>"%m/%d/%Y"</code>).
+
+<li>
+Uses the found date to calculate the new filename (with the format YYMM01-YYMM&lt;last-day&gt;.csv).
+
+<li>
+Renames the file if no conflicts occur.
+
+</ul>
+</ul>
+<div id="Example QuickAction-Step 3. Setting Up Your Automator Quick Action"><h2 id="Step 3. Setting Up Your Automator Quick Action" class="header"><a href="#Example QuickAction-Step 3. Setting Up Your Automator Quick Action">Step 3. Setting Up Your Automator Quick Action</a></h2></div>
+
+<ul>
+<li>
+Open Automator and Create a New Quick Action (or Service):
+
+<ul>
+<li>
+Choose “Quick Action” (or “Service” in older macOS versions).
+
+</ul>
+<li>
+Configure the Workflow:
+
+<ul>
+<li>
+At the top, set “Workflow receives current” to “files or folders” in “Finder”.
+
+<li>
+In the action’s options, choose “Pass input: as arguments.”
+
+</ul>
+<li>
+Add a “Run Shell Script” Action:
+
+<ul>
+<li>
+In the “Run Shell Script” action, set the shell to /bin/bash (or your preferred shell).
+
+<li>
+In the “Pass input” drop‑down, choose “as arguments.”
+
+<li>
+Enter a command such as:
+
+</ul>
+</ul>
+  
+<pre bash>
+/path/to/rename_csv.py "$@"
+</pre>
+
+<p>
+(Replace <code>/path/to/rename_csv.py</code> with the actual full path to your script.)
+</p>
+
+<ul>
+<li>
+Save the Quick Action:
+
+<ul>
+<li>
+Give it a descriptive name like “Rename CSV Files.”
+
+</ul>
+</ul>
+<p>
+Now, when you right‑click on one or more CSV files in Finder and choose your Quick Action, it will run the Python script on those files.
+</p>
+
+<p>
+This setup lets your script dynamically process files that you pass to it via a right‑click in Finder, using the current selected files as input.
+</p>
+
 <p>
 <a href="Python.html">Python</a>
 </p>
