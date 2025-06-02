@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>python_csv_files_rename</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+<div id="CSV Renamer"><h1 id="CSV Renamer" class="header"><a href="#CSV Renamer">CSV Renamer</a></h1></div>
+
+<div id="CSV Renamer-PROBLEM"><h2 id="PROBLEM" class="header"><a href="#CSV Renamer-PROBLEM">PROBLEM</a></h2></div>
+
+<p>
+I have a directory full of csv files from a bank. The filenames are meaningless. I know that each csv file contains transactions from a specific month and year. I want to use Python to examine the contents of each file, and create a filename (and rename) with a format like 250501-250531.csv (reverse dates, YYMMDD-YYMMDD) with month start to month end. The first column contains dates in a 5/2/2025 format. Can you help me approach this? I might need csv modules, and then I need to write a script to: * Read each file * look which month the transactions are from (I only need one to see that) * Form a filename * Rename each file.
+</p>
+
+<div id="CSV Renamer-SOLUTION"><h2 id="SOLUTION" class="header"><a href="#CSV Renamer-SOLUTION">SOLUTION</a></h2></div>
+
+<p>
+Below is one way to approach the problem. The idea is to write a Python script that:
+</p>
+<ul>
+<li>
+Iterates over all CSV files in a given directory.
+
+<li>
+For each CSV file, reads the first column for a date (skipping headers or blank lines as needed).
+
+<li>
+Parses that date (assumed to be in a format like <code>5/2/2025</code>).
+
+<li>
+Uses the resulting year and month to determine the “month start” and “month end” (by computing the last day of that month).
+
+<li>
+Constructs a new filename in the format <code>YYMMDD-YYMMDD.csv</code> (e.g. <code>250501-250531.csv</code> for May 2025).
+
+<li>
+Renames the file to the new name (with some optional error checking).
+
+</ul>
+<p>
+Below is a sample Python script that illustrates this approach:
+</p>
+
+<pre python>
+#!/usr/bin/env python3
+import os
+import csv
+from datetime import datetime
+import calendar
+
+def get_first_transaction_date(filepath):
+    """
+    Reads the CSV file and returns the first valid transaction date
+    found in the first column. Assumes dates in the form M/D/YYYY.
+    """
+    with open(filepath, newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            # Skip empty rows (and possibly a header row)
+            if not row or len(row) == 0:
+                continue
+            try:
+                # Try to parse the date from the first column.
+                # Adjust the format if your dates differ.
+                date_obj = datetime.strptime(row[0], "%m/%d/%Y")
+                return date_obj
+            except ValueError:
+                # If parsing fails, it might be a header row so we continue.
+                continue
+    return None
+
+def create_new_filename(date_obj):
+    """
+    Given a datetime object, returns a new filename in the format:
+    YYMM01-YYMM&lt;last-day&gt;.csv
+    For example, for May 2025, this returns: '250501-250531.csv'
+    """
+    year_full = date_obj.year
+    month = date_obj.month
+    # Determine last day of the given month
+    last_day = calendar.monthrange(year_full, month)[1]
+    # Use the last two digits of the year
+    year_two = year_full % 100
+    new_filename = f"{year_two:02d}{month:02d}01-{year_two:02d}{month:02d}{last_day:02d}.csv"
+    return new_filename
+
+def rename_csv_files(directory):
+    """
+    Iterates over CSV files in the given directory, checks for the
+    transaction date and renames the file accordingly.
+    """
+    for filename in os.listdir(directory):
+        # Only process files ending in '.csv' (case insensitive)
+        if filename.lower().endswith(".csv"):
+            old_filepath = os.path.join(directory, filename)
+            date_obj = get_first_transaction_date(old_filepath)
+            if not date_obj:
+                print(f"Skipping {filename}: Could not determine a transaction date.")
+                continue
+            # Construct the new filename
+            new_filename = create_new_filename(date_obj)
+            new_filepath = os.path.join(directory, new_filename)
+            # Check to avoid accidental overwriting
+            if os.path.exists(new_filepath):
+                print(f"Warning: {new_filename} already exists. Skipping rename of {filename}.")
+                continue
+            print(f"Renaming {filename} -&gt; {new_filename}")
+            os.rename(old_filepath, new_filepath)
+
+if __name__ == "__main__":
+    # Specify the directory containing your CSV files (adjust as needed)
+    target_directory = "./csv_files"
+    rename_csv_files(target_directory)
+</pre>
+
+<div id="CSV Renamer-SOLUTION-Explanation"><h3 id="Explanation" class="header"><a href="#CSV Renamer-SOLUTION-Explanation">Explanation</a></h3></div>
+
+<div id="CSV Renamer-SOLUTION-Explanation-Reading the Date:"><h4 id="Reading the Date:" class="header"><a href="#CSV Renamer-SOLUTION-Explanation-Reading the Date:">Reading the Date:</a></h4></div>
+
+<ul>
+<li>
+The function <code>get_first_transaction_date()</code> opens the CSV file and reads rows, attempting to parse the first non-header line’s first column as a date.
+
+<li>
+The code uses <code>datetime.strptime(row[0], "%m/%d/%Y")</code> to interpret dates like <code>5/2/2025</code>. (Change the format string if your dates differ.)
+
+</ul>
+<div id="CSV Renamer-SOLUTION-Explanation-Creating a New Filename:"><h4 id="Creating a New Filename:" class="header"><a href="#CSV Renamer-SOLUTION-Explanation-Creating a New Filename:">Creating a New Filename:</a></h4></div>
+
+<ul>
+<li>
+Once the date is parsed, <code>create_new_filename()</code> uses the <code>calendar.monthrange()</code> function to determine how many days are in that month.
+
+<li>
+It then formats a new filename in the desired format. For a date in May 2025, this would result in <code>250501-250531.csv</code>.
+
+</ul>
+<div id="CSV Renamer-SOLUTION-Explanation-Renaming Files:"><h4 id="Renaming Files:" class="header"><a href="#CSV Renamer-SOLUTION-Explanation-Renaming Files:">Renaming Files:</a></h4></div>
+
+<ul>
+<li>
+The <code>rename_csv_files()</code> function lists all files in a directory, selects those ending with <code>.csv</code>, and then uses the above functions to determine the new name.
+
+<li>
+It prints a warning if the new file already exists and uses <code>os.rename()</code> to perform the rename.
+
+</ul>
+<div id="CSV Renamer-SOLUTION-Next Steps"><h3 id="Next Steps" class="header"><a href="#CSV Renamer-SOLUTION-Next Steps">Next Steps</a></h3></div>
+
+<ul>
+<li>
+<code>Adjust the CSV Parsing</code>: If your CSVs have header rows or other quirks, you might need to adjust how you pick the right row for the date.
+
+<li>
+<code>Backup Files</code>: Before renaming files, experiment on a copy of your directory to avoid accidental data loss.
+
+<li>
+<code>Enhance Error Handling</code>: You may wish to add additional error handling depending on your needs.
+
+</ul>
+<p>
+This approach should give you a head start in processing the CSV files to extract month and year information and rename them accordingly.
+</p>
+
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
