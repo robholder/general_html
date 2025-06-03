@@ -72,12 +72,65 @@ re.search(r'\s', 'Hello World')  # Matches the space between words
 <code>.</code> – Dot Matches any character except a newline (unless you use the re.DOTALL flag).
 
 <li>
-<code>^</code> – Start of line.
+<code>^</code> – Start of line. (See note below!)
 
 <li>
-<code>$</code> – End of line.
+<code>$</code> – End of line. (See note below!)
 
 </ul>
+<div id="Regex-Start-of-line Caret and End-of-Line $"><h3 id="Start-of-line Caret and End-of-Line $" class="header"><a href="#Regex-Start-of-line Caret and End-of-Line $">Start-of-line Caret and End-of-Line $</a></h3></div>
+
+<p>
+The caret (<code>^</code>) anchors the match to the very beginning of the string by default, and the dollar symbol (<code>$</code>) anchors the match to the very end of a line. That means when you use:
+</p>
+
+<pre python>
+match = re.search(r'^&lt;search_term&gt;', text)
+</pre>
+
+<p>
+Python expects "&lt;search_term&gt;" to be the first characters in the entire text string. If "&lt;search_term&gt;" appears later in the text—say, at the start of a new line (after a newline)—the pattern won’t match.
+</p>
+
+<div id="Regex-Start-of-line Caret and End-of-Line $-How to Match at the Start of a Line:"><h4 id="How to Match at the Start of a Line:" class="header"><a href="#Regex-Start-of-line Caret and End-of-Line $-How to Match at the Start of a Line:">How to Match at the Start of a Line:</a></h4></div>
+
+<p>
+If you want the caret to work for the beginning of any line (not just the very start), you can use the re.MULTILINE flag. This flag makes ^ match immediately following a newline, as well as the start of the string. For example:
+</p>
+
+<pre python>
+import re
+
+text = "Some Intro\n&lt;search_term&gt; Data starts here"
+match = re.search(r'^&lt;search_term&gt;', text, re.MULTILINE)
+
+if match:
+    print("Found '&lt;search_term&gt;' at the start of a line!")
+else:
+    print("Not found.")
+</pre>
+
+<p>
+With <code>re.MULTILINE</code>, the pattern <code>^&lt;search_term&gt;</code> matches <code>"&lt;search_term&gt;"</code> if it starts on any line in the text.
+</p>
+
+<div id="Regex-Start-of-line Caret and End-of-Line $-In summary:"><h4 id="In summary:" class="header"><a href="#Regex-Start-of-line Caret and End-of-Line $-In summary:">In summary:</a></h4></div>
+
+<ul>
+<li>
+Without <code>^</code>: The pattern finds "&lt;search_term&gt;" anywhere.
+
+<li>
+With <code>^</code> and no <code>re.MULTILINE</code> flag: The match will only succeed if "&lt;search_term&gt;" is at the very beginning of the string.
+
+<li>
+With <code>^</code> and the <code>re.MULTILINE</code> flag: The pattern will match "&lt;search_term&gt;" at the beginning of any line.
+
+</ul>
+<p>
+Search fails when you add the caret without setting re.MULTILINE, yet works when the caret is removed due to the whole text is treated as one 'line' or 'block'.
+</p>
+
 <div id="Regex-Matching Specific Patterns with Quantifiers"><h3 id="Matching Specific Patterns with Quantifiers" class="header"><a href="#Regex-Matching Specific Patterns with Quantifiers">Matching Specific Patterns with Quantifiers</a></h3></div>
 
 <p>
@@ -215,6 +268,72 @@ match = pattern.search("2025-05-02")
 if match:
     print(match.groups())
 </pre>
+
+<div id="Regex-Flags that Modify Matching Behavior-Patterns with Either/Or"><h3 id="Patterns with Either/Or" class="header"><a href="#Regex-Flags that Modify Matching Behavior-Patterns with Either/Or">Patterns with Either/Or</a></h3></div>
+
+<p>
+You can do an "either/or" search using the pipe operator (<code>|</code>) within a regex expression. The pipe acts like a logical OR, so you can match one pattern or the other. You can place your alternatives in a non-capturing group (using <code>(?:...)</code>) if you don’t want the alternative prefixes to be captured.
+For example, suppose you want to match either "Primary Account:" or "Account Number:" followed by an account number (digits). You could write your pattern like this:
+</p>
+
+<pre python>
+import re
+
+text = """
+Some text here
+Primary Account: 12345678901
+More text here
+Account Number: 10987654321
+"""
+
+# The non-capturing group (?:...) groups the alternatives without capturing them.
+# \s* allows for optional whitespace after the prefix.
+# (\d+) captures one or more digits (the account number).
+pattern = r'(?:Primary Account:|Account Number:)\s*(\d+)'
+
+# Use re.search to find the first occurrence in the text.
+match = re.search(pattern, text)
+if match:
+    account_number = match.group(1)
+    print(f"Matched account number: {account_number}")
+else:
+    print("No match found.")
+</pre>
+
+<div id="Regex-Flags that Modify Matching Behavior-Patterns with Either/Or-Explanation"><h4 id="Explanation" class="header"><a href="#Regex-Flags that Modify Matching Behavior-Patterns with Either/Or-Explanation">Explanation</a></h4></div>
+
+<ul>
+<li>
+Non-capturing Group <code>(?:Primary Account:|Account Number:)</code>:
+
+<ul>
+<li>
+Using <code>(?: ... )</code> groups the two alternatives without storing the matched prefix. This helps if you only care about the digits that follow.
+
+<li>
+The pipe (<code>|</code>) indicates that it can match either <code>"Primary Account:"</code> or <code>"Account Number:"</code>.
+
+</ul>
+<li>
+<code>\s:*</code>
+
+<ul>
+<li>
+The <code>\s*</code> matches any whitespace (including none) between the prefix and the digits.
+
+</ul>
+<li>
+Capturing Group <code>(\d+)</code>:
+
+<ul>
+<li>
+<code>(\d+)</code> captures one or more digits. This is what you'll retrieve with <code>match.group(1)</code>.
+
+</ul>
+</ul>
+<p>
+This regex will match documents where the account number is preceded by either of your desired labels. You can adjust it further if your patterns include additional formatting.
+</p>
 
 <div id="Regex-Flags that Modify Matching Behavior-Summary"><h3 id="Summary" class="header"><a href="#Regex-Flags that Modify Matching Behavior-Summary">Summary</a></h3></div>
 
