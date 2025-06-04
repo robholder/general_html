@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_expresion_node_index</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Nuke - Expression Node"><h1 id="Nuke - Expression Node" class="header"><a href="#Nuke - Expression Node">Nuke - Expression Node</a></h1></div>
+
+<div id="Nuke - Expression Node-Node Panel Quick Tip"><h2 id="Node Panel Quick Tip" class="header"><a href="#Nuke - Expression Node-Node Panel Quick Tip">Node Panel Quick Tip</a></h2></div>
+
+<p>
+There is a wrench on each node's property panel: click this to 'save' presets. These presets will appear as pulldown user choices. (Very handy for the Expression node.)
+</p>
+
+<div id="Nuke - Expression Node-Luminance"><h2 id="Luminance" class="header"><a href="#Nuke - Expression Node-Luminance">Luminance</a></h2></div>
+
+<p>
+In compositing and color science, luminance is typically expressed as a weighted sum of the red, green, and blue channels. In Nuke’s Expression node, you can calculate luminance by using one of the common standards.
+</p>
+
+<p>
+For example, if you want to use the Rec.709 (or sRGB) standard, where the weights are approximately 0.2126 for red, 0.7152 for green, and 0.0722 for blue, your expression would be:
+</p>
+
+<pre plaintext>
+0.2126*r + 0.7152*g + 0.0722*b
+</pre>
+
+<p>
+Alternatively, some legacy workflows use the Rec.601 standard, which uses weights close to 0.299 for red, 0.587 for green, and 0.114 for blue:
+</p>
+
+<pre>
+plaintext
+0.299*r + 0.587*g + 0.114*b
+</pre>
+
+<p>
+You can enter either one of these formulas in the Expression field of your Expression node. The chosen weights depend on your project’s color standards, but both formulas will calculate a luminance value that takes into account the perceptual sensitivity of the human eye.
+</p>
+
+<p>
+There isn't any built-in “luminance” function in Nuke's expression language by default, so writing out the weighted sum is the typical approach. This gives you full control over the conversion and makes the process explicit in your node tree.
+</p>
+
+<div id="Nuke - Expression Node-Luminance-In the Expression node:"><h4 id="In the Expression node:" class="header"><a href="#Nuke - Expression Node-Luminance-In the Expression node:">In the Expression node:</a></h4></div>
+
+<p>
+On the left box - <code>l</code>
+On the right box - = <code>(0.2126*r + 0.7152*g + 0.0722*b)</code>
+</p>
+
+<div id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression"><h2 id="Fixing Single Pixel NaNs with an Expression" class="header"><a href="#Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression">Fixing Single Pixel NaNs with an Expression</a></h2></div>
+
+<p>
+Below is one way you could handle single‑pixel NaNs with an Expression node by checking if a channel’s value is NaN and, if so, replacing it with an average of its eight immediate neighbors. (You’d want to replicate or modify the expression similarly for each channel as needed.) For example, for the red channel, you could write:
+</p>
+
+<pre nuke>
+isnan(r) ? (r[-1,0] + r[1,0] + r[0,-1] + r[0,1] + r[-1,-1] + r[1,-1] + r[-1,1] + r[1,1]) / 8 : r
+</pre>
+
+<div id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Explanation"><h3 id="Explanation" class="header"><a href="#Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Explanation">Explanation</a></h3></div>
+
+<ul>
+<li>
+<span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Explanation-Detecting NaNs"></span><strong id="Detecting NaNs">Detecting NaNs</strong>: The function <code>isnan(r)</code> checks if the current pixel’s red channel is a NaN value.
+
+<li>
+<span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Explanation-Sampling Neighboring Pixels"></span><strong id="Sampling Neighboring Pixels">Sampling Neighboring Pixels</strong>: The notation <code>r[dx, dy]</code> lets you sample the red channel from the pixel offset by <code>dx</code> (horizontal) and <code>dy</code> (vertical) from the current pixel. For example, <code>r[-1,0]</code> samples the pixel one unit to the left, and <code>r[0,1]</code> one unit below.
+
+<li>
+Alternately, you can use <code>r(x-1, y)</code> and <code>r(x, y+1)</code> syntax.
+
+<li>
+<span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Explanation-Averaging"></span><strong id="Averaging">Averaging</strong>: When the current pixel is NaN, the expression sums the red values of the eight neighboring pixels and divides by 8, thereby replacing the NaN with their average.
+
+<li>
+<span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Explanation-Fallback"></span><strong id="Fallback">Fallback</strong>: If the current pixel isn’t NaN, it simply uses the original red value.
+
+</ul>
+<div id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels"><h3 id="Applying to Other Channels" class="header"><a href="#Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels">Applying to Other Channels</a></h3></div>
+
+<p>
+If you need to do this for the green and blue channels, you can create similar expressions, substituting r with g and b respectively:
+</p>
+
+<div id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels-Green Channel:"><h4 id="Green Channel:" class="header"><a href="#Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels-Green Channel:">Green Channel:</a></h4></div>
+
+<pre nuke>
+isnan(g) ? (g[-1,0] + g[1,0] + g[0,-1] + g[0,1] + g[-1,-1] + g[1,-1] + g[-1,1] + g[1,1]) / 8 : g
+</pre>
+
+<div id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels-Blue Channel:"><h4 id="Blue Channel:" class="header"><a href="#Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels-Blue Channel:">Blue Channel:</a></h4></div>
+
+<pre nuke>
+isnan(b) ? (b[-1,0] + b[1,0] + b[0,-1] + b[0,1] + b[-1,-1] + b[1,-1] + b[-1,1] + b[1,1]) / 8 : b
+</pre>
+
+<div id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Caveats"><h3 id="Caveats" class="header"><a href="#Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Caveats">Caveats</a></h3></div>
+
+<ul>
+<li>
+<span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Caveats-Edge Pixels"></span><strong id="Edge Pixels">Edge Pixels</strong>: Be aware that at the borders of the image there might not be eight neighbors, so you might need to implement safeguards or pre‑filter the image to avoid artifacts at the edges.
+
+<li>
+<span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Caveats-Multiple Pixels"></span><strong id="Multiple Pixels">Multiple Pixels</strong>: This expression only fixes pixels that are NaN on their own. If you have clusters of NaNs, additional logic or a different approach (such as a blur or a more sophisticated neighborhood interpolation) may be needed.
+
+</ul>
+<p>
+This technique lets you “heal” isolated NaN pixels by blending information from their local area, which is often sufficient for many compositing tasks in Nuke. Enjoy experimenting with your expressions!
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
