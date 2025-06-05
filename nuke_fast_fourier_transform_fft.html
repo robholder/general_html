@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_fast_fourier_transform_fft</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="FFT - Fast Fourier Transform"><h1 id="FFT - Fast Fourier Transform" class="header"><a href="#FFT - Fast Fourier Transform">FFT - Fast Fourier Transform</a></h1></div>
+
+<p>
+The Fast Fourier Transform (FFT) is a mathematical algorithm that takes an image—essentially a grid of pixel values—and decomposes it into its frequency components. In imagery and compositing software like Nuke, an FFT lets you view and work with an image in its frequency domain instead of its spatial domain. Here's a breakdown of what that means and why it's useful:
+</p>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Decomposition into Frequencies"></span><strong id="Decomposition into Frequencies">Decomposition into Frequencies</strong>: Think of any image as a combination of various patterns or sine waves of different frequencies (and orientations). The FFT efficiently computes which frequencies (the “ingredients”) add up to create your image. Low frequencies correspond to broad, gradual tonal changes (like large areas of smooth color), while high frequencies represent fine details (such as edges, textures, and noise).
+
+<li>
+<span id="FFT - Fast Fourier Transform-Visual Representation"></span><strong id="Visual Representation">Visual Representation</strong>: When you apply an FFT to an image, you're usually shown an amplitude spectrum (and sometimes phase information). The amplitude tells you how much of each frequency is present in the image:
+
+<ul>
+<li>
+The center of the FFT result (in a centered FFT) generally represents the low-frequency components—the overall shapes and shading.
+
+<li>
+The edges or outer areas represent high-frequency information—the details, noise, and sharp transitions.
+
+</ul>
+</ul>
+<p>
+In some visualizations (depending on the software’s defaults), the zero-frequency (DC) component might be at the top-left corner instead, so often the result is rearranged (“FFT shift”) to make interpretation more intuitive.
+</p>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Advantages in Image Processing"></span><strong id="Advantages in Image Processing">Advantages in Image Processing</strong>: By working in the frequency domain, you can:
+
+<ul>
+<li>
+Filter or Enhance specific frequency ranges: For instance, applying a low-pass filter to remove high-frequency noise or a high-pass filter to enhance edges.
+
+<li>
+Diagnose Issues: It helps to see if unwanted noise or artifacts are concentrated in a particular frequency range.
+
+<li>
+Creative Effects: Some visual effects involve manipulating the frequency components directly to generate moiré patterns, style transfers, or other effects.
+
+<li>
+Efficiency and Control: The FFT algorithm is “fast” because it reduces what would normally be a computationally heavy operation to something that is manageable (reducing the complexity from O(n²) for a direct discrete Fourier transform to O(n log n) for the FFT). This efficiency makes it practical to use even on high-resolution imagery.
+
+</ul>
+</ul>
+<div id="FFT - Fast Fourier Transform-Summary"><h3 id="Summary" class="header"><a href="#FFT - Fast Fourier Transform-Summary">Summary</a></h3></div>
+
+<p>
+In summary, when you see an FFT in Nuke or similar software, you’re looking at a map of the image's frequency makeup: a spectrum revealing how much of smooth gradients versus sharp details (or noise) compose the image. This insight allows you to perform targeted filtering, effects, and analyses that would be much harder to achieve when only working in the spatial (pixel) domain.
+</p>
+
+<div id="FFT - Fast Fourier Transform-Using FFT in Nuke"><h2 id="Using FFT in Nuke" class="header"><a href="#FFT - Fast Fourier Transform-Using FFT in Nuke">Using FFT in Nuke</a></h2></div>
+
+<p>
+Below is an example workflow that uses Nuke’s FFT toolkit to identify and attenuate periodic (pattern) artifacts from an image. This “frequency cleaning” method essentially performs a notch-filtering operation in the frequency domain and then reconstructs a cleaner image through an inverse FFT. Here’s a step‑by‑step breakdown:
+</p>
+
+<div id="FFT - Fast Fourier Transform-Using FFT in Nuke-Load Your Image"><h3 id="Load Your Image" class="header"><a href="#FFT - Fast Fourier Transform-Using FFT in Nuke-Load Your Image">Load Your Image</a></h3></div>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Load Your Image-Read Node"></span><strong id="Read Node">Read Node</strong>: Start with a Read node that brings in your image with the artifact.
+
+</ul>
+<div id="FFT - Fast Fourier Transform-Using FFT in Nuke-Convert to Frequency Space"><h3 id="Convert to Frequency Space" class="header"><a href="#FFT - Fast Fourier Transform-Using FFT in Nuke-Convert to Frequency Space">Convert to Frequency Space</a></h3></div>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Convert to Frequency Space-FFT Node"></span><strong id="FFT Node">FFT Node</strong>: Insert an FFT node (or use the Fourier Transform node available in Nuke) to convert your image into the frequency domain.
+
+<ul>
+<li>
+In the Viewer, the FFT result will show you an amplitude spectrum where low frequencies (smooth variations) are near the center and high frequencies (details and noise) toward the edges.
+
+</ul>
+<li>
+The pattern artifacts usually appear as bright spots or symmetric spikes away from the center.
+
+</ul>
+<div id="FFT - Fast Fourier Transform-Using FFT in Nuke-Identify the Artifact Frequencies"><h3 id="Identify the Artifact Frequencies" class="header"><a href="#FFT - Fast Fourier Transform-Using FFT in Nuke-Identify the Artifact Frequencies">Identify the Artifact Frequencies</a></h3></div>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Identify the Artifact Frequencies-Visual Inspection"></span><strong id="Visual Inspection">Visual Inspection</strong>: Look at the FFT image and note where the unwanted frequencies lie.
+
+</ul>
+<p>
+They might show as distinct spots (or a series of spots) that are higher in amplitude than the surrounding areas.
+</p>
+<ul>
+<li>
+It helps to use a “Shift” operation (if available) to center the DC (zero-frequency) component for easier reference.
+
+</ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Identify the Artifact Frequencies-Notch Picking"></span><strong id="Notch Picking">Notch Picking</strong>: You will eventually “notch out” these frequencies. Think of it like drawing a mask over the unwanted spikes.
+
+<div id="FFT - Fast Fourier Transform-Using FFT in Nuke-Attenuate the Artifacts"><h3 id="Attenuate the Artifacts" class="header"><a href="#FFT - Fast Fourier Transform-Using FFT in Nuke-Attenuate the Artifacts">Attenuate the Artifacts</a></h3></div>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Attenuate the Artifacts-Roto Node / Masking"></span><strong id="Roto Node / Masking">Roto Node / Masking</strong>: Connect a Roto (or RotoPaint) node to your FFT output.
+
+<ul>
+<li>
+Draw shapes (usually small circles or custom shapes) over the bright spots corresponding to the artifacts.
+
+<li>
+Invert the mask if necessary so that the mask isolates just the frequency spikes.
+
+</ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Attenuate the Artifacts-Grade or Multiply"></span><strong id="Grade or Multiply">Grade or Multiply</strong>: Use a Grade node (or alternatively, a Multiply node) to reduce the amplitude at those frequencies.
+
+<ul>
+<li>
+For example, you can use your mask as a multiplier to “darken” (attenuate) the unwanted highs.
+
+<li>
+This step is essentially implementing a notch filter that suppresses the specific frequencies while leaving the rest of the data intact.
+
+</ul>
+</ul>
+<div id="FFT - Fast Fourier Transform-Using FFT in Nuke-Reconstruct the Image"><h3 id="Reconstruct the Image" class="header"><a href="#FFT - Fast Fourier Transform-Using FFT in Nuke-Reconstruct the Image">Reconstruct the Image</a></h3></div>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Reconstruct the Image-iFFT Node"></span><strong id="iFFT Node">iFFT Node</strong>: After applying your frequency mask/attenuation, attach an Inverse FFT (iFFT) node to convert the modified frequency data back into the spatial image domain.
+
+<ul>
+<li>
+The result should be the original image, now cleaned of (or with reduced) the pattern artifacts.
+
+</ul>
+</ul>
+<div id="FFT - Fast Fourier Transform-Using FFT in Nuke-Fine-Tuning"><h3 id="Fine-Tuning" class="header"><a href="#FFT - Fast Fourier Transform-Using FFT in Nuke-Fine-Tuning">Fine-Tuning</a></h3></div>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Fine-Tuning-Additional Correction"></span><strong id="Additional Correction">Additional Correction</strong>: If some artifacts remain or if the knee of the notch filter is too harsh, you may add a further Grade node or a Blur node after the iFFT to smooth out any residual seams.
+
+<li>
+<span id="FFT - Fast Fourier Transform-Using FFT in Nuke-Fine-Tuning-Iterative Adjustments"></span><strong id="Iterative Adjustments">Iterative Adjustments</strong>: You might need to tweak the shapes, feathering, or strength of the attenuation in the Roto/Grade step to strike a balance between removing the artifacts and preserving image detail.
+
+</ul>
+<div id="FFT - Fast Fourier Transform-Summary of the Node Tree"><h2 id="Summary of the Node Tree" class="header"><a href="#FFT - Fast Fourier Transform-Summary of the Node Tree">Summary of the Node Tree</a></h2></div>
+
+<p>
+A simplified node structure might look like this:
+</p>
+<ul>
+<li>
+Read Node →
+
+<li>
+FFT Node →
+
+<li>
+Roto / Mask Node (Notch filter mask) →
+
+<li>
+Grade/Multiply Node (Apply attenuation) →
+
+<li>
+iFFT Node →
+
+<li>
+(Optional downstream clean-up nodes) →
+
+<li>
+Viewer / Write Node
+
+</ul>
+<div id="FFT - Fast Fourier Transform-Final Thoughts"><h2 id="Final Thoughts" class="header"><a href="#FFT - Fast Fourier Transform-Final Thoughts">Final Thoughts</a></h2></div>
+
+<ul>
+<li>
+<span id="FFT - Fast Fourier Transform-Final Thoughts-Advantages"></span><strong id="Advantages">Advantages</strong>: By working in the frequency domain, you can target periodic noise very precisely. The FFT gives you a “map” of the frequencies in your image so that you can design an accurate filter.
+
+<li>
+<span id="FFT - Fast Fourier Transform-Final Thoughts-Considerations"></span><strong id="Considerations">Considerations</strong>: The technique works best for clearly defined, periodic artifacts. If the noise is more random or covers a broader frequency band, other methods (like adaptive filtering or spatial de-noising) might be more effective.
+
+<li>
+<span id="FFT - Fast Fourier Transform-Final Thoughts-Practice"></span><strong id="Practice">Practice</strong>: Because each image is different, the exact placement and shape of your notch filters might need some experimentation. Using the expression nodes or gizmos to dynamically adjust the filter parameters might also be a further refinement.
+
+</ul>
+<p>
+This workflow provides a robust starting point to eliminate pattern artifacts using Nuke’s FFT capabilities.
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>

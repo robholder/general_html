@@ -123,6 +123,87 @@ isnan(b) ? (b[-1,0] + b[1,0] + b[0,-1] + b[0,1] + b[-1,-1] + b[1,-1] + b[-1,1] +
 This technique lets you “heal” isolated NaN pixels by blending information from their local area, which is often sufficient for many compositing tasks in Nuke. Enjoy experimenting with your expressions!
 </p>
 
+<div id="Edge Pixels"><h1 id="Edge Pixels" class="header"><a href="#Edge Pixels">Edge Pixels</a></h1></div>
+
+<p>
+There are a few strategies you can use to safeguard against edge cases (literally!) when sampling neighborhood pixels. The idea is to avoid trying to sample pixels beyond the image's borders. Here are some common techniques:
+</p>
+
+<div id="Edge Pixels-Pre-Extend or Clamp the Image Data"><h2 id="Pre-Extend or Clamp the Image Data" class="header"><a href="#Edge Pixels-Pre-Extend or Clamp the Image Data">Pre-Extend or Clamp the Image Data</a></h2></div>
+
+<p>
+The easiest and most robust approach is often to modify your node tree upstream so that the image data is effectively “padded” at the edges. For example:
+</p>
+<ul>
+<li>
+<span id="Edge Pixels-Pre-Extend or Clamp the Image Data-EdgeExtend or Border Node"></span><strong id="EdgeExtend or Border Node">EdgeExtend or Border Node</strong>: Use an upstream node (like a Border or Copy node set to extend the edges) that replicates or clamps the edge pixels. This way, every lookup—even for pixels outside the original image boundaries—returns a valid value.
+
+<li>
+<span id="Edge Pixels-Pre-Extend or Clamp the Image Data-Clamp the Coordinates"></span><strong id="Clamp the Coordinates">Clamp the Coordinates</strong>: In some cases, you may be able to clamp your sample coordinates using an expression. Although Nuke’s expression node might not provide a dedicated <code>clamp()</code> function, you can sometimes simulate it using conditional operators. For example, for the left neighbor you might write:
+<pre nuke>
+x &gt; 0 ? r[-1,0] : r[0,0]
+</pre>
+
+</ul>
+<p>
+This checks if <code>x &gt; 0</code>; if not, it falls back to the current pixel’s value. You’d need a similar condition for each neighbor so that out-of-bound positions default to the nearest in-bound pixel.
+</p>
+
+<div id="Edge Pixels-Conditional Sampling Within the Expression"><h2 id="Conditional Sampling Within the Expression" class="header"><a href="#Edge Pixels-Conditional Sampling Within the Expression">Conditional Sampling Within the Expression</a></h2></div>
+
+<p>
+If you want to handle the edge case entirely inside the Expression node, you can manually check the current pixel’s position. For example, assuming you have access to the current coordinates and the image dimensions (via variables like <code>x</code>, <code>y</code>, <code>width</code>, and <code>height</code>):
+</p>
+
+<pre nuke>
+(
+  x &gt; 0 ? r[-1,0] : r[0,0]
+  + x &lt; width-1 ? r[1,0] : r[0,0]
+  + y &gt; 0 ? r[0,-1] : r[0,0]
+  + y &lt; height-1 ? r[0,1] : r[0,0]
+  + x &gt; 0 &amp;&amp; y &gt; 0 ? r[-1,-1] : r[0,0]
+  + x &lt; width-1 &amp;&amp; y &gt; 0 ? r[1,-1] : r[0,0]
+  + x &gt; 0 &amp;&amp; y &lt; height-1 ? r[-1,1] : r[0,0]
+  + x &lt; width-1 &amp;&amp; y &lt; height-1 ? r[1,1] : r[0,0]
+) / 8
+</pre>
+
+<p>
+This example uses conditional (ternary) expressions so that if an offset would be outside the image dimensions, it substitutes the current pixel’s value (or any other fallback value). This approach can get messy quickly, however, especially if you need to do it for every color channel.
+</p>
+
+<p>
+In Nuke, you’d typically insert an expression like this into an Expression node’s field for the channel you want to process (for example, the red channel). However, if your expression is very long, it might not be very practical to type or edit it directly in the single‑line text input.
+</p>
+
+<p>
+Some versions of Nuke allow you to open a larger editor by right-clicking on an Expression field and choosing an “Edit…” option. This lets you work with the expression over multiple lines, making it easier to read and debug.
+</p>
+
+<p>
+The cleanest solution for edge handling is sometimes not to include all the conditional logic in your expression at all. Instead, you might use an upstream node (like an Edge Extend, Border, or Reformat node configured to clamp values) to pad out the image so that every pixel lookup remains valid.
+</p>
+
+<div id="Edge Pixels-Using an Upstream Node to Control Border Behavior"><h2 id="Using an Upstream Node to Control Border Behavior" class="header"><a href="#Edge Pixels-Using an Upstream Node to Control Border Behavior">Using an Upstream Node to Control Border Behavior</a></h2></div>
+
+<p>
+Often the cleanest solution is to let Nuke handle the border. For instance, you can add a Reformat node with a setting for edge extension, or use a FrameHold node set to “Extend” mode. This way, your expression doesn’t have to worry about boundaries because Nuke ensures that any lookup beyond the edge returns the clamped border pixel.
+</p>
+
+<div id="Edge Pixels-Final Thoughts"><h2 id="Final Thoughts" class="header"><a href="#Edge Pixels-Final Thoughts">Final Thoughts</a></h2></div>
+
+<ul>
+<li>
+<span id="Edge Pixels-Final Thoughts-Preprocessing the Image"></span><strong id="Preprocessing the Image">Preprocessing the Image</strong>: For many compositing workflows, setting an upstream node (like Border/Extend) to pre-handle edge pixels is both easier and less error-prone.
+
+<li>
+<span id="Edge Pixels-Final Thoughts-Manual Safeguards"></span><strong id="Manual Safeguards">Manual Safeguards</strong>: Only if you need the logic within the Expression node itself should you consider adding conditional checks. While it offers precise control, it increases complexity.
+
+</ul>
+<p>
+By adopting one of these strategies, you can ensure your averages are computed correctly even for pixels near the edge of the image.
+</p>
+
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
