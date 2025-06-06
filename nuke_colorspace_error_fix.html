@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_colorspace_error_fix</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)"><h1 id="Correcting Incorrect Read Node Colorspace (post-comp work)" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)">Correcting Incorrect Read Node Colorspace (post-comp work)</a></h1></div>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix"><h2 id="Fix" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix">Fix</a></h2></div>
+
+<pre plaintext>
+  input        ┌────────┐
+               │  READ  │
+  Cineon       │        │                 Oops!
+  Image Files  │  sRGB  │◄────── Should have been set to Cineon
+               └────┬───┘
+                    │
+                    │
+            ┌───────┴──────┐
+            │ comp network │◄─────── Whole lot of colorwork
+            └───────┬──────┘           in wrong colorspace
+                    │
+                    │
+       ┌────────────┴──────────┐
+       │      COLORSPACE       │
+       │                       │
+       │  in  Linear           │
+       │                       │
+       │ out  sRGB             │
+       └────────────┬──────────┘
+                    │
+       ┌────────────┴──────────┐
+       │      COLORSPACE       │
+       │                       │
+       │  in  Cineon           │
+       │                       │
+       │ out  Linear           │
+       └────────────┬──────────┘
+                    │
+             ┌──────┴────┐
+             │   WRITE   │
+             │           │◄─── All good!!
+             │  Cineon   │
+             └───────────┘
+
+             Cineon output
+</pre>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is the common problem addressed in this network?"><h3 id="What is the common problem addressed in this network?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is the common problem addressed in this network?">What is the common problem addressed in this network?</a></h3></div>
+
+<p>
+The network addresses the common problem of misinterpreting the color space of a plate (source footage) in a compositing software - Nuke. With the variety of cameras and formats available, it's easy to accidentally set the wrong color space for a read node, which can lead to significant color mismatches, especially after extensive color correction has been applied to other elements to match the incorrectly interpreted plate.
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-Why is this color space issue particularly problematic?"><h3 id="Why is this color space issue particularly problematic?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-Why is this color space issue particularly problematic?">Why is this color space issue particularly problematic?</a></h3></div>
+
+<p>
+This issue is problematic because artists often spend a considerable amount of time and effort performing detailed color correction on CG elements or other layers to seamlessly integrate them with the plate. If it's discovered later that the plate's color space was misinterpreted, simply changing the read node to the correct color space will likely break all the existing color grading, requiring the artist to redo a potentially large amount of work.
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is the &quot;obvious&quot; but often failed interview question related to this problem?"><h3 id="What is the &quot;obvious&quot; but often failed interview question related to this problem?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is the &quot;obvious&quot; but often failed interview question related to this problem?">What is the "obvious" but often failed interview question related to this problem?</a></h3></div>
+
+<p>
+The common interview question for compositing artists is how to fix this specific color space problem without redoing all the color correction. Many artists might suggest re-grading the CG elements, but the technique demonstrated in the video provides a much more efficient solution.
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is one simple way to fix the color space issue without redoing color correction?"><h3 id="What is one simple way to fix the color space issue without redoing color correction?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is one simple way to fix the color space issue without redoing color correction?">What is one simple way to fix the color space issue without redoing color correction?</a></h3></div>
+
+<p>
+One simple solution is to set the output color space in the write node to the same incorrect color space that was used in the misinterpretated read node. By rendering in the wrong color space that the grading was based on, and then interpreting the rendered output in the correct color space externally, the original color relationships and the integration work will be preserved.
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is another, arguably more organized, method to fix the color space issue before the write node?"><h3 id="What is another, arguably more organized, method to fix the color space issue before the write node?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is another, arguably more organized, method to fix the color space issue before the write node?">What is another, arguably more organized, method to fix the color space issue before the write node?</a></h3></div>
+
+<p>
+A more organized method involves adding two color space nodes just before the write node. The first color space node should convert the current (<code>linear</code>) color space back to the incorrect color space that was used in the read node (e.g., <code>sRGB</code>). The second color space node then interprets this signal as if it were in the correct color space (e.g., <code>Cineon</code>) and converts it to linear. This effectively corrects the interpretation within the Nuke script before writing out the final image in the correct color space.
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is another, arguably more organized, method to fix the color space issue before the write node?-How does this method involving two color space nodes work?"><h4 id="How does this method involving two color space nodes work?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is another, arguably more organized, method to fix the color space issue before the write node?-How does this method involving two color space nodes work?">How does this method involving two color space nodes work?</a></h4></div>
+
+<p>
+This method works by essentially reversing the initial incorrect color space interpretation and then applying the correct interpretation. The first node returns the color values to what they would have been in the incorrectly interpreted color space, and the second node then treats those values as if they originated from the correct color space, transforming them into the linear working space of Nuke in the intended way.
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-Why is it important to match the black and white levels during initial color correction, even if the color space is wrong?"><h3 id="Why is it important to match the black and white levels during initial color correction, even if the color space is wrong?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-Why is it important to match the black and white levels during initial color correction, even if the color space is wrong?">Why is it important to match the black and white levels during initial color correction, even if the color space is wrong?</a></h3></div>
+
+<p>
+If the black and white levels were correctly matched during the initial color grading (even when the plate was in the wrong color space), the integration should still hold when the color space is corrected using these methods. Matching these fundamental levels helps maintain the relative relationships between the elements, making the color space adjustment more successful.
+</p>
+
+<div id="Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is the benefit of using these methods instead of redoing the color correction?"><h3 id="What is the benefit of using these methods instead of redoing the color correction?" class="header"><a href="#Correcting Incorrect Read Node Colorspace (post-comp work)-Fix-What is the benefit of using these methods instead of redoing the color correction?">What is the benefit of using these methods instead of redoing the color correction?</a></h3></div>
+
+<p>
+The primary benefit of using these methods is saving a significant amount of time and effort. Instead of spending days or weeks re-grading all the elements to match the correctly interpreted plate, these techniques allow artists to quickly adjust the color space interpretation at the end of the comp, preserving all the previous color correction work.
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
