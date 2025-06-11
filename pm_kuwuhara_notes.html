@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pm_kuwuhara_notes</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+<div id="Kuwuhara Filter"><h1 id="Kuwuhara Filter" class="header"><a href="#Kuwuhara Filter">Kuwuhara Filter</a></h1></div>
+
+<p>
+Below is an overview of the Kuwahara filter—what it does, how it works, and what you might consider when building a similar tool in Nuke.
+</p>
+
+<div id="Kuwuhara Filter-Purpose and Characteristics"><h2 id="Purpose and Characteristics" class="header"><a href="#Kuwuhara Filter-Purpose and Characteristics">Purpose and Characteristics</a></h2></div>
+
+<ul>
+<li>
+<span id="Kuwuhara Filter-Purpose and Characteristics-Edge-Preserving Smoothing"></span><strong id="Edge-Preserving Smoothing">Edge-Preserving Smoothing</strong>: Unlike linear filters (e.g., Gaussian blur) that smooth throughout an image—including across edges—the Kuwahara filter smooths flat regions while preserving edges. This makes it ideal for reducing noise without blurring significant transitions.
+
+<li>
+<span id="Kuwuhara Filter-Purpose and Characteristics-Non-Linear Approach"></span><strong id="Non-Linear Approach">Non-Linear Approach</strong>: The filter is non-linear; it computes statistical properties (mean and variance) across subregions of a local window to decide how and where to average pixel values.
+
+<li>
+How the Filter Works
+
+</ul>
+<div id="Kuwuhara Filter-The Local Window and its Subdivision"><h2 id="The Local Window and its Subdivision" class="header"><a href="#Kuwuhara Filter-The Local Window and its Subdivision">The Local Window and its Subdivision</a></h2></div>
+
+<ul>
+<li>
+<span id="Kuwuhara Filter-The Local Window and its Subdivision-Square Window"></span><strong id="Square Window">Square Window</strong>: For each pixel in an image, the filter defines a square window (commonly with an odd number of pixels per side, such as 5×5, 7×7, 9×9, etc.) centered on that pixel.
+
+<li>
+<span id="Kuwuhara Filter-The Local Window and its Subdivision-Division into Overlapping Subregions"></span><strong id="Division into Overlapping Subregions">Division into Overlapping Subregions</strong>: The square window is subdivided into four overlapping subregions (typically:
+
+<ul>
+<li>
+Top‐left,
+
+<li>
+Top‐right,
+
+<li>
+Bottom‐left,
+
+<li>
+Bottom‐right).
+
+</ul>
+</ul>
+<p>
+Note that because the subregions overlap (the center pixel is part of all four), they share some common pixels but otherwise represent slightly different parts of the window.
+</p>
+
+<div id="Kuwuhara Filter-Statistical Analysis on Each Subregion"><h2 id="Statistical Analysis on Each Subregion" class="header"><a href="#Kuwuhara Filter-Statistical Analysis on Each Subregion">Statistical Analysis on Each Subregion</a></h2></div>
+
+<ul>
+<li>
+<span id="Kuwuhara Filter-Statistical Analysis on Each Subregion-Compute Mean and Variance"></span><strong id="Compute Mean and Variance">Compute Mean and Variance</strong>: For each of the four subregions, the filter calculates:
+
+<ul>
+<li>
+The arithmetic mean (average brightness or color value).
+
+<li>
+The variance or standard deviation (a measure of how homogeneous or textured the region is).
+
+</ul>
+<li>
+<span id="Kuwuhara Filter-Statistical Analysis on Each Subregion-Choosing the Most Homogeneous Area"></span><strong id="Choosing the Most Homogeneous Area">Choosing the Most Homogeneous Area</strong>: The idea is that in a flat, uniform area (or on one side of an edge), the variance will be lower. The filter compares the computed variances and selects the subregion with the lowest variance.
+
+</ul>
+<div id="Kuwuhara Filter-Determining the Output Pixel Value"><h2 id="Determining the Output Pixel Value" class="header"><a href="#Kuwuhara Filter-Determining the Output Pixel Value">Determining the Output Pixel Value</a></h2></div>
+
+<ul>
+<li>
+<span id="Kuwuhara Filter-Determining the Output Pixel Value-Assign the Mean"></span><strong id="Assign the Mean">Assign the Mean</strong>: The output value for the central pixel is set to the mean value of the subregion with the smallest variance. This ensures that if a window straddles an edge, the filter will favor the side that is more uniform (thus preserving the edge sharpness).
+
+<li>
+<span id="Kuwuhara Filter-Determining the Output Pixel Value-Adaptive Smoothing"></span><strong id="Adaptive Smoothing">Adaptive Smoothing</strong>: Because the operation is local and based on variability, the filter adapts its behavior over the image—smoothing uniformly flat regions strongly, while leaving edges and details relatively untouched.
+
+</ul>
+<div id="Kuwuhara Filter-Advantages and Limitations"><h2 id="Advantages and Limitations" class="header"><a href="#Kuwuhara Filter-Advantages and Limitations">Advantages and Limitations</a></h2></div>
+
+<div id="Kuwuhara Filter-Advantages and Limitations-Advantages"><h3 id="Advantages" class="header"><a href="#Kuwuhara Filter-Advantages and Limitations-Advantages">Advantages</a></h3></div>
+
+<ul>
+<li>
+<span id="Kuwuhara Filter-Advantages and Limitations-Advantages-Edge Preservation"></span><strong id="Edge Preservation">Edge Preservation</strong>: By choosing the most homogeneous subregion, the filter substantially reduces blurring across edges.
+
+<li>
+<span id="Kuwuhara Filter-Advantages and Limitations-Advantages-Noise Reduction"></span><strong id="Noise Reduction">Noise Reduction</strong>: It effectively reduces random noise within flat areas by averaging pixels with similar values.
+
+</ul>
+<div id="Kuwuhara Filter-Advantages and Limitations-Limitations"><h3 id="Limitations" class="header"><a href="#Kuwuhara Filter-Advantages and Limitations-Limitations">Limitations</a></h3></div>
+
+<ul>
+<li>
+<span id="Kuwuhara Filter-Advantages and Limitations-Limitations-Blockiness"></span><strong id="Blockiness">Blockiness</strong>: At larger kernel sizes, the division into four hard-edged subregions can create a blocky or painterly effect that may or may not be desirable.
+
+<li>
+<span id="Kuwuhara Filter-Advantages and Limitations-Limitations-Computation Cost"></span><strong id="Computation Cost">Computation Cost</strong>: The calculation of multiple statistics per pixel (for every subregion) can be computationally intensive, especially on high-resolution images.
+
+<li>
+<span id="Kuwuhara Filter-Advantages and Limitations-Limitations-Parameter Sensitivity"></span><strong id="Parameter Sensitivity">Parameter Sensitivity</strong>: The size of the window and any optional parameters (if you implement an anisotropic version) must be tuned to balance smoothing and detail preservation.
+
+</ul>
+<div id="Kuwuhara Filter-Considerations for a Nuke Tool"><h2 id="Considerations for a Nuke Tool" class="header"><a href="#Kuwuhara Filter-Considerations for a Nuke Tool">Considerations for a Nuke Tool</a></h2></div>
+
+<p>
+If you’re planning to build a custom Nuke node that mimics the Kuwahara filter, keep these points in mind:
+</p>
+<ul>
+<li>
+<span id="Kuwuhara Filter-Considerations for a Nuke Tool-Input Parameters"></span><strong id="Input Parameters">Input Parameters</strong>: Allow the user to adjust the window size. You might also consider parameters for anisotropy, sharpness, or iterations if you wish to replicate variants of the basic filter.
+
+<li>
+<span id="Kuwuhara Filter-Considerations for a Nuke Tool-Channel Handling"></span><strong id="Channel Handling">Channel Handling</strong>: Decide if you’ll process each color channel independently or use a combined luminance calculation. The approach can influence the color fidelity of the output.
+
+<li>
+<span id="Kuwuhara Filter-Considerations for a Nuke Tool-Edge Handling"></span><strong id="Edge Handling">Edge Handling</strong>: Make sure your node handles boundaries properly—near the image borders, the window might extend beyond the available pixels, so consider strategies such as mirror padding.
+
+<li>
+<span id="Kuwuhara Filter-Considerations for a Nuke Tool-Performance Optimization"></span><strong id="Performance Optimization">Performance Optimization</strong>: Since the Kuwahara filter involves several per-pixel computations, look into GPU acceleration or optimizations (like processing on a downscaled image and then upscaling the result) to improve performance.
+
+<li>
+<span id="Kuwuhara Filter-Considerations for a Nuke Tool-User Documentation"></span><strong id="User Documentation">User Documentation</strong>: An effective tool should include clear documentation that explains the behavior of parameters and the overall effect, so users know how to balance noise reduction versus edge preservation.
+
+</ul>
+<div id="Kuwuhara Filter-Considerations for a Nuke Tool-Summary"><h3 id="Summary" class="header"><a href="#Kuwuhara Filter-Considerations for a Nuke Tool-Summary">Summary</a></h3></div>
+
+<p>
+The Kuwahara filter works by:
+</p>
+<ul>
+<li>
+Dividing a local window into overlapping subregions.
+
+<li>
+Calculating the mean and standard deviation of each subregion.
+
+<li>
+Setting the output pixel to the subregion’s mean that has the smallest standard deviation, preserving edges and reducing noise adaptively.
+
+<li>
+This methodology lets you create a specialized smoothing tool that maintains important image features while reducing unwanted noise. In Nuke, building such a tool would involve careful replication of these statistical calculations and appropriate parameterization for user control.
+
+</ul>
+<p>
+For further technical details and visual examples, you might review sources like the Wikipedia page on Kuwahara filters or documentation related to similar nodes in other systems (Blender Kuwahara Node Documentation).
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+</body>
+</html>
