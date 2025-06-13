@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_group_node_access</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Nuke - Python - Group Node Access"><h1 id="Nuke - Python - Group Node Access" class="header"><a href="#Nuke - Python - Group Node Access">Nuke - Python - Group Node Access</a></h1></div>
+
+<p>
+Below is a detailed guide on how to use Python scripting in Nuke to access the nodes that reside inside a Group node. One common approach is to "enter" the group node’s internal node graph with the functions <code>nuke.begin()</code> and <code>nuke.end()</code>. In addition, there are alternative ways (such as querying the group’s internal structure if you stored references) but the begin/end pattern is the standard method.
+</p>
+
+<div id="Nuke - Python - Group Node Access-The Begin/End Pattern"><h2 id="The Begin/End Pattern" class="header"><a href="#Nuke - Python - Group Node Access-The Begin/End Pattern">The Begin/End Pattern</a></h2></div>
+
+<p>
+Every Group node in Nuke contains its own node graph. To manipulate or query this internal graph, you must set the context to that inside of the group. Here’s the procedure:
+</p>
+<ul>
+<li>
+Identify or get the Group node. Use <code>nuke.toNode("GroupNodeName")</code> to retrieve your group node object.
+
+<li>
+Enter the group context. Calling <code>nuke.begin(groupNode)</code> will change the context so that any call like <code>nuke.allNodes()</code> or <code>nuke.selectedNode()</code> will now return nodes from within the group.
+
+<li>
+Do your operations. Once inside, you can list, modify, or even add new nodes to this inner node graph.
+
+<li>
+Exit the group context. After you’re done, make sure to call <code>nuke.end()</code> so that the context returns to the top-level node graph.
+
+</ul>
+<div id="Nuke - Python - Group Node Access-The Begin/End Pattern-Example Code"><h4 id="Example Code" class="header"><a href="#Nuke - Python - Group Node Access-The Begin/End Pattern-Example Code">Example Code</a></h4></div>
+
+<pre python>
+import nuke
+
+# Retrieve your Group node (replace "MyGroup" with the actual node name)
+group_node = nuke.toNode("MyGroup")
+
+if group_node.Class() == "Group":
+    # Enter the group context
+    nuke.begin(group_node)
+    
+    # For example, list all nodes inside the group
+    inner_nodes = nuke.allNodes()
+    for node in inner_nodes:
+        nuke.tprint("Found inner node: %s" % node.name())
+    
+    # Or you can select one node by name, change knobs, etc.
+    my_inner_node = nuke.toNode("InnerNode1")
+    if my_inner_node:
+        # Set a knob value
+        my_inner_node.knob("label").setValue("Modified Inside Group")
+    
+    # Exit the group context
+    nuke.end()
+else:
+    nuke.tprint("The selected node is not a Group node.")
+</pre>
+
+<div id="Nuke - Python - Group Node Access-The Begin/End Pattern-Explanation"><h3 id="Explanation" class="header"><a href="#Nuke - Python - Group Node Access-The Begin/End Pattern-Explanation">Explanation</a></h3></div>
+
+<ul>
+<li>
+<code>nuke.toNode("MyGroup")</code>: Returns the node object with the specified name. Ensure that the node really is a Group.
+
+<li>
+<code>nuke.begin(group_node)</code>: Sets the current context to the internal node graph of <code>group_node</code>. After this call, any search (e.g., <code>nuke.allNodes()</code>) will target nodes inside the group.
+
+<li>
+<code>nuke.allNodes()</code>: Retrieves a list of all nodes in the current context (i.e. inside the group).
+
+<li>
+<code>nuke.end()</code>: Returns the context back to the parent graph (top-level node graph).
+
+</ul>
+<div id="Nuke - Python - Group Node Access-Alternative Approaches"><h2 id="Alternative Approaches" class="header"><a href="#Nuke - Python - Group Node Access-Alternative Approaches">Alternative Approaches</a></h2></div>
+
+<p>
+While the begin/end pattern is the most common, you might sometimes see other methods depending on your workflow:
+</p>
+<ul>
+<li>
+Storing a Reference to the Group’s Node Graph:
+
+<ul>
+<li>
+Some advanced pipelines might expose a group’s internal node graph as a separate container object. However, Nuke’s API generally expects you to use the begin/end pattern.
+
+</ul>
+<li>
+Using Callbacks and nuke.thisGroup():
+
+<ul>
+<li>
+When working inside a Group node (for example, in a Python script run by that group), you can use <code>nuke.thisGroup()</code> to get the reference to the group you’re inside of.
+
+</ul>
+<li>
+Directly Iterating Over a Group’s Children:
+
+<ul>
+<li>
+There isn’t a direct method like <code>group_node.children()</code>, but by setting the context with <code>nuke.begin(group_node)</code>, you effectively retrieve the “children” with functions like <code>nuke.allNodes()</code>.
+
+</ul>
+</ul>
+<div id="Nuke - Python - Group Node Access-Scripting Considerations"><h2 id="Scripting Considerations" class="header"><a href="#Nuke - Python - Group Node Access-Scripting Considerations">Scripting Considerations</a></h2></div>
+
+<ul>
+<li>
+<span id="Nuke - Python - Group Node Access-Scripting Considerations-Always End Your Group Context"></span><strong id="Always End Your Group Context">Always End Your Group Context</strong>: Forgetting to call <code>nuke.end()</code> can leave your script in a changed context, which may cause subsequent node search or creation functions to return or act on the wrong part of the node graph.
+
+<li>
+<span id="Nuke - Python - Group Node Access-Scripting Considerations-Error Checking"></span><strong id="Error Checking">Error Checking</strong>: It’s a good idea to check that the node is indeed a Group before calling <code>nuke.begin()</code>. Use <code>group_node.Class()</code> to ensure that it returns <code>"Group"</code> (or <code>"BackdropNode"</code> in special cases if you're handling those).
+
+<li>
+<span id="Nuke - Python - Group Node Access-Scripting Considerations-Printing and Debugging"></span><strong id="Printing and Debugging">Printing and Debugging</strong>: Use <code>nuke.tprint()</code> (or simply Python’s <code>print()</code>) to output messages to Nuke’s Script Editor. This helps with debugging your node traversal logic.
+
+<li>
+<span id="Nuke - Python - Group Node Access-Scripting Considerations-Iterative Modifications"></span><strong id="Iterative Modifications">Iterative Modifications</strong>: Inside the Group context, you can loop over nodes, access or modify knobs, and even add new nodes. This makes it possible to script complex adjustments or create custom tools that work inside your Group nodes.
+
+</ul>
+<div id="Nuke - Python - Group Node Access-Putting It All Together"><h2 id="Putting It All Together" class="header"><a href="#Nuke - Python - Group Node Access-Putting It All Together">Putting It All Together</a></h2></div>
+
+<p>
+Using the begin/end pattern is the standard way to work with nodes inside groups in Nuke. A typical workflow in Python might involve:
+</p>
+<ul>
+<li>
+Getting a Group node reference.
+
+<li>
+Entering the group with <code>nuke.begin()</code>.
+
+<li>
+Querying and modifying inner nodes with methods like <code>nuke.allNodes()</code> and <code>nuke.toNode()</code>.
+
+<li>
+Exiting back to the parent context with <code>nuke.end()</code>.
+
+</ul>
+<p>
+This method ensures that your operations target the intended node graph without confusion.
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="Index.html">Index</a>
+</p>
+
+</body>
+</html>
