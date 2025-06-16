@@ -19,21 +19,208 @@
 
 <div id="Nuke - Python - knobChanged"><h1 id="Nuke - Python - knobChanged" class="header"><a href="#Nuke - Python - knobChanged">Nuke - Python - knobChanged</a></h1></div>
 
+<div id="Nuke - Python - knobChanged-Anthony Tan's YouTube Intro"><h2 id="Anthony Tan's YouTube Intro" class="header"><a href="#Nuke - Python - knobChanged-Anthony Tan's YouTube Intro">Anthony Tan's YouTube Intro</a></h2></div>
 
-<div id="Nuke - Python - knobChanged-knobChanged"><h2 id="knobChanged" class="header"><a href="#Nuke - Python - knobChanged-knobChanged">knobChanged</a></h2></div>
+<p>
+Each node in Nuke has a property called <code>knobChanged</code>. It's not accessible through the panels, it's essentially invisible - but it there.
+</p>
+
+<p>
+When you evoke a knobChanged bit of code, it can apply to all of Nuke, or you can register code to individual or specific nodes.
+</p>
+
+<pre python>
+import nuke
+
+the_grade = nuke.selectedNode()
+the_grade.knob('knobChanged').setValue("print('hello')")
+</pre>
+
+<p>
+Adding a more substantial code block to the knobChange:
+</p>
+<pre python>
+import nuke
+
+the_grade = nuke.selectedNode()
+
+my_code = """
+import datetime
+print("hello: {}".format(datetime.datetime.now()))
+"""
+
+the_grade.knob('knobChanged').setValue(my_code)
+</pre>
+
+<div id="Nuke - Python - knobChanged-What Counts as a Knob Change?"><h2 id="What Counts as a Knob Change?" class="header"><a href="#Nuke - Python - knobChanged-What Counts as a Knob Change?">What Counts as a Knob Change?</a></h2></div>
+
+<p>
+Everything!!
+</p>
+
+<ul>
+<li>
+Checking a box is a knobChange:
+
+<ul>
+<li>
+True/False
+
+</ul>
+<li>
+Selected/Deselecting a node is a knobChange:
+
+<ul>
+<li>
+selected = True/False
+
+</ul>
+<li>
+Collapsing a node panel is a knobChange.
+
+</ul>
+<div id="Nuke - Python - knobChanged-What Counts as a Knob Change?-Caution"><h3 id="Caution" class="header"><a href="#Nuke - Python - knobChanged-What Counts as a Knob Change?-Caution">Caution</a></h3></div>
+
+<p>
+A slider will trigger an enormous amount of knobChange events - one for every update of the interface.
+</p>
+
+<div id="Nuke - Python - knobChanged-Another Example"><h2 id="Another Example" class="header"><a href="#Nuke - Python - knobChanged-Another Example">Another Example</a></h2></div>
+
+<pre python>
+import nuke
+
+# Select a target 'Grade' node:
+the_grade = nuke.selectedNode()
+
+my_code = """
+this_node = nuke.thisNode() # hey, what node am I running on?
+this_knob = nuke.thisKnob() # hey, what knob am I running on?
+
+if this_knob.name() == "multiply":
+    if this_node.knob('multiply').value() &gt; 1.2:
+        this_node.knob('label').setValue("TOO HOT")
+    else:
+        this_node.knob('label').setValue("")
+"""
+the_grade.knob('knobChanged').setValue(my_code)
+</pre>
+
+<div id="Nuke - Python - knobChanged-More Complex"><h2 id="More Complex" class="header"><a href="#Nuke - Python - knobChanged-More Complex">More Complex</a></h2></div>
+
+<pre python>
+import nuke
+
+# Select a target 'Grade' node:
+the_grade = nuke.selectedNode()
+
+my_code = """
+this_node = nuke.thisNode() # hey, what node am I running on?
+this_knob = nuke.thisKnob() # hey, what knob am I running on?
+
+if this_knob.name() in ("multiply", "white"):
+    if this_node.knob('multiply').value() &gt; 1.2:
+        this_node.knob('label').setValue("TOO HOT")
+    else:
+        this_node.knob('label').setValue("")
+"""
+the_grade.knob('knobChanged').setValue(my_code)
+</pre>
+
+<div id="Nuke - Python - knobChanged-Using Functions"><h2 id="Using Functions" class="header"><a href="#Nuke - Python - knobChanged-Using Functions">Using Functions</a></h2></div>
+
+
+<pre python>
+# Select a target 'Grade' node:
+the_grade = nuke.selectedNode()
+
+my_code = """
+do_some_warnings()
+"""
+
+def do_some_warnings():
+    this_node = nuke.thisNode()
+    this_knob = nuke.thisKnob()
+    
+    if this_knob.name() in ("multiply", "white"):
+        if this_knob.value() &gt; 1.2:
+            this_node.knob('label').setValue("TOOO HOT")
+        else:
+            this_node.knob('label').setValue("")
+the_grade.knob('knobChanged').setValue(my_code)
+</pre>
+
+<p>
+A warning about this technique. If you sent the resulting custom node (with the knobChanged code assigned), it wouldn't work unless the target user also had the function loaded.
+</p>
+
+<p>
+Adding this as a nested code like previous examples would mean it would work, even if sent to a different environment or machine.
+</p>
+
+<div id="Nuke - Python - knobChanged-Directing Register on A Specific Node"><h2 id="Directing Register on A Specific Node" class="header"><a href="#Nuke - Python - knobChanged-Directing Register on A Specific Node">Directing Register on A Specific Node</a></h2></div>
+
+<p>
+Instead of <code>nuke.selectedNode()</code>, you could target a known node with <code>nuke.toNode("Grade18")</code>.
+</p>
+
+<pre python>
+# Instead of:
+the_grade.knob('knobChanged').setValue(my_code)
+
+# Target a known node:
+nuke.toNode("Grade18").knob("knobChanged").setValue(my_code)
+</pre>
+
+<p>
+So in context:
+</p>
+<pre python>
+# Select a target 'Grade' node:
+
+my_code = """
+do_some_warnings()
+"""
+
+def do_some_warnings():
+    this_node = nuke.thisNode()
+    this_knob = nuke.thisKnob()
+    
+    if this_knob.name() in ("multiply", "white"):
+        if this_knob.value() &gt; 1.2:
+            this_node.knob('label').setValue("TOOO HOT")
+        else:
+            this_node.knob('label').setValue("")
+
+# Target a known node:
+nuke.toNode("Grade18").knob("knobChanged").setValue(my_code)
+</pre>
+
+
+<hr />
+
+<table>
+<tr>
+<td>
+COPILOT DRIVEL.
+</td>
+</tr>
+</table>
+
+<div id="knobChanged"><h1 id="knobChanged" class="header"><a href="#knobChanged">knobChanged</a></h1></div>
 
 <p>
 The <code>nuke.knobChanged()</code> mechanism is a way in Nuke to set up callbacks that run whenever one or more knobs on a node change their values. In many cases, a node is created with a hidden knob called <code>"knobChanged"</code> — this knob can hold a string of Python code, and that code is executed after the user manipulates any of the node’s knobs (unless that knob is flagged to bypass these callbacks) .
 </p>
 
-<div id="Nuke - Python - knobChanged-What It Does"><h2 id="What It Does" class="header"><a href="#Nuke - Python - knobChanged-What It Does">What It Does</a></h2></div>
+<div id="knobChanged-What It Does"><h2 id="What It Does" class="header"><a href="#knobChanged-What It Does">What It Does</a></h2></div>
 
 <ul>
 <li>
-<span id="Nuke - Python - knobChanged-What It Does-Event Callback"></span><strong id="Event Callback">Event Callback</strong>: When a user changes a knob (for example, toggling a checkbox or sliding a numeric value), Nuke calls the function specified in the "knobChanged" knob. This mechanism allows you to automatically respond to changes—such as enabling/disabling other knobs, showing/hiding UI controls, or updating dependent parameters.
+<span id="knobChanged-What It Does-Event Callback"></span><strong id="Event Callback">Event Callback</strong>: When a user changes a knob (for example, toggling a checkbox or sliding a numeric value), Nuke calls the function specified in the "knobChanged" knob. This mechanism allows you to automatically respond to changes—such as enabling/disabling other knobs, showing/hiding UI controls, or updating dependent parameters.
 
 <li>
-<span id="Nuke - Python - knobChanged-What It Does-Accessing the Change"></span><strong id="Accessing the Change">Accessing the Change</strong>: Inside your callback function, you can access the node and the specific knob that changed by using the helper functions:
+<span id="knobChanged-What It Does-Accessing the Change"></span><strong id="Accessing the Change">Accessing the Change</strong>: Inside your callback function, you can access the node and the specific knob that changed by using the helper functions:
 
 <ul>
 <li>
@@ -44,14 +231,14 @@ The <code>nuke.knobChanged()</code> mechanism is a way in Nuke to set up callbac
 
 </ul>
 </ul>
-<div id="Nuke - Python - knobChanged-How to Use It"><h2 id="How to Use It" class="header"><a href="#Nuke - Python - knobChanged-How to Use It">How to Use It</a></h2></div>
+<div id="knobChanged-How to Use It"><h2 id="How to Use It" class="header"><a href="#knobChanged-How to Use It">How to Use It</a></h2></div>
 
 <p>
 There are two common ways to use knobChanged:
 </p>
 <ul>
 <li>
-<span id="Nuke - Python - knobChanged-How to Use It-Directly Assigning Code to the Hidden Knob"></span><strong id="Directly Assigning Code to the Hidden Knob">Directly Assigning Code to the Hidden Knob</strong>: You can assign a one‑line string of code so that each time any knob is changed, that code runs. For example:
+<span id="knobChanged-How to Use It-Directly Assigning Code to the Hidden Knob"></span><strong id="Directly Assigning Code to the Hidden Knob">Directly Assigning Code to the Hidden Knob</strong>: You can assign a one‑line string of code so that each time any knob is changed, that code runs. For example:
 
 </ul>
   
@@ -70,7 +257,7 @@ In this example, whenever any knob is changed, the code checks if the changed kn
 </p>
 <ul>
 <li>
-<span id="Nuke - Python - knobChanged-How to Use It-Defining a Callback Function in an External Module"></span><strong id="Defining a Callback Function in an External Module">Defining a Callback Function in an External Module</strong>: A more flexible approach is to define a Python function—say, in your Nuke startup scripts or a separate module—and then set the "knobChanged" knob to call that function. For example:
+<span id="knobChanged-How to Use It-Defining a Callback Function in an External Module"></span><strong id="Defining a Callback Function in an External Module">Defining a Callback Function in an External Module</strong>: A more flexible approach is to define a Python function—say, in your Nuke startup scripts or a separate module—and then set the "knobChanged" knob to call that function. For example:
 
 </ul>
   
@@ -97,20 +284,20 @@ nuke.selectedNode().knob('knobChanged').setValue("myCallbacks.knob_changed_callb
 This method keeps your code modular and easier to maintain—if you update the callback function, all nodes referencing it will automatically use the new behavior .
 </p>
 
-<div id="Nuke - Python - knobChanged-Best Practices"><h2 id="Best Practices" class="header"><a href="#Nuke - Python - knobChanged-Best Practices">Best Practices</a></h2></div>
+<div id="knobChanged-Best Practices"><h2 id="Best Practices" class="header"><a href="#knobChanged-Best Practices">Best Practices</a></h2></div>
 
 <ul>
 <li>
-<span id="Nuke - Python - knobChanged-Best Practices-Selective Behavior"></span><strong id="Selective Behavior">Selective Behavior</strong>: It’s common to check the name of the knob that caused the change using <code>nuke.thisKnob().name()</code>. This way, your code only does extra work if the knob you care about was adjusted.
+<span id="knobChanged-Best Practices-Selective Behavior"></span><strong id="Selective Behavior">Selective Behavior</strong>: It’s common to check the name of the knob that caused the change using <code>nuke.thisKnob().name()</code>. This way, your code only does extra work if the knob you care about was adjusted.
 
 <li>
-<span id="Nuke - Python - knobChanged-Best Practices-Chaining Calls"></span><strong id="Chaining Calls">Chaining Calls</strong>: For custom operators (Ops) or Gizmos, if you override an existing <code>knobChanged</code> method, it’s good practice to call the parent class’s <code>knobChanged</code> at the end. This ensures that any in‑built functionality remains intact .
+<span id="knobChanged-Best Practices-Chaining Calls"></span><strong id="Chaining Calls">Chaining Calls</strong>: For custom operators (Ops) or Gizmos, if you override an existing <code>knobChanged</code> method, it’s good practice to call the parent class’s <code>knobChanged</code> at the end. This ensures that any in‑built functionality remains intact .
 
 <li>
-<span id="Nuke - Python - knobChanged-Best Practices-One-Liner Code Strings"></span><strong id="One-Liner Code Strings">One-Liner Code Strings</strong>: Because the value passed to a knob must be a string, your callback code is often written on a single line with semicolons separating statements or with newline characters (<code>\n</code>) if you prefer the code to be more readable when editing in your text editor.
+<span id="knobChanged-Best Practices-One-Liner Code Strings"></span><strong id="One-Liner Code Strings">One-Liner Code Strings</strong>: Because the value passed to a knob must be a string, your callback code is often written on a single line with semicolons separating statements or with newline characters (<code>\n</code>) if you prefer the code to be more readable when editing in your text editor.
 
 </ul>
-<div id="Nuke - Python - knobChanged-Best Practices-Summary"><h3 id="Summary" class="header"><a href="#Nuke - Python - knobChanged-Best Practices-Summary">Summary</a></h3></div>
+<div id="knobChanged-Best Practices-Summary"><h3 id="Summary" class="header"><a href="#knobChanged-Best Practices-Summary">Summary</a></h3></div>
 
 <p>
 <code>nuke.knobChanged()</code> is less a function you call and more a callback mechanism. You “install” your custom code to be triggered each time a knob's value changes on a node. This can be done directly by setting the hidden <code>"knobChanged"</code> knob with a code string or by referencing an externally defined Python function. Both techniques enable dynamic UI behavior in Nuke, like conditionally enabling/disabling or hiding/showing other knobs based on user interaction.
