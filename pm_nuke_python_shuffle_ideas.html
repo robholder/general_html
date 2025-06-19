@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pm_nuke_python_shuffle_ideas</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+<div id="Nuke - Python - Shuffle Ideas"><h1 id="Nuke - Python - Shuffle Ideas" class="header"><a href="#Nuke - Python - Shuffle Ideas">Nuke - Python - Shuffle Ideas</a></h1></div>
+
+
+<div id="Nuke - Python - Shuffle Ideas-250618"><h3 id="250618" class="header"><a href="#Nuke - Python - Shuffle Ideas-250618">250618</a></h3></div>
+
+<div id="Nuke - Python - Shuffle Ideas-250618-QUESTION"><h4 id="QUESTION" class="header"><a href="#Nuke - Python - Shuffle Ideas-250618-QUESTION">QUESTION</a></h4></div>
+
+<table>
+<tr>
+<td>
+I'm building a tool using the NoOp node, and adding User Knobs to it. I have a text field for a user to enter a search string. How to I add a Python scdript to a Python button, so that the script queries the user's text input to filter channels? I want to put channels that match the search string (or contain the search string) and populate a pull down button with the matching channel names. I think want to add code, so that a user can choose one of those items in the pulldown to create a shuffle node.
+</td>
+</tr>
+</table>
+
+<div id="Nuke - Python - Shuffle Ideas-250618-SUGGESTION"><h4 id="SUGGESTION" class="header"><a href="#Nuke - Python - Shuffle Ideas-250618-SUGGESTION">SUGGESTION</a></h4></div>
+
+<p>
+Below is one way to accomplish this. The idea is to add a text knob (for search input), a button with a Python callback (to run the search), and a pulldown knob (to list matching channels). You can then use another callback (or include extra code) to create a Shuffle node based on the pulldown selection. Here’s an example that you can add to your NoOp node:
+</p>
+
+<div id="Setup:"><h1 id="Setup:" class="header"><a href="#Setup:">Setup:</a></h1></div>
+
+<ul>
+<li>
+In your NoOp node’s knob panel, add the following user knobs (you can add them by right‑clicking the node and choosing “Manage User Knobs”):
+
+<ul>
+<li>
+A text knob named "search".
+
+<li>
+A button knob named "searchButton" with an appropriate label.
+
+<li>
+A pulldown knob named "channelList".
+
+<ul>
+<li>
+(Optional) A button knob named "createShuffleButton" if you want to immediately create a Shuffle node once a channel is chosen.
+
+</ul>
+</ul>
+</ul>
+<div id="Setup:-Example Code for the Search Button Callback"><h2 id="Example Code for the Search Button Callback" class="header"><a href="#Setup:-Example Code for the Search Button Callback">Example Code for the Search Button Callback</a></h2></div>
+
+<p>
+Edit the Python script in the "searchButton" knob’s callback so that it reads the search string, gets the channels from a target node (for example, the currently selected node or a specifically referenced node), filters them to see which ones contain the search string, and then repopulates the pulldown.
+</p>
+
+<p>
+Below is a sample script for the "searchButton" button callback:
+</p>
+
+<pre python>
+import nuke
+
+def updateChannelList():
+    # 'nuke.thisNode()' returns the NoOp that contains our knobs.
+    noop = nuke.thisNode()
+    
+    # Get the search string entered by the user
+    search_str = noop['search'].value().strip()
+    
+    # Define which node to check for channels.
+    # For example, this could be a Read node selected in the Node Graph.
+    # Adjust this as needed (e.g., by using a knob to select the target node).
+    try:
+        target_node = nuke.selectedNode()
+    except ValueError:
+        nuke.message("Please select a node with channels to search")
+        return
+
+    # Ensure that the node has channels
+    if not hasattr(target_node, 'channels'):
+        nuke.message("The selected node does not have channels!")
+        return
+
+    # Get all channels (like "rgba.red", "rgba.green", etc.)
+    channels = target_node.channels()
+    
+    # Filter channels that contain the search string (case-insensitive)
+    matching = [ch for ch in channels if search_str.lower() in ch.lower()]
+    
+    # Get the pulldown knob from the NoOp node
+    pulldown = noop['channelList']
+    
+    # Set the pulldown values. To do this, we update its 'values' property.
+    # If matching is empty, you might choose to clear it.
+    if matching:
+        new_values = " ".join(matching)
+        pulldown.setValues(new_values)
+    else:
+        pulldown.setValues("")
+        nuke.message("No channels found with the search string: '{}'".format(search_str))
+    
+    # Optionally, you can print to the Script Editor:
+    print("Matching channels:", matching)
+
+# Call the function so that the button action runs this script.
+updateChannelList()
+</pre>
+
+<p>
+Instructions to set up the button callback:
+</p>
+<ul>
+<li>
+Open the NoOp node’s properties.
+
+<li>
+In the User Knobs section, add a new button (or edit its Script field) and paste the code above.
+
+<li>
+When the user clicks the button, it will:
+
+<ul>
+<li>
+Read the search string from the "search" knob.
+
+<li>
+Look at the currently selected node’s channels.
+
+<li>
+Filter them for any channels that contain the search string.
+
+<li>
+Populate the "channelList" pulldown knob with matching channel names.
+
+</ul>
+</ul>
+<div id="Setup:-Creating a Shuffle Node from the Pulldown Selection"><h2 id="Creating a Shuffle Node from the Pulldown Selection" class="header"><a href="#Setup:-Creating a Shuffle Node from the Pulldown Selection">Creating a Shuffle Node from the Pulldown Selection</a></h2></div>
+
+<p>
+You might want a second button (say using a knob named "createShuffleButton") whose callback reads the chosen channel from the "channelList" pulldown and then creates a Shuffle node that uses that channel for its shuffle. For example:
+</p>
+
+<pre python>
+import nuke
+
+def createShuffleFromSelection():
+    noop = nuke.thisNode()
+    channel_to_shuffle = noop['channelList'].value()
+    
+    if not channel_to_shuffle:
+        nuke.message("No channel selected for shuffling!")
+        return
+    
+    # Optionally, determine the target node for the shuffle.
+    # For now, we assume the current node selection is the desired input.
+    try:
+        target_node = nuke.selectedNode()
+    except ValueError:
+        nuke.message("Select a node to use as the Shuffle input")
+        return
+
+    # Create a Shuffle node and set its input to the target node.
+    shuffle = nuke.createNode("Shuffle")
+    shuffle.setInput(0, target_node)
+    
+    # Set the Shuffle node’s channel, assuming you want to map that channel to all outputs.
+    # Typically, you would assign the specific channel to a mask input or the composite.
+    # Here, we set the 'in' knob to the chosen channel.
+    shuffle['in'].setValue(channel_to_shuffle)
+    nuke.message("Created Shuffle node shuffling channel: {}".format(channel_to_shuffle))
+
+createShuffleFromSelection()
+</pre>
+
+<p>
+Setup:
+</p>
+<ul>
+<li>
+Add this code to the callback for a button knob (e.g., "createShuffleButton") on the NoOp node.
+
+</ul>
+<div id="Setup:-Creating a Shuffle Node from the Pulldown Selection-Summary"><h3 id="Summary" class="header"><a href="#Setup:-Creating a Shuffle Node from the Pulldown Selection-Summary">Summary</a></h3></div>
+
+<ul>
+<li>
+<span id="Setup:-Creating a Shuffle Node from the Pulldown Selection-Summary-Search Button:"></span><strong id="Search Button:">Search Button:</strong> Reads the text from a user text knob, examines a target node’s channels, filters them, and populates a pulldown knob.
+
+<li>
+<span id="Setup:-Creating a Shuffle Node from the Pulldown Selection-Summary-Create Shuffle Button:"></span><strong id="Create Shuffle Button:">Create Shuffle Button:</strong> Reads the chosen channel from the pulldown and creates a Shuffle node using that channel.
+
+</ul>
+<p>
+This approach lets your tool be interactive—allowing users to enter a search term, update the dropdown with matching channels, and then trigger the creation of a node based on that selection.
+</p>
+
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+</body>
+</html>
