@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pm_nuke_gizmos_splineblur_analysis</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+
+<p>
+I'm looking at an existing color matrix node in Nuke. This is in a stream of Vectors. What does the matrix... [-1 -2 -1] [ 0 0 0] [ 1 2 1] ...do? And second proceeds: [1 0 -1] [2 0 -2] [1 0 -1] ...and what does this one do?
+Both of those matrices are classic convolution kernels used in image processing—specifically for edge detection. When used in Nuke’s ColorMatrix node (or more appropriately in a Convolve or Matrix node if you're working with image data rather than color transforms), they act as filters that highlight changes in pixel intensity.
+</p>
+
+<p>
+First Matrix:
+[-1 -2 -1]
+[  0  0  0]
+[  1  2  1]
+This is the Sobel operator for vertical edge detection. It emphasizes vertical gradients—meaning it detects horizontal edges in the image. It works by subtracting pixel values above and below a center pixel, amplifying areas where there's a strong vertical change in brightness.
+</p>
+
+<p>
+Second Matrix:
+[ 1  0 -1]
+[ 2  0 -2]
+[ 1  0 -1]
+This is the Sobel operator for horizontal edge detection. It highlights vertical edges by detecting horizontal gradients—essentially looking for changes from left to right.
+</p>
+
+<p>
+In Practice
+If you're seeing these in a ColorMatrix node, it's likely being used in a custom setup to process luminance or vector data (like motion vectors or normals) rather than RGB color. These filters are often used in tandem to compute edge magnitude or direction, such as in motion blur, depth edge enhancement, or stylized looks.
+</p>
+
+<p>
+Want help combining them into a full edge magnitude pass or visualizing the result?
+</p>
+
+<p>
+I'd like to see how to visualize the result.
+Great! To visualize the result of applying Sobel operators in Nuke, you can build a simple setup using Matrix nodes to simulate the convolution, then view the output as a grayscale or color-coded image. Here's a step-by-step guide:
+</p>
+
+<ol>
+<li>
+Prepare Your Input
+
+</ol>
+<p>
+Start with a grayscale image or convert your input to luminance using a Colorspace node set to HSV and shuffle out the V channel, or use a Shuffle node to isolate luminance.
+</p>
+
+<ol>
+<li>
+Apply the Sobel Filters
+
+</ol>
+<p>
+Add two Matrix nodes.
+</p>
+
+<p>
+In the first, input the horizontal Sobel kernel:
+</p>
+
+<p>
+[ 1  0 -1
+  2  0 -2
+  1  0 -1 ]
+In the second, input the vertical Sobel kernel:
+</p>
+
+<p>
+[-1 -2 -1
+  0  0  0
+  1  2  1 ]
+</p>
+<ol>
+<li>
+Combine the Results
+
+</ol>
+<p>
+Use a Merge (plus) node or an Expression node to combine the outputs:
+</p>
+
+<p>
+For edge magnitude: sqrt(pow(horizontal, 2) + pow(vertical, 2))
+</p>
+
+<p>
+For direction: atan2(vertical, horizontal) (if you want to visualize edge orientation)
+</p>
+
+<ol>
+<li>
+Normalize and View
+
+</ol>
+<p>
+Use a Grade or Expression node to normalize the result into a 0–1 range for viewing. You can also colorize it using a ColorLookup or HueShift node for more visual impact.
+</p>
+
+<p>
+If you want a visual walkthrough, this tutorial on matrix filters in Nuke includes examples of edge detection and how to build the setup from scratch.
+</p>
+
+<p>
+Want me to help you build a gizmo for this?
+</p>
+
+<p>
+What does this ColorMatrix do: [0 1 0] [1 0 0] [0 0 0] It comes after the edge detection matrices above.
+That matrix is doing something clever—it’s swapping the red and green channels while discarding the blue.
+</p>
+
+<p>
+Let’s break it down:
+</p>
+
+<p>
+[0 1 0]   → Output Red   = Input Green
+[1 0 0]   → Output Green = Input Red
+[0 0 0]   → Output Blue  = 0 (black)
+So after applying this matrix:
+</p>
+
+<p>
+The red channel becomes whatever was in the green channel.
+</p>
+
+<p>
+The green channel becomes whatever was in the red.
+</p>
+
+<p>
+The blue channel is wiped out entirely.
+</p>
+
+<p>
+Why use this after edge detection?
+If your edge detection was applied to a grayscale or luminance image and then split into horizontal and vertical passes (as you did with the Sobel filters), this matrix might be used to encode those two directions into color channels—for example:
+</p>
+
+<p>
+Horizontal edges in red
+</p>
+
+<p>
+Vertical edges in green
+</p>
+
+<p>
+By swapping red and green, the artist might be reassigning which direction maps to which channel for visualization or further processing. And zeroing out blue keeps the result clean and focused.
+</p>
+
+<p>
+Want to try building a color-coded edge direction pass with this?
+</p>
+
+<p>
+The next node is aColorMatrix being driven by and Axis node, and it's Rotation in 'z'. This is changing the world matrix of the Axis, and it's these values that drive the ColorMatrix (by expression linking). It's the first two cells in the first row, and the first two cells in the second row that are being manipulated. I'm guessing this allows a user to rotate the Axis and in effect 'rotate' the direction of the resulting vectors being input into the ColorMatrix node. Can you elucidate and exapand on that?
+Absolutely—you're on the right track, and this is a clever use of Nuke’s 3D system to manipulate 2D vector data.
+</p>
+
+<p>
+What’s Happening Here
+The ColorMatrix node is being used as a 2D rotation matrix. When you link the first two cells of the first two rows to an Axis node’s world matrix (specifically its rotation in Z), you’re effectively rotating a 2D vector field—like motion vectors, normals, or edge directions—by the same amount as the Axis.
+</p>
+
+<p>
+Here’s how it works:
+</p>
+
+<p>
+A 2D rotation matrix looks like this:
+[ cos(θ)  -sin(θ) ]
+[ sin(θ)   cos(θ) ]
+So if you plug:
+</p>
+
+<p>
+cos(rotationZ) into cell [0][0]
+</p>
+
+<p>
+-sin(rotationZ) into cell [0][1]
+</p>
+
+<p>
+sin(rotationZ) into cell [1][0]
+</p>
+
+<p>
+cos(rotationZ) into cell [1][1]
+</p>
+
+<p>
+...you’re rotating any 2D vector input by the Z rotation of the Axis node.
+</p>
+
+<p>
+Why Use This?
+This setup gives you interactive control over vector orientation:
+</p>
+
+<p>
+You can rotate edge directions, motion vectors, or normals to align with a new reference frame.
+</p>
+
+<p>
+It’s especially useful in stylized effects, directional blurs, or relighting setups where vector direction matters.
+</p>
+
+<p>
+Because it’s driven by an Axis, you can animate or parent it to other 3D elements for dynamic control.
+</p>
+
+<p>
+Bonus Tip
+If you want to visualize the effect, try piping in a color-coded vector pass (like red = X, green = Y), apply this ColorMatrix, and view the result. You’ll see the vectors rotate in real time as you spin the Axis.
+</p>
+
+<p>
+Want help building a gizmo that wraps this into a neat little tool?
+</p>
+
+<p>
+How do I make a color-coded vector pass?
+</p>
+
+
+
+
+
+
+<p>
+3 videos
+To make a color-coded vector pass in Nuke, you're essentially visualizing 2D vector data (like motion vectors or edge directions) by mapping the X and Y components to color channels—typically red and green. Here's how to build one from scratch or from existing data:
+</p>
+
+<p>
+Option 1: From Existing Motion Vectors
+If you already have a motion vector pass (from a renderer like Redshift, Arnold, or a SmartVector node):
+</p>
+
+<p>
+Shuffle the vector channels into RGB:
+</p>
+
+<p>
+Use a Shuffle node.
+</p>
+
+<p>
+Set red to the X component (often motion.x or forward.u).
+</p>
+
+<p>
+Set green to the Y component (like motion.y or forward.v).
+</p>
+
+<p>
+Set blue to 0 or leave it black.
+</p>
+
+<p>
+Grade or Multiply to normalize or exaggerate the vectors for visibility.
+</p>
+
+<p>
+Viewer: Now you’ll see a color-coded image where:
+</p>
+
+<p>
+Red = horizontal motion
+</p>
+
+<p>
+Green = vertical motion
+</p>
+
+<p>
+Option 2: From Custom Vectors (e.g. Edge Detection)
+If you’ve created horizontal and vertical edge passes (like with Sobel filters):
+</p>
+
+<p>
+Merge the horizontal and vertical passes using a Copy or Shuffle node.
+</p>
+
+<p>
+Assign:
+</p>
+
+<p>
+Horizontal (X) to red
+</p>
+
+<p>
+Vertical (Y) to green
+</p>
+
+<p>
+Blue to 0
+</p>
+
+<p>
+Optionally, use a ColorMatrix to rotate or remap the vectors.
+</p>
+
+<p>
+Bonus: Visualizing Direction with Hue
+If you want to get fancy:
+</p>
+
+<p>
+Convert the X/Y vector into angle and magnitude using an Expression node:
+</p>
+
+<p>
+atan2(y, x) for direction
+</p>
+
+<p>
+sqrt(x*x + y*y) for magnitude
+</p>
+
+<p>
+Map direction to Hue and magnitude to Saturation using HSV conversion.
+</p>
+
+<p>
+For a visual walkthrough, check out this Redshift &amp; Nuke motion vector tutorial—it shows how to extract and visualize motion vectors cleanly.
+</p>
+
+</body>
+</html>
