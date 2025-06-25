@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_alpha_rolloff_edges</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Alpha Rolloff"><h1 id="Alpha Rolloff" class="header"><a href="#Alpha Rolloff">Alpha Rolloff</a></h1></div>
+
+<p>
+Expression node:
+</p>
+
+<pre plaintext>
+# Variable:
+Le -&gt; sqrt(Alpha^2) + 0.001
+# Alpha channel:
+Alpha / Le
+</pre>
+
+<p>
+This is a subtle but elegant trick to soften or taper the edges of the alpha matte using a form of vector normalization logic, similar to what you were doing with direction vectors earlier.
+</p>
+
+<div id="Alpha Rolloff-Let’s break it down:"><h2 id="Let’s break it down:" class="header"><a href="#Alpha Rolloff-Let’s break it down:">Let’s break it down:</a></h2></div>
+
+<p>
+🔄 Step-by-Step Breakdown
+</p>
+
+<div id="Alpha Rolloff-Let’s break it down:-Unpremult"><h3 id="Unpremult" class="header"><a href="#Alpha Rolloff-Let’s break it down:-Unpremult">Unpremult</a></h3></div>
+
+<p>
+Unpremultiplying separates the RGB from the alpha influence. This ensures any changes to the alpha won’t immediately alter the RGB pixels—good for precise control.
+</p>
+
+<div id="Alpha Rolloff-Let’s break it down:-Modify Alpha:"><h3 id="Modify Alpha:" class="header"><a href="#Alpha Rolloff-Let’s break it down:-Modify Alpha:">Modify Alpha:</a></h3></div>
+
+<pre nuke>
+Le = sqrt(Alpha^2) + 0.001
+Alpha = Alpha / Le
+</pre>
+
+<p>
+Let’s simplify:
+</p>
+
+<ul>
+<li>
+<code>sqrt(Alpha^2)</code> is just <code>abs(Alpha)</code> - but since alpha is typically 0 to 1, it’s already positive.
+
+<li>
+So this is effectively:
+<pre plaintext>
+Alpha = Alpha / (Alpha + ε)
+</pre>
+
+</ul>
+<p>
+Where <code>ε</code> is a tiny value (<code>0.001</code>) to prevent division by zero.
+</p>
+
+<p>
+This operation does something interesting: It compresses values closer to zero (edges) more than it compresses values near one (solid areas). In effect, this flattens the middle of the alpha and subtly softens the edge falloff, creating a tighter transition.
+</p>
+
+<div id="Alpha Rolloff-Let’s break it down:-Premult Again"><h3 id="Premult Again" class="header"><a href="#Alpha Rolloff-Let’s break it down:-Premult Again">Premult Again</a></h3></div>
+
+<p>
+After modifying alpha, the RGB is multiplied by this new tapered alpha, producing softer or more stylized edges on the comped element.
+</p>
+
+<div id="Alpha Rolloff-🎯 In Practice"><h2 id="🎯 In Practice" class="header"><a href="#Alpha Rolloff-🎯 In Practice">🎯 In Practice</a></h2></div>
+
+<p>
+This technique is often used to:
+</p>
+<ul>
+<li>
+Tighten or "roll off" alpha edges for better integration
+
+<li>
+Fix noisy or aliased alpha mattes from poor keying or roto
+
+<li>
+Add a choked or eroded falloff without hard clipping
+
+</ul>
+<p>
+It’s basically a DIY alpha bias adjustment using math, rather than relying on a Blur or Erode node. Very clever when used precisely.
+</p>
+
+<div id="More Aggressive Falloff Version"><h1 id="More Aggressive Falloff Version" class="header"><a href="#More Aggressive Falloff Version">More Aggressive Falloff Version</a></h1></div>
+
+<p>
+Let's break down what's happening and then explore how you can tweak the process for a more aggressive edge shaping—and how to visualize the effect.
+</p>
+
+<div id="More Aggressive Falloff Version-What the Expression Is Doing"><h4 id="What the Expression Is Doing" class="header"><a href="#More Aggressive Falloff Version-What the Expression Is Doing">What the Expression Is Doing</a></h4></div>
+
+<ul>
+<li>
+Unpremultiply The image is first unpremultiplied, which separates the color (RGB) data from the alpha channel. This lets you manipulate the alpha independently of the RGB.
+
+<li>
+Normalizing the Alpha The expression used is:
+
+</ul>
+  
+<pre python>
+Le = sqrt(Alpha * Alpha) + 0.001
+Alpha_new = Alpha / Le
+</pre>
+
+<p>
+Since the square root of (Alpha squared) is just the absolute value of Alpha (and alpha is already positive from 0 to 1), this is essentially:
+</p>
+
+<pre python>
+Alpha_new = Alpha / (Alpha + 0.001)
+</pre>
+
+<p>
+What does this do?
+</p>
+<ul>
+<li>
+For pixels where the alpha is near 1 (solid regions), you get something close to 1.
+
+<li>
+For pixels where the alpha is very low (near the edge), the division by a small number (with the epsilon) can noticeably alter the value.
+
+</ul>
+<p>
+The result is a slight “compression” or remapping of alpha values that can, in effect, soften or adjust the edge transition.
+</p>
+
+<ul>
+<li>
+Premultiply Back After the alpha has been modified, the image is premultiplied again. At that point, the altered alpha multiplies back into the RGB, effectively changing the look of the edges in the comp.
+
+</ul>
+<p>
+In effect, this trick is a way to mathematically adjust the matte’s edge falloff without resorting to additional blurring or erosion nodes.
+</p>
+
+<div id="More Aggressive Falloff Version-Making the Edge Shaping More Aggressive"><h2 id="Making the Edge Shaping More Aggressive" class="header"><a href="#More Aggressive Falloff Version-Making the Edge Shaping More Aggressive">Making the Edge Shaping More Aggressive</a></h2></div>
+
+<p>
+If you want a more pronounced change—i.e., a sharper or more aggressively tapered edge—you can modify the expression to more deeply affect the lower alpha values. A common approach is to apply a power function (gamma correction) to the alpha before normalizing.
+</p>
+
+<p>
+For example, consider replacing the simple alpha with an exponentiated alpha:
+</p>
+
+<ul>
+<li>
+Apply a Power/Lift to Alpha Instead of using Alpha directly, use:
+
+</ul>
+  
+<pre python>
+power = 1.5  # Experiment with values greater than 1 to tighten the edge, less than 1 to soften further.
+A_mod = pow(Alpha, power)
+</pre>
+
+<ul>
+<li>
+Normalize the Modified Alpha Use a similar normalization:
+
+</ul>
+  
+<pre python>
+Le = sqrt(A_mod * A_mod) + 0.001  # Essentially, Le = A_mod + 0.001
+Alpha_new = A_mod / Le
+</pre>
+
+<p>
+This simplifies to:
+</p>
+
+<pre python>
+Alpha_new = pow(Alpha, power) / (pow(Alpha, power) + 0.001)
+</pre>
+
+<div id="More Aggressive Falloff Version-Making the Edge Shaping More Aggressive-What does this do?"><h3 id="What does this do?" class="header"><a href="#More Aggressive Falloff Version-Making the Edge Shaping More Aggressive-What does this do?">What does this do?</a></h3></div>
+
+<ul>
+<li>
+Increasing the power (e.g., using 1.5, 2, or even higher) will suppress the mid-range alpha values more aggressively, effectively “choking” the edge.
+
+<li>
+If you decrease the power (for instance, 0.5), the transformation will be softer, and the edge will be less pronounced.
+
+</ul>
+<div id="More Aggressive Falloff Version-Visualizing the New Alpha Curve"><h2 id="Visualizing the New Alpha Curve" class="header"><a href="#More Aggressive Falloff Version-Visualizing the New Alpha Curve">Visualizing the New Alpha Curve</a></h2></div>
+
+<div id="More Aggressive Falloff Version-Visualizing the New Alpha Curve-Method 1: CurveTool and Viewer"><h4 id="Method 1: CurveTool and Viewer" class="header"><a href="#More Aggressive Falloff Version-Visualizing the New Alpha Curve-Method 1: CurveTool and Viewer">Method 1: CurveTool and Viewer</a></h4></div>
+
+<ul>
+<li>
+Viewing the Alpha Channel Directly
+
+<ul>
+<li>
+In your Viewer panel, switch the display to view the alpha channel only. This way, you can see the matte as a grayscale image.
+
+</ul>
+<li>
+Use a CurveTool Node
+
+<ul>
+<li>
+Connect a CurveTool node to the output of your expression or Grade node.
+
+<li>
+Configure the CurveTool to sample the alpha channel.
+
+<li>
+Run the tool to generate a histogram or curve that represents the distribution of alpha values. You can compare the curve before and after your expression adjustments.
+
+</ul>
+</ul>
+<div id="More Aggressive Falloff Version-Visualizing the New Alpha Curve-Method 2: Duplicate the Pipeline for Comparison"><h4 id="Method 2: Duplicate the Pipeline for Comparison" class="header"><a href="#More Aggressive Falloff Version-Visualizing the New Alpha Curve-Method 2: Duplicate the Pipeline for Comparison">Method 2: Duplicate the Pipeline for Comparison</a></h4></div>
+
+<ul>
+<li>
+Duplicate the Node Tree
+
+<ul>
+<li>
+Create two branches: one with the original alpha manipulation and one with the modified expression using the power function.
+
+</ul>
+<li>
+Merge or Side-by-Side Comparison
+
+<ul>
+<li>
+Merge them side by side using a Viewer or a SplitScreen gizmo.
+
+<li>
+This way, you can visually compare how the edge falls off in each case.
+
+</ul>
+</ul>
+<div id="More Aggressive Falloff Version-Visualizing the New Alpha Curve-Method 3: Create a Custom Gizmo"><h4 id="Method 3: Create a Custom Gizmo" class="header"><a href="#More Aggressive Falloff Version-Visualizing the New Alpha Curve-Method 3: Create a Custom Gizmo">Method 3: Create a Custom Gizmo</a></h4></div>
+
+<ul>
+<li>
+Wrap the Process in a Group
+
+<ul>
+<li>
+Inside the group, expose controls (via knobs) for the exponent (power) and for the epsilon (0.001).
+
+<li>
+This lets you interactively adjust the edge shaping and immediately see the result.
+
+</ul>
+<li>
+Add a Roto or Ramp for Reference
+
+<ul>
+<li>
+Optionally, include a Roto node that draws a line or curve representing a typical alpha transition. You can then juxtapose this curve with the generated matte to see how the shape changes.
+
+</ul>
+</ul>
+<div id="More Aggressive Falloff Version-Putting It All Together"><h2 id="Putting It All Together" class="header"><a href="#More Aggressive Falloff Version-Putting It All Together">Putting It All Together</a></h2></div>
+
+<p>
+Initial Expression Example (Basic):
+</p>
+
+<pre python>
+# Basic normalization (per pixel)
+Le = sqrt(Alpha * Alpha) + 0.001
+Alpha_new = Alpha / Le
+</pre>
+
+<p>
+Modified Expression Example (Aggressive Edge Shaping):
+</p>
+
+<pre python>
+power = 1.5  # Increase to make edges tighter; lower for softer
+A_mod = pow(Alpha, power)
+Le = A_mod + 0.001
+Alpha_new = A_mod / Le
+</pre>
+
+<p>
+Replace the old expression with this modified version in your Expression node.
+</p>
+
+<p>
+Repremultiply and Compare
+</p>
+
+<ul>
+<li>
+After the Expression node, repremultiply to see the effect on your RGB data.
+
+<li>
+Compare the results in the Viewer by toggling the alpha channel display or using a split-screen view.
+
+</ul>
+<div id="Gizmo"><h1 id="Gizmo" class="header"><a href="#Gizmo">Gizmo</a></h1></div>
+
+<p>
+Here’s a little Python snippet you can paste into Nuke’s Script Editor. It builds a Group node called AlphaEdgeTaper with two user knobs (power and epsilon) and wires up Unpremult → Expr → Premult for you:
+</p>
+
+<pre import nuke>
+
+def createAlphaEdgeTaper():
+    # 1. Create the Group
+    grp = nuke.nodes.Group(name="AlphaEdgeTaper")
+    grp.begin()
+
+    # 2. Add user knobs (use Double_Knob for floats)
+    power_knob   = nuke.Double_Knob("power",   "Edge Power")
+    power_knob.setValue(1.0)
+    epsilon_knob = nuke.Double_Knob("epsilon", "Epsilon")
+    epsilon_knob.setValue(0.001)
+    grp.addKnob(power_knob)
+    grp.addKnob(epsilon_knob)
+
+    # 3. Build the internal network
+    inp       = nuke.nodes.Input(name="IN")
+    unpremult = nuke.nodes.Unpremult(name="Unpremult1")
+    expr      = nuke.nodes.Expression(name="EdgeTaperExpr")
+    premult   = nuke.nodes.Premult(name="Premult1")
+    out       = nuke.nodes.Output(name="OUT")
+
+    # 4. Wire them up
+    unpremult.setInput(0, inp)
+    expr.setInput(0, unpremult)
+    premult.setInput(0, expr)
+    out.setInput(0, premult)
+
+    # 5. Tell the Expression node how to remap alpha
+    #    leave RGB through untouched, only remap alpha
+    #    expr0-&gt;r, expr1-&gt;g, expr2-&gt;b, expr3-&gt;alpha
+    expr['expr0'].setValue('r')
+    expr['expr1'].setValue('g')
+    expr['expr2'].setValue('b')
+    expr['expr3'].setValue(
+        "pow(alpha, power) / (pow(alpha, power) + epsilon)"
+    )
+
+    grp.end()
+    return grp
+
+# Execute this in the Script Editor:
+createAlphaEdgeTaper()
+</pre>
+
+<p>
+How to use this:
+</p>
+
+<ul>
+<li>
+Copy the snippet above into Nuke’s Script Editor and press Ctrl+Enter.
+
+<li>
+A new AlphaEdgeTaper node will appear in your graph.
+
+<li>
+Hook your comp into it.
+
+<ul>
+<li>
+IN → your upstream
+
+<li>
+OUT → your downstream
+
+</ul>
+<li>
+Tweak Edge Power (≥1 tightens/chokes the edge; &lt;1 softens it) and Epsilon (small number to avoid divide-by-zero) in the node’s properties.
+
+</ul>
+<p>
+If you like, you can select that group in your node graph, right-click → Export → As Gizmo, and save it into your .nuke (or plugin) folder. Next time you’ll have AlphaEdgeTaper available straight from the Tab menu.
+</p>
+
+
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
