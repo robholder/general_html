@@ -391,7 +391,472 @@ Map direction to Hue and magnitude to Saturation using HSV conversion.
 For a visual walkthrough, check out this <a href="https://www.youtube.com/watch?v=jT11tFOFc5k">Redshift &amp; Nuke motion vector tutorial</a> - it shows how to extract and visualize motion vectors cleanly.
 </p>
 
+<div id="Analysis"><h1 id="Analysis" class="header"><a href="#Analysis">Analysis</a></h1></div>
+
+<div id="Analysis-Spline Input"><h3 id="Spline Input" class="header"><a href="#Analysis-Spline Input">Spline Input</a></h3></div>
+
 <ul>
+<li>
+Reformat:
+
+<ul>
+<li>
+Common to Image input
+
+<li>
+Gizmo Control: <code>Include Overscan</code> checkbox:
+
+<ul>
+<li>
+Expression culls to only non-zero pixels
+
+<li>
+<code>input.bbox.r - input.bbox.x</code>
+
+<li>
+<code>input.bbox.t - input.bbox.y</code>
+
+</ul>
+</ul>
+<li>
+FilterErode:
+
+<ul>
+<li>
+Massive negative erode:
+
+<ul>
+<li>
+<code>parent.Extend*(-100)</code>
+
+<li>
+mix - Edge extend checkbox
+
+</ul>
+</ul>
+<li>
+Blur:
+
+<ul>
+<li>
+Massive positive blur:
+
+<ul>
+<li>
+<code>parent.Extend*50</code>
+
+<li>
+mix - Edge extend checkbox
+
+</ul>
+</ul>
+<li>
+Matrix:
+
+<ul>
+<li>
+Sobel vertical edge detection
+
+</ul>
+<li>
+Matrix:
+
+<ul>
+<li>
+Sobel horizontal edge detection
+<table>
+<tr>
+<td>
+NOTE: The mathematically accepted way of doing the Sobel operations is to do them in parallel, not in series. Testing the parallel results in 'cleaner' strokes - not right or wrong, but less swirly blotches with the conventional approach.
+</td>
+</tr>
+</table>
+
+</ul>
+<li>
+Grade:
+
+<ul>
+<li>
+Set to Blue only
+
+<li>
+Gain to zero
+
+<li>
+Effectively means - zero values in <code>b</code> channel.
+
+</ul>
+<li>
+Expression - Normalize:
+
+<ul>
+<li>
+NVO:
+
+<ul>
+<li>
+Normalize Vector Operator/Output.
+
+<li>
+<code>Le = sqrt((Red*Red) + (Green*Green))+0.00000001</code>
+
+<li>
+Red channel: <code>Red/Le</code>
+
+<li>
+Green channel: <code>Green/Le</code>
+
+<li>
+Finds current absolute length of a vector, then divides this into the X(R) and Y(G) components.
+
+</ul>
+</ul>
+<li>
+Median:
+
+<ul>
+<li>
+This is hard coded to '3'
+
+<li>
+Seems to smooth out swirl artifacts (caused by 'in series' Sobels)
+
+<li>
+Smooths 'strokes' a bit, but seems like a 'fix' for 'in series' Sobels since there is no external control.
+
+<li>
+The artifacts are somewhat painterly though.
+
+</ul>
+<li>
+ColorMatrix:
+
+<ul>
+<li>
+Swaps <code>Red</code> and <code>Green</code> channels - and Ignores (removes) any values from <code>Blue</code>.
+
+</ul>
+<li>
+Axis node:
+
+<ul>
+<li>
+Rotate Z is driven but an Expression from Vector Rotation +90 degrees 
+
+<li>
+This defines the World Matrix values of the Axis
+
+<li>
+This is passes to the following ColorMatrix World Matrix to realign the vectors.
+
+</ul>
+<li>
+ColorMatrix:
+
+<ul>
+<li>
+Uses the Axis node above as input (and this is with the +90 degree offset expression already baked)
+
+<li>
+This makes the strokes follow the input spline rather than the default perpendicular direction
+
+</ul>
+</ul>
+<p>
+This now goes off to 'Strokes' and to the output.
+</p>
+
+<ul>
+<li>
+Shuffle:
+
+<ul>
+<li>
+This plumbs the vectors into:
+
+<ul>
+<li>
+forward:
+
+<ul>
+<li>
+red -&gt; forward.u
+
+<li>
+green -&gt; forward.v
+
+</ul>
+<li>
+Strokes stream into:
+
+<ul>
+<li>
+rgba -&gt; rgba
+
+</ul>
+</ul>
+</ul>
+</ul>
+<div id="Analysis-Noise Input"><h3 id="Noise Input" class="header"><a href="#Analysis-Noise Input">Noise Input</a></h3></div>
+
+<ul>
+<li>
+Original Image Input
+
+<li>
+Reformat:
+
+<ul>
+<li>
+Common to Image input
+
+<li>
+Gizmo Control: <code>Include Overscan</code> checkbox:
+
+<ul>
+<li>
+Expression culls to only non-zero pixels
+
+<li>
+<code>input.bbox.r - input.bbox.x</code>
+
+<li>
+<code>input.bbox.t - input.bbox.y</code>
+
+</ul>
+</ul>
+<li>
+Shuffle:
+
+<ul>
+<li>
+Set to rgba -&gt; b,b,b,b
+
+<li>
+I think this is just passing on the image size/format
+
+</ul>
+<li>
+Noise:
+
+<ul>
+<li>
+type <code>fBm</code>
+
+<li>
+x/ysize = <code>parent.Noise2_size.0 x57 6.6</code> 
+
+<li>
+z (seed) = <code>parent.Noise2_zoffset</code>
+
+<li>
+octaves = <code>parent.Noise2_octaves</code>
+
+<li>
+clip at Nyquist Limit = <code>parent.Noise2_nyquist</code>
+
+<li>
+lacunarity = <code>parent.Noise2_lacunarity</code>
+
+<li>
+gain =  <code>parent.Noise2_gain</code>
+
+<li>
+gamma = <code>parent.Noise2_gamma</code>
+
+</ul>
+<li>
+Switch:
+
+<ul>
+<li>
+Allows for direct Noise input (from external source)
+
+</ul>
+</ul>
+<div id="Analysis-Noise Branch I"><h3 id="Noise Branch I" class="header"><a href="#Analysis-Noise Branch I">Noise Branch I</a></h3></div>
+
+<p>
+Goes into <code>Inject Vectors into Strokes</code>
+</p>
+
+<div id="Analysis-Noise Branch II"><h3 id="Noise Branch II" class="header"><a href="#Analysis-Noise Branch II">Noise Branch II</a></h3></div>
+
+<p>
+Goes into <code>Strokes Area I</code>
+</p>
+
+<div id="Analysis-Strokes Area I"><h3 id="Strokes Area I" class="header"><a href="#Analysis-Strokes Area I">Strokes Area I</a></h3></div>
+
+<ul>
+<li>
+bl_Threshold (from Noise):
+
+<ul>
+<li>
+threshold = <code>1-(parent.NoiseAmount*0.6)</code>
+
+<li>
+This sets a threshold between black an white based on a mid value.
+
+<li>
+Creates a blotchy black and white matte.
+
+</ul>
+<li>
+Invert:
+
+<ul>
+<li>
+Reverse noise pattern
+
+</ul>
+<li>
+bl_Threshold (from stroke/grad):
+
+<ul>
+<li>
+Mask for noise - outside of spline gets cut off
+
+<li>
+If the spline is broadly spread with blur and erode, this might not do anything
+
+</ul>
+<li>
+Invert:
+
+<ul>
+<li>
+Reverse matte.
+
+</ul>
+<li>
+Merge (Over):
+
+<ul>
+<li>
+No B input (essentially black)
+
+<li>
+Noise A input
+
+<li>
+Mask - Image alpha
+
+<li>
+Results in noise pattern over image data only 
+
+</ul>
+<li>
+Shuffle:
+
+<ul>
+<li>
+A - Image - rgba -&gt; rgba
+
+<li>
+B - Noise - rgba.red -&gt; rgba.alpha
+
+<li>
+Results in Image in RGB, Noise in Alpha Channel
+
+</ul>
+<li>
+Grade:
+
+<ul>
+<li>
+Crunch the values (fixed settings - no external controls)
+
+<ul>
+<li>
+blackpoint - 0.25
+
+<li>
+whitepoint - 0.5
+
+</ul>
+</ul>
+<li>
+ColorCorrect:
+
+<ul>
+<li>
+Crunch more (master):
+
+<ul>
+<li>
+contrast - 2
+
+<li>
+gain - 0.25
+
+</ul>
+</ul>
+<li>
+Merge (Multiply):
+
+<ul>
+<li>
+Mix controlled from outside:
+
+<ul>
+<li>
+Stroke Variation <code>parent.variation</code>
+
+<li>
+Optionally adds the noise to the Vectors from <code>Spline Input</code>
+
+</ul>
+</ul>
+</ul>
+<pre><code>
+</code></pre>
+
+
+<div id="Analysis-Inject Vectors into Strokes"><h3 id="Inject Vectors into Strokes" class="header"><a href="#Analysis-Inject Vectors into Strokes">Inject Vectors into Strokes</a></h3></div>
+
+<ul>
+<li>
+Noise:
+
+<ul>
+<li>
+Noise layered onto end of <code>Noise Input</code> above
+
+<li>
+This adds more peaks (more frequency - and is locked with no outer controls)
+
+</ul>
+<li>
+Grade:
+
+<ul>
+<li>
+Whitepoint to 2 (halving peaks - since extra noise potentially doubled <a href="the.html">the</a> values. 
+
+</ul>
+<li>
+Shuffle:
+
+<ul>
+<li>
+rgba -&gt; rgba
+
+<li>
+Doesn't see to do anything.
+<pre plaintext>
+[Read] → … → [Expression: normalize &amp; scale → flowX,flowY]
+                              ↓
+                          [Shuffle: flow → motion.rgb]
+                              ↓
+                       [VectorBlur (use motion.rgb)]
+                              ↓
+                            [Write]
+</pre>
+
+</ul>
 <li>
 <a href="pmount_index.html">PM</a>
 
