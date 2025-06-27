@@ -22,62 +22,24 @@
 <pre python>
 import nuke
 
-# 1) Grab the Group node (or any node) that has your MyExpressionKnob knob  
-g = nuke.toNode("MyGroup")  # replace with your group’s name
-# 2) Walk every node inside it  
-for n in g.nodes(recurseGroups=True):  
-    # 3) Check every knob on that node  
-    for k in n.allKnobs():  
-        # only knobs that support expressions have .hasExpression()
-        try:  
-            if k.hasExpression():  
-                expr = k.expression()  
-                # 4) Look for your slider’s name in the expression string  
-                if "MyExpressionKnob" in expr:  
-                    print("{node}.{knob}  →  {expr}".format(  
-                        node=n.fullName(),  
-                        knob=k.name(),  
-                        expr=expr  
-                    ))  
-        except AttributeError:  
-            # some knobs (like the label) won’t have hasExpression()
-            continue
+def find_links_in_group(group_name, search_term="StrokeTexture"):
+    grp = nuke.toNode(group_name)
+    if not grp:
+        raise ValueError("No node called %r" % group_name)
+    for n in nuke.allNodes(group=grp):
+        for kname, knob in n.knobs().items():
+            try:
+                src = knob.toScript()           # the knob’s script block
+            except Exception:
+                continue
+            if search_term in src:
+                print("%-30s %-15s →  %s" %
+                      (n.fullName(), kname, src.strip().replace("\n"," ")))
+
+# call it:
+find_links_in_group("SplineBlur_group", "StrokeTexture")
+
 </pre>
-
-<div id="Find Driven Nodes Inside A Group (By Expressions)-Explanation of the steps:"><h2 id="Explanation of the steps:" class="header"><a href="#Find Driven Nodes Inside A Group (By Expressions)-Explanation of the steps:">Explanation of the steps:</a></h2></div>
-
-<ul>
-<li>
-Use <code>nuke.toNode()</code> to grab the Group (or just <code>nuke.thisGroup()</code> if you’re running this from inside a Group’s Python callback).
-
-<li>
-<code>group.nodes(recurseGroups=True)</code> returns every node in that group—including nested groups.
-
-<li>
-<code>node.allKnobs()</code> gives you every knob object on a node. Knobs that can hold expressions respond to <code>.hasExpression()</code> and <code>.expression()</code>.
-
-<li>
-You filter for any expression containing your user-knob’s name ("MyExpressionKnob"), and then print out exactly which node.knob is linked and what the expression is.
-
-</ul>
-<p>
-If you just want a one-liner to dump all expressions in the whole script and grep for your knob name, you could also do:
-</p>
-
-<pre python>
-for n in nuke.allNodes():  
-    for k in n.allKnobs():  
-        try:
-            e = k.expression()
-            if "MyExpressionKnob" in e:
-                print(n.name(), k.name(), e)
-        except:
-            pass
-</pre>
-
-<p>
-But sticking to group.nodes() keeps the output scoped to that Group.
-</p>
 
 
 <p>
