@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_switch_non_integral_interpolation</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Switch - Blend - Non Integral Interpolation"><h1 id="Switch - Blend - Non Integral Interpolation" class="header"><a href="#Switch - Blend - Non Integral Interpolation">Switch - Blend - Non Integral Interpolation</a></h1></div>
+
+<p>
+In Nuke, the Switch node’s “which” knob isn’t a hard integer‐only pick—if you feed it a non‐integral value it will linearly interpolate between the two nearest inputs. In other words:
+</p>
+
+<ul>
+<li>
+Let w = “which”
+
+<li>
+Let i = floor(w)
+
+<li>
+Let f = w-i
+
+<li>
+Output = input[i]×(1-f) + input[i+1]×f
+
+</ul>
+<p>
+So if you only have 2 inputs (input0 and input1) and you drive which = parent.StrokeTexture + 0.99 then:
+</p>
+
+<ul>
+<li>
+When: StrokeTexture=0 → which=0.99 → i=0, f=0.99 → 99% input1 + 1% input0
+
+<li>
+When: StrokeTexture=0.5 → which=1.49 → i=1, f=0.49 → 51% input1 + 49% (black) if you have no input2
+
+<li>
+When: StrokeTexture=1 → which=1.99 → i=1, f=0.99 → 99% input2 + 1% input1 (or black if no input2)
+
+</ul>
+<p>
+In practice, with only two inputs you’re doing a cross‐fade between them as StrokeTexture ramps from 0→1. That’s why you see the intensity moving smoothly. If you want a hard cut instead, wrap your expression in a floor() or use an integer offset:
+</p>
+
+<p>
+which = floor(parent.StrokeTexture + 0.5)
+</p>
+
+<p>
+That way, StrokeTexture&lt;0.5 picks input0, ≥0.5 picks input1, with no blending.
+</p>
+
+<div id="Switch - Blend - Non Integral Interpolation-Breakdown of terms"><h3 id="Breakdown of terms" class="header"><a href="#Switch - Blend - Non Integral Interpolation-Breakdown of terms">Breakdown of terms</a></h3></div>
+
+<p>
+Let’s break it right down in plain English—no magic, just math:
+</p>
+
+<div id="Switch - Blend - Non Integral Interpolation-Breakdown of terms-What “floor” and the fractional part mean"><h4 id="What “floor” and the fractional part mean" class="header"><a href="#Switch - Blend - Non Integral Interpolation-Breakdown of terms-What “floor” and the fractional part mean">What “floor” and the fractional part mean</a></h4></div>
+
+<ul>
+<li>
+floor(w) is “w rounded down to the nearest whole number.”
+
+<li>
+floor(1.9) → 1
+
+<li>
+floor(1.0) → 1
+
+<li>
+floor(0.99) → 0
+
+</ul>
+  
+<ul>
+<li>
+f = w – floor(w) is the fractional remainder after you take out the whole number.
+
+<li>
+if w=1.9 → floor(w)=1 → f=0.9
+
+<li>
+if w=0.4 → floor(w)=0 → f=0.4
+
+</ul>
+<div id="Switch - Blend - Non Integral Interpolation-Breakdown of terms-How Switch uses them to mix two inputs Switch internally does:"><h4 id="How Switch uses them to mix two inputs Switch internally does:" class="header"><a href="#Switch - Blend - Non Integral Interpolation-Breakdown of terms-How Switch uses them to mix two inputs Switch internally does:">How Switch uses them to mix two inputs Switch internally does:</a></h4></div>
+
+<p>
+out = input[i]×(1–f) + input[i+1]×f where i = floor(w) and f = fractional part of w.
+</p>
+
+<ul>
+<li>
+If w=0 exactly → i=0, f=0 → out = input0×1 + input1×0 → input0
+
+<li>
+If w=1 exactly → i=1, f=0 → out = input1×1 + input2×0 → input1
+
+<li>
+If w=0.5 → i=0, f=0.5 → out = input0×0.5 + input1×0.5 → 50/50 blend
+
+</ul>
+<div id="Switch - Blend - Non Integral Interpolation-Breakdown of terms-Why “+0.99” on your slider makes a 0→1 float turn into a smooth fade"><h4 id="Why “+0.99” on your slider makes a 0→1 float turn into a smooth fade" class="header"><a href="#Switch - Blend - Non Integral Interpolation-Breakdown of terms-Why “+0.99” on your slider makes a 0→1 float turn into a smooth fade">Why “+0.99” on your slider makes a 0→1 float turn into a smooth fade</a></h4></div>
+
+<p>
+You set w = parent.StrokeTexture + 0.99 so as StrokeTexture goes from 0 → 1, w goes from 0.99 → 1.99.
+</p>
+
+<ul>
+<li>
+At StrokeTexture = 0 – w = 0.99 → i = floor(0.99) = 0, f = 0.99 – out = input0×(1–0.99) + input1×0.99 = 0.01·input0 + 0.99·input1 (almost entirely input1)
+
+<li>
+At StrokeTexture = 0.5 – w = 1.49 → i = 1, f = 0.49 – out = input1×(1–0.49) + input2×0.49 = 0.51·input1 + 0.49·input2
+
+</ul>
+<p>
+(if you only wired two inputs, Nuke treats input2 as black/zero, so this is effectively 51% input1)
+</p>
+
+<ul>
+<li>
+At StrokeTexture = 1 – w = 1.99 → i = 1, f = 0.99 – out = input1×0.01 + input2×0.99 = 0.01·input1 + 0.99·black → nearly black
+
+</ul>
+<p>
+In practice you wire just input0 and input1; above you’re actually fading from input1 back down to black after StrokeTexture passes ~0.51.
+</p>
+
+<div id="Switch - Blend - Non Integral Interpolation-Breakdown of terms-A simpler way to get exact 0→1 cross-fade between two inputs"><h4 id="A simpler way to get exact 0→1 cross-fade between two inputs" class="header"><a href="#Switch - Blend - Non Integral Interpolation-Breakdown of terms-A simpler way to get exact 0→1 cross-fade between two inputs">A simpler way to get exact 0→1 cross-fade between two inputs</a></h4></div>
+
+<p>
+If all you want is out = (1–T)·input0 + T·input1 where T runs 0→1, you can choose: w = 0.0001 + T * 0.9998 Then i = 0, f ≈ T, out = input0×(1–T) + input1×T with no weird post-fade to black.
+</p>
+
+<p>
+Or just use a Keymix/Merge node’s Mix knob—that slider is designed for a straight 0–1 blend, and it never tries to treat its value as an input index.
+</p>
+
+<div id="Switch - Blend - Non Integral Interpolation-Why doesn't a straight link to the values of the slider work?"><h2 id="Why doesn't a straight link to the values of the slider work?" class="header"><a href="#Switch - Blend - Non Integral Interpolation-Why doesn't a straight link to the values of the slider work?">Why doesn't a straight link to the values of the slider work?</a></h2></div>
+
+<p>
+Because “which” is actually an integer‐only knob under the hood, feeding it a raw 0-1 float from your slider will always get truncated (or rounded) to 0 - so you only ever see input0 until you hit exactly 1.0, at which point it flips to input1.
+</p>
+
+<p>
+By writing
+</p>
+
+<pre plaintext>
+which = parent.StrokeTexture + 0.99
+</pre>
+
+<p>
+you do two things:
+</p>
+<ul>
+<li>
+You push your 0→1 slider into the 0.99→1.99 range.
+
+<li>
+For any non‐integer “which” value, Nuke linearly interpolates between the two adjacent inputs: out = in[floor(w)](1-frac(w)) + in[floor(w)+1]frac(w)
+
+</ul>
+<p>
+So:
+</p>
+
+<ul>
+<li>
+StrokeTexture=0 → which=0.99 → floor=0, frac=0.99 → 99% input1 + 1% input0
+
+<li>
+StrokeTexture=0.5 → which=1.49 → floor=1, frac=0.49 → 49% input2 (black if no input2) + 51% input1
+
+<li>
+StrokeTexture=1 → which=1.99 → floor=1, frac=0.99 → 99% input2 + 1% input1
+
+</ul>
+<p>
+With only two inputs this effectively cross‐fades input0↔input1 as your slider moves, instead of snapping at 0/1.
+</p>
+
+<p>
+If you really want a hard cut (no blend), you can wrap it in a floor or a round:
+</p>
+
+<pre plaintext>
+which = floor(parent.StrokeTexture + 0.5)
+</pre>
+
+<p>
+Now anything &lt;0.5 → input0, ≥0.5 → input1.
+</p>
+
+<table>
+<tr>
+<td>
+Is the Switch designed to do this +0.99 trick? It seems like a very opaque and obscure application.
+</td>
+</tr>
+</table>
+
+<p>
+It’s not that the Switch node was explicitly built to use “+0.99”—that’s just a clever side‐effect people discovered once they realized that:
+</p>
+
+<ul>
+<li>
+Switch’s internal “which” knob is really an integer index, but it will linearly interpolate between input N and N+1 when you feed it a floating-point value.
+
+<li>
+By offsetting your 0→1 slider into 0.99→1.99, you force that interpolation window to live entirely between input0 and input1 (and never wander off into input2).
+
+</ul>
+<p>
+So yes, it’s a bit of a hack—Switch wasn’t originally marketed as a tween tool. Its primary job is a fast, multi-input hard selector. But because of that interpolation quirk, folks reuse it as a built-in cross-fader when they don’t want to stack Merge/Keymix nodes.
+</p>
+
+<p>
+If you find the +0.99 trick too opaque, here are a couple more explicit alternatives:
+</p>
+
+<ul>
+<li>
+Use an Expression or KnobChanged script to snap the Switch index: • Expression on “which”:
+
+</ul>
+  
+<pre plaintext>
+floor(parent.StrokeTexture + 0.5)  
+</pre>
+
+<ul>
+<li>
+That gives you a hard cut at 0.5 with zero interpolation—more predictable if you just need an on/off toggle.
+
+<li>
+Swap in a Keymix (or Merge) for two-way blends:
+
+<li>
+Keymix has a dedicated “mix” knob (0→1) and never tries to interpret non-integer inputs.
+
+<li>
+Visually it says “A⟷B : mix,” so anyone reading the graph knows exactly what that slider does.
+
+<li>
+Build a tiny gizmo:
+
+<li>
+Expose a Boolean button (“Hard Cut?”) on your gizmo’s panel.
+
+<li>
+If Boolean=off, wire StrokeTexture straight into a Keymix/mix knob.
+
+<li>
+If Boolean=on, wire through floor(StrokeTexture+0.5) into a Switch which=0/1.
+
+</ul>
+<p>
+That way you keep your intent crystal-clear: – You’re either doing a straight blend (Keymix) – Or you’re switching hard (floor() → Switch) – No more magic +0.99 offsets hidden on a mystery knob.
+</p>
+
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
