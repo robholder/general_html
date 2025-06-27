@@ -391,6 +391,98 @@ Map direction to Hue and magnitude to Saturation using HSV conversion.
 For a visual walkthrough, check out this <a href="https://www.youtube.com/watch?v=jT11tFOFc5k">Redshift &amp; Nuke motion vector tutorial</a> - it shows how to extract and visualize motion vectors cleanly.
 </p>
 
+<div id="Sobel Operators (Matrix)"><h1 id="Sobel Operators (Matrix)" class="header"><a href="#Sobel Operators (Matrix)">Sobel Operators (Matrix)</a></h1></div>
+
+<p>
+How can I conceptualize or visualize the Sobel operators on a gradient and the resulting Vector Field?
+</p>
+
+<p>
+Every pixel in your gradient image carries two pieces of information once you run both Sobel filters: • Gx (via the horizontal-edge Sobel) ≈ ∂I/∂x – how quickly intensity is changing left-to-right • Gy (via the vertical-edge Sobel) ≈ ∂I/∂y – how quickly intensity is changing up-to-down
+</p>
+
+<p>
+When you treat those two outputs as the X and Y components of a 2D vector at each pixel, you’ve built a “gradient vector field.”
+</p>
+
+<p>
+What that vector field actually means:
+</p>
+<ul>
+<li>
+Direction: the arrow at each pixel points toward the steepest ascent in brightness—i.e., it’s normal to the edge at that location.
+
+<li>
+Magnitude (length): how strong that edge is (bigger change in brightness → longer arrow).
+
+</ul>
+<p>
+Why it’s useful in Nuke:
+</p>
+<ul>
+<li>
+You can visualize edge strength &amp; orientation with a Vectorfield or ColorLookup node (mapping angle→hue, magnitude→intensity).*
+
+<li>
+Feed it into a VectorBlur to smear pixels along intensity gradients (great for painterly or motion-like effects driven by image content).
+
+<li>
+Use it in custom relighting or edge-driven stylization gizmos-where the vector always tells you “which way brightness is changing here.”
+
+</ul>
+<p>
+Under the hood those two 3×3 Sobel kernels are simply finite-difference approximations of the partial derivatives:
+</p>
+
+<p>
+Gx kernel: [-1 0 +1; -2 0 +2; -1 0 +1] Gy kernel: [-1 -2 -1; 0 0 0; +1 +2 +1]
+</p>
+
+<p>
+Convolve each with your source, then pack Gx→R, Gy→G (and B=0) to get your vector map.
+</p>
+
+<p>
+So if you imagine your gradient ramp (black→white) going left to right, Gx will be positive everywhere and Gy zero—your vector field is just a bunch of right-pointing arrows. Wherever the ramp tilts up or down, those arrows tilt accordingly.
+</p>
+
+<div id="Sobel Operators (Matrix) in Series or Parallel"><h1 id="Sobel Operators (Matrix) in Series or Parallel" class="header"><a href="#Sobel Operators (Matrix) in Series or Parallel">Sobel Operators (Matrix) in Series or Parallel</a></h1></div>
+
+<p>
+In the FB SplineBlur, the Sobel operators are in Series (not Parallel) which seems odd at first. However, using in the traditional Parallel way (separate operations 'added' after the calculations).
+</p>
+
+<p>
+Here's Copilot's notes on choosing from the two:
+</p>
+
+<div id="Sobel Operators (Matrix) in Series or Parallel-Copilot"><h2 id="Copilot" class="header"><a href="#Sobel Operators (Matrix) in Series or Parallel-Copilot">Copilot</a></h2></div>
+
+<p>
+When you chain one Sobel after another—say Gy (vertical‐edge) feeding into Gx (horizontal‐edge)—you’ve effectively built a second‐derivative filter, not a true gradient field. Here’s the breakdown:
+</p>
+
+<ul>
+<li>
+What you get in series isn’t (∂I/∂x, ∂I/∂y) anymore • First pass, Gy gives you Gy = ∂I/∂y (how much the brightness is changing up/down). • Second pass, Gx on that result gives you Gx(Gy) ≈ ∂/∂x (∂I/∂y) = ∂²I/(∂x∂y). Instead of “where is the image brightest in x and y?”, you’re detecting “where does the vertical gradient itself change in x?”
+
+<li>
+Why you see a swirling vector field If your original ramp twists or curves, its first‐derivative field already “flows” around the spline. Running a second derivative along the orthogonal direction picks up those curvature changes—so your arrows end up swirling in lockstep with the bends of the blur.
+
+<li>
+Standard vs. “creative” usage • Standard Sobel‐vector workflows run Gx and Gy in parallel on the same source, then pack (Gx, Gy) into (R,G). That gives you a true gradient vector everywhere—ideal for edge masking, motion blurs driven by intensity changes, or normal‐map tricks. • Series chaining is legitimate mathematically, but it isn’t a gradient field—it’s a cross‐derivative operator more akin to what corner‐detectors or Hessian filters do. You’ll rarely see it in classic edge‐oriented pipelines, but it can be an intentional stylization: it highlights curvature or “twists” in your ramp.
+
+<li>
+If you want a swirling field that still represents first derivatives • Blur the spline, then run Gx ‖ Gy in parallel—you’ll get a smooth gradient map you can visualize with Vectorfield or feed into VectorBlur. • If you love the second‐derivative swirl, consider also experimenting with Laplacian kernels (∂²I/∂x² + ∂²I/∂y²) or a Hessian‐based ridge detector for other “curvature” effects.
+
+<li>
+Next steps • Try swapping your series chain for a parallel setup and compare the look. • Blend between first‐derivative and cross‐derivative maps for a hybrid effect. • If you’re packaging this into a gizmo, expose a toggle (“Derivative Order”) so users can choose 1st (parallel) vs. 2nd (series) derivative.
+
+</ul>
+<p>
+Understanding that series Sobel isn’t “wrong,” just a different operator, should help you decide whether you want true gradient vectors or a curvature‐emphasis pass for your stylized blur.
+</p>
+
 <div id="Analysis"><h1 id="Analysis" class="header"><a href="#Analysis">Analysis</a></h1></div>
 
 <p>

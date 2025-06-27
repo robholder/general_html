@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pm_twos_tracking_and_animation_curves_start</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="pmount_index.html">PMount</a>
+</p>
+
+<div id="Nuke - Tracking and Animation Curves on Twos"><h1 id="Nuke - Tracking and Animation Curves on Twos" class="header"><a href="#Nuke - Tracking and Animation Curves on Twos">Nuke - Tracking and Animation Curves on Twos</a></h1></div>
+
+<p>
+Here’s how you can deal with “on-twos” footage in Nuke and then lock your own hand-animated curves into the same two-frame freeze:
+</p>
+
+<div id="Nuke - Tracking and Animation Curves on Twos-Tracking “On-Twos” Option A – Half-rate your Read"><h2 id="Tracking “On-Twos” Option A – Half-rate your Read" class="header"><a href="#Nuke - Tracking and Animation Curves on Twos-Tracking “On-Twos” Option A – Half-rate your Read">Tracking “On-Twos” Option A – Half-rate your Read</a></h2></div>
+
+<div id="Nuke - Tracking and Animation Curves on Twos-Tracking “On-Twos” Option A – Half-rate your Read-Option A - Read Node"><h4 id="Option A - Read Node" class="header"><a href="#Nuke - Tracking and Animation Curves on Twos-Tracking “On-Twos” Option A – Half-rate your Read-Option A - Read Node">Option A - Read Node</a></h4></div>
+
+<p>
+In the Read node’s properties set Frame Rate = half your comp’s frame-rate (e.g. 12 fps in a 24 fps comp).
+</p>
+
+<p>
+Nuke will hold each source frame for two comp-frames. When you track normally, the 2D Tracker will only “see” real motion on the unique frames and sit flat on the duplicates.
+</p>
+
+<p>
+Your output translate/rotate/scale curves will automatically step every two frames—just what you want for true on-twos motion.
+</p>
+
+<div id="Nuke - Tracking and Animation Curves on Twos-Tracking “On-Twos” Option A – Half-rate your Read-Option B – Pre-map frames with TimeWarp"><h4 id="Option B – Pre-map frames with TimeWarp" class="header"><a href="#Nuke - Tracking and Animation Curves on Twos-Tracking “On-Twos” Option A – Half-rate your Read-Option B – Pre-map frames with TimeWarp">Option B – Pre-map frames with TimeWarp</a></h4></div>
+
+<ul>
+<li>
+Insert a TimeWarp node upstream of your Tracker.
+
+<li>
+Set Warp Mode to “TimeMap”, interpolation to Nearest, and the frame expression to:
+
+</ul>
+  
+<pre plaintext>
+floor(frame/2)  
+</pre>
+
+<ul>
+<li>
+That remaps your 24 fps input so it only samples frame 0, 1, 2… (no duplicates) while leaving the comp at 24 fps. Feed the result into your Tracker and you’ll get the same stepped curves.
+
+<li>
+Freezing Your Own Motion Curves Every Two Frames Once you’ve got a nice smooth curve, you can bake it into a two-frame step in one of two ways:
+
+</ul>
+<div id="Nuke - Tracking and Animation Curves on Twos-Python keyframe-bake (bulletproof)"><h2 id="Python keyframe-bake (bulletproof)" class="header"><a href="#Nuke - Tracking and Animation Curves on Twos-Python keyframe-bake (bulletproof)">Python keyframe-bake (bulletproof)</a></h2></div>
+
+<pre python>
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
+
+import nuke
+
+n = nuke.toNode("YourTransform")
+k = n["translate"]            # or "rotate"/"scale" etc.
+first = int(nuke.root()["first_frame"].value())
+last  = int(nuke.root()["last_frame"].value())
+
+# clear any existing keys if you really want a pure on-twos bake:
+k.clearAnimated()
+
+for f in range(first, last+1, 2):
+    v = k.getValueAt(f)
+    k.setValueAt(v, f)
+    k.setValueAt(v, f+1)
+</pre>
+
+<p>
+This loops through your shot in two-frame steps, samples the original value at each even frame f, and writes that same value back at f and f+1.
+</p>
+
+<div id="Nuke - Tracking and Animation Curves on Twos-Python() expression hack (no key baking)"><h2 id="Python() expression hack (no key baking)" class="header"><a href="#Nuke - Tracking and Animation Curves on Twos-Python() expression hack (no key baking)">Python() expression hack (no key baking)</a></h2></div>
+
+<p>
+If you don’t want to destroy your original curve, make a second Transform (or Expression) node and drive its knobs with:
+</p>
+
+<pre>
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
+python('nuke.toNode("YourTransform")["translate"].getValue(frame - frame % 2)')
+“frame – frame%2” knocks every frame back to the even frame it belongs to, so the value never changes for two frames in a row.
+</pre>
+
+<ul>
+<li>
+Pick the “half-rate Read” or “TimeWarp” trick for clean on-twos tracking, and then use either the Python bake or Python() expression to lock any motion you draw into strict two-frame steps.
+
+</ul>
+<p>
+<a href="pmount_index.html">PMount</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+</body>
+</html>
