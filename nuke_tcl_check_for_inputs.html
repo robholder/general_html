@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_tcl_check_for_inputs</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Nuke TCL - Check for Legitimate Inputs (Switch)"><h1 id="Nuke TCL - Check for Legitimate Inputs (Switch)" class="header"><a href="#Nuke TCL - Check for Legitimate Inputs (Switch)">Nuke TCL - Check for Legitimate Inputs (Switch)</a></h1></div>
+
+<table>
+<tr>
+<td>
+THIS PYTHON EXPRESSION NEEDS TO BE VERIFIED - BUT THE TCL EXPRESSIONS BELOW HAVE BEEN TESTED.
+</td>
+</tr>
+</table>
+
+<p>
+This Python expression on the 'which' knob of a Switch node will set to the other if an input is disconnected.
+</p>
+
+<pre python>
+1 if nuke.thisNode().input(0) else 0
+</pre>
+
+<p>
+This expression when set on the 'which' knob of a Switch node, will check if there is an alpha (you can check for other channels too), and sets to zero if it fails:
+</p>
+
+<pre tcl>
+[lsearch [channels this] rgba.alpha] &gt; -1
+</pre>
+
+
+<p>
+Nuke’s TCL‐expressions only re‐compute when one of the knobs they reference changes (or on frame change if you explicitly reference frame). Simply wiring or un–wiring an external input does not count as a knob change, so your lsearch [channels this] rgba.alpha] &gt; -1 will sit “stuck” until you open the editor (which forces a re‐write) or you bump another parameter.
+</p>
+
+<p>
+You have two quick ways to make it auto‐update:
+</p>
+
+<p>
+Add a dummy dependency on frame Edit your expression to include frame (multiplied by zero so it doesn’t actually affect the result), for example:
+</p>
+
+<pre tcl>
+(lsearch [channels this] rgba.alpha] &gt; -1) + 0*frame
+</pre>
+
+
+<p>
+Now on every frame Nuke will re‐evaluate that knob, see your input come and go, and switch accordingly.
+</p>
+
+<div id="Other Node Targets"><h1 id="Other Node Targets" class="header"><a href="#Other Node Targets">Other Node Targets</a></h1></div>
+
+<p>
+You don’t have to stick with “this” — the TCL channels function will take any valid node name (or full path) and return its channel list. Just replace this with the node you care about. For example, if you have a Read node called Read1 whose alpha you want to test:
+</p>
+
+<pre tcl>
+[lsearch [channels Read1] rgba.alpha] &gt; -1 + 0*frame
+</pre>
+
+<p>
+If your <code>Read1</code> is buried inside a Group called <code>MyGroup</code>, you can use its full path:
+</p>
+
+<pre tcl>
+[lsearch [channels MyGroup/Read1] rgba.alpha] &gt; -1 + 0*frame
+</pre>
+
+<p>
+Or, if you want it to be driven by a knob on your Group (say you have a String knob targetNode holding the name), you can do:
+</p>
+
+<pre tcl>
+[lsearch [channels [value targetNode]] rgba.alpha] &gt; -1 + 0*frame
+</pre>
+
+<div id="Other Node Targets-Key points:"><h2 id="Key points:" class="header"><a href="#Other Node Targets-Key points:">Key points:</a></h2></div>
+
+<ul>
+<li>
+<code>channels NodeName</code> returns the list of channels that NodeName outputs.
+
+<li>
+<code>lsearch … rgba.alpha</code> finds the index of <code>"rgba.alpha"</code> or returns -1 if missing.
+
+<li>
+You still tack on <code>+0*frame</code> so Nuke re-evaluates every frame (and on panel changes).
+
+</ul>
+<p>
+With that you can point your test at any node in your script, not just the one the expression lives on.
+</p>
+
+<div id="Other Node Targets-Efficiency"><h2 id="Efficiency" class="header"><a href="#Other Node Targets-Efficiency">Efficiency</a></h2></div>
+
+<p>
+Tcl expressions like this are extremely lightweight:
+</p>
+
+<ul>
+<li>
+String operations only: channels just returns a short list of channel names (usually 3–6 items), and lsearch does a tiny linear scan through that list.
+
+<li>
+No pixel processing: You’re not sampling pixels or touching image data—just querying metadata.
+
+<li>
+Microsecond scale: On modern hardware a single Tcl call of this sort is on the order of tens to hundreds of microseconds.
+
+</ul>
+<p>
+Even if you run it every frame, on one node it’s virtually zero overhead.
+</p>
+
+<div id="Other Node Targets-When It Could Matter"><h2 id="When It Could Matter" class="header"><a href="#Other Node Targets-When It Could Matter">When It Could Matter</a></h2></div>
+
+<p>
+You’ll only notice a slowdown if you multiply this tiny cost by a very large number of nodes or very tight loops:
+</p>
+
+<ul>
+<li>
+Dozens or hundreds of such expressions all firing every frame
+
+<li>
+Complex TCL logic beyond a simple channels/lsearch test
+
+<li>
+Expressions embedded on per-pixel operations (not the case here)
+
+</ul>
+<p>
+If your comp stays snappy with playback and ﬁlter updates, you’re fine.
+</p>
+
+<div id="Other Node Targets-Tips to Keep It Snappy"><h2 id="Tips to Keep It Snappy" class="header"><a href="#Other Node Targets-Tips to Keep It Snappy">Tips to Keep It Snappy</a></h2></div>
+
+<p>
+If you ever hit a performance wall, consider:
+</p>
+
+<ul>
+<li>
+Consolidate checks: Instead of ten nodes each running the same “alpha?” test, drive a single toggle in the Group’s Python tab and share that result.
+
+<li>
+Cache results: Use a small Python callback (only fires on frame change) to set a hidden knob once per frame, then let your Switch.which read that knob—avoids re-parsing the channel list multiple times.
+
+<li>
+Profile if needed: Drop in a timer or simply toggle the expression off/on and compare playback speeds.
+
+</ul>
+<div id="Other Node Targets-Bottom Line"><h2 id="Bottom Line" class="header"><a href="#Other Node Targets-Bottom Line">Bottom Line</a></h2></div>
+
+<p>
+For a single Switch (or even a handful), the overhead is negligible. You’re safe to leave it in place without worrying about measurable slow-downs.
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>

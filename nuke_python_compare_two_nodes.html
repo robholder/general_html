@@ -19,6 +19,35 @@
 
 <div id="Compare Two Nodes"><h1 id="Compare Two Nodes" class="header"><a href="#Compare Two Nodes">Compare Two Nodes</a></h1></div>
 
+<div id="Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences"><h2 id="Comparing Two Merge Nodes for Hidden Differences" class="header"><a href="#Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences">Comparing Two Merge Nodes for Hidden Differences</a></h2></div>
+
+<p>
+If two Merge nodes look identical in the UI but behave differently, chances are there’s a subtle mismatch in a hidden knob, default flag or expression. You can automate a full comparison with Python:
+</p>
+
+<div id="Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Select or Name Your Two Nodes"><h4 id="Select or Name Your Two Nodes" class="header"><a href="#Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Select or Name Your Two Nodes">Select or Name Your Two Nodes</a></h4></div>
+
+<p>
+Either click to select the two Merge nodes in your Node Graph, or note down their names (e.g. "Merge1" and "Merge2").
+</p>
+
+<div id="Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Run This Comparison Snippet"><h4 id="Run This Comparison Snippet" class="header"><a href="#Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Run This Comparison Snippet">Run This Comparison Snippet</a></h4></div>
+
+<p>
+Paste into the Script Editor and execute. It will:
+</p>
+
+<ul>
+<li>
+Gather every knob on each node
+
+<li>
+Serialize each knob to its script form (including hidden values, flags, expressions)
+
+<li>
+Report any knob where the two scripts differ
+
+</ul>
 <p>
 Select two nodes in the node graph, and run this script:
 </p>
@@ -61,7 +90,62 @@ else:
     nuke.message("Please select exactly two nodes to compare.")
 </pre>
 
+<div id="Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Interpreting the Results"><h4 id="Interpreting the Results" class="header"><a href="#Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Interpreting the Results">Interpreting the Results</a></h4></div>
 
+<ul>
+<li>
+Missing knobs: One node has a custom knob the other doesn’t.
+
+<li>
+Different scripts: Might be a different default value, hidden flag (e.g. <code>nuke.READ_ONLY</code>), an expression, or even a color/tile setting you didn’t spot in the panel.
+
+</ul>
+<p>
+Once you spot the offending knob, you can either manually align its value or script a fix (e.g. node2.knob("mix").setValue(node1.knob("mix").value())).
+</p>
+
+<div id="Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Bonus: Whole-Node Script Diff"><h4 id="Bonus: Whole-Node Script Diff" class="header"><a href="#Compare Two Nodes-Comparing Two Merge Nodes for Hidden Differences-Bonus: Whole-Node Script Diff">Bonus: Whole-Node Script Diff</a></h4></div>
+
+<p>
+For a broader look, you can diff the entire node definitions:
+</p>
+
+<pre>
+def node_script_lines(node):
+    # Header line for clarity
+    lines = [f"# Node {node.name()}  ({node.Class()})"]
+    # Walk every knob and grab its script form
+    for knob in node.allKnobs():
+        lines.append(knob.toScript().strip())
+    return lines
+
+import nuke
+import difflib
+
+# 1. Grab exactly two selected nodes
+selected = nuke.selectedNodes()
+if len(selected) != 2:
+    nuke.message("Select exactly two nodes to compare")
+else:
+    node_a, node_b = selected
+
+    # 2. Generate script lines for each
+    a_lines = node_script_lines(node_a)
+    b_lines = node_script_lines(node_b)
+
+    # 3. Run the diff
+    for line in difflib.unified_diff(
+            a_lines, b_lines,
+            fromfile=node_a.name(),
+            tofile=node_b.name(),
+            lineterm=""):
+        print(line)
+</pre>
+
+
+<p>
+This shows a line-by-line diff of their .nk representations—great for spotting any stray properties, comments or hidden flags.
+</p>
 
 <p>
 <a href="nuke_index.html">Nuke Index</a>
