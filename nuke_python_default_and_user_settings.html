@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_default_and_user_settings</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Adding Default and User Settings to User Knobs"><h1 id="Adding Default and User Settings to User Knobs" class="header"><a href="#Adding Default and User Settings to User Knobs">Adding Default and User Settings to User Knobs</a></h1></div>
+
+<div id="Adding Default and User Settings to User Knobs-Request"><h2 id="Request" class="header"><a href="#Adding Default and User Settings to User Knobs-Request">Request</a></h2></div>
+
+<ul>
+<li>
+I want to give the user the facility to 'save' the current settings for all knobs on a node.
+
+<li>
+What I'd like is to have a Python button that populates a "Pulldown Choice" button with Default settings, and any settings added by the user.
+
+<li>
+I'd like to 'save' settings to the pulldown menu.
+
+</ul>
+<div id="Adding Default and User Settings to User Knobs-Step-by-step Solution"><h2 id="Step-by-step Solution" class="header"><a href="#Adding Default and User Settings to User Knobs-Step-by-step Solution">Step-by-step Solution</a></h2></div>
+
+<p>
+Here’s a self-contained prototype you can drop straight into <code>Manage User Knobs…</code> on a <code>NoOp</code> (or <code>Group</code>) panel. It gives you:
+</p>
+<ul>
+<li>
+A hidden JSON store (<code>__presets</code>)
+
+<li>
+An Enumeration knob <code>preset</code>
+
+<li>
+Three Python-Script buttons:
+
+<ul>
+<li>
+<span id="Adding Default and User Settings to User Knobs-Step-by-step Solution-Init Presets"></span><strong id="Init Presets">Init Presets</strong> (captures the “factory” defaults)
+
+<li>
+<span id="Adding Default and User Settings to User Knobs-Step-by-step Solution-Apply Preset"></span><strong id="Apply Preset">Apply Preset</strong> (loads the JSON for the selected preset)
+
+<li>
+<span id="Adding Default and User Settings to User Knobs-Step-by-step Solution-Save Preset"></span><strong id="Save Preset">Save Preset</strong> (prompts for a name and appends the current settings)
+
+</ul>
+</ul>
+<div id="Adding Default and User Settings to User Knobs-In Manage User Knobs…"><h2 id="In Manage User Knobs…" class="header"><a href="#Adding Default and User Settings to User Knobs-In Manage User Knobs…">In Manage User Knobs…</a></h2></div>
+
+<p>
+Add these knobs in order (you’ll choose the types from the dialog):
+</p>
+<ul>
+<li>
+* Text knob Name:* <code>__presets</code> Label: (leave blank) Default value: <code>{}</code>:
+
+<ul>
+<li>
+Flags: ✔ Hide
+
+</ul>
+<li>
+<span id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Enumeration knob Name:"></span><strong id="Enumeration knob Name:">Enumeration knob Name:</strong> preset Label: Preset Items: leave blank (we’ll populate it in Init) Default: blank
+
+<li>
+<span id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Python Script Button Name:"></span><strong id="Python Script Button Name:">Python Script Button Name:</strong> init_presets Label: Init Presets
+
+</ul>
+<p>
+Script:
+</p>
+  
+<pre python>
+import nuke, json
+n = nuke.thisNode()
+# load or init the JSON store
+data = json.loads(n['__presets'].value() or '{}')
+if 'Default' not in data:
+    # capture factory defaults
+    defaults = {}
+    for kname, knob in n.knobs().items():
+        if kname.startswith('__') or kname in ('preset','init_presets','apply_preset','save_preset'):
+            continue
+        try:    defaults[kname] = knob.value()
+        except: pass
+    data['Default'] = defaults
+# save back
+n['__presets'].setValue(json.dumps(data))
+# populate the pulldown
+n.knob('preset').setValues(list(data.keys()))
+n.knob('preset').setValue('Default')
+</pre>
+
+<ul>
+<li>
+<span id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Python Script Button Name:"></span><strong id="Python Script Button Name:">Python Script Button Name:</strong> <code>apply_preset</code> Label: <code>Apply Preset</code>.
+
+</ul>
+<p>
+Script:
+</p>
+
+<pre python>
+import nuke, json
+n = nuke.thisNode()
+data = json.loads(n['__presets'].value() or '{}')
+sel  = n['preset'].value()
+for kname, val in data.get(sel, {}).items():
+    try: n.knob(kname).setValue(val)
+    except: pass
+</pre>
+
+<ul>
+<li>
+<span id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Python Script Button Name:"></span><strong id="Python Script Button Name:">Python Script Button Name:</strong> <code>save_preset</code> Label: <code>Save Preset</code>.
+
+</ul>
+<p>
+Script:
+</p>
+
+<pre python>
+import nuke, json
+n = nuke.thisNode()
+data = json.loads(n['__presets'].value() or '{}')
+# ask for a new preset name
+name = nuke.getInput('New Preset Name','') or f'Preset{len(data)}'
+# gather current values
+vals = {}
+for kname, knob in n.knobs().items():
+    if kname.startswith('__') or kname in ('preset','init_presets','apply_preset','save_preset'):
+        continue
+    try:    vals[kname] = knob.value()
+    except: pass
+# store &amp; save
+data[name] = vals
+n['__presets'].setValue(json.dumps(data))
+# update the pulldown and select the new preset
+n.knob('preset').setValues(list(data.keys()))
+n.knob('preset').setValue(name)
+</pre>
+
+<p>
+Finally, add whatever user controls you like (sliders, checkboxes, etc.).
+</p>
+
+<div id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage"><h3 id="Usage" class="header"><a href="#Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage">Usage</a></h3></div>
+
+<ul>
+<li>
+<span id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Init Presets:"></span><strong id="Init Presets:">Init Presets:</strong> runs once to capture your panel’s “factory” defaults into {"Default":{…}} and populates the Preset pulldown.
+
+<li>
+<span id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Apply Preset:"></span><strong id="Apply Preset:">Apply Preset:</strong> immediately applies whichever preset is chosen in that pulldown.
+
+<li>
+<span id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Save Preset:"></span><strong id="Save Preset:">Save Preset:</strong> prompts you for a new name, then freezes all current knob values under that name—adding it to the pulldown.
+
+</ul>
+<p>
+Now you have a simple preset system entirely on the Group (or NoOp) panel, without any external callbacks or gizmo-file edits.
+</p>
+
+<table>
+<tr>
+<td>
+Is this persistent across Nuke session? Do the presets get stored in RAM or inside the NoOp?
+</td>
+</tr>
+</table>
+
+<div id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Where the Presets Live"><h4 id="Where the Presets Live" class="header"><a href="#Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Where the Presets Live">Where the Presets Live</a></h4></div>
+
+<p>
+The preset map is stored in the hidden Text knob (<code>__presets</code>) on that specific NoOp (or Group) node.| 
+</p>
+<ul>
+<li>
+It’s part of the node’s knob values, so it’s serialized into your Nuke script.
+
+<li>
+When you save your <code>.nk</code> (or <code>.gizmo</code>) file, the JSON goes with it.
+
+</ul>
+<div id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Persistence Across Sessions"><h4 id="Persistence Across Sessions" class="header"><a href="#Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Persistence Across Sessions">Persistence Across Sessions</a></h4></div>
+
+<ul>
+<li>
+Yes, as long as you save your script, the presets travel with the node into any future Nuke session.
+
+<li>
+If you close without saving, you lose any newly created presets (just like any unsaved knob tweak).
+
+</ul>
+<div id="Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Session-Only vs. On-Disk"><h4 id="Session-Only vs. On-Disk" class="header"><a href="#Adding Default and User Settings to User Knobs-In Manage User Knobs…-Usage-Session-Only vs. On-Disk">Session-Only vs. On-Disk</a></h4></div>
+
+<ul>
+<li>
+In memory while the script is open, they live in RAM via the Text knob.
+
+<li>
+On disk once you hit File → Save, they’re written into the <code>.nk</code> (or <code>.gizmo</code>) file itself.
+
+</ul>
+<p>
+So your users can click Save Preset, save the script, restart Nuke, and all saved presets will reappear on that node’s panel.
+</p>
+
+<div id="Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features"><h2 id="Extending Your Panel with Preset Management Features" class="header"><a href="#Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features">Extending Your Panel with Preset Management Features</a></h2></div>
+
+<p>
+Below is a recipe to augment the Manage User Knobs setup you already have. You’ll add three new Python-Script buttons—Delete Preset, Export Preset, Import Preset—and hard-protect the <code>Default</code> entry from deletion.
+</p>
+
+<div id="Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features-Knob List (Manage User Knobs…)"><h4 id="Knob List (Manage User Knobs…)" class="header"><a href="#Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features-Knob List (Manage User Knobs…)">Knob List (Manage User Knobs…)</a></h4></div>
+
+<p>
+Make sure you already have these from before:
+</p>
+<ul>
+<li>
+Text knob:
+
+<ul>
+<li>
+Name: __presets
+
+<li>
+Default: {}
+
+<li>
+Flags: Hide
+
+</ul>
+<li>
+Enumeration knob
+
+<ul>
+<li>
+Name: preset
+
+<li>
+Label: Preset
+
+<li>
+Items: blank (populated by Init)
+
+</ul>
+<li>
+Python Script Button knobs
+
+<ul>
+<li>
+init_presets   → Init Presets
+
+<li>
+apply_preset → Apply Preset
+
+<li>
+save_preset → Save Preset
+
+</ul>
+</ul>
+<p>
+Now add:
+</p>
+<ul>
+<li>
+Python Script Button
+
+<ul>
+<li>
+Name: delete_preset
+
+<li>
+Label: Delete Preset
+
+</ul>
+<li>
+Python Script Button
+
+<ul>
+<li>
+Name: export_preset
+
+<li>
+Label: Export Preset
+
+</ul>
+<li>
+Python Script Button
+
+<ul>
+<li>
+Name: import_preset
+
+<li>
+Label: Import Preset
+
+</ul>
+</ul>
+<div id="Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features-Button Scripts"><h4 id="Button Scripts" class="header"><a href="#Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features-Button Scripts">Button Scripts</a></h4></div>
+
+<p>
+Paste these into the Script area of each button.
+</p>
+
+<ul>
+<li>
+delete_preset (deletes the selected preset)
+
+</ul>
+  
+<pre python>
+import nuke, json
+
+n   = nuke.thisNode()
+data= json.loads(n['__presets'].value() or '{}')
+sel = n['preset'].value()
+
+if sel == 'Default':
+    nuke.message("Cannot delete the Default preset.")
+else:
+    if sel in data:
+        del data[sel]
+        # write back
+        n['__presets'].setValue(json.dumps(data))
+        # repopulate pulldown, select Default
+        n.knob('preset').setValues(list(data.keys()))
+        n.knob('preset').setValue('Default')
+</pre>
+
+<ul>
+<li>
+export_preset (saves selected preset to a .json file)
+
+</ul>
+  
+<pre python>
+import nuke, json, os
+
+n    = nuke.thisNode()
+data = json.loads(n['__presets'].value() or '{}')
+sel  = n['preset'].value()
+
+if sel not in data:
+    nuke.message("No such preset to export.")
+else:
+    # ask for file path
+    path = nuke.getFilename("Export Preset", "json")
+    if path:
+        with open(path, 'w') as f:
+            json.dump({sel: data[sel]}, f, indent=2)
+        nuke.message("Preset '%s' exported to\n%s" % (sel, os.path.basename(path)))
+
+* import_preset (loads one or more presets from a .json file)
+
+{{{python
+import nuke, json, os
+
+n    = nuke.thisNode()
+data = json.loads(n['__presets'].value() or '{}')
+
+# pick a JSON file containing {"Name":{…}, …}
+path = nuke.getFilename("Import Preset(s)", "json")
+if path:
+    try:
+        with open(path) as f:
+            incoming = json.load(f)
+    except Exception as e:
+        nuke.message("Error reading JSON:\n" + str(e))
+    else:
+        # merge (overwrites any name duplicates)
+        data.update(incoming)
+        n['__presets'].setValue(json.dumps(data))
+        # refresh pulldown, select first imported
+        names = list(data.keys())
+        n.knob('preset').setValues(names)
+        # pick the first new key
+        new_sel = next(iter(incoming.keys()))
+        n.knob('preset').setValue(new_sel)
+        nuke.message("Imported preset(s):\n" + ", ".join(incoming.keys()))
+</pre>
+
+<div id="Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features-Protecting “Default”"><h4 id="Protecting “Default”" class="header"><a href="#Adding Default and User Settings to User Knobs-Extending Your Panel with Preset Management Features-Protecting “Default”">Protecting “Default”</a></h4></div>
+
+<ul>
+<li>
+<code>Init Presets</code> should always create a <code>Default</code> entry if missing.
+
+<li>
+<code>delete_preset</code> refuses to delete when <code>sel == 'Default'</code>.
+
+<li>
+<code>import_preset</code> and <code>save_preset</code> simply overwrite or add—never touches Default unless you explicitly name it.
+
+</ul>
+<div id="Adding Default and User Settings to User Knobs-Workflow"><h2 id="Workflow" class="header"><a href="#Adding Default and User Settings to User Knobs-Workflow">Workflow</a></h2></div>
+
+<ul>
+<li>
+Init Presets → capture your authored defaults under "Default" and populate the pulldown.
+
+<li>
+Save Preset → snapshot the current knobs under a new name.
+
+<li>
+Apply Preset → instantly restore any saved preset.
+
+<li>
+Delete Preset → remove unwanted user-created presets (Default is always safe).
+
+<li>
+Export Preset → write a single preset out to JSON.
+
+<li>
+Import Preset → merge external JSON files into your panel’s list.
+
+</ul>
+<p>
+All presets live in the hidden <code>__presets</code> knob on that node, so they travel with your script or Gizmo automatically.
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
