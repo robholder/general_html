@@ -762,6 +762,66 @@ In UDIM 1002 at the same local U (0.3) it will be R=1.3 (brighter red).
 That jump is simply the coordinate stepping into the next tile, not a coded “pass label.” You then use those values to drive your STMap/UVTile logic so the right texture tile is sampled.
 </p>
 
+<div id="UDIM Passes &amp; Noise-In the Comp - The Grade Node (Whitepoint)"><h3 id="In the Comp - The Grade Node (Whitepoint)" class="header"><a href="#UDIM Passes &amp; Noise-In the Comp - The Grade Node (Whitepoint)">In the Comp - The Grade Node (Whitepoint)</a></h3></div>
+
+<p>
+The tooltip says:
+</p>
+
+<table>
+<tr>
+<td>
+"Set the clamp to the number of UDIMS in the scene geometry. Larger numbers will reduce fidelity, but ensure coverage of all geo."
+</td>
+</tr>
+</table>
+
+<p>
+The tooltip really nails it: that Grade is not there to recolor—it's acting as a “clamp &amp; scale” on your UV‐pass so that the STMap node drives the noise sampler over exactly the UDIM range you care about.
+</p>
+
+<div id="UDIM Passes &amp; Noise-In the Comp - The Grade Node (Whitepoint)-Here’s the step-by-step in the setup:"><h5 id="Here’s the step-by-step in the setup:" class="header"><a href="#UDIM Passes &amp; Noise-In the Comp - The Grade Node (Whitepoint)-Here’s the step-by-step in the setup:">Here’s the step-by-step in the setup:</a></h5></div>
+
+<ul>
+<li>
+The CG render emits a UV pass where each pixel’s R and G are the U,V coordinates.
+
+<li>
+You pipe that UV pass through a Grade node, using the whitepoint slider as a clamp/scale value.
+
+<ul>
+<li>
+Grade’s whitepoint defines the input value that maps to output = 1.0 (anything above it gets clipped to 1).
+
+<li>
+By setting whitepoint = N (the number of UDIM tiles in your scene), you effectively remap UVs from [0…N] → [0…1] and clamp anything above N down to 1.
+
+</ul>
+<li>
+That graded result goes into STMap’s stmap input. STMap then interprets those normalized U &amp; V channels as “where in the noise texture to sample.”
+
+<li>
+The noise node in STMap’s src sees a UV map that covers [0…1] exactly once for each tile in the UDIM space you specified.
+
+</ul>
+<div id="UDIM Passes &amp; Noise-In the Comp - The Grade Node (Whitepoint)-Why this matters:"><h4 id="Why this matters:" class="header"><a href="#UDIM Passes &amp; Noise-In the Comp - The Grade Node (Whitepoint)-Why this matters:">Why this matters:</a></h4></div>
+
+<ul>
+<li>
+If you set whitepoint too low, any UVs outside that range will all collapse to 1—so large chunks of geometry end up sampling the same noise.
+
+<li>
+If you set it too high, you spread the [0…1] noise domain across many UDIMs, giving each tile less noise detail (reduced fidelity).
+
+<li>
+By matching whitepoint to your UDIM count, you ensure each tile sees the full [0…1] noise sweep exactly once, with no out-of-range UVs sampling “blank” areas.
+
+</ul>
+<p>
+In short, that Grade’s whitepoint knob is a quick “map your 0→UDIM-space UVs into a 0→1 domain for STMap” so your procedural noise tiles correctly over all of your scene’s geometry.
+</p>
+
+
 <div id="Node by Node"><h1 id="Node by Node" class="header"><a href="#Node by Node">Node by Node</a></h1></div>
 
 <p>
