@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pmount_tools_batch_rename</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+<div id="Tools"><h2 id="Tools" class="header"><a href="#Tools">Tools</a></h2></div>
+
+<div id="Batch Rename"><h1 id="Batch Rename" class="header"><a href="#Batch Rename">Batch Rename</a></h1></div>
+
+<div id="Batch Rename-Nuke Message"><h3 id="Nuke Message" class="header"><a href="#Batch Rename-Nuke Message">Nuke Message</a></h3></div>
+
+
+<pre>
+#!/usr/bin/env python
+
+"""
+File: batch_rename.py
+
+Description: Nuke 'message' with fields for 'search' term and 'replace' term.
+
+Description: Python Qt panel for Nuke, to allow for channel filtering and selection to create
+             corresponding shuffle nodes. Primarily for creating Matte streams.
+
+Author: Robert Holder
+
+Created: 6/20/2025
+
+Version History:
+"""
+
+
+import nuke
+
+def batch_rename_nodes():
+    # 1) Gather selection
+    nodes = nuke.selectedNodes()
+    if not nodes:
+        nuke.message("No nodes selected – please select some nodes first.")
+        return
+
+    # 2) Build the dialog
+    p = nuke.Panel("Batch Rename")
+    p.addSingleLineInput("Search for:", "")
+    p.addSingleLineInput("Replace with:", "")
+    ok = p.show()
+    if not ok:
+        return
+
+    search  = p.value("Search for:")
+    replace = p.value("Replace with:")
+
+    # 3) Perform renaming inside an undo context
+    with nuke.Undo("Batch Rename Nodes"):
+        for node in nodes:
+            old_name = node.name()
+            new_name = old_name.replace(search, replace)
+            if new_name != old_name:
+                try:
+                    node.setName(new_name)
+                except RuntimeError:
+                    # Happens if new_name already exists in the script
+                    nuke.message(f"Cannot rename '{old_name}' → '{new_name}': name in use.")
+
+
+
+batch_rename_nodes()
+
+#nuke.menu("Nuke").addCommand( "Custom/Batch Rename…", "batch_rename_nodes()")
+</pre>
+<pre><code>
+</code></pre>
+
+<div id="Batch Rename-Qt PySide2"><h3 id="Qt PySide2" class="header"><a href="#Batch Rename-Qt PySide2">Qt PySide2</a></h3></div>
+
+<p>
+Start point:
+</p>
+
+<pre python>
+import nuke
+#!/usr/bin/env python
+
+"""
+File: batch_rename.py
+
+Description: Nuke 'message' with fields for 'search' term and 'replace' term.
+
+Description: Python Qt panel for Nuke, corresponding shuffle nodes. Primarily for creating Matte streamsto allow for channel filtering and selection to create.
+
+Author: Robert Holder
+
+Created: 6/20/2025
+
+Version History:
+"""
+
+import nukescripts
+from PySide2 import QtWidgets, QtCore
+
+ 
+# 1) Create the Dialog Class
+class BatchRenameDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(BatchRenameDialog, self).__init__(parent)
+        self.setWindowTitle("Batch Rename Nodes")
+        self.setWindowFlags(self.windowFlags() &amp; ~QtCore.Qt.WindowContextHelpButtonHint)
+
+        # Widgets
+        self.search_label  = QtWidgets.QLabel("Search for:")
+        self.search_input  = QtWidgets.QLineEdit()
+        self.replace_label = QtWidgets.QLabel("Replace with:")
+        self.replace_input = QtWidgets.QLineEdit()
+        self.ok_button     = QtWidgets.QPushButton("OK")
+        self.cancel_button = QtWidgets.QPushButton("Cancel")
+
+        # Layout: form + buttons
+        form = QtWidgets.QFormLayout()
+        form.addRow(self.search_label,  self.search_input)
+        form.addRow(self.replace_label, self.replace_input)
+
+        btns = QtWidgets.QHBoxLayout()
+        btns.addStretch(1)
+        btns.addWidget(self.ok_button)
+        btns.addWidget(self.cancel_button)
+
+        main = QtWidgets.QVBoxLayout(self)
+        main.addLayout(form)
+        main.addLayout(btns)
+
+        # Signals
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+
+    @staticmethod
+    def getTerms(parent=None):
+        dialog = BatchRenameDialog(parent)
+        result = dialog.exec_()
+        return (dialog.search_input.text(),
+                dialog.replace_input.text(),
+                result == QtWidgets.QDialog.Accepted)
+
+
+# 2) The Tool Entry Point
+def batch_rename_nodes_dialog():
+    nodes = nuke.selectedNodes()
+    if not nodes:
+        nuke.message("No nodes selected.\nPlease select one or more nodes first.")
+        return
+
+    # Find a suitable parent for our dialog
+    qt_app = QtWidgets.QApplication.instance()
+    parent = qt_app.activeWindow() if qt_app else None
+
+    search, replace, ok = BatchRenameDialog.getTerms(parent)
+    if not ok:
+        return
+
+    # Perform rename inside Nuke's undo stack
+    with nuke.Undo("Batch Rename Nodes"):
+        for node in nodes:
+            old_name = node.name()
+            new_name = old_name.replace(search, replace)
+            if new_name != old_name:
+                try:
+                    node.setName(new_name)
+                except RuntimeError:
+                    nuke.message(f"Cannot rename '{old_name}' → '{new_name}': name already exists.")
+
+
+# 3) Hook Into Nuke's Menu
+#menu = nuke.menu("Nuke")
+#menu.addCommand( "Custom/Batch Rename…", "batch_rename_nodes_dialog()")
+</pre>
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+</body>
+</html>
