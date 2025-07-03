@@ -450,8 +450,61 @@ Alternatively, just clone - but this was an interesting case to see (and how to 
 <div id="fBm Noise Formula"><h1 id="fBm Noise Formula" class="header"><a href="#fBm Noise Formula">fBm Noise Formula</a></h1></div>
 
 <p>
-Breakdown of the fBm Noise Formula
+Breakdown of the fBm Noise Formula on the customized Expression node, HueNoise_controls:
 </p>
+
+<div id="fBm Noise Formula-Red"><h4 id="Red" class="header"><a href="#fBm Noise Formula-Red">Red</a></h4></div>
+
+<pre nuke>
+set cut_paste_input [stack 0]
+version 15.0 v7
+push $cut_paste_input
+Expression {
+ channel0 rgb
+ expr0 fBm(r*xScale/globalScale+pos.x,g*yScale/globalScale+pos.y,b*zScale/globalScale+pos.z,oct,lac,gain)
+ name HueNoise_controls
+ selected true
+ xpos 376
+ ypos 438
+ addUserKnob {20 User}
+ addUserKnob {13 pos}
+ pos {1850 925 0}
+ addUserKnob {7 globalScale R 0 10}
+ globalScale 15
+ addUserKnob {7 yScale R 0 5}
+ yScale 0.5
+ addUserKnob {7 xScale R 0 5}
+ xScale 0.5
+ addUserKnob {7 zScale R 0 5}
+ zScale 0.5
+ addUserKnob {7 oct R 0 10}
+ oct 10
+ addUserKnob {7 lac R 0 5}
+ lac 3.82
+ addUserKnob {7 gain R 0 2}
+ gain 0.5
+}
+</pre>
+
+<div id="fBm Noise Formula-Green"><h4 id="Green" class="header"><a href="#fBm Noise Formula-Green">Green</a></h4></div>
+
+<p>
+As <code>Red</code> but with:
+</p>
+<pre nuke>
+ pos {{parent.HueNoise_controls.pos} {parent.HueNoise_controls.pos-1000} {parent.HueNoise_controls.pos}}
+</pre>
+
+<div id="fBm Noise Formula-Blue"><h4 id="Blue" class="header"><a href="#fBm Noise Formula-Blue">Blue</a></h4></div>
+
+<p>
+As <code>Red</code> but with:
+</p>
+<pre nuke>
+ pos {{parent.HueNoise_controls.pos} {parent.HueNoise_controls.pos+1000} {parent.HueNoise_controls.pos}}
+</pre>
+
+<div id="fBm Noise Formula-Generic Formula"><h4 id="Generic Formula" class="header"><a href="#fBm Noise Formula-Generic Formula">Generic Formula</a></h4></div>
 
 <p>
 Below is the generic form of the formula, with each term named rather than hard-coded:
@@ -617,6 +670,98 @@ noise = fBm(
 This generates a procedural noise value in the Red channel, keyed to your image content and tuned by the octaves, lacunarity, and gain knobs.
 </p>
 
+
+<div id="UDIM Passes &amp; Noise"><h1 id="UDIM Passes &amp; Noise" class="header"><a href="#UDIM Passes &amp; Noise">UDIM Passes &amp; Noise</a></h1></div>
+
+<div id="UDIM Passes &amp; Noise-What a UDIM‐based UV Pass Looks Like"><h4 id="What a UDIM‐based UV Pass Looks Like" class="header"><a href="#UDIM Passes &amp; Noise-What a UDIM‐based UV Pass Looks Like">What a UDIM‐based UV Pass Looks Like</a></h4></div>
+
+<p>
+A “UV pass” from your renderer is simply an image where each pixel’s red and green channels encode its U and V coordinates on the model. When you use UDIM tiling, those UVs aren’t constrained to 0–1—you’ll see values stepping up into 1–2, 2–3, and so on, depending on the tile.
+</p>
+
+<div id="UDIM Passes &amp; Noise-UDIM Tile Layout"><h3 id="UDIM Tile Layout" class="header"><a href="#UDIM Passes &amp; Noise-UDIM Tile Layout">UDIM Tile Layout</a></h3></div>
+
+<p>
+UDIM numbers start at 1001 in the lower‐left tile and increase to the right and then upward in rows of ten. Visually:
+</p>
+
+<pre text>
+Row y=1:  1011 1012 1013 …  
+Row y=0:  1001 1002 1003 …   ← V between 0–1
+           ↑U =0–1   1–2   2–3
+</pre>
+
+<ul>
+<li>
+Tile 1001 has UVs U∈[0,1), V∈[0,1).
+
+<li>
+Tile 1002 has U∈[1,2), V∈[0,1).
+
+<li>
+Tile 1011 has U∈[0,1), V∈[1,2).
+
+</ul>
+<div id="UDIM Passes &amp; Noise-How That Appears in Your UV Pass"><h3 id="How That Appears in Your UV Pass" class="header"><a href="#UDIM Passes &amp; Noise-How That Appears in Your UV Pass">How That Appears in Your UV Pass</a></h3></div>
+
+<p>
+In the render:
+</p>
+
+<ul>
+<li>
+U channel (R in your UV pass)
+
+<ul>
+<li>
+On tile 1001: values range 0.0→1.0 (dark to bright in red channel).
+
+<li>
+On tile 1002: values range 1.0→2.0 (even brighter).
+
+<li>
+On tile 1003: 2.0→3.0, etc.
+
+</ul>
+<li>
+V channel (G in your UV pass) works the same vertically.
+
+</ul>
+<p>
+There’s no special “brightness” hack per tile—pixels simply carry the raw U, V numbers that tell you exactly which UDIM tile and where within it each point lives.
+</p>
+
+<div id="UDIM Passes &amp; Noise-Why This Matters in Compositing"><h3 id="Why This Matters in Compositing" class="header"><a href="#UDIM Passes &amp; Noise-Why This Matters in Compositing">Why This Matters in Compositing</a></h3></div>
+
+<ul>
+<li>
+<span id="UDIM Passes &amp; Noise-Why This Matters in Compositing-Identify the tile:"></span><strong id="Identify the tile:">Identify the tile:</strong> floor(U) and floor(V) give you the tile’s X and Y index (e.g. U=4.2 → tile X=4 ⇒ 1001+4 = 1005).
+
+<li>
+<span id="UDIM Passes &amp; Noise-Why This Matters in Compositing-Reconstruct UDIM number:"></span><strong id="Reconstruct UDIM number:">Reconstruct UDIM number:</strong> UDIM = 1001 + floor(U) + floor(V)×10
+
+<li>
+<span id="UDIM Passes &amp; Noise-Why This Matters in Compositing-Sample per‐tile sources:"></span><strong id="Sample per‐tile sources:">Sample per‐tile sources:</strong> Using an STMap or UVTile node, these absolute UVs drive look-ups so that each pixel fetches the right UDIM tile of your textures.
+
+</ul>
+<div id="UDIM Passes &amp; Noise-Why This Matters in Compositing-So—does each UDIM show up as a “brighter” band?"><h4 id="So—does each UDIM show up as a “brighter” band?" class="header"><a href="#UDIM Passes &amp; Noise-Why This Matters in Compositing-So—does each UDIM show up as a “brighter” band?">So—does each UDIM show up as a “brighter” band?</a></h4></div>
+
+<p>
+Sort of—but that brightness isn’t artistic, it’s numeric:
+</p>
+
+<ul>
+<li>
+A pixel in UDIM 1001 might have U = 0.3 → R=0.3 (dark red).
+
+<li>
+In UDIM 1002 at the same local U (0.3) it will be R=1.3 (brighter red).
+
+</ul>
+<p>
+That jump is simply the coordinate stepping into the next tile, not a coded “pass label.” You then use those values to drive your STMap/UVTile logic so the right texture tile is sampled.
+</p>
+
 <div id="Node by Node"><h1 id="Node by Node" class="header"><a href="#Node by Node">Node by Node</a></h1></div>
 
 <p>
@@ -720,6 +865,21 @@ Mix set to zero (so no color influence).
 
 <li>
 Ensures stream integrity. 
+
+</ul>
+</ul>
+<div id="3d Noise Group"><h1 id="3d Noise Group" class="header"><a href="#3d Noise Group">3d Noise Group</a></h1></div>
+
+<ul>
+<li>
+HueNoise_control:
+
+<ul>
+<li>
+This is a customized <code>Expression</code> node, with 'User' knobs for variables for an fBm formula
+
+<li>
+See above for explanation.
 
 </ul>
 </ul>
