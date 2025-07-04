@@ -97,6 +97,37 @@ Someone changes the method later and assumes <code>__init__()</code> has finishe
 So while it works, it’s one of those “know what you’re doing” strategies.
 </p>
 
+<div id="Allowing Access To Nuke (With Dialog Open)"><h1 id="Allowing Access To Nuke (With Dialog Open)" class="header"><a href="#Allowing Access To Nuke (With Dialog Open)">Allowing Access To Nuke (With Dialog Open)</a></h1></div>
+
+<p>
+The <code>_find_nuke_main_window()</code> method is returning Nuke’s main application window as the parent for <code>QDialog</code>, which gives your custom UI the right stacking, focus behavior, and modality relationship without blocking the rest of Nuke. Here’s why that’s meaningful:
+</p>
+
+<div id="Allowing Access To Nuke (With Dialog Open)-🎯 Why Set the Parent to the Main Window?"><h4 id="🎯 Why Set the Parent to the Main Window?" class="header"><a href="#Allowing Access To Nuke (With Dialog Open)-🎯 Why Set the Parent to the Main Window?">🎯 Why Set the Parent to the Main Window?</a></h4></div>
+
+<ul>
+<li>
+<span id="Allowing Access To Nuke (With Dialog Open)-🎯 Why Set the Parent to the Main Window?-Window stacking"></span><strong id="Window stacking">Window stacking</strong>: It ensures your dialog stays on top of the main Nuke window but below any modal popups.
+
+<li>
+<span id="Allowing Access To Nuke (With Dialog Open)-🎯 Why Set the Parent to the Main Window?-Focus handling"></span><strong id="Focus handling">Focus handling</strong>: Clicking back on Nuke’s UI won’t accidentally bury your tool behind it, which happens if the dialog is floating unparented.
+
+<li>
+<span id="Allowing Access To Nuke (With Dialog Open)-🎯 Why Set the Parent to the Main Window?-Modal vs Non-modal"></span><strong id="Modal vs Non-modal">Modal vs Non-modal</strong>: Your dialog can stay active without locking out the rest of the Nuke UI, unless you explicitly make it modal.
+
+<li>
+<span id="Allowing Access To Nuke (With Dialog Open)-🎯 Why Set the Parent to the Main Window?-Cross-platform integration"></span><strong id="Cross-platform integration">Cross-platform integration</strong>: On macOS especially, if a dialog has no proper parent, the OS window manager may treat it as a standalone app, which messes with focus, Cmd+Tab behavior, etc.
+
+<li>
+<span id="Allowing Access To Nuke (With Dialog Open)-🎯 Why Set the Parent to the Main Window?-Event loop ownership"></span><strong id="Event loop ownership">Event loop ownership</strong>: By parenting it to the main window, your dialog cleanly inherits the application’s event loop context, drag-and-drop, tooltips, and styling.
+
+</ul>
+<div id="Allowing Access To Nuke (With Dialog Open)-💡 Extra Insight"><h4 id="💡 Extra Insight" class="header"><a href="#Allowing Access To Nuke (With Dialog Open)-💡 Extra Insight">💡 Extra Insight</a></h4></div>
+
+<p>
+The call to <code>super().__init__(self._find_nuke_main_window())</code> is subtly elegant—it wires the dialog directly into Nuke’s UI hierarchy, letting it behave like a native extension of the software, not some rogue top-level window. And because <code>_find_nuke_main_window()</code> is run right then, you’re guaranteed to bind to the current session’s live main window.
+</p>
+
 <div id="Working Code"><h1 id="Working Code" class="header"><a href="#Working Code">Working Code</a></h1></div>
 
 <p>
