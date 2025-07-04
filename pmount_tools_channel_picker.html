@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pmount_tools_channel_picker</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+<div id="Tools"><h2 id="Tools" class="header"><a href="#Tools">Tools</a></h2></div>
+
+<div id="Channel Picker"><h1 id="Channel Picker" class="header"><a href="#Channel Picker">Channel Picker</a></h1></div>
+
+<p>
+Notes on the Channel Picker code.
+</p>
+
+<div id="Channel Picker-Super Calls A Subclass Method"><h2 id="Super Calls A Subclass Method" class="header"><a href="#Channel Picker-Super Calls A Subclass Method">Super Calls A Subclass Method</a></h2></div>
+
+<pre python>
+super().__init__(self._find_nuke_main_window())
+</pre>
+<p>
+In the init stage of the Channel Picker's dialog subclass <code>class ChannelPickerDialog(QtWidgets.QDialog):</code>, there's the super init call, and it calls a method from within the subclass. Why is it doing this?
+</p>
+
+<p>
+This is one of those PySide/PyQt quirks that can be deceptively tricky when you're reading through someone else's code.
+</p>
+
+<p>
+But the mystery is this:
+</p>
+
+<pre python>
+super().__init__(self._find_nuke_main_window())
+</pre>
+
+<p>
+The <code>self._find_nuke_main_window()</code> call happens before the <code>__init__</code> of QDialog is executed—not after. That’s because Python evaluates the arguments before the method is called. So what’s happening here is:
+</p>
+<ul>
+<li>
+<code>self._find_nuke_main_window()</code> is called.
+
+<li>
+Its return value is passed as an argument to <code>QDialog.__init__()</code> (via <code>super()</code>).
+
+<li>
+Then <code>QDialog.__init__()</code> is called with that value (likely as the parent widget argument).
+
+</ul>
+<div id="Channel Picker-Super Calls A Subclass Method-🧠 So how is self._find_nuke_main_window() callable if the __init__ hasn't finished yet?"><h4 id="🧠 So how is self._find_nuke_main_window() callable if the __init__ hasn't finished yet?" class="header"><a href="#Channel Picker-Super Calls A Subclass Method-🧠 So how is self._find_nuke_main_window() callable if the __init__ hasn't finished yet?">🧠 So how is self._find_nuke_main_window() callable if the _<em>init</em>_ hasn't finished yet?</a></h4></div>
+
+<p>
+The answer lies in how Python creates objects:
+</p>
+<ul>
+<li>
+The <code>__init__()</code> method is not what creates the object; it merely initializes it.
+
+<li>
+By the time <code>__init__()</code> is executing, the object (<code>self</code>) already exists.
+
+<li>
+That means all its methods (even private ones like <code>_find_nuke_main_window</code>) are already accessible.
+
+</ul>
+<p>
+So it’s perfectly legal (though sometimes surprising) to call one of your subclass’s own methods as part of the arguments to super()._<em>init</em>_().
+</p>
+
+<div id="Channel Picker-Super Calls A Subclass Method-🤔 Should you do this?"><h4 id="🤔 Should you do this?" class="header"><a href="#Channel Picker-Super Calls A Subclass Method-🤔 Should you do this?">🤔 Should you do this?</a></h4></div>
+
+<p>
+In practice, it’s okay if you know the method doesn’t rely on the object being fully initialized yet. But it can become hard to maintain if:
+</p>
+<ul>
+<li>
+That method accesses attributes that haven’t been set yet.
+
+<li>
+Someone changes the method later and assumes <code>__init__()</code> has finished.
+
+</ul>
+<p>
+So while it works, it’s one of those “know what you’re doing” strategies.
+</p>
+
+<div id="Working Code"><h1 id="Working Code" class="header"><a href="#Working Code">Working Code</a></h1></div>
+
+<p>
+PySide 2 Code 0.3.1
+</p>
+<pre python>
+# file: channel_picker.py
+#
+# -*- coding: utf-8 -*-
+
+import nuke
+import os
+import json
+from PySide2 import QtWidgets, QtCore
+
+
+"""
+File: channel_picker.py
+
+Description: Python Qt panel for Nuke, to allow for channel filtering and selection to create
+             corresponding shuffle nodes. Primarily for creating Matte streams.
+
+Author: Robert Holder
+
+Created: 6/20/2025
+
+Version History:
+- 0.1.0 (2025-06-20): Initial beta.
+- 0.2.0 (2025-06-23): Add Refresh option and remove node selection requirement at launch.
+- 0.3.0 (2025-06-23): Remove refresh button; stack new shuffles vertically to the left; new Shuffles remain selected.
+- 0.3.1 (2025-06-23): Add clear-field buttons, fix stretch of list view, add resize corner icon.
+- 0.3.2 (2025-06-25): Add dots configuration option, fix a 'no selection' bug; now list gets cleared on 'no selection'.
+- 0.3.3 (2025-06-25): Minor tweak: new shuffles created nearer to source.
+
+"""
+
+# GLOBALS:
+
+VERSION = "Version 0.3.3"
+
+SAVE_FILTERS_PATH = os.path.join(os.path.expanduser("~"), ".nuke", "channel_picker_filters.json")
+
+# Test if the _saved_filters already exists to prevent 'overwrite'
+if "_saved_filters" not in globals():
+    import os
+    import json
+
+    SAVE_FILTERS_PATH = os.path.join(os.path.expanduser("~"), ".nuke", "channel_picker_filters.json")
+
+    _saved_filters = {}
+
+    if os.path.exists(SAVE_FILTERS_PATH):
+        try:
+            with open(SAVE_FILTERS_PATH, "r") as f:
+                _saved_filters = json.load(f)
+        except Exception as e:
+            print("Could not load saved filters:", e)
+
+    # Ensure all expected keys exist, even if the file was partial or corrupted
+    defaults = {
+        "f1": "matte",
+        "f2": "",
+        "f3": "",
+        "f4": "",
+        "radio": "a",
+        "dots_layout": True,
+        "remember": False,
+    }
+    # If a key is missing, add the key with a default value, else leave 'as is'
+    for key, val in defaults.items():
+        _saved_filters.setdefault(key, val)
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 1) ProxyModel: AND-logic multi-pattern filter for a QStringListModel
+# ────────────────────────────────────────────────────────────────────────────────
+class MultiPatternProxyModel(QtCore.QSortFilterProxyModel):
+    """
+    A QSortFilterProxyModel subclass that supports AND-based multi-pattern filtering.
+
+    When you call `setPatterns([...])`, it stores all non-empty strings and updates the
+    filtering behavior so that only rows that contain *all* the specified substrings
+    (case-insensitive) will be shown.
+    """
+
+    def __init__(self, parent=None):
+        """
+        Initialize the proxy model, using case-insensitive filtering by default.
+        """
+        super().__init__(parent)
+        self.patterns = []  # list of active filter terms
+        self.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
+
+    def setPatterns(self, patterns):
+        """
+        Custom Method.
+        Provide a list of filter patterns. Only non-empty strings are kept.
+
+        Parameters:
+            patterns (List[str]): A list of user-entered search terms.
+        """
+        self.patterns = [p for p in patterns if p]
+        self.invalidateFilter()  # Qt method - triggers a view re-evaluation, and a refresh
+
+    def filterAcceptsRow(self, row, parent):
+        """
+        Overridden Qt Method.
+        Override the default filtering behavior. Accepts rows only if their
+        string in column 0 contains *all* of the specified patterns.
+
+        Returns:
+            bool: True if row matches all filters, False otherwise.
+        """
+        # sourceModel returns the original model that the proxy is filtering.
+        # Get the text for this row in column 0 (parent is obsolete here practically)
+        # Get data
+        indx = self.sourceModel().index(row, 0, parent)
+        # Extract text
+        txt = self.sourceModel().data(indx)
+
+        # Accept the row only if ALL patterns are found as substrings
+        return all(p.lower() in txt.lower() for p in self.patterns)
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 2) ChannelPickerDialog
+# ────────────────────────────────────────────────────────────────────────────────
+class ChannelPickerDialog(QtWidgets.QDialog):
+    RADIO_MAP = {'r':'red','g':'green','b':'blue','a':'alpha'}
+    KEY_ORDER = ['r','g','b','a']
+
+    def __init__(self, nodes):
+        """
+        Create and configure the Channel Picker dialog.
+
+        This dialog presents a combined list of channels from the supplied Nuke nodes,
+        lets the user filter them via up to four text patterns, and pick one or more
+        channels to shuffle into new R/G/B/A outputs.  A set of radio buttons
+        chooses which output channel to map, and a “remember filters” checkbox
+        optionally persists filter text between Nuke sessions.
+
+        Args:
+            nodes (List[nuke.Node]):
+                One or more Nuke node objects whose
+                channel names will populate the list.
+
+        Side Effects:
+            - Starts a QTimer to poll for node reselection.
+            - Builds a QStringListModel + MultiPatternProxyModel for live filtering.
+            - Creates 4 QLineEdits, pre-filled from saved settings.
+            - Instantiates a QListView in extended-selection mode.
+            - Adds r/g/b/a radio buttons in a button group.
+            - Adds “Create Shuffles” and “Close” buttons.
+            - Adds a “Remember filters” checkbox + status label to control JSON persistence.
+            - Wires up all signal connections (filters → proxy → view resizing, enable/disable buttons, save on close).
+            - Calls `_update_patterns()` once to apply the initial filter state.
+        """
+        super().__init__(self._find_nuke_main_window())
+        # Older syntax:
+        #super(ChannelPickerDialog, self).__init__(self._find_nuke_main_window())
+
+        self.setWindowTitle("Channel Picker")
+        self.nodes = nodes
+
+        # keep track of which node’s channels we’re showing
+        if self.nodes:
+            self._last_src = nodes[0]
+        else:
+            self._last_src = None
+
+        # set up a timer to poll for new node selection
+        self._poll = QtCore.QTimer(self)
+        self._poll.setInterval(300)                       # every 300ms
+        self._poll.timeout.connect(self._check_for_new_source)
+        self._poll.start()
+
+        # - build channel list → model → proxy
+        chans = sorted({c for n in nodes for c in n.channels()})
+        base  = QtCore.QStringListModel(chans, self)
+        self.proxy = MultiPatternProxyModel(self)
+        self.proxy.setSourceModel(base)
+
+        # - four search fields (first pre-filled “matte”)
+        self.search1 = QtWidgets.QLineEdit(_saved_filters.get("f1", "matte"))
+        self.search1.setPlaceholderText("Filter #1")
+        self.search1.setClearButtonEnabled(True)
+        self.search2 = QtWidgets.QLineEdit(_saved_filters.get("f2", ""))
+        self.search2.setPlaceholderText("Filter #2")
+        self.search2.setClearButtonEnabled(True)
+        self.search3 = QtWidgets.QLineEdit(_saved_filters.get("f3", ""))
+        self.search3.setPlaceholderText("Filter #3")
+        self.search3.setClearButtonEnabled(True)
+        self.search4 = QtWidgets.QLineEdit(_saved_filters.get("f4", ""))
+        self.search4.setPlaceholderText("Filter #4")
+        self.search4.setClearButtonEnabled(True)
+
+        # - live list (ExtendedSelection for Shift/Ctrl-style multi-select)
+        self.view = QtWidgets.QListView()
+        self.view.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        self.view.setModel(self.proxy)
+        self.view.setSelectionMode(
+            QtWidgets.QAbstractItemView.ExtendedSelection
+        )
+
+        # Now connect to resizing after the model is live
+        self.proxy.rowsInserted.connect(self._resize_view_to_content)
+        self.proxy.rowsRemoved.connect(self._resize_view_to_content)
+
+
+        # - horizontal radios (r, g, b, a)
+        self.radio_group = QtWidgets.QButtonGroup(self)
+        radio_w = QtWidgets.QWidget()
+        radio_l = QtWidgets.QHBoxLayout(radio_w)
+        radio_l.setContentsMargins(0,0,0,0)
+        #radio_l.setSpacing(12)
+        for key in self.KEY_ORDER:
+            btn = QtWidgets.QRadioButton(key)
+            btn.setSizePolicy(QtWidgets.QSizePolicy.Fixed,
+                              QtWidgets.QSizePolicy.Fixed)
+            radio_l.addWidget(btn)
+            self.radio_group.addButton(btn)
+
+            # Radio restoration
+            radio_key = _saved_filters.get("radio", "a")
+            for btn in self.radio_group.buttons():
+                if btn.text() == radio_key:
+                    btn.setChecked(True)
+
+        radio_l.addStretch(1)
+        radio_w.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
+                              QtWidgets.QSizePolicy.Fixed)
+
+        # - action buttons
+        self.create_btn = QtWidgets.QPushButton("Create Shuffles")
+        self.create_btn.setEnabled(False)
+        self.close_btn  = QtWidgets.QPushButton("Close")
+
+        # - dots checkbox
+        self.dots_cb = QtWidgets.QCheckBox("Create 'Dots' with Shuffles")
+        self.dots_cb.setChecked(_saved_filters.get("dots_layout", True))
+        self.dots_cb.setLayoutDirection(QtCore.Qt.RightToLeft)
+        dots_cb_h = QtWidgets.QHBoxLayout()
+        dots_cb_h.addStretch()
+        dots_cb_h.addWidget(self.dots_cb, alignment=QtCore.Qt.AlignRight)
+
+        # - remember settings checkbox
+        self.remember_filters_cb = QtWidgets.QCheckBox("Remember filters between Nuke sessions")
+        self.remember_filters_cb.setChecked(_saved_filters.get("remember", False))
+        # Flip it so the box appears on the right
+        self.remember_filters_cb.setLayoutDirection(QtCore.Qt.RightToLeft)
+        remember_cb_h = QtWidgets.QHBoxLayout()
+        remember_cb_h.addStretch()
+        remember_cb_h.addWidget(self.remember_filters_cb, alignment=QtCore.Qt.AlignRight)
+
+        # - saving status label
+        self.status_label = QtWidgets.QLabel("")  # Will show "Saved!" or "Session only"
+        self.status_label.setAlignment(QtCore.Qt.AlignRight)
+        self._update_filter_status_label()  # Set initial text
+
+        # - version label
+        self.version_label = QtWidgets.QLabel(VERSION)
+        self.version_label.setAlignment(QtCore.Qt.AlignRight)
+        self.version_label.setStyleSheet("color: gray;")
+
+        # Build a footer VBox that pushes everything to the right and stacks vertically.
+        footer_v  = QtWidgets.QVBoxLayout()
+        footer_v.addStretch()
+        footer_v.addLayout(dots_cb_h)
+        footer_v.addLayout(remember_cb_h)
+        #footer_v.addWidget(self.dots_cb, alignment=QtCore.Qt.AlignRight)
+        footer_v.addWidget(self.status_label, alignment=QtCore.Qt.AlignRight)
+        footer_v.addWidget(self.version_label, alignment=QtCore.Qt.AlignRight)
+
+        # Add resize corner.
+        size_grip = QtWidgets.QSizeGrip(self)
+        footer_v.addWidget(size_grip, 0, QtCore.Qt.AlignRight)
+        # Wrap v box into h box
+        footer = QtWidgets.QHBoxLayout()
+        footer.addStretch()  # absorbs left-over space
+        footer.addLayout(footer_v)
+
+        # - layout
+        main = QtWidgets.QVBoxLayout(self)
+        for w in (self.search1, self.search2, self.search3, self.search4):
+            main.addWidget(w)
+        main.addWidget(self.view, stretch=1)
+        main.addWidget(radio_w, alignment=QtCore.Qt.AlignLeft)
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(self.create_btn)
+        btn_row.addWidget(self.close_btn)
+        main.addLayout(btn_row)
+        main.addLayout(footer)
+
+        # - signals
+        for w in (self.search1, self.search2, self.search3, self.search4):
+            w.textChanged.connect(self._update_patterns)
+        self.radio_group.buttonClicked.connect(self._update_patterns)
+        self.proxy.rowsInserted.connect(self._toggle_create)
+        self.proxy.rowsRemoved .connect(self._toggle_create)
+        self.view.selectionModel().selectionChanged.connect(self._toggle_create)
+        self.create_btn.clicked.connect(self._on_create)
+        self.close_btn.clicked.connect(self.close)
+        self.remember_filters_cb.stateChanged.connect(self._update_filter_status_label)
+
+        # - kickoff
+        self._update_patterns()
+
+    def _update_filter_status_label(self):
+        """
+        Refresh the small status label to reflect the “remember filters” checkbox state.
+
+        Reads the state of `self.remember_filters_cb` and updates
+        `self.status_label` with a clear message and style:
+
+          - When checked: displays “✔ Saving filters between sessions”
+          - When unchecked: displays “⚠ Saving session filters only”
+
+        The label text color is set uniformly (gray) to keep the focus on the message.
+        """
+        if self.remember_filters_cb.isChecked():
+            self.status_label.setText("✔ Saving filters between Nuke sessions")
+            self.status_label.setStyleSheet("color: gray;")
+        else:
+            self.status_label.setText("⚠ Saving filters per Nuke session only")
+            self.status_label.setStyleSheet("color: gray;")
+
+    def _find_nuke_main_window(self):
+        """
+        Locate the main Nuke application window for parenting dialogs.
+
+        Iterates through the QApplication’s top‐level widgets and returns
+        the first one whose className matches Nuke’s main window types.
+
+        Returns:
+            QWidget or None: The DockMainWindow or MainWindow instance if found,
+            otherwise None.
+        """
+        app = QtWidgets.QApplication.instance()
+        for w in app.topLevelWidgets():
+            if w.metaObject().className() in ("DockMainWindow","MainWindow"):
+                return w
+        return None
+
+    def _update_patterns(self, *_):
+        """Updates the filtering patterns for the proxy based on UI elements.
+
+        This method gathers filter text from four search fields (search1, search2, search3, and search4)
+        and, if a radio button is selected in the radio_group, appends the corresponding RGBA channel key
+        (using the RADIO_MAP lookup) to the list of patterns. The resulting list is then passed to the
+        proxy model via setPatterns() to update the display immediately. If the dialog has already been
+        deleted (indicated by the absence of the 'search4' attribute), the method returns without making
+        any changes.
+
+        Args:
+            *_: Additional positional arguments (ignored).
+        """
+        # Prevent accidental calls after dialog deletion
+        if not hasattr(self, "search4"):
+            return
+
+        # Append the selected RGBA channel key (e.g. 'r', 'g', 'b', 'a')
+        patterns = [
+            self.search1.text(),
+            self.search2.text(),
+            self.search3.text(),
+            self.search4.text()
+        ]
+
+        rb = self.radio_group.checkedButton()
+        if rb:
+            patterns.append(self.RADIO_MAP[rb.text()])
+
+        # Push the new pattern list into the proxy for immediate filtering
+        self.proxy.setPatterns(patterns)
+
+    def showEvent(self, event):
+        """
+        Overridden Qt Method.
+        Handle the dialog’s show event by deferring the initial load and layout.
+
+        This override ensures that channel population and view resizing
+        happen only after the dialog is first rendered, preventing
+        premature measurements on an empty or unpainted widget.
+
+        Args:
+            event (QShowEvent): The Qt show event that triggered this method.
+        """
+        # Call implementation of base class's showEvent() before custom behavior.
+        super().showEvent(event)
+        # Give Qt a moment to finish showing us...
+        QtCore.QTimer.singleShot(0, self._initialize_view)
+
+    def _initialize_view(self):
+        """
+        Perform the dialog’s initial population and sizing pass.
+
+        Called once immediately after the dialog is shown. This method
+        forces a refresh of the channel list from the current Nuke node
+        selection and then resizes the view to snugly fit its content,
+        allowing the window to shrink to the correct width on first display.
+
+        Side effects:
+            - Invokes self._check_for_new_source() to load channels.
+            - Invokes self._resize_view_to_content(shrink=True) to adjust width.
+
+        No parameters or return value.
+        """
+        # Force a population from whatever's selected now
+        self._check_for_new_source()
+        # Now resize based on the real content
+        self._resize_view_to_content(shrink=True)
+
+    def _resize_view_to_content(self, shrink=False):
+        """
+        Resize the dialog’s list view width to fit its current contents.
+
+        Calculates the width needed for the widest visible row plus
+        margins for scrollbars and framing, then adjusts the dialog’s
+        width. By default, this only expands the window; if `shrink=True`,
+        it will also shrink the window to match the content.
+
+        Args:
+            shrink (bool):
+                If True, allows the dialog to shrink to fit the content.
+                If False (default), only increases width if content is larger.
+
+        Side effects:
+            - May call self.resize() to adjust the dialog’s width.
+            - Does nothing if there are no rows in the proxy model.
+        """
+        count = self.proxy.rowCount()
+        if count == 0:
+            return
+
+        # Find widest visible row
+        max_w = 0
+        for row in range(count):
+            idx = self.proxy.index(row, 0)
+            hint = self.view.sizeHintForIndex(idx)
+            max_w = max(max_w, hint.width())
+
+        # Add scrollbar, frame, and padding
+        margin = self.view.frameWidth() \
+               + self.view.verticalScrollBar().sizeHint().width() \
+               + 20
+        target = max_w + margin
+
+        # Determine new width
+        if shrink:
+            new_width = target
+        else:
+            new_width = max(self.width(), target)
+
+        # Apply the resize
+        self.resize(new_width, self.height())
+
+    def _toggle_create(self, *args):
+        """
+        Enable or disable the “Create Shuffles” button based on user selections.
+
+        This method checks two things:
+          1. At least one channel is selected in the QListView.
+          2. At least one Nuke node is selected in the DAG.
+
+        If both conditions are true, the Create button becomes enabled; otherwise, it’s disabled.
+
+        Args:
+            *args: Optional positional arguments (ignored). This signature lets
+                   this method be connected to Qt signals like rowsInserted,
+                   rowsRemoved, and selectionChanged.
+
+        Side effects:
+            Updates the enabled state of self.create_btn.
+        """
+        # must have at least one channel AND at least one DAG-node selected
+        sel_chans = self.view.selectionModel().selectedIndexes()
+        sel_nodes = nuke.selectedNodes()
+        ok = bool(sel_chans) and bool(sel_nodes)
+        self.create_btn.setEnabled(ok)
+
+    def _on_create(self):
+        """
+        Instantiate Shuffle2 nodes for each selected channel and map them into RGBA.
+
+        When the user clicks “Create Shuffles”, this method:
+          1. Verifies that one or more channels are selected in the list.
+          2. Retrieves the first selected Nuke node as the source.
+          3. Wraps the entire creation sequence in a Nuke.Undo context
+             so the user can undo all shuffles in one step.
+          4. For each selected channel:
+             - Splits its full name into layer and channel parts.
+             - Creates a new Shuffle2 node.
+             - Connects its A-input to the source node.
+             - Sets its `in1` knob to the layer name.
+             - Maps the chosen channel into all RGBA outputs.
+             - Labels the node with its layer name.
+             - Offsets the node’s position in the DAG for visibility.
+          5. Clears the list selection and disables the Create button,
+             leaving the dialog open for further edits.
+
+        Side Effects:
+            - Adds one or more Shuffle2 nodes to the Nuke graph.
+            - Alters node positions and knob values.
+            - Clears the QListView selection and disables `self.create_btn`.
+        """
+        indxs = self.view.selectionModel().selectedIndexes()
+        if not indxs:
+            self._toggle_create()
+            return
+
+        sel_nodes = nuke.selectedNodes()
+        src = sel_nodes[0]
+
+        indx_count = len(indxs)
+
+
+        shuffles = []
+
+        if not self.dots_cb.isChecked():
+            # Create vertically stacked shuffles connected to source node
+            with nuke.Undo(f"Create {indx_count} Shuffles"):
+                offset_x, offset_y = -300, 80
+                for indx in indxs:
+                    full_chan = indx.data()               # e.g. "mymatte.alpha"
+                    layer, channel = full_chan.split('.', 1)
+
+                    sh = nuke.nodes.Shuffle2()
+                    sh.setInput(0, src)
+                    sh["in1"].setValue(layer)
+                    shuffles.append(sh)
+
+                    self._set_shuffle_mappings(sh, layer, channel)
+
+                    sh.setXpos(src.xpos() + offset_x)
+                    sh.setYpos(src.ypos() + offset_y)
+                    offset_y += 60
+        else:
+            # Create shuffles in dot connected block (akin to template layout)
+            with nuke.Undo(f"Create {indx_count} Shuffles"):
+
+                # Set initial offset to clear the existing network selected node
+                offset_x_initial, offset_y_initial = -100, 80
+
+                # Create the first 'anchor' dot
+                dt_src = nuke.nodes.Dot()
+                dt_src.setInput(0, src)
+                dt_src.setXpos(src.xpos() + offset_x_initial)
+                dt_src.setYpos(src.ypos() + offset_y_initial)
+
+                # Add to the potential end selection group
+                shuffles.append(dt_src)
+
+                dt_offset_x, dt_offset_y = 0, 60
+                sh_offset_x, sh_offset_y = -160, 0
+
+                for indx in indxs:
+
+                    # Extract layer name and channel choice
+                    full_chan = indx.data()               # e.g. "mymatte.alpha"
+                    layer, channel = full_chan.split('.', 1)
+
+                    # Create dot for shuffle
+                    dt = nuke.nodes.Dot()
+                    dt.setInput(0, dt_src)
+                    dt.setXpos(dt_src.xpos() + dt_offset_x)
+                    dt.setYpos(dt_src.ypos() + dt_offset_y)
+
+                    dt_top = dt.ypos()
+                    dt_height = dt.screenHeight()
+                    dt_center = dt_top + dt_height / 2
+                    shuffles.append(dt)
+
+                    # Reset current 'dot' as src
+                    dt_src = dt
+
+                    # Create Shuffle
+                    sh = nuke.nodes.Shuffle2()
+                    sh.setInput(0, dt_src)
+                    sh["in1"].setValue(layer)
+                    shuffles.append(sh)
+
+                    # 'Wire' internals of Shuffle node
+                    self._set_shuffle_mappings(sh, layer, channel)
+
+                    sh_height = sh.screenHeight()
+                    sh_top = dt_center - (sh_height / 2)
+                    sh.setXpos(dt.xpos() + sh_offset_x)
+                    sh.setYpos(int(sh_top))
+
+        # Select all new nodes
+        if shuffles:
+            try:
+                nuke.clearSelection()
+            except AttributeError:
+                for n in nuke.allNodes():
+                    n.setSelected(False)
+
+            for shuffle in shuffles:
+                shuffle.setSelected(True)
+
+        # Clear View selection and disable Create button
+        self.view.selectionModel().clearSelection()
+        self.create_btn.setEnabled(False)
+
+    def _set_shuffle_mappings(self, sh_node, layer, channel):
+        mappings = [
+                (f"{layer}.{channel}", "rgba.red"),
+                (f"{layer}.{channel}", "rgba.green"),
+                (f"{layer}.{channel}", "rgba.blue"),
+                (f"{layer}.{channel}", "rgba.alpha"),
+                ]
+
+        sh_node["mappings"].setValue(mappings)
+        sh_node["label"].setValue("[value in1]")
+
+    def _check_for_new_source(self):
+        """
+        Periodically poll Nuke for a new node selection and rebuild the channel list if it changes.
+
+        This method is invoked by a QTimer. It checks the first selected DAG node in Nuke:
+          - If called before the UI is fully constructed or when the dialog is hidden, it returns immediately.
+          - If no node is selected, it clears the source model (leaving the list empty).
+          - If the selected node is the same as last time, it does nothing.
+          - Otherwise, it:
+              1. Updates the internal `_last_src` reference.
+              2. Replaces the base model’s channel list with the new node’s channels.
+              3. Reapplies any active text‐filter patterns.
+              4. Clears the channel view’s selection and disables the Create button.
+              5. Resizes the list view to fit the new content.
+
+        Returns:
+            None
+
+        Side effects:
+            - Alters `self.proxy.sourceModel()` via `setStringList()`
+            - Calls `self._update_patterns()`
+            - Clears and disables UI elements (`view`, `create_btn`)
+            - May resize the dialog via `_resize_view_to_content()`
+        """
+        if not hasattr(self, "search4") or not self.isVisible():
+            return
+
+        if not self.isVisible():
+            return
+
+        sel = nuke.selectedNodes()
+        if not sel:
+            base = self.proxy.sourceModel()
+            base.setStringList([])
+            return
+
+        new_src = sel[0]
+        if new_src is self._last_src:
+            return
+
+        self._last_src = new_src
+        # get its channels
+        chans = sorted(new_src.channels())
+        # reset base‐model’s list
+        base = self.proxy.sourceModel()
+        base.setStringList(chans)
+
+        # reapply filters, clear selection, disable Create, and resize
+        self._update_patterns()
+        self.view.selectionModel().clearSelection()
+        self.create_btn.setEnabled(False)
+        self._resize_view_to_content()
+
+    def closeEvent(self, event):
+        """
+        Overridden Qt Method.
+        Clean up resources and persist filter settings when the dialog closes.
+
+        This override of QDialog.closeEvent performs the following steps:
+          1. Disconnects, stops, and deletes the internal QTimer used for polling Nuke node selections.
+          2. Reads the current text from all four filter fields and the selected radio button,
+             storing them in the `_saved_filters` dictionary.
+          3. Stores the state of the 'Create Dots' checkbox.
+          4. If the “remember filters” checkbox is checked:
+               - Writes `_saved_filters` out to `SAVE_FILTERS_PATH` as JSON.
+             Otherwise:
+               - Deletes the existing JSON file (if any) to clear persisted state.
+          5. Calls the superclass closeEvent to complete the normal Qt shutdown.
+
+        Args:
+            event (QCloseEvent): The close event triggered by the dialog.
+        """
+        if hasattr(self, "_poll"):
+            self._poll.timeout.disconnect()
+            self._poll.stop()
+            self._poll.deleteLater()
+            self._poll = None  # safety
+
+        # Save current filters
+        _saved_filters["f1"] = self.search1.text()
+        _saved_filters["f2"] = self.search2.text()
+        _saved_filters["f3"] = self.search3.text()
+        _saved_filters["f4"] = self.search4.text()
+        _saved_filters["dots_layout"] = self.dots_cb.isChecked()
+        rb = self.radio_group.checkedButton()
+        if rb:
+            _saved_filters["radio"] = rb.text()
+        _saved_filters["remember"] = self.remember_filters_cb.isChecked()
+
+        # Conditionally write to disk or remove saved file
+        if _saved_filters["remember"]:
+            try:
+                with open(SAVE_FILTERS_PATH, "w") as f:
+                    json.dump(_saved_filters, f, indent=2)
+            except Exception as e:
+                print("Could not save filters to JSON:", e)
+        else:
+            # If the user unchecked "remember", clear the saved file
+            try:
+                if os.path.exists(SAVE_FILTERS_PATH):
+                    os.remove(SAVE_FILTERS_PATH)
+            except Exception as e:
+                print("Could not delete saved filter file:", e)
+
+        # Call on base class's method after custom behavior to clean up and conclude.
+        super().closeEvent(event)
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 3) Launcher &amp; menu hook
+# ────────────────────────────────────────────────────────────────────────────────
+_picker_dialog = None        # module‐level
+
+def showChannelPicker():
+    """
+    Open (or refresh) the Channel Picker dialog for the currently selected Nuke nodes.
+
+    This function:
+      1. Closes any previously opened ChannelPickerDialog instance to ensure
+         only one panel is active at a time.
+      2. Creates a new ChannelPickerDialog, passing in the list of selected nodes.
+      3. Calls `.show()` to display the dialog non‐modally, allowing the user
+         to continue interacting with the Nuke UI while the panel stays open.
+
+    Side effects:
+        - Opens (and potentially closes) a ChannelPickerDialog.
+        - Stores the active dialog in the module‐level `_picker_dialog` variable.
+
+    Returns:
+        None
+    """
+    sel = nuke.selectedNodes()
+    # if not sel:
+    #     nuke.message("Select at least one node to branch off.")
+    #     return
+
+    global _picker_dialog
+    # Close any existing panel instance before creating a new one
+    if _picker_dialog is not None:
+        _picker_dialog.close()
+
+    _picker_dialog = ChannelPickerDialog(sel)
+    _picker_dialog.show()  # keep the dialog alive so the user can click back into Nuke
+
+
+#showChannelPicker()
+# nuke.menu("Nuke").addCommand("Custom Channel Picker…", showChannelPicker)
+</pre>
+
+
+<p>
+<a href="pmount_index.html">PM</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+</body>
+</html>
