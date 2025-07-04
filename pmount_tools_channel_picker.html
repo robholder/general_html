@@ -128,6 +128,65 @@ The <code>_find_nuke_main_window()</code> method is returning Nuke’s main appl
 The call to <code>super().__init__(self._find_nuke_main_window())</code> is subtly elegant—it wires the dialog directly into Nuke’s UI hierarchy, letting it behave like a native extension of the software, not some rogue top-level window. And because <code>_find_nuke_main_window()</code> is run right then, you’re guaranteed to bind to the current session’s live main window.
 </p>
 
+<div id="How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)"><h1 id="How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)" class="header"><a href="#How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)">How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)</a></h1></div>
+
+<p>
+Let's unpack what’s really going on under the hood.
+</p>
+
+<div id="How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)-🧠 QDialog’s __init__ and Its parent Argument"><h4 id="🧠 QDialog’s __init__ and Its parent Argument" class="header"><a href="#How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)-🧠 QDialog’s __init__ and Its parent Argument">🧠 QDialog’s _<em>init</em>_ and Its parent Argument</a></h4></div>
+
+<p>
+When you write:
+</p>
+
+<pre python>
+super().__init__(self._find_nuke_main_window())
+</pre>
+
+<p>
+You’re not passing in a method—you’re passing in the result of that method, which is typically a reference to a <code>QMainWindow</code> (like Nuke’s main interface window). That value becomes the parent widget for your dialog. And PyQt/PySide’s <code>QDialog.__init__()</code> is defined like this:
+</p>
+
+<pre python>
+QDialog(parent: Optional[QWidget] = None)
+</pre>
+
+<p>
+So the <code>QDialog</code> constructor expects a <code>QWidget</code> (or <code>None</code>) as its optional first argument. When it receives your main window as the parent, it:
+</p>
+<ul>
+<li>
+Hooks into the parent’s window hierarchy, so the dialog stays on top of the parent.
+
+<li>
+Shares the event loop and styles, so it visually and behaviorally integrates.
+
+<li>
+Inherits ownership, which means if the parent window is closed, the dialog is cleaned up too.
+
+</ul>
+<p>
+This is core to Qt's object hierarchy and memory management system. Your dialog becomes a child of the main window—not just visually, but in the internal object tree.
+</p>
+
+<div id="How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)-📌 In Short:"><h3 id="📌 In Short:" class="header"><a href="#How does the parent class know what to do with that information? (I mean the self._find_nuke_main_window() private method.)-📌 In Short:">📌 In Short:</a></h3></div>
+
+<ul>
+<li>
+You’re not asking the parent class to interpret your method.
+
+<li>
+You’re simply calling your own method first to get a widget reference.
+
+<li>
+That reference is then handed off to the base class constructor, which understands what to do with it (because it expects a QWidget as its argument).
+
+</ul>
+<p>
+It’s kind of like saying: &gt; “Hey QDialog, when you boot up, here’s the main app window you should live inside of.”
+</p>
+
 <div id="Working Code"><h1 id="Working Code" class="header"><a href="#Working Code">Working Code</a></h1></div>
 
 <p>
