@@ -76,7 +76,121 @@ Whenever it hits an action that is a submenu (action.menu()), it recurses deeper
 Otherwise it prints “Parent/Sub/Item” for every real command.
 </p>
 
+<div id="Keyboard Shortcuts"><h1 id="Keyboard Shortcuts" class="header"><a href="#Keyboard Shortcuts">Keyboard Shortcuts</a></h1></div>
 
+<table>
+<tr>
+<td>
+COPILOT: Untested from here down!
+</td>
+</tr>
+</table>
+
+<div id="Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke"><h2 id="Adding a Hotkey to Any Menu Item in Nuke" class="header"><a href="#Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke">Adding a Hotkey to Any Menu Item in Nuke</a></h2></div>
+
+<p>
+You have two clean ways to bind a key to an existing Nuke menu item:
+</p>
+
+<ul>
+<li>
+Override the built-in command via nuke.menu(...).addCommand()
+
+<li>
+Fetch its underlying QAction and call .setShortcut()
+
+</ul>
+<div id="Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke-Override with addCommand()"><h4 id="Override with addCommand()" class="header"><a href="#Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke-Override with addCommand()">Override with addCommand()</a></h4></div>
+
+<p>
+By re-registering the exact same menu path, Nuke will replace the old binding with yours (but keep the same callback).
+</p>
+
+<pre python>
+import nuke
+
+# 1) Identify the exact menu path (case &amp; spacing must match)
+menu_path = "Edit/Node/Filename/Search and Replace"
+
+# 2) Find out the internal Python call (you can guess or inspect nuke source)
+cmd = "nuke.filenameSearchReplace()"
+
+# 3) Re-add with your custom key
+nuke.menu("Nuke").addCommand(
+    menu_path,
+    cmd,
+    "ctrl+alt+f"          # your desired hotkey
+)
+</pre>
+
+<p>
+After restarting Nuke (or sourcing your menu.py), Ctrl+Alt+F will open Search &amp; Replace.
+</p>
+
+<div id="Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke-Tweak the QAction Shortcut Directly"><h4 id="Tweak the QAction Shortcut Directly" class="header"><a href="#Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke-Tweak the QAction Shortcut Directly">Tweak the QAction Shortcut Directly</a></h4></div>
+
+<p>
+If you prefer not to re-register anything, you can grab the real Qt QAction and swap its shortcut:
+</p>
+
+<pre python>
+from PySide2 import QtWidgets
+import nuke
+
+def set_menu_shortcut(path, shortcut):
+    """
+    path: slash-delimited list of menu labels, e.g. "Edit/Node/Filename/…"
+    shortcut: Qt-style key string, e.g. "Ctrl+Alt+F"
+    """
+    labels = path.split("/")
+    # find QMainWindow → QMenuBar
+    app = QtWidgets.QApplication.instance()
+    menubar = next(
+        (w.menuBar() for w in app.topLevelWidgets() if hasattr(w, "menuBar")),
+        None
+    )
+    if not menubar:
+        return False
+
+    def recurse(menu, tokens):
+        for action in menu.actions():
+            text = action.text().replace("&amp;", "")
+            if text == tokens[0]:
+                # leaf action?
+                if len(tokens) == 1:
+                    action.setShortcut(shortcut)
+                    return True
+                # dive into submenu
+                if action.menu():
+                    return recurse(action.menu(), tokens[1:])
+        return False
+
+    return recurse(menubar, labels)
+
+# usage
+set_menu_shortcut(
+    "Edit/Node/Filename/Search and Replace",
+    "Ctrl+Alt+F"
+)
+</pre>
+
+<p>
+This will locate your nested menu item and assign the new hotkey—no need to re-add the command.
+</p>
+
+<div id="Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke-Quick Tips"><h4 id="Quick Tips" class="header"><a href="#Keyboard Shortcuts-Adding a Hotkey to Any Menu Item in Nuke-Quick Tips">Quick Tips</a></h4></div>
+
+<ul>
+<li>
+Always match the exact menu labels (including spaces).
+
+<li>
+Use menubar.actions() recursion to discover paths if you’re unsure.
+
+<li>
+Restart Nuke (or reload your menu.py) to see changes applied.
+
+</ul>
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
