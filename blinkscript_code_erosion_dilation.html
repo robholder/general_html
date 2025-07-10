@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>blinkscript_code_erosion_dilation</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a>
+</p>
+
+<div id="BlinkScript - Erosion and Dilation"><h1 id="BlinkScript - Erosion and Dilation" class="header"><a href="#BlinkScript - Erosion and Dilation">BlinkScript - Erosion and Dilation</a></h1></div>
+
+<p>
+The folowing Blinkscript code defines an image processing operation that can either erode or dilate an image based on a mod input and a threshold parameter. 
+</p>
+
+<pre cpp>
+/// Blank script outline
+kernel erodeKernel : ImageComputationKernel&lt;ePixelWise&gt; {
+ // Input and output images
+ Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src;  // randomly accessing and edge clamping
+ Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; mod;
+ Image&lt;eWrite&gt; dst;
+
+// Parameters are made available to the user as knobs.
+param:
+ // 
+ int size;
+ float threshold;
+ 
+// Local variables can be initialised once in init() and used from all pixel positions.
+local:
+
+
+void define() {
+   defineParam(size, "Kernel Size", 1);
+   defineParam(threshold, "Threshold", 0.5f);  // default to 0.5
+ }
+ // The init() function is run once before any calls to process().
+ void init() {
+   src.setRange(-size, -size, size, size);  
+   float bias = 0.5f;
+   threshold *= bias;
+ }
+
+ // The process() function runs over all pixel positions of the output image.
+
+ void process() {
+   //float4 accum = 0;
+   float totalWeight = 0.0f;
+   
+   float modVal = mod().w;
+   
+   
+   int modSize = int(size * fabs(float(modVal - threshold)));  // symmetrical range
+
+   bool isThicken = modVal &gt; threshold;
+   float4 accum = isThicken ? 0 : 1;
+   for (int Y = -modSize; Y &lt;= modSize; Y++) {
+     for (int X = -modSize; X &lt;= modSize; X++) {
+       float4 pixel = src(X, Y);
+       accum = isThicken ? max(accum, pixel) : min(accum, pixel);
+     }
+   }
+   float4 black = 0;
+   float4 white = 1;
+   dst() = clamp(accum, black, white);
+ }
+};
+</pre>
+
+
+<div id="BlinkScript - Erosion and Dilation-Here's a breakdown of the code:"><h2 id="Here's a breakdown of the code:" class="header"><a href="#BlinkScript - Erosion and Dilation-Here's a breakdown of the code:">Here's a breakdown of the code:</a></h2></div>
+
+<ul>
+<li>
+kernel erodeKernel : ImageComputationKernel&lt;ePixelWise&gt;
+
+<ul>
+<li>
+This declares a BlinkScript kernel named erodeKernel.
+
+<li>
+ImageComputationKernel indicates that this kernel processes image data, and ePixelWise means the kernel operates independently on each pixel of the output image.
+
+</ul>
+<li>
+Input and output images
+
+<ul>
+<li>
+Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src;
+
+<ul>
+<li>
+src is the primary input image, accessed in a 2D ranged manner.
+
+<li>
+eEdgeClamped specifies that when accessing pixels outside the image boundaries, the nearest edge pixel's value is used.
+
+</ul>
+<li>
+Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; mod;
+
+<ul>
+<li>
+mod is a secondary input image, likely used for controlling the erosion/dilation behavior.
+
+<li>
+eAccessPoint means each pixel of mod is accessed individually at its exact location.
+
+<li>
+eEdgeClamped again indicates edge clamping for out-of-bounds access.
+
+</ul>
+<li>
+Image&lt;eWrite&gt; dst;
+
+<ul>
+<li>
+dst is the output image where the processed results will be written.
+
+</ul>
+</ul>
+</ul>
+<div id="BlinkScript - Erosion and Dilation-Here's a breakdown of the code:-Parameters (param:)"><h4 id="Parameters (param:)" class="header"><a href="#BlinkScript - Erosion and Dilation-Here's a breakdown of the code:-Parameters (param:)">Parameters (param:)</a></h4></div>
+
+<ul>
+<li>
+These variables are exposed to the user as controls (knobs) in the BlinkScript node's properties. They are defined with <code>defineParam</code> as shown on Foundry Learn.
+
+<li>
+int size;
+
+<ul>
+<li>
+This parameter controls the size of the processing kernel (the area around each pixel considered for the operation).
+
+</ul>
+<li>
+float threshold;
+
+<ul>
+<li>
+This parameter is used to determine whether erosion or dilation is performed, with a default value of 0.5.
+
+</ul>
+</ul>
+<div id="BlinkScript - Erosion and Dilation-Here's a breakdown of the code:-Local variables (local:)"><h4 id="Local variables (local:)" class="header"><a href="#BlinkScript - Erosion and Dilation-Here's a breakdown of the code:-Local variables (local:)">Local variables (local:)</a></h4></div>
+
+<ul>
+<li>
+These variables are internal to the kernel and are not directly exposed to the user as knobs.
+
+<li>
+void define() { ... }
+
+<ul>
+<li>
+This function is where the parameters are defined and given default values and user-facing labels.
+
+<li>
+defineParam(size, "Kernel Size", 1); sets the default Kernel Size to 1.
+
+<li>
+defineParam(threshold, "Threshold", 0.5f); sets the Threshold to 0.5.
+
+</ul>
+<li>
+void init() { ... }
+
+<ul>
+<li>
+This function is executed once before the process() function is called for any pixel.
+
+<li>
+src.setRange(-size, "-size," size, size); This sets the range of pixels that the src image will access around the current processing pixel to a square defined by size. The range is centered around the current pixel, extending size pixels in each direction (X and Y).
+
+<li>
+float bias = 0.5f; declares and initializes a local variable bias to 0.5.
+
+<li>
+threshold *= bias; multiplies the threshold parameter by the bias, effectively reducing the threshold to 0.25 (since the default is 0.5).
+
+</ul>
+<li>
+void process() { ... }
+
+<ul>
+<li>
+This function is executed for every pixel in the output image (dst).
+
+<li>
+float modVal = mod().w; obtains the value of the mod input at the current pixel location. The .w component suggests it's likely working with the alpha channel or a single channel image input represented as a float4 (a vector with four floating-point components).
+
+<li>
+int modSize = int(size * fabs(float(modVal - threshold)));
+
+<ul>
+<li>
+Calculates a modified kernel size based on the difference between the modVal and the threshold.
+
+<li>
+fabs() ensures that the difference is always positive.
+
+<li>
+This means the kernel size will vary depending on the mod input, potentially creating a feathered or spatially varying effect.
+
+</ul>
+</ul>
+<li>
+bool isThicken = modVal &gt; threshold;
+
+<ul>
+<li>
+This boolean variable determines whether to perform a "thicken" operation (dilation) or a "thin" operation (erosion).
+
+<li>
+If modVal is greater than threshold, isThicken is true, and dilation will be performed.
+
+<li>
+Otherwise, isThicken is false, and erosion will be performed.
+
+</ul>
+<li>
+float4 accum = isThicken ? 0 : 1;
+
+<ul>
+<li>
+Initializes the accum variable, which will store the result of the accumulation.
+
+<li>
+If isThicken (dilation) is true, accum starts at 0 (black).
+
+<li>
+If isThicken (erosion) is false, accum starts at 1 (white).
+
+<li>
+This setup is crucial for morphological operations, where dilation uses the maximum and erosion uses the minimum within the kernel.
+
+</ul>
+<li>
+for (int Y = "-modSize;" Y &lt;= modSize; Y++) { ... }
+
+<ul>
+<li>
+This nested loop iterates over a square neighborhood of pixels around the current output pixel, defined by modSize.
+
+</ul>
+<li>
+for (int X = "-modSize;" X &lt;= modSize; X++) { ... }
+
+<ul>
+<li>
+The inner loop iterates horizontally within the defined neighborhood.
+
+</ul>
+<li>
+float4 pixel = src(X, Y);
+
+<ul>
+<li>
+Retrieves the value of a pixel from the src image at the relative coordinates (X, Y) within the kernel's range.
+
+</ul>
+<li>
+accum = isThicken ? max(accum, pixel) : min(accum, pixel);
+
+<ul>
+<li>
+This is the core of the erosion/dilation operation.
+
+<li>
+If isThicken is true (dilation): accum is updated with the maximum value between its current value and the pixel's value. This effectively expands the "bright" areas of the image by taking the maximum.
+
+<li>
+If isThicken is false (erosion): accum is updated with the minimum value between its current value and the pixel's value. This shrinks the "bright" areas by taking the minimum.
+
+</ul>
+<li>
+float4 black = 0; and float4 white = 1; define float4 values for black and white, representing the minimum and maximum possible pixel values.
+
+<li>
+dst() = clamp(accum, black, white);
+
+<ul>
+<li>
+The final accum value (which holds the result of the erosion or dilation) is clamped to the range between black (0) and white (1) to ensure valid pixel values.
+
+<li>
+The clamped value is then written to the corresponding pixel in the output image dst. 
+
+</ul>
+</ul>
+<p>
+In summary: This BlinkScript kernel implements a controllable erosion/dilation filter. The mod input image, along with the threshold parameter, dynamically adjusts the size of the kernel and switches between erosion (thinning) and dilation (thickening) operations based on the mod pixel values relative to the threshold.
+</p>
+
+
+
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>

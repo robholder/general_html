@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_list_all_gizmos_in_scene</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Nuke - Python - List Gizmos in Scene"><h1 id="Nuke - Python - List Gizmos in Scene" class="header"><a href="#Nuke - Python - List Gizmos in Scene">Nuke - Python - List Gizmos in Scene</a></h1></div>
+
+<p>
+Here’s a more bullet-proof way to catch every gizmo node in your open script, even if the old <code>nuke.plugins()</code> approach came up empty. We’ll:
+</p>
+
+<ul>
+<li>
+Scan your pluginPath() folders (recursively) for all .gizmo files → build a set of their Class names
+
+<li>
+Walk all nodes in your script (including inside Groups) via nuke.allNodes(recurseGroups=True)
+
+<li>
+ Report every node whose .Class() matches one of those gizmo names
+<pre python>
+import nuke, os
+from collections import defaultdict
+
+def find_scene_gizmos():
+    # 1) Gather every gizmo class name from all pluginPath dirs
+    gizmo_classes = set()
+    for plugin_dir in nuke.pluginPath():
+        if not os.path.isdir(plugin_dir):
+            continue
+        for root, _, files in os.walk(plugin_dir):
+            for fn in files:
+                if fn.lower().endswith('.gizmo'):
+                    name, _ = os.path.splitext(fn)
+                    gizmo_classes.add(name)
+
+    # 2) Scan every node in the scene, recursing into Groups
+    used = defaultdict(list)
+    for node in nuke.allNodes(recurseGroups=True):
+        cls = node.Class()
+        if cls in gizmo_classes:
+            # fullName() gives you the group‐hierarchy/path
+            try:
+                full = node.fullName()
+            except AttributeError:
+                full = node.name()
+            used[cls].append(full)
+
+    return used
+
+# Example usage: print out the map
+gizmo_map = find_scene_gizmos()
+if not gizmo_map:
+    print("No gizmos found in this script.")
+else:
+    for gz_class, instances in gizmo_map.items():
+        print(f"{gz_class} ({len(instances)} instance{'s' if len(instances)&gt;1 else ''}):")
+        for path in instances:
+            print("   ", path)
+</pre>
+
+</ul>
+<div id="Nuke - Python - List Gizmos in Scene-What this does:"><h2 id="What this does:" class="header"><a href="#Nuke - Python - List Gizmos in Scene-What this does:">What this does:</a></h2></div>
+
+<ul>
+<li>
+<span id="Nuke - Python - List Gizmos in Scene-What this does:-pluginPath scan:"></span><strong id="pluginPath scan:">pluginPath scan:</strong> walks every folder you’ve added with nuke.pluginAddPath(), finds .gizmo files even in nested subfolders, and builds a set of their Class names.
+
+<li>
+<span id="Nuke - Python - List Gizmos in Scene-What this does:-allNodes(recurseGroups=True):"></span><strong id="allNodes(recurseGroups=True):">allNodes(recurseGroups=True):</strong> flattens the entire script (inside and outside Groups) so you don’t miss any.
+
+<li>
+<span id="Nuke - Python - List Gizmos in Scene-What this does:-fullName():"></span><strong id="fullName():">fullName():</strong> shows exactly where each gizmo lives (e.g. Root/Group1/SubGroup/MyGizmo1).
+
+</ul>
+<p>
+Drop that into your Script Editor—now you’ll see a complete list of every gizmo-based node in your scene.
+</p>
+
+
+<div id="Missing Gizmos"><h1 id="Missing Gizmos" class="header"><a href="#Missing Gizmos">Missing Gizmos</a></h1></div>
+
+<p>
+Here are a few different tricks you can use to sniff out gizmos that your open script still references but whose .gizmo files didn’t actually load:
+</p>
+
+<div id="Missing Gizmos-Spot “Load Gizmo” Groups with a dead file-knob"><h2 id="Spot “Load Gizmo” Groups with a dead file-knob" class="header"><a href="#Missing Gizmos-Spot “Load Gizmo” Groups with a dead file-knob">Spot “Load Gizmo” Groups with a dead file-knob</a></h2></div>
+
+<p>
+Whenever you do File → Load Gizmo…, Nuke creates a plain “Group” node and sticks the path to that .gizmo on its file knob. If that file can’t be found on disk (or in any of your pluginPath() dirs), you know it’s missing:
+</p>
+
+<pre python>
+import nuke, os
+
+missing = []
+for n in nuke.allNodes(recurseGroups=True):
+    k = n.knob('file')
+    if not k: 
+        continue
+    path = k.value()
+    # only care about .gizmo files
+    if not path.lower().endswith('.gizmo'):
+        continue
+    # if it’s nowhere on disk → missing
+    if not os.path.exists(path):
+        missing.append((n.fullName(), path))
+
+if not missing:
+    print("No dead gizmo groups found.")
+else:
+    for node_name, gizmo_path in missing:
+        print(f"Missing gizmo: {node_name} → {gizmo_path}")
+</pre>
+
+<p>
+That immediately flags any Group-loaded gizmo whose source file isn’t where Nuke expected it.
+</p>
+
+<div id="Missing Gizmos-Compare script-referenced Gizmo classes vs. what actually loaded"><h2 id="Compare script-referenced Gizmo classes vs. what actually loaded" class="header"><a href="#Missing Gizmos-Compare script-referenced Gizmo classes vs. what actually loaded">Compare script-referenced Gizmo classes vs. what actually loaded</a></h2></div>
+
+<p>
+When you <code>pluginAddPath()</code> a folder of gizmos, Nuke brings every .gizmo file into memory under its Class name. If your script was saved referencing a Class that never made it into memory, you know that gizmo never loaded.
+</p>
+
+<pre python>
+import nuke, os, re
+
+def find_missing_gizmo_classes():
+    # 1) what actually loaded?
+    loaded = {os.path.splitext(p)[0]
+              for p in nuke.plugins() if p.lower().endswith('.gizmo')}
+
+    # 2) parse your .nk for every node Class it references
+    script = nuke.root().name()
+    if not os.path.isfile(script):
+        nuke.message("Please save your script first.")
+        return []
+
+    classes_in_file = set()
+    pat = re.compile(r'^\s*\w+\s+(\w+)\s*\{')
+    with open(script) as f:
+        for line in f:
+            m = pat.match(line)
+            if m:
+                classes_in_file.add(m.group(1))
+
+    # 3) missing = referenced in script but not loaded
+    return sorted(classes_in_file - loaded)
+
+missing = find_missing_gizmo_classes()
+if not missing:
+    print("All gizmo classes in the script are loaded.")
+else:
+    print("Referenced gizmo classes not found on pluginPath():")
+    for cls in missing:
+        print("  ", cls)
+</pre>
+
+<p>
+This will list any gizmo-Class your .nk mentions but whose .gizmo never made it into nuke.plugins().
+</p>
+
+<div id="Missing Gizmos-Hook into Nuke’s load-failure callbacks"><h2 id="Hook into Nuke’s load-failure callbacks" class="header"><a href="#Missing Gizmos-Hook into Nuke’s load-failure callbacks">Hook into Nuke’s load-failure callbacks</a></h2></div>
+
+<p>
+If you want real-time catching when the script first tries (and fails) to find the gizmo, you can temporarily wrap/suppress nuke.ask() in your init.py and record the class name being requested. Something like:
+</p>
+
+<pre python>
+import nuke
+
+# keep track of missing gizmo class names
+missing_requests = set()
+
+# wrap the original nuke.ask to catch missing-gizmo prompts
+_real_ask = nuke.ask
+def catch_ask(prompt):
+    # prompt example: "Can't find Gizmo MyCoolGizmo.gizmo. Browse for it?"
+    if "Can't find Gizmo" in prompt:
+        # split out the class name before the “.gizmo”
+        cn = prompt.split()[3].split(".")[0]
+        missing_requests.add(cn)
+    return _real_ask(prompt)
+
+# install our catcher
+nuke.ask = catch_ask
+</pre>
+
+<p>
+After your script loads (silencing the pop-ups if you like), inspect missing_requests to see every gizmo it tried—and failed—to pull in.
+</p>
+
+<p>
+Pick whichever approach fits your pipeline best:
+</p>
+<ul>
+<li>
+Method 1 for gizmos you’ve explicitly “Load Gizmo’ed.”
+
+<li>
+Method 2 to catch any Class references in the raw .nk that never actually loaded.
+
+<li>
+Method 3 if you want to catch them exactly at load-time.
+
+</ul>
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
