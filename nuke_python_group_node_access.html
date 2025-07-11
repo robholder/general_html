@@ -2,6 +2,7 @@
 <html>
 <head>
 <link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
 <title>nuke_python_group_node_access</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,6 +19,75 @@
 
 
 <div id="Brief Introduction"><h1 id="Brief Introduction" class="header"><a href="#Brief Introduction">Brief Introduction</a></h1></div>
+
+<table>
+<tr>
+<td>
+Late addition: Since I had limited success with the guide below this brief example to get the selected nodes in a graph.
+</td>
+</tr>
+</table>
+
+<p>
+Here’s a small recursive helper that walks a Group’s children (and any sub-Groups) without using the nonexistent recurseGroups flag. It checks each node’s hidden selected knob and returns only those that are highlighted:
+</p>
+
+<pre python>
+import nuke
+
+def _collect_selected(nodes, out):
+    for n in nodes:
+        # if this node is selected, record it
+        if n['selected'].value() == 1:
+            out.append(n)
+        # if it’s a Group, recurse into its children
+        if n.Class() == 'Group':
+            _collect_selected(n.nodes(), out)
+
+def selected_in_current_group():
+    """
+    Returns a list of all nodes selected inside the active Group.
+    """
+    try:
+        grp = nuke.thisGroup()
+    except ValueError:
+        # not currently inside a Group panel
+        return []
+
+    selected = []
+    _collect_selected(grp.nodes(), selected)
+    return selected
+
+# Example usage:
+sel = selected_in_current_group()
+if sel:
+    for node in sel:
+        print("  •", node.fullName())
+else:
+    print("No nodes are selected in this group.")
+</pre>
+
+<div id="Brief Introduction-How it works:"><h3 id="How it works:" class="header"><a href="#Brief Introduction-How it works:">How it works:</a></h3></div>
+
+<ul>
+<li>
+<code>nuke.thisGroup()</code> gives you the Group whose panel you’re editing.
+
+<li>
+<code>_collect_selected(nodes, out)</code> loops through the given nodes list, appends any with <code>n['selected'].value() == 1</code>, and when it sees a child Group, calls itself on <code>n.nodes()</code>.
+
+</ul>
+<p>
+You end up with a flat list of every selected node, wherever it lives in that Group’s hierarchy.
+</p>
+
+<table>
+<tr>
+<td>
+Back to the initial notes.
+</td>
+</tr>
+</table>
 
 <div id="Brief Introduction-How do you use nuke.selectedNode() inside a Group?"><h2 id="How do you use nuke.selectedNode() inside a Group?" class="header"><a href="#Brief Introduction-How do you use nuke.selectedNode() inside a Group?">How do you use nuke.selectedNode() inside a Group?</a></h2></div>
 
@@ -46,7 +116,6 @@ Here's how you can properly get the selected node inside the group:
 <span id="Brief Introduction-How do you use nuke.selectedNode() inside a Group?-Step-by-Step Example-Restore Context:"></span><strong id="Restore Context:">Restore Context:</strong> Always call <code>group.end()</code> to switch out of the group context and back to the global context.
 
 </ul>
-
 <div id="Brief Introduction-How do you use nuke.selectedNode() inside a Group?-Code Example"><h3 id="Code Example" class="header"><a href="#Brief Introduction-How do you use nuke.selectedNode() inside a Group?-Code Example">Code Example</a></h3></div>
 
 <pre python>
@@ -79,7 +148,6 @@ else:
 <code>nuke.thisGroup()</code> vs. <code>nuke.selectedNode()</code>: The function <code>nuke.thisGroup()</code> returns the Group node in which the callback or script is running. Once you have that, switching context with <code>group.begin()</code> lets you call <code>nuke.selectedNode()</code> reliably.
 
 </ul>
-
 <div id="Brief Introduction-How do you use nuke.selectedNode() inside a Group?-Code Example-When This Is Useful"><h4 id="When This Is Useful" class="header"><a href="#Brief Introduction-How do you use nuke.selectedNode() inside a Group?-Code Example-When This Is Useful">When This Is Useful</a></h4></div>
 
 <p>
@@ -124,7 +192,6 @@ When looking up a node by name using <code>nuke.toNode("my_node")</code>, the fu
 <span id="Another Approach - Selected in a Group-How about using 'nuke.toNode('my_node')' if it's inside a Group?-Using nuke.toNode() in a Group-Restore the Original Context:"></span><strong id="Restore the Original Context:">Restore the Original Context:</strong> Call <code>group.end()</code> to return to the global node graph when done.
 
 </ul>
-
 <div id="Another Approach - Selected in a Group-How about using 'nuke.toNode('my_node')' if it's inside a Group?-Example Code"><h4 id="Example Code" class="header"><a href="#Another Approach - Selected in a Group-How about using 'nuke.toNode('my_node')' if it's inside a Group?-Example Code">Example Code</a></h4></div>
 
 <pre python>
@@ -158,7 +225,6 @@ else:
 <span id="Another Approach - Selected in a Group-How about using 'nuke.toNode('my_node')' if it's inside a Group?-Points to Note-Restoring Context:"></span><strong id="Restoring Context:">Restoring Context:</strong> Always call <code>group.end()</code> after switching the context with <code>group.begin()</code> to prevent unexpected behavior in subsequent node lookups or operations.
 
 </ul>
-
 <p>
 By following this sequence, you can reliably retrieve nodes that are nested within groups using nuke.toNode().
 </p>
@@ -188,7 +254,6 @@ Do your operations. Once inside, you can list, modify, or even add new nodes to 
 Exit the group context. After you’re done, make sure to call <code>nuke.end()</code> so that the context returns to the top-level node graph.
 
 </ul>
-
 <div id="Nuke - Python - Group Node Access-The Begin/End Pattern-Example Code"><h4 id="Example Code" class="header"><a href="#Nuke - Python - Group Node Access-The Begin/End Pattern-Example Code">Example Code</a></h4></div>
 
 <pre python>
@@ -234,7 +299,6 @@ else:
 <code>nuke.end()</code>: Returns the context back to the parent graph (top-level node graph).
 
 </ul>
-
 <div id="Nuke - Python - Group Node Access-Alternative Approaches"><h2 id="Alternative Approaches" class="header"><a href="#Nuke - Python - Group Node Access-Alternative Approaches">Alternative Approaches</a></h2></div>
 
 <p>
@@ -266,7 +330,6 @@ There isn’t a direct method like <code>group_node.children()</code>, but by se
 
 </ul>
 </ul>
-
 <div id="Nuke - Python - Group Node Access-Scripting Considerations"><h2 id="Scripting Considerations" class="header"><a href="#Nuke - Python - Group Node Access-Scripting Considerations">Scripting Considerations</a></h2></div>
 
 <ul>
@@ -283,7 +346,6 @@ There isn’t a direct method like <code>group_node.children()</code>, but by se
 <span id="Nuke - Python - Group Node Access-Scripting Considerations-Iterative Modifications"></span><strong id="Iterative Modifications">Iterative Modifications</strong>: Inside the Group context, you can loop over nodes, access or modify knobs, and even add new nodes. This makes it possible to script complex adjustments or create custom tools that work inside your Group nodes.
 
 </ul>
-
 <div id="Nuke - Python - Group Node Access-Putting It All Together"><h2 id="Putting It All Together" class="header"><a href="#Nuke - Python - Group Node Access-Putting It All Together">Putting It All Together</a></h2></div>
 
 <p>
@@ -303,7 +365,6 @@ Querying and modifying inner nodes with methods like <code>nuke.allNodes()</code
 Exiting back to the parent context with <code>nuke.end()</code>.
 
 </ul>
-
 <p>
 This method ensures that your operations target the intended node graph without confusion.
 </p>
