@@ -369,6 +369,154 @@ Exiting back to the parent context with <code>nuke.end()</code>.
 This method ensures that your operations target the intended node graph without confusion.
 </p>
 
+<div id="Print expressions on a node inside a group"><h1 id="Print expressions on a node inside a group" class="header"><a href="#Print expressions on a node inside a group">Print expressions on a node inside a group</a></h1></div>
+
+<pre python>
+import nuke
+
+def _collect_selected(nodes, out):
+    for n in nodes:
+        if n['selected'].value() == 1:
+            out.append(n)
+        if n.Class() == 'Group':
+            _collect_selected(n.nodes(), out)
+
+def get_active_selection():
+    """
+    Return the node you highlighted in the open Group,
+    or fall back to the root selectedNode().
+    """
+    try:
+        grp = nuke.thisGroup()
+        found = []
+        _collect_selected(grp.nodes(), found)
+        if found:
+            return found[0]
+    except ValueError:
+        pass
+
+    try:
+        return nuke.selectedNode()
+    except ValueError:
+        return None
+
+def dump_knob_assignments(node):
+    """
+    For each knob (and each sub‐value) on `node`, print either:
+      • its expression (raw string), or
+      • its literal value (not evaluated by a frame)
+    """
+    print("── Dumping knobs for %s ──" % node.fullName())
+    for name, knob in node.knobs().items():
+        # figure out how many slots this knob holds
+        try:
+            count = knob.maxValueCount()
+        except AttributeError:
+            count = 1
+
+        for i in range(count):
+            # 1) try expression first
+            expr = ""
+            try:
+                if knob.hasExpression(i):
+                    expr = knob.expression(i)
+            except Exception:
+                pass
+
+            if expr:
+                print("  %s[%d]  →  expr: %s" % (name, i, expr))
+                continue
+
+            # 2) otherwise, grab the raw value
+            val = None
+            for getter in ("value", "getValue", "valueAt"):
+                try:
+                    fn = getattr(knob, getter)
+                    # some getters take an index arg, some don’t
+                    val = fn(i) if fn.__code__.co_argcount&gt;1 else fn()
+                    break
+                except Exception:
+                    continue
+            # fallback to knob.toScript() if nothing else worked
+            if val is None:
+                try:
+                    val = knob.toScript(name)
+                except Exception:
+                    val = "&lt;unreadable&gt;"
+
+            print("  %s[%d]  →  val: %s" % (name, i, val))
+
+# ——— run it ———
+node = get_active_selection()
+if not node:
+    nuke.message("Select a node first (in the root or inside a Group).")
+else:
+    dump_knob_assignments(node)
+</pre>
+
+<div id="Syntax for Nodes in a Group"><h1 id="Syntax for Nodes in a Group" class="header"><a href="#Syntax for Nodes in a Group">Syntax for Nodes in a Group</a></h1></div>
+
+<p>
+In Nuke the path separator in a node’s “fullName” is a forward‐slash, not a dot. So if you have:
+</p>
+
+<p>
+• a Group node called “MyGroup” • inside it a Blur called “Blur1”
+</p>
+
+<p>
+then the full name of that Blur is
+</p>
+
+<pre text>
+MyGroup/Blur1
+</pre>
+
+<p>
+...and you reference it in Python with that exact string:
+</p>
+
+<pre python>
+# pump an expression into the 'size' knob of Blur1  
+nuke.toNode('MyGroup/Blur1')['size'].setExpression('frame*2 + 1')
+</pre>
+
+<p>
+— or, if you prefer to actually enter the Group’s context and then address the child by its local name:
+</p>
+
+<pre python>
+grp = nuke.toNode('MyGroup')   # the Group node in the root
+grp.begin()                    # jump into it
+nuke.toNode('Blur1')['size'].setExpression('frame*2 + 1')
+grp.end()                      # pop back out
+</pre>
+<p>
+For deeper nests, just chain more slashes:
+</p>
+
+<pre python>
+# a Reformat inside a nested Group A → GroupB → Reformat1
+nuke.toNode('A/GroupB/Reformat1')['filter'].setExpression('width/2')
+</pre>
+
+<div id="Syntax for Nodes in a Group-Key points:"><h4 id="Key points:" class="header"><a href="#Syntax for Nodes in a Group-Key points:">Key points:</a></h4></div>
+
+<ul>
+<li>
+Use “/” to separate levels in the node graph.
+
+<li>
+nuke.toNode() always looks in the root graph unless you’ve begin()-ed a Group.
+
+<li>
+Inside a Group (after grp.begin()), toNode('LocalName') resolves to that child.
+
+</ul>
+<p>
+So, pick whichever style you like best (slash path or begin/​end) and you can drive any knob on any node inside any Group.
+</p>
+
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
