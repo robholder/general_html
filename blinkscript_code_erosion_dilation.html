@@ -493,6 +493,202 @@ Think of the linework as being printed on a textured paper that absorbs ink unev
 You’re not just visualizing it—you’re essentially designing a procedural stylistic effect using core image-processing principles.
 </p>
 
+<div id="Watercolor"><h1 id="Watercolor" class="header"><a href="#Watercolor">Watercolor</a></h1></div>
+
+<p>
+Simulating watercolor bleed is a beautiful fusion of physics, texture, and artistry. Let’s build on your BlinkScript erosion/dilation concept and explore how it could evolve into a procedural watercolor bleed effect.
+</p>
+
+<div id="Watercolor-🧪 Core Idea: Simulating Watercolor Bleed"><h2 id="🧪 Core Idea: Simulating Watercolor Bleed" class="header"><a href="#Watercolor-🧪 Core Idea: Simulating Watercolor Bleed">🧪 Core Idea: Simulating Watercolor Bleed</a></h2></div>
+
+<p>
+Watercolor bleed mimics how pigment spreads on wet paper. In digital terms, this involves:
+</p>
+<ul>
+<li>
+Soft diffusion of color
+
+<li>
+Edge darkening or feathering
+
+<li>
+Paper texture interaction
+
+<li>
+Variable flow based on moisture or pigment density
+
+</ul>
+
+<div id="Watercolor-🧩 How to Adapt Your Morphological Kernel"><h2 id="🧩 How to Adapt Your Morphological Kernel" class="header"><a href="#Watercolor-🧩 How to Adapt Your Morphological Kernel">🧩 How to Adapt Your Morphological Kernel</a></h2></div>
+
+<p>
+You can use your erosion/dilation logic as a foundation for pigment flow:
+</p>
+
+<div id="Watercolor-🧩 How to Adapt Your Morphological Kernel-Primary Image"><h4 id="Primary Image" class="header"><a href="#Watercolor-🧩 How to Adapt Your Morphological Kernel-Primary Image">Primary Image</a></h4></div>
+
+<ul>
+<li>
+Contains linework or color regions (e.g. character outlines or painted zones).
+
+</ul>
+
+<div id="Watercolor-🧩 How to Adapt Your Morphological Kernel-Secondary Image (Control Map)"><h4 id="Secondary Image (Control Map)" class="header"><a href="#Watercolor-🧩 How to Adapt Your Morphological Kernel-Secondary Image (Control Map)">Secondary Image (Control Map)</a></h4></div>
+
+<ul>
+<li>
+Represents “wetness” or “paper absorbency” using noise or texture.
+
+<li>
+High values = more pigment spread (simulate wet paper).
+
+<li>
+Low values = less spread (simulate dry or resistant areas).
+
+</ul>
+
+<div id="Watercolor-🧩 How to Adapt Your Morphological Kernel-Modified Kernel Behavior"><h4 id="Modified Kernel Behavior" class="header"><a href="#Watercolor-🧩 How to Adapt Your Morphological Kernel-Modified Kernel Behavior">Modified Kernel Behavior</a></h4></div>
+
+<ul>
+<li>
+Instead of binary erosion/dilation, use a weighted blend:
+
+</ul>
+  
+<pre c>
+float4 accum = 0;
+float totalWeight = 0;
+for (int Y = -modSize; Y &lt;= modSize; Y++) {
+  for (int X = -modSize; X &lt;= modSize; X++) {
+    float4 pixel = src(X, Y);
+    float weight = control(X, Y); // from second image
+    accum += pixel * weight;
+    totalWeight += weight;
+  }
+}
+
+return accum / totalWeight;
+</pre>
+
+<ul>
+<li>
+This simulates diffusion, where pigment spreads more in wetter zones.
+
+</ul>
+
+<div id="Watercolor-🖼️ Visual Inspiration"><h2 id="🖼️ Visual Inspiration" class="header"><a href="#Watercolor-🖼️ Visual Inspiration">🖼️ Visual Inspiration</a></h2></div>
+
+<p>
+Here are some visuals that show how watercolor bleed can be simulated or stylized:
+</p>
+
+<ul>
+<li>
+<a href="https://www.tylerxhobbs.com/words/a-guide-to-simulating-watercolor-paint-with-generative-art">Tyler Hobbs’ generative watercolor guide</a> — brilliant breakdown of procedural brush layering
+
+</ul>
+
+<ul>
+<li>
+<a href="https://jixipix.com/blog-files/simulated_watercolor_ink_flow.pdf">JixiPix’s simulated ink flow algorithm</a> — PDF with technical details on edge wobble and pigment diffusion
+
+</ul>
+
+
+<div id="Watercolor-🧠 Creative Extensions"><h2 id="🧠 Creative Extensions" class="header"><a href="#Watercolor-🧠 Creative Extensions">🧠 Creative Extensions</a></h2></div>
+
+<p>
+Want to push it further? Try combining:
+</p>
+
+<ul>
+<li>
+Edge detection to darken outlines post-bleed
+
+<li>
+Time-based diffusion to animate pigment spread
+
+<li>
+Color separation to simulate granulation or flocculation
+
+<li>
+Paper grain maps to modulate flow direction
+
+</ul>
+
+<p>
+This could be a stunning way to stylize animation frames or create painterly transitions. Want help sketching out a BlinkScript version or building a node graph in Nuke to prototype it? I’m all in.
+</p>
+
+<p>
+In your weighted blend code example, would that be a third image? (Second, secondary image input in addition to the texture mod input?).
+Fantastic catch—and you're right to question that. In the weighted blend example, I introduced the concept of control(X, Y) as if there were a separate map providing per-pixel influence weights. That could be interpreted in two ways, depending on how you architect the BlinkScript node:
+</p>
+
+<p>
+🧩 Option 1: Dual-Use Second Input (Most Common)
+You could use a single second input image (texture mod) and sample it twice:
+</p>
+
+<p>
+Once to determine whether to erode or dilate (modVal &gt; threshold)
+</p>
+
+<p>
+And again to serve as the weight map within the kernel loop
+</p>
+
+<p>
+If you reuse it this way, you'd write something like:
+</p>
+
+<p>
+c
+float weight = srcB(X, Y); // sampled from second input
+This assumes your texture map has spatial variation that's meaningful for both decisions and weighting (common with organic noise).
+</p>
+
+<p>
+🧩 Option 2: Add a Third Input (Advanced Approach)
+You can extend the BlinkScript node to accept a third image input specifically as a weight map. This gives you more separation of concerns:
+</p>
+
+<p>
+Input A: Linework or painted image
+</p>
+
+<p>
+Input B: Texture mod (for erosion/dilation toggle)
+</p>
+
+<p>
+Input C: Weight map (controls pigment flow intensity)
+</p>
+
+<p>
+This gives you precise artistic control—like having a moisture map separate from the paper texture. The node's metadata would need to define three inputs, and you'd access srcC(X, Y) inside your loop.
+</p>
+
+<p>
+🌈 Why Use Separate Inputs?
+If you're building a complex simulation like watercolor diffusion, separating your control maps lets you dial in behaviors individually:
+</p>
+
+<p>
+Texture input gives irregularity
+</p>
+
+<p>
+Flow weight map determines how far pigment travels
+</p>
+
+<p>
+Optional depth or brush pressure map could be used later to modulate color density or directionality
+</p>
+
+<p>
+You're essentially evolving a simple morphological effect into a full-blown procedural painting engine.
+</p>
 
 <p>
 <a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a>
