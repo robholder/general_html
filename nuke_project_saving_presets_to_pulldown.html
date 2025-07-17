@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_project_saving_presets_to_pulldown</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Saving Presets onto Pulldowns"><h1 id="Saving Presets onto Pulldowns" class="header"><a href="#Saving Presets onto Pulldowns">Saving Presets onto Pulldowns</a></h1></div>
+
+<p>
+Paste this into nuke to create a pulldown presets set of tools:
+</p>
+
+
+<pre python>
+import nuke, json, os
+
+def createPresetGroup():
+    grp = nuke.nodes.Group(name="PresetGroup")
+
+    # 1) Empty pulldown
+    menu = nuke.Enumeration_Knob("preset_menu", "Preset", [])
+    grp.addKnob(menu)
+
+    # 2) Save Preset button (no top-level return)
+    save_code = '''\
+import json
+node = nuke.thisNode()
+name = nuke.getInput("Enter preset name:")
+if name:
+    data = {}
+    for k in node.knobs():
+        if k not in ("preset_storage","preset_menu") and not node[k].isAnimated():
+            try: data[k] = node[k].value()
+            except: pass
+    raw = node["preset_storage"].value()
+    allp = json.loads(raw) if raw else {}
+    allp[name] = data
+    node["preset_storage"].setValue(json.dumps(allp))
+    node["preset_menu"].setValues(list(allp.keys()))
+'''
+    grp.addKnob(nuke.PyScript_Knob("save_preset",   "Save Preset",   save_code))
+
+    # 3) Load Preset button
+    load_code = '''\
+import json
+node = nuke.thisNode()
+raw = node["preset_storage"].value()
+presets = json.loads(raw) if raw else {}
+sel = node["preset_menu"].value()
+if sel in presets:
+    for k, v in presets[sel].items():
+        if k in node.knobs():
+            try: node[k].setValue(v)
+            except: pass
+else:
+    nuke.message("Preset not found!")
+'''
+    grp.addKnob(nuke.PyScript_Knob("load_preset",   "Load Preset",   load_code))
+
+    # 4) Delete Preset button
+    delete_code = '''\
+import json
+node = nuke.thisNode()
+raw = node["preset_storage"].value()
+presets = json.loads(raw) if raw else {}
+sel = node["preset_menu"].value()
+if sel in presets:
+    del presets[sel]
+    node["preset_storage"].setValue(json.dumps(presets))
+    node["preset_menu"].setValues(list(presets.keys()))
+else:
+    nuke.message("No preset to delete.")
+'''
+    grp.addKnob(nuke.PyScript_Knob("delete_preset", "Delete Preset", delete_code))
+
+    # 5) Export Presets button
+    export_code = '''\
+import os
+node = nuke.thisNode()
+raw = node["preset_storage"].value()
+path = nuke.getFilename("Export Presets…", "*.json")
+if path:
+    with open(path, "w") as f:
+        f.write(raw)
+'''
+    grp.addKnob(nuke.PyScript_Knob("export_presets","Export Presets", export_code))
+
+    # 6) Import Presets button
+    import_code = '''\
+import json, os
+node = nuke.thisNode()
+path = nuke.getFilename("Import Presets…", "*.json")
+if path and os.path.exists(path):
+    with open(path, "r") as f:
+        incoming = json.load(f)
+    raw = node["preset_storage"].value()
+    existing = json.loads(raw) if raw else {}
+    existing.update(incoming)
+    node["preset_storage"].setValue(json.dumps(existing))
+    node["preset_menu"].setValues(list(existing.keys()))
+'''
+    grp.addKnob(nuke.PyScript_Knob("import_presets","Import Presets", import_code))
+
+    # 7) Hidden storage knob
+    storage = nuke.String_Knob("preset_storage", "")
+    storage.setVisible(False)
+    grp.addKnob(storage)
+
+    # 8) Auto-sync knobChanged callback
+    sync_code = '''\
+import json
+node = nuke.thisNode()
+raw = node["preset_storage"].value()
+try: presets = json.loads(raw)
+except: presets = {}
+node["preset_menu"].setValues(list(presets.keys()))
+'''
+    grp.knob("knobChanged").setValue(sync_code)
+
+    # 9) Initial populate of pulldown
+    try: presets = json.loads(grp["preset_storage"].value())
+    except: presets = {}
+    grp["preset_menu"].setValues(list(presets.keys()))
+
+    return grp
+
+# Run it!
+createPresetGroup()
+</pre>
+
+
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
