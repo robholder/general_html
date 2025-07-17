@@ -141,8 +141,95 @@ node["preset_menu"].setValues(list(presets.keys()))
 createPresetGroup()
 </pre>
 
+<div id="Follow up - pulldown activation"><h1 id="Follow up - pulldown activation" class="header"><a href="#Follow up - pulldown activation">Follow up - pulldown activation</a></h1></div>
 
+<table>
+<tr>
+<td>
+Stunning! Works well! I have another question. How posible would it be to have the 'Load Preset' action pickup as soon as the pulldown menu is set to one of the set presets? I feel it would be more intuative to have the preset 'load' as soon as it is chosen.
+</td>
+</tr>
+</table>
 
+<div id="Follow up - pulldown activation-Pulldown Autoload"><h2 id="Pulldown Autoload" class="header"><a href="#Follow up - pulldown activation-Pulldown Autoload">Pulldown Autoload</a></h2></div>
+
+<p>
+To have the Group auto-load a preset the moment the user picks it from the pulldown, you just need to extend your existing knobChanged callback so that it:
+</p>
+<ul>
+<li>
+Syncs the menu whenever your internal storage changes
+
+<li>
+Runs your “load preset” logic whenever preset_menu itself is changed
+
+</ul>
+<p>
+Here’s a drop-in replacement for your knobChanged script. In your Python snippet that builds the node (or in the Group’s Script → Set Script → knobChanged field), replace the old sync code with this:
+</p>
+
+<pre python>
+import json
+
+node     = nuke.thisNode()
+knobName = nuke.thisKnob().name()
+
+# 1) Whenever presets get added/removed/imported, re-populate the pulldown
+if knobName in ("preset_storage","save_preset","delete_preset","import_presets"):
+    raw     = node["preset_storage"].value()
+    presets = json.loads(raw) if raw else {}
+    node["preset_menu"].setValues(list(presets.keys()))
+
+# 2) Whenever the user actually picks from the pulldown, load it immediately
+elif knobName == "preset_menu":
+    raw     = node["preset_storage"].value()
+    presets = json.loads(raw) if raw else {}
+    sel     = node["preset_menu"].value()
+    if sel in presets:
+        data = presets[sel]
+        for k,v in data.items():
+            if k in node.knobs():
+                try:
+                    node[k].setValue(v)
+                except:
+                    pass
+</pre>
+
+<p>
+How to wire it in:
+</p>
+<ul>
+<li>
+If you used the Python builder script, find where you do
+
+</ul>
+  
+<pre python>
+grp.knob("knobChanged").setValue(sync_code)
+</pre>
+
+<p>
+...and replace sync_code with the block above (wrap it as a triple-quoted Python string).
+</p>
+
+<ul>
+<li>
+If you’re editing the Group in the GUI, open Group → Node → Edit → knobChanged, delete whatever’s there, and paste the block above.
+
+</ul>
+<div id="Follow up - pulldown activation-Pulldown Autoload-Result:"><h4 id="Result:" class="header"><a href="#Follow up - pulldown activation-Pulldown Autoload-Result:">Result:</a></h4></div>
+
+<ul>
+<li>
+As soon as the user picks a name in Preset, the knobChanged fires and instantly applies that preset.
+
+<li>
+When they Save/Delete/Import, the menu stays in sync too.
+
+<li>
+That gives you the truly “live” behavior: select → load, no extra button clicks.
+
+</ul>
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
