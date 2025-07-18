@@ -572,6 +572,166 @@ The pulldown is rebuilt and auto-loads on selection, but protected names never d
 Feel free to adjust default_presets at the top to your tool’s knobs and values. This gives you a truly bullet-proof “suggested” list plus full user-generated presets.
 </p>
 
+<div id="Lines and New lines"><h1 id="Lines and New lines" class="header"><a href="#Lines and New lines">Lines and New lines</a></h1></div>
+
+<p>
+This is a repeat of the code above, with some lines and STARTLINE (newline) flags
+</p>
+
+<pre python>
+import nuke, json, os
+
+def createPresetGroup():
+    # 0) Define your protected defaults here:
+    default_presets = {
+        "Suggested Soft": {
+            # replace these with your tool's knob names &amp; values
+            "radius": 5,
+            "flowIntensity": 1.5,
+            "edgeFalloff": 0.3
+        },
+        "Suggested Strong": {
+            "radius": 12,
+            "flowIntensity": 4.0,
+            "edgeFalloff": 0.9
+        }
+    }
+
+    # 1) Create the Group node
+    grp = nuke.nodes.Group(name="PresetGroup")
+
+    # 2) Add the UI knobs
+    enumb = nuke.Enumeration_Knob("preset_menu", "Preset", [])
+    enumb.setFlag(nuke.STARTLINE)
+    #grp.addKnob(nuke.Enumeration_Knob("preset_menu", "Preset", []))
+    grp.addKnob(enumb)
+
+    savekb = nuke.PyScript_Knob("save_preset",   "Save Preset",   save_code)
+    savekb.setFlag(nuke.STARTLINE)
+    grp.addKnob(savekb)
+    line = nuke.Text_Knob("divName","","")
+    grp.addKnob(line)
+    #grp.addKnob(nuke.PyScript_Knob("load_preset",   "Load Preset",   load_code))
+    grp.addKnob(nuke.PyScript_Knob("delete_preset", "Delete Preset", delete_code))
+    grp.addKnob(nuke.PyScript_Knob("export_presets","Export Presets",export_code))
+    grp.addKnob(nuke.PyScript_Knob("import_presets","Import Presets",import_code))
+
+    # 3) Hidden knobs for storage and defaults
+    defaults_knob = nuke.String_Knob("preset_defaults", "")
+    defaults_knob.setVisible(False)
+    grp.addKnob(defaults_knob)
+    storage_knob  = nuke.String_Knob("preset_storage",  "")
+    storage_knob.setVisible(False)
+    grp.addKnob(storage_knob)
+
+    # 4) Initialize knobs values
+    grp["preset_defaults"].setValue(json.dumps(default_presets))
+    # merge defaults into storage
+    raw = grp["preset_storage"].value()
+    stored = json.loads(raw) if raw else {}
+    for name, vals in default_presets.items():
+        stored.setdefault(name, vals)
+    grp["preset_storage"].setValue(json.dumps(stored))
+    grp["preset_menu"].setValues(list(stored.keys()))
+
+    # 5) knobChanged: sync menu &amp; auto-load on change
+    sync_code = '''\
+import json
+node      = nuke.thisNode()
+knob      = nuke.thisKnob().name()
+defaults  = json.loads(node["preset_defaults"].value())
+storage   = json.loads(node["preset_storage"].value() or "{}")
+
+# always ensure defaults exist
+for dname, dvals in defaults.items():
+    storage.setdefault(dname, dvals)
+node["preset_storage"].setValue(json.dumps(storage))
+
+# sync the pulldown menu
+node["preset_menu"].setValues(list(storage.keys()))
+
+# if the user changed the pulldown, apply immediately
+if knob=="preset_menu":
+    sel = node["preset_menu"].value()
+    for k,v in storage[sel].items():
+        if k in node.knobs():
+            try: node[k].setValue(v)
+            except: pass
+'''
+    grp.knob("knobChanged").setValue(sync_code)
+
+    return grp
+
+# Stand-alone PyScript blocks for the buttons
+save_code = '''\
+import json
+node = nuke.thisNode()
+name = nuke.getInput("Preset name:")
+if name:
+    data={}
+    for k in node.knobs():
+        if k not in ("preset_storage","preset_defaults","preset_menu") and not node[k].isAnimated():
+            try: data[k]=node[k].value()
+            except: pass
+    allp= json.loads(node["preset_storage"].value() or "{}")
+    allp[name]=data
+    node["preset_storage"].setValue(json.dumps(allp))
+    node["preset_menu"].setValues(list(allp.keys()))
+    node["preset_menu"].setValue(name)
+'''
+
+load_code = '''\
+# (Now also handled via knobChanged on sel change)
+nuke.thisNode().knob("knobChanged").execute()
+'''
+
+delete_code = '''\
+import json
+node = nuke.thisNode()
+sel = node["preset_menu"].value()
+defaults = json.loads(node["preset_defaults"].value() or "{}")
+allp = json.loads(node["preset_storage"].value() or "{}")
+if sel in defaults:
+    nuke.message("“%s” is a protected preset and cannot be deleted." % sel)
+else:
+    # find index
+    keys=list(allp.keys()); idx=keys.index(sel)
+    del allp[sel]
+    node["preset_storage"].setValue(json.dumps(allp))
+    node["preset_menu"].setValues(list(allp.keys()))
+    # select previous
+    new_keys=list(allp.keys())
+    if new_keys:
+        prev = idx-1 if idx&gt;0 else 0
+        node["preset_menu"].setValue(new_keys[prev])
+'''
+
+export_code = '''\
+import os
+node=nuke.thisNode()
+raw=node["preset_storage"].value()
+path=nuke.getFilename("Export Presets","*.json")
+if path:
+    open(path,"w").write(raw)
+'''
+
+import_code = '''\
+import json,os
+node=nuke.thisNode()
+path=nuke.getFilename("Import Presets","*.json")
+if path and os.path.exists(path):
+    incoming=json.load(open(path))
+    existing=json.loads(node["preset_storage"].value() or "{}")
+    existing.update(incoming)
+    node["preset_storage"].setValue(json.dumps(existing))
+    node["preset_menu"].setValues(list(existing.keys()))
+'''
+
+# Finally build the group
+createPresetGroup()
+</pre>
+
+
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
