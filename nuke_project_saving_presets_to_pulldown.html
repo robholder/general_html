@@ -572,7 +572,7 @@ The pulldown is rebuilt and auto-loads on selection, but protected names never d
 Feel free to adjust default_presets at the top to your tool’s knobs and values. This gives you a truly bullet-proof “suggested” list plus full user-generated presets.
 </p>
 
-<div id="Lines and New lines"><h1 id="Lines and New lines" class="header"><a href="#Lines and New lines">Lines and New lines</a></h1></div>
+<div id="Lines and New lines, and a Delete Dialog"><h1 id="Lines and New lines, and a Delete Dialog" class="header"><a href="#Lines and New lines, and a Delete Dialog">Lines and New lines, and a Delete Dialog</a></h1></div>
 
 <p>
 This is a repeat of the code above, with some lines and STARTLINE (newline) flags
@@ -687,23 +687,34 @@ nuke.thisNode().knob("knobChanged").execute()
 
 delete_code = '''\
 import json
-node = nuke.thisNode()
-sel = node["preset_menu"].value()
+import nuke
+
+node     = nuke.thisNode()
+sel      = node["preset_menu"].value()
 defaults = json.loads(node["preset_defaults"].value() or "{}")
-allp = json.loads(node["preset_storage"].value() or "{}")
+
+# Protected presets can’t be removed
 if sel in defaults:
-    nuke.message("“%s” is a protected preset and cannot be deleted." % sel)
-else:
-    # find index
-    keys=list(allp.keys()); idx=keys.index(sel)
+    nuke.message("“%s” is protected and cannot be deleted." % sel)
+
+# Ask for confirmation on user-created presets
+elif nuke.ask("Delete preset '%s'? This cannot be undone." % sel):
+    allp = json.loads(node["preset_storage"].value() or "{}")
+    keys = list(allp.keys())
+    idx  = keys.index(sel)
+
+    # Remove and update storage
     del allp[sel]
     node["preset_storage"].setValue(json.dumps(allp))
-    node["preset_menu"].setValues(list(allp.keys()))
-    # select previous
-    new_keys=list(allp.keys())
+
+    # Refresh the pulldown
+    new_keys = list(allp.keys())
+    node["preset_menu"].setValues(new_keys)
+
+    # Select the previous entry (if any)
     if new_keys:
-        prev = idx-1 if idx&gt;0 else 0
-        node["preset_menu"].setValue(new_keys[prev])
+        prev_idx = idx - 1 if idx &gt; 0 else 0
+        node["preset_menu"].setValue(new_keys[prev_idx])
 '''
 
 export_code = '''\
