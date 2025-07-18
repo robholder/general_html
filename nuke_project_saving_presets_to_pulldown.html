@@ -141,6 +141,7 @@ node["preset_menu"].setValues(list(presets.keys()))
 createPresetGroup()
 </pre>
 
+
 <div id="Follow up - pulldown activation"><h1 id="Follow up - pulldown activation" class="header"><a href="#Follow up - pulldown activation">Follow up - pulldown activation</a></h1></div>
 
 <table>
@@ -230,6 +231,347 @@ When they Save/Delete/Import, the menu stays in sync too.
 That gives you the truly “live” behavior: select → load, no extra button clicks.
 
 </ul>
+<div id="Pulldown refresh on Save"><h1 id="Pulldown refresh on Save" class="header"><a href="#Pulldown refresh on Save">Pulldown refresh on Save</a></h1></div>
+
+<p>
+| That works well too! Another intuitive driven tweak would be to have the pulldown to jump to the new preset as soon as the user saves the preset.
+</p>
+
+<p>
+To make the pulldown jump to your new preset immediately after saving (and—because of your knobChanged logic—also load it instantly), all you need is one extra line in your Save Preset script: set the pulldown’s value to the new name.
+</p>
+
+<p>
+Here’s the updated save_preset block (just the part inside the triple‐quotes). Replace your old version with this:
+</p>
+
+<pre python>
+import json
+node = nuke.thisNode()
+name = nuke.getInput("Enter preset name:")
+if name:
+    # collect existing knob values
+    data = {}
+    for k in node.knobs():
+        if k not in ("preset_storage","preset_menu") and not node[k].isAnimated():
+            try: data[k] = node[k].value()
+            except: pass
+
+    # merge into storage
+    raw = node["preset_storage"].value()
+    allp = json.loads(raw) if raw else {}
+    allp[name] = data
+    node["preset_storage"].setValue(json.dumps(allp))
+
+    # refresh menu choices *and* select the newly created preset
+    node["preset_menu"].setValues(list(allp.keys()))
+    node["preset_menu"].setValue(name)
+</pre>
+
+<div id="Pulldown refresh on Save-Why this works:"><h4 id="Why this works:" class="header"><a href="#Pulldown refresh on Save-Why this works:">Why this works:</a></h4></div>
+
+<ul>
+<li>
+You save your preset into preset_storage as before.
+
+<li>
+You rebuild the pulldown choices with setValues(...).
+
+<li>
+New: you immediately call setValue(name) on the pulldown knob.
+
+<li>
+Since your knobChanged callback watches for preset_menu changes, it will then fire and load the preset right away.
+
+</ul>
+<p>
+— If you’re generating the Group via the Python snippet I gave you, just swap out the save_code string in createPresetGroup() with the block above. If you added the button manually in your Group node, open the Save Preset pyScript knob, paste the updated script, and you’re done.
+Now: save → pulldown jumps → preset loads. Smooth and intuitive!
+</p>
+
+
+<div id="Jump to previous Pulldown item on delete"><h1 id="Jump to previous Pulldown item on delete" class="header"><a href="#Jump to previous Pulldown item on delete">Jump to previous Pulldown item on delete</a></h1></div>
+
+<table>
+<tr>
+<td>
+Wonderful! It's much more slick now! Another tweak for a more polished result would be to have the pulldown to jump to the previous item in the pulldown when the current one is deleted.
+</td>
+</tr>
+</table>
+
+<p>
+To make the menu jump to the item immediately before the one you just deleted, you only need to enhance your Delete Preset script. The idea is:
+</p>
+
+<ul>
+<li>
+Grab the current list of presets
+
+<li>
+Find the index of the one being removed
+
+<li>
+Delete it from storage
+
+<li>
+Refresh the menu choices
+
+<li>
+Compute “previous index” (clamped to 0)
+
+<li>
+Set the pulldown to that previous entry
+
+</ul>
+<p>
+Because your knobChanged callback already listens for preset_menu changes and auto-loads the selection, it will load the new choice right away.
+</p>
+
+<div id="Jump to previous Pulldown item on delete-Updated Delete Script"><h4 id="Updated Delete Script" class="header"><a href="#Jump to previous Pulldown item on delete-Updated Delete Script">Updated Delete Script</a></h4></div>
+
+<p>
+Replace your existing delete block with this:
+</p>
+<pre python>
+import json
+
+node = nuke.thisNode()
+raw = node["preset_storage"].value()
+presets = json.loads(raw) if raw else {}
+sel = node["preset_menu"].value()
+
+if sel in presets:
+    # 1) Capture ordered list and index of current
+    keys = list(presets.keys())
+    idx  = keys.index(sel)
+
+    # 2) Delete from storage
+    del presets[sel]
+    node["preset_storage"].setValue(json.dumps(presets))
+
+    # 3) Refresh menu choices
+    new_keys = list(presets.keys())
+    node["preset_menu"].setValues(new_keys)
+
+    # 4) Compute previous index
+    if new_keys:
+        prev_idx = idx - 1 if idx &gt; 0 else 0
+        node["preset_menu"].setValue(new_keys[prev_idx])
+else:
+    nuke.message("No preset to delete.")
+</pre>
+
+<div id="Jump to previous Pulldown item on delete-How to install"><h4 id="How to install" class="header"><a href="#Jump to previous Pulldown item on delete-How to install">How to install</a></h4></div>
+
+<ul>
+<li>
+If you’re using the Python builder snippet – In createPresetGroup(), find the delete_code string and swap it out with the block above. – Re-run the builder script to re-create the Group.
+
+<li>
+If you edited the Group manually – Double-click your Group → right-click Delete Preset knob → Edit Script… – Paste in the updated code, hit OK.
+
+</ul>
+<p>
+Now, when you click Delete Preset, the menu will immediately select and load the previous preset in the list—no extra clicks required. Let me know how it feels, or if you’d like any other UI refinements!
+</p>
+
+<div id="Protected Defaults"><h1 id="Protected Defaults" class="header"><a href="#Protected Defaults">Protected Defaults</a></h1></div>
+
+<table>
+<tr>
+<td>
+Phenomenally good! Another request: could we have protect (default) settings that may be prepopulated in the Group tool? I imagine a few items in the pulldown that could be pre-named 'suggested' settings that cannot be deleted.
+</td>
+</tr>
+</table>
+
+<p>
+Below is an augmented version of the createPresetGroup() builder that:
+</p>
+<ul>
+<li>
+Defines a set of protected default presets
+
+<li>
+Stores them in an invisible preset_defaults knob
+
+<li>
+Merges them into your internal storage on creation and on import
+
+<li>
+Updates the Delete Preset script so you cannot delete any protected preset
+
+</ul>
+<p>
+Copy–paste this into Nuke’s Script Editor (Python tab) and run it. You’ll get a Group with two built-in “Suggested” presets that always appear (and cannot be removed), plus your own saved presets.
+</p>
+
+<pre python>
+import nuke, json, os
+
+def createPresetGroup():
+    # 0) Define your protected defaults here:
+    default_presets = {
+        "Suggested Soft": {
+            # replace these with your tool's knob names &amp; values
+            "radius": 5,
+            "flowIntensity": 1.5,
+            "edgeFalloff": 0.3
+        },
+        "Suggested Strong": {
+            "radius": 12,
+            "flowIntensity": 4.0,
+            "edgeFalloff": 0.9
+        }
+    }
+
+    # 1) Create the Group node
+    grp = nuke.nodes.Group(name="PresetGroup")
+
+    # 2) Add the UI knobs
+    grp.addKnob(nuke.Enumeration_Knob("preset_menu", "Preset", []))
+    grp.addKnob(nuke.PyScript_Knob("save_preset",   "Save Preset",   save_code))
+    grp.addKnob(nuke.PyScript_Knob("load_preset",   "Load Preset",   load_code))
+    grp.addKnob(nuke.PyScript_Knob("delete_preset", "Delete Preset", delete_code))
+    grp.addKnob(nuke.PyScript_Knob("export_presets","Export Presets",export_code))
+    grp.addKnob(nuke.PyScript_Knob("import_presets","Import Presets",import_code))
+
+    # 3) Hidden knobs for storage and defaults
+    defaults_knob = nuke.String_Knob("preset_defaults", "")
+    defaults_knob.setVisible(False)
+    grp.addKnob(defaults_knob)
+    storage_knob  = nuke.String_Knob("preset_storage",  "")
+    storage_knob.setVisible(False)
+    grp.addKnob(storage_knob)
+
+    # 4) Initialize knobs values
+    grp["preset_defaults"].setValue(json.dumps(default_presets))
+    # merge defaults into storage
+    raw = grp["preset_storage"].value()
+    stored = json.loads(raw) if raw else {}
+    for name, vals in default_presets.items():
+        stored.setdefault(name, vals)
+    grp["preset_storage"].setValue(json.dumps(stored))
+    grp["preset_menu"].setValues(list(stored.keys()))
+
+    # 5) knobChanged: sync menu &amp; auto-load on change
+    sync_code = '''\
+import json
+node      = nuke.thisNode()
+knob      = nuke.thisKnob().name()
+defaults  = json.loads(node["preset_defaults"].value())
+storage   = json.loads(node["preset_storage"].value() or "{}")
+
+# always ensure defaults exist
+for dname, dvals in defaults.items():
+    storage.setdefault(dname, dvals)
+node["preset_storage"].setValue(json.dumps(storage))
+
+# sync the pulldown menu
+node["preset_menu"].setValues(list(storage.keys()))
+
+# if the user changed the pulldown, apply immediately
+if knob=="preset_menu":
+    sel = node["preset_menu"].value()
+    for k,v in storage[sel].items():
+        if k in node.knobs():
+            try: node[k].setValue(v)
+            except: pass
+'''
+    grp.knob("knobChanged").setValue(sync_code)
+
+    return grp
+
+# Stand-alone PyScript blocks for the buttons
+save_code = '''\
+import json
+node = nuke.thisNode()
+name = nuke.getInput("Preset name:")
+if name:
+    data={}
+    for k in node.knobs():
+        if k not in ("preset_storage","preset_defaults","preset_menu") and not node[k].isAnimated():
+            try: data[k]=node[k].value()
+            except: pass
+    allp= json.loads(node["preset_storage"].value() or "{}")
+    allp[name]=data
+    node["preset_storage"].setValue(json.dumps(allp))
+    node["preset_menu"].setValues(list(allp.keys()))
+    node["preset_menu"].setValue(name)
+'''
+
+load_code = '''\
+# (Now also handled via knobChanged on sel change)
+nuke.thisNode().knob("knobChanged").execute()
+'''
+
+delete_code = '''\
+import json
+node = nuke.thisNode()
+sel = node["preset_menu"].value()
+defaults = json.loads(node["preset_defaults"].value() or "{}")
+allp = json.loads(node["preset_storage"].value() or "{}")
+if sel in defaults:
+    nuke.message("“%s” is a protected preset and cannot be deleted." % sel)
+else:
+    # find index
+    keys=list(allp.keys()); idx=keys.index(sel)
+    del allp[sel]
+    node["preset_storage"].setValue(json.dumps(allp))
+    node["preset_menu"].setValues(list(allp.keys()))
+    # select previous
+    new_keys=list(allp.keys())
+    if new_keys:
+        prev = idx-1 if idx&gt;0 else 0
+        node["preset_menu"].setValue(new_keys[prev])
+'''
+
+export_code = '''\
+import os
+node=nuke.thisNode()
+raw=node["preset_storage"].value()
+path=nuke.getFilename("Export Presets","*.json")
+if path:
+    open(path,"w").write(raw)
+'''
+
+import_code = '''\
+import json,os
+node=nuke.thisNode()
+path=nuke.getFilename("Import Presets","*.json")
+if path and os.path.exists(path):
+    incoming=json.load(open(path))
+    existing=json.loads(node["preset_storage"].value() or "{}")
+    existing.update(incoming)
+    node["preset_storage"].setValue(json.dumps(existing))
+    node["preset_menu"].setValues(list(existing.keys()))
+'''
+
+# Finally build the group
+createPresetGroup()
+</pre>
+
+<div id="Protected Defaults-How it works"><h4 id="How it works" class="header"><a href="#Protected Defaults-How it works">How it works</a></h4></div>
+
+<ul>
+<li>
+<code>preset_defaults</code> holds your protected presets as JSON.
+
+<li>
+On creation and any change (knobChanged), we merge defaults into storage so they always exist.
+
+<li>
+The Delete script refuses to remove anything listed in preset_defaults.
+
+<li>
+The pulldown is rebuilt and auto-loads on selection, but protected names never disappear.
+
+</ul>
+<p>
+Feel free to adjust default_presets at the top to your tool’s knobs and values. This gives you a truly bullet-proof “suggested” list plus full user-generated presets.
+</p>
+
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
