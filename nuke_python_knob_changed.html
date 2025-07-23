@@ -2,6 +2,7 @@
 <html>
 <head>
 <link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
 <title>nuke_python_knob_changed</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -78,7 +79,6 @@ selected = True/False
 Collapsing a node panel is a knobChange.
 
 </ul>
-
 <div id="Nuke - Python - knobChanged-What Counts as a Knob Change?-Caution"><h3 id="Caution" class="header"><a href="#Nuke - Python - knobChanged-What Counts as a Knob Change?-Caution">Caution</a></h3></div>
 
 <p>
@@ -288,7 +288,6 @@ The <code>nuke.knobChanged()</code> mechanism is a way in Nuke to set up callbac
 
 </ul>
 </ul>
-
 <div id="knobChanged-How to Use It"><h2 id="How to Use It" class="header"><a href="#knobChanged-How to Use It">How to Use It</a></h2></div>
 
 <p>
@@ -355,7 +354,6 @@ This method keeps your code modular and easier to maintain—if you update the c
 <span id="knobChanged-Best Practices-One-Liner Code Strings"></span><strong id="One-Liner Code Strings">One-Liner Code Strings</strong>: Because the value passed to a knob must be a string, your callback code is often written on a single line with semicolons separating statements or with newline characters (<code>\n</code>) if you prefer the code to be more readable when editing in your text editor.
 
 </ul>
-
 <div id="knobChanged-Best Practices-Summary"><h3 id="Summary" class="header"><a href="#knobChanged-Best Practices-Summary">Summary</a></h3></div>
 
 <p>
@@ -373,9 +371,6 @@ It's very common and by design for custom panels or nodes in Nuke to include a m
 <ul>
 <li>
 <span id="Common Usage-What It Does-Callback Mechanism"></span><strong id="Callback Mechanism">Callback Mechanism</strong>: Nuke calls the knobChanged method on your panel or node whenever a knob is modified. In your example:
-
-</ul>
-
 <pre python>
 def knobChanged(self, knob):
     if knob is self.openScript:
@@ -385,6 +380,7 @@ def knobChanged(self, knob):
         self.scripts.setValues(refreshScripts)
 </pre>
 
+</ul>
 <p>
 The method receives the specific knob that changed as an argument. You can test which knob fired the event (using, for example, if knob is self.openScript:) and then run your custom logic accordingly.
 </p>
@@ -393,7 +389,6 @@ The method receives the specific knob that changed as an argument. You can test 
 <span id="Common Usage-What It Does-Integration with Custom Panels"></span><strong id="Integration with Custom Panels">Integration with Custom Panels</strong>: When you subclass Nuke’s panel classes (like nukescripts.PythonPanel), the framework automatically calls knobChanged on your instance when any knob within the panel is altered by the user. This gives you a central place to handle interactions, update UI states, or trigger additional processing.
 
 </ul>
-
 <div id="Common Usage-Is the Name Special or Required?"><h2 id="Is the Name Special or Required?" class="header"><a href="#Common Usage-Is the Name Special or Required?">Is the Name Special or Required?</a></h2></div>
 
 <ul>
@@ -404,7 +399,6 @@ The method receives the specific knob that changed as an argument. You can test 
 <span id="Common Usage-Is the Name Special or Required?-Built-in vs. Custom Implementation"></span><strong id="Built-in vs. Custom Implementation">Built-in vs. Custom Implementation</strong>: While you could implement other names if you manually attach a callback string to a knob, the advantage of using the method is clarity and integration. For panels, Nuke will automatically route knob changes to your <code>knobChanged</code> method if it exists. Thus, using this method is both common and recommended.
 
 </ul>
-
 <div id="Common Usage-Is the Name Special or Required?-In Summary"><h3 id="In Summary" class="header"><a href="#Common Usage-Is the Name Special or Required?-In Summary">In Summary</a></h3></div>
 
 <ul>
@@ -415,9 +409,71 @@ The method receives the specific knob that changed as an argument. You can test 
 <span id="Common Usage-Is the Name Special or Required?-In Summary-Naming Convention"></span><strong id="Naming Convention">Naming Convention</strong>: The name <code>knobChanged</code> isn’t imposed by Python itself, but it’s required by Nuke’s framework for panels and nodes that need to respond to knob modifications.
 
 </ul>
-
 <p>
 This approach helps keep your UI behavior modular and maintainable; you simply check which knob changed and take action accordingly.
+</p>
+
+
+<div id="Quick Example in Action"><h1 id="Quick Example in Action" class="header"><a href="#Quick Example in Action">Quick Example in Action</a></h1></div>
+
+<p>
+A switch node that changes Label (using regular TCL expression), and changes color on 'knobChanged':
+</p>
+
+<p>
+In the Script Editor / Python API:
+</p>
+
+<ul>
+<li>
+Select your Switch node in the Node Graph (or grab it by name):
+
+</ul>
+  
+<pre python>
+node = nuke.toNode('Switch13')
+</pre>
+
+<p>
+Build your multi-line Python as a single string:
+</p>
+
+<pre python>
+code = """
+if nuke.thisKnob().name() == 'which':
+    n = nuke.thisNode()
+    colors = [582156543, 3003121919]
+    try:
+        n['tile_color'].setValue(colors[int(n['which'].value())])
+    except:
+        pass
+"""
+</pre>
+
+<p>
+Stuff it into the knobChanged knob:
+</p>
+
+<pre python>
+node['knobChanged'].setValue(code)
+</pre>
+
+<p>
+Now every time you change which, your tile_color will flip to the corresponding entry in your colors list.
+</p>
+
+<div id="Quick Example in Action-Breaking the link"><h4 id="Breaking the link" class="header"><a href="#Quick Example in Action-Breaking the link">Breaking the link</a></h4></div>
+
+<p>
+If you ever want to remove the callback:
+</p>
+
+<pre python>
+node['knobChanged'].setValue("")  
+</pre>
+
+<p>
+That clears out the code and the Switch will go back to normal.
 </p>
 
 <p>
