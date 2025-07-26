@@ -2,6 +2,7 @@
 <html>
 <head>
 <link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
 <title>nuke_expresion_node_index</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,7 +17,7 @@
 <a href="nuke_index.html">Nuke Index</a>
 </p>
 
-<div id="Contents" class="toc"><h1 id="Contents">Contents</a></h1></div>
+<div id="Contents" class="toc"><h1 id="Contents" class="header"><a href="#Contents">Contents</a></h1></div>
 <ul>
 <li>
 <a href="nuke_expresion_node_index.html#Node Panel Quick Tip">Node Panel Quick Tip</a>
@@ -77,7 +78,6 @@
 <a href="nuke_expresion_node_index.html#Summary">Summary</a>
 
 </ul>
-
 <div id="Nuke - Expression Node"><h1 id="Nuke - Expression Node" class="header"><a href="#Nuke - Expression Node">Nuke - Expression Node</a></h1></div>
 
 <div id="Nuke - Expression Node-Node Panel Quick Tip"><h2 id="Node Panel Quick Tip" class="header"><a href="#Nuke - Expression Node-Node Panel Quick Tip">Node Panel Quick Tip</a></h2></div>
@@ -152,7 +152,6 @@ Alternately, you can use <code>r(x-1, y)</code> and <code>r(x, y+1)</code> synta
 <span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Explanation-Fallback"></span><strong id="Fallback">Fallback</strong>: If the current pixel isn’t NaN, it simply uses the original red value.
 
 </ul>
-
 <div id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels"><h3 id="Applying to Other Channels" class="header"><a href="#Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Applying to Other Channels">Applying to Other Channels</a></h3></div>
 
 <p>
@@ -181,7 +180,6 @@ isnan(b) ? (b[-1,0] + b[1,0] + b[0,-1] + b[0,1] + b[-1,-1] + b[1,-1] + b[-1,1] +
 <span id="Nuke - Expression Node-Fixing Single Pixel NaNs with an Expression-Caveats-Multiple Pixels"></span><strong id="Multiple Pixels">Multiple Pixels</strong>: This expression only fixes pixels that are NaN on their own. If you have clusters of NaNs, additional logic or a different approach (such as a blur or a more sophisticated neighborhood interpolation) may be needed.
 
 </ul>
-
 <p>
 This technique lets you “heal” isolated NaN pixels by blending information from their local area, which is often sufficient for many compositing tasks in Nuke. Enjoy experimenting with your expressions!
 </p>
@@ -203,13 +201,11 @@ The easiest and most robust approach is often to modify your node tree upstream 
 
 <li>
 <span id="Edge Pixels-Pre-Extend or Clamp the Image Data-Clamp the Coordinates"></span><strong id="Clamp the Coordinates">Clamp the Coordinates</strong>: In some cases, you may be able to clamp your sample coordinates using an expression. Although Nuke’s expression node might not provide a dedicated <code>clamp()</code> function, you can sometimes simulate it using conditional operators. For example, for the left neighbor you might write:
-
-</ul>
-
 <pre nuke>
 x &gt; 0 ? r[-1,0] : r[0,0]
 </pre>
 
+</ul>
 <p>
 This checks if <code>x &gt; 0</code>; if not, it falls back to the current pixel’s value. You’d need a similar condition for each neighbor so that out-of-bound positions default to the nearest in-bound pixel.
 </p>
@@ -265,7 +261,6 @@ Often the cleanest solution is to let Nuke handle the border. For instance, you 
 <span id="Edge Pixels-Final Thoughts-Manual Safeguards"></span><strong id="Manual Safeguards">Manual Safeguards</strong>: Only if you need the logic within the Expression node itself should you consider adding conditional checks. While it offers precise control, it increases complexity.
 
 </ul>
-
 <p>
 By adopting one of these strategies, you can ensure your averages are computed correctly even for pixels near the edge of the image.
 </p>
@@ -295,7 +290,6 @@ In Nuke's expression language, the expression
 <span id="Decimate an Image-Multiplication of the Booleans:"></span><strong id="Multiplication of the Booleans:">Multiplication of the Booleans:</strong> The expression multiplies the two Boolean results. It will only return 1 if both <code>!(x%10)</code> and <code>!(y%10)</code> are true (i.e. both equal to 1), which happens when both x and y are exact multiples of 10. If either is not a multiple of 10, one side becomes 0 and the multiplication returns 0.
 
 </ul>
-
 <div id="Decimate an Image-Summary"><h4 id="Summary" class="header"><a href="#Decimate an Image-Summary">Summary</a></h4></div>
 
 <ul>
@@ -306,13 +300,240 @@ In Nuke's expression language, the expression
 <span id="Decimate an Image-Summary-Result is 0:"></span><strong id="Result is 0:">Result is 0:</strong> Otherwise.
 
 </ul>
-
 <p>
 This type of expression is often used to create a grid-like pattern (for example, a set of points) that only appears at positions where both coordinates are divisible by 10.
 </p>
 
+<div id="Radial Vector Field Generator"><h1 id="Radial Vector Field Generator" class="header"><a href="#Radial Vector Field Generator">Radial Vector Field Generator</a></h1></div>
 
+<p>
+ In an expression node with a Manage User Knobs... knob added (position knob) at each pixel (x,y), the two formulas
+</p>
 
+<pre text>
+R = sin( atan(x - center.x, y - center.y) + 3.14 ) / 2.48  
+G = sin( atan(y - center.y, x - center.x) + 3.14 ) / 2.48  
+</pre>
+
+<p>
+...actually build a 2D radial vector field centered on center.x, center.y. Here’s the breakdown:
+</p>
+
+<div id="Radial Vector Field Generator-Convert pixel → local coordinates"><h4 id="Convert pixel → local coordinates" class="header"><a href="#Radial Vector Field Generator-Convert pixel → local coordinates">Convert pixel → local coordinates</a></h4></div>
+
+<pre>
+dx = x – center.x
+
+dy = y – center.y
+</pre>
+
+<p>
+These shift your coordinate system so the “origin” is the chosen center point.
+</p>
+
+<div id="Radial Vector Field Generator-Compute angles with atan"><h4 id="Compute angles with atan" class="header"><a href="#Radial Vector Field Generator-Compute angles with atan">Compute angles with atan</a></h4></div>
+
+<p>
+Nuke’s atan(a,b) is the same as atan2(a,b). So:
+</p>
+
+<pre text>
+atan(dx, dy) yields an angle φ₁ whose tangent is dx/dy (i.e. angle from the positive Y axis).
+
+atan(dy, dx) yields an angle φ₂ whose tangent is dy/dx (i.e. angle from the positive X axis).
+</pre>
+
+<div id="Radial Vector Field Generator-Extract vector components via sin(θ+π)"><h4 id="Extract vector components via sin(θ+π)" class="header"><a href="#Radial Vector Field Generator-Extract vector components via sin(θ+π)">Extract vector components via sin(θ+π)</a></h4></div>
+
+<p>
+Recall:
+</p>
+
+<pre text>
+sin(θ+π) = –sin(θ)
+</pre>
+
+<p>
+For the two angles you get:
+</p>
+<ul>
+<li>
+<code>R = –sin(φ₁)/2.48</code>
+
+<li>
+<code>G = –sin(φ₂)/2.48</code>
+
+</ul>
+<p>
+If you work through the trigonometry, you find:
+</p>
+
+<pre text>
+R ≈ –(dx / √(dx²+dy²)) / 2.48
+G ≈ –(dy / √(dx²+dy²)) / 2.48
+</pre>
+
+<p>
+That is, R and G become the X and Y components of a unit-length vector pointing into the center, scaled down by 1/2.48.
+</p>
+
+<div id="Radial Vector Field Generator-What you get"><h4 id="What you get" class="header"><a href="#Radial Vector Field Generator-What you get">What you get</a></h4></div>
+
+<p>
+Every pixel’s R-G pair is a small vector pointing radially inward.
+</p>
+
+<p>
+The magnitude is constant (1/2.48 ≃ 0.40) so it’s a uniform “pull” toward the center.
+</p>
+
+<p>
+You can feed these channels into a Displace or VectorDistort node to tug the image inward in a circular fashion.
+</p>
+
+<div id="Radial Vector Field Generator-Variations and next steps"><h4 id="Variations and next steps" class="header"><a href="#Radial Vector Field Generator-Variations and next steps">Variations and next steps</a></h4></div>
+
+<ul>
+<li>
+Change the divisor (2.48) to control pull strength.
+
+<li>
+Offset the angle by π/2 instead of π to create a swirl (tangential) vector field.
+
+<li>
+Multiply by a ramp or noise to get radial falloff or jitter.
+
+<li>
+Combine with a radial mask to confine the effect to a circle.
+
+</ul>
+<div id="Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke"><h2 id="Hooking up Implosion and Vortex in Nuke" class="header"><a href="#Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke">Hooking up Implosion and Vortex in Nuke</a></h2></div>
+
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
+
+<p>
+Here’s how to take your radial vector expressions and feed them into a distort node for either an implosion (radial pull) or a vortex (swirl).
+</p>
+
+<div id="Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)"><h3 id="Implosion (Radial Inward Pull)" class="header"><a href="#Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)">Implosion (Radial Inward Pull)</a></h3></div>
+
+<div id="Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-Expression Node Setup"><h4 id="Expression Node Setup" class="header"><a href="#Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-Expression Node Setup">Expression Node Setup</a></h4></div>
+
+<p>
+Create an Expression node and hook your plate into it.
+</p>
+
+<p>
+In the channels tab, add two new output channels:
+</p>
+
+<pre text>
+forward.u
+
+forward.v
+</pre>
+
+<p>
+In the forward.u field paste:
+</p>
+
+<pre>
+sin( atan(x - center.x, y - center.y) + 3.14159 ) / 2.48  
+</pre>
+
+<p>
+In the forward.v field paste:
+</p>
+
+<pre text>
+sin( atan(y - center.y, x - center.x) + 3.14159 ) / 2.48  
+</pre>
+
+<p>
+Tweak center.x and center.y interactively or link them to a Tracker/Roto.
+</p>
+
+<div id="Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-VectorDistort Node"><h4 id="VectorDistort Node" class="header"><a href="#Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-VectorDistort Node">VectorDistort Node</a></h4></div>
+
+<ul>
+<li>
+Add a VectorDistort node.
+
+<li>
+Connect your original plate into input 1 and the Expression node into input 2.
+
+<li>
+In the VectorDistort properties:
+
+<ul>
+<li>
+UV channels: forward
+
+<li>
+Filter: Bicubic (for smooth warping)
+
+</ul>
+<li>
+Wrap: Off (or On if you need tiling)
+
+</ul>
+<p>
+You’ll now see the image “pulled” uniformly toward your center point.
+</p>
+
+<div id="Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-Vortex (Tangential Swirl)"><h4 id="Vortex (Tangential Swirl)" class="header"><a href="#Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-Vortex (Tangential Swirl)">Vortex (Tangential Swirl)</a></h4></div>
+
+<p>
+To spin instead of pull, offset the angle by 90° (π/2 ≃ 1.5708 radians):
+</p>
+
+<p>
+In your existing Expression node, replace expressions:
+</p>
+
+<pre>
+forward.u
+
+sin( atan(y - center.y, x - center.x) + 1.5708 ) / 2.48  
+
+forward.v
+
+-sin( atan(x - center.x, y - center.y) + 1.5708 ) / 2.48  
+</pre>
+
+<p>
+Keep your VectorDistort setup exactly the same.
+</p>
+
+<p>
+Now each pixel is pushed perpendicular to its radius, creating a swirling vortex.
+</p>
+
+<div id="Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-Fine-Tuning and Extensions"><h4 id="Fine-Tuning and Extensions" class="header"><a href="#Radial Vector Field Generator-Hooking up Implosion and Vortex in Nuke-Implosion (Radial Inward Pull)-Fine-Tuning and Extensions">Fine-Tuning and Extensions</a></h4></div>
+
+<ul>
+<li>
+Change the 2.48 divisor to strengthen or weaken the effect.
+
+<li>
+Drive center.x/center.y with animation curves or tracking data.
+
+<li>
+Use a Ramp node into the VectorDistort mask to contain the warp inside a circular area.
+
+<li>
+Inject noise into the expressions for turbulent distortions.
+
+<li>
+Animate the angle offset (1.5708) over time for a dynamic spin speed.
+
+</ul>
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
