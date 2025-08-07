@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>blinkscdript_accessing_components</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a>
+</p>
+
+<div id="Accessing Components"><h1 id="Accessing Components" class="header"><a href="#Accessing Components">Accessing Components</a></h1></div>
+
+
+<p>
+In BlinkScript, accessing channel values depends on the kernel granularity (ePixelWise or eComponentWise) and is done within the process() function.
+</p>
+
+<div id="Accessing Components-Pixel-wise Kernels (ePixelWise):"><h2 id="Pixel-wise Kernels (ePixelWise):" class="header"><a href="#Accessing Components-Pixel-wise Kernels (ePixelWise):">Pixel-wise Kernels (ePixelWise):</a></h2></div>
+
+<p>
+When using ePixelWise granularity, you can access all channels of a pixel simultaneously as a float4 vector (representing RGBA).
+To get the channel values of the current pixel from an input image (e.g., src), you can call src() within the process() function. This returns a float4 where .x is red, .y is green, .z is blue, and .w is alpha.
+</p>
+
+<pre C++>
+kernel MyPixelWiseKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src;
+    Image&lt;eWrite&gt; dst;
+
+    void process()
+    {
+        float4 pixelValue = src(); // Get the RGBA values of the current pixel from 'src'
+        float redChannel = pixelValue.x;
+        float greenChannel = pixelValue.y;
+        float blueChannel = pixelValue.z;
+        float alphaChannel = pixelValue.w;
+
+        // ... perform operations using channel values ...
+
+        dst() = pixelValue; // Write the modified pixel back to 'dst'
+    }
+};
+</pre>
+
+<div id="Accessing Components-Component-wise Kernels (eComponentWise):"><h2 id="Component-wise Kernels (eComponentWise):" class="header"><a href="#Accessing Components-Component-wise Kernels (eComponentWise):">Component-wise Kernels (eComponentWise):</a></h2></div>
+
+<p>
+With eComponentWise granularity, the kernel processes one channel at a time. Within the process() function, you can only access the current component's value from the input images and write to the current component of the output image.
+The src() function in this context returns a float representing the value of the current channel being processed. 
+</p>
+
+<pre C++>
+kernel MyComponentWiseKernel : ImageComputationKernel&lt;eComponentWise&gt;
+{
+    Image&lt;eRead, eAccessPoint, eEdgeClamped&gt; src;
+    Image&lt;eWrite&gt; dst;
+
+    void process()
+    {
+        float currentChannelValue = src(); // Get the value of the current channel from 'src'
+
+        // ... perform operations using the current channel value ...
+
+        dst() = currentChannelValue; // Write the modified value back to the current channel of 'dst'
+    }
+};
+</pre>
+
+<div id="Accessing Components-Component-wise Kernels (eComponentWise):-In summary:"><h3 id="In summary:" class="header"><a href="#Accessing Components-Component-wise Kernels (eComponentWise):-In summary:">In summary:</a></h3></div>
+
+<ul>
+<li>
+<code>ePixelWise</code>: Use src() to get a float4 (RGBA) for a pixel, then access individual channels using .x, .y, .z, .w.
+
+<li>
+<code>eComponentWise</code>: Use src() to get a float for the current channel being processed.
+
+</ul>
+<div id="blinkscript get channel value"><h1 id="blinkscript get channel value" class="header"><a href="#blinkscript get channel value">blinkscript get channel value</a></h1></div>
+
+<p>
+When working with Nuke's BlinkScript node, you can access and manipulate individual channel values within your image processing kernels. How you get a channel's value depends on the kernel's granularity: 
+</p>
+ 
+<div id="blinkscript get channel value-Pixelwise kernels (ePixelWise)"><h2 id="Pixelwise kernels (ePixelWise)" class="header"><a href="#blinkscript get channel value-Pixelwise kernels (ePixelWise)">Pixelwise kernels (ePixelWise)</a></h2></div>
+
+<ul>
+<li>
+In a pixelwise kernel, you process the image one pixel at a time, and all channel values (red, green, blue, alpha, and any custom channels) can be read from and written to simultaneously.
+
+<li>
+Pixel values are commonly stored in a float4 vector variable (representing RGBA).
+
+<li>
+You can access individual channels using dot notation (e.g., srcPixel.r, srcPixel.g, srcPixel.b, srcPixel.a) or array indexing (e.g., srcPixel[0], srcPixel[1], srcPixel[2], srcPixel[3]). 
+
+</ul>
+<p>
+Example:
+</p>
+
+<pre blinkscript>
+kernel MyPixelwiseKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessPoint&gt; src; // Input image
+    Image&lt;eWrite&gt; dst; // Output image
+
+    void process()
+    {
+        float4 srcPixel = src(); // Get the pixel value from the input
+        float redChannelValue = srcPixel.r; // Access the red channel
+        
+        // Manipulate the channel value (example: increase red by 0.1)
+        srcPixel.r = redChannelValue + 0.1f; 
+        
+        dst() = srcPixel; // Output the modified pixel
+    }
+}
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<div id="blinkscript get channel value-Componentwise kernels (eComponentWise)"><h2 id="Componentwise kernels (eComponentWise)" class="header"><a href="#blinkscript get channel value-Componentwise kernels (eComponentWise)">Componentwise kernels (eComponentWise)</a></h2></div>
+
+<ul>
+<li>
+In a componentwise kernel, you process the image one channel at a time, iterating through all pixels for that channel before moving to the next.
+
+<li>
+Only the current channel's value can be accessed in any of the input images.
+
+<li>
+You access the current channel value by calling the input image directly within the process() function. 
+
+</ul>
+<p>
+Example:
+</p>
+
+<pre blinkscript>
+kernel MyComponentwiseKernel : ImageComputationKernel&lt;eComponentWise&gt;
+{
+    Image&lt;eRead, eAccessPoint&gt; src; // Input image
+    Image&lt;eWrite&gt; dst; // Output image
+
+    void process()
+    {
+        // Get the current channel's value from the input
+        float currentChannelValue = src(); 
+
+        // Manipulate the channel value (example: invert the current channel)
+        dst() = 1.0f - currentChannelValue; 
+    }
+}
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<div id="blinkscript get channel value-Componentwise kernels (eComponentWise)-Important considerations"><h3 id="Important considerations" class="header"><a href="#blinkscript get channel value-Componentwise kernels (eComponentWise)-Important considerations">Important considerations</a></h3></div>
+
+<ul>
+<li>
+<span id="blinkscript get channel value-Componentwise kernels (eComponentWise)-Important considerations-Image Access:"></span><strong id="Image Access:">Image Access:</strong> Within the process() function, you access images by calling the image object with an operator ().
+
+<li>
+<span id="blinkscript get channel value-Componentwise kernels (eComponentWise)-Important considerations-Kernel Granularity:"></span><strong id="Kernel Granularity:">Kernel Granularity:</strong> Choosing between ePixelWise and eComponentWise depends on whether your operation requires interdependent channel access (use ePixelWise) or independent channel processing (use eComponentWise).
+
+<li>
+<span id="blinkscript get channel value-Componentwise kernels (eComponentWise)-Important considerations-Channel Names:"></span><strong id="Channel Names:">Channel Names:</strong> Foundry Learn explains that you can get the names of existing channels in a Nuke script using Python (e.g., nuke.channels()).
+
+<li>
+<span id="blinkscript get channel value-Componentwise kernels (eComponentWise)-Important considerations-Custom Channels:"></span><strong id="Custom Channels:">Custom Channels:</strong> BlinkScript also supports working with custom channels beyond the standard RGBA, like depth or motion vectors. 
+
+</ul>
+<p>
+AI responses may include mistakes. Learn more
+</p>
+
+
+
+
+<table>
+<tr>
+<td>
+How do I use Blinkscript to examine a box of surrounding pixels, and derive a pixel value based on an evaluation of all those pixels, and return it to a value of the current pixel?
+</td>
+</tr>
+</table>
+
+
+<div id="Neighborhood processing in BlinkScript"><h1 id="Neighborhood processing in BlinkScript" class="header"><a href="#Neighborhood processing in BlinkScript">Neighborhood processing in BlinkScript</a></h1></div>
+
+<p>
+To examine a box of surrounding pixels and derive a new value for the current pixel, you need to use BlinkScript's ability to access pixels outside of the current point. This is often called neighborhood processing or convolution. 
+</p>
+
+<div id="Neighborhood processing in BlinkScript-Set up your kernel"><h2 id="Set up your kernel" class="header"><a href="#Neighborhood processing in BlinkScript-Set up your kernel">Set up your kernel</a></h2></div>
+
+<ul>
+<li>
+You'll need a pixelwise kernel, as you're operating on a per-pixel basis and require access to individual channels.
+
+<li>
+Declare your input and output images (e.g., src and dst).
+
+<li>
+For accessing surrounding pixels, you'll need to specify a range for your input image when setting it up within the init() function. 
+
+</ul>
+  
+<pre blinkscript>
+kernel MyNeighborhoodKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+    Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src; 
+    Image&lt;eWrite&gt; dst;
+
+    param:
+        int radius = 1; // Defines the size of the neighborhood box (e.g., radius=1 means a 3x3 box)
+
+    void init()
+    {
+        // Set the access range for the input image based on the radius
+        src.setRange(-radius, -radius, radius, radius); 
+    }
+
+    void process()
+    {
+        // Initialize a variable to accumulate pixel values
+        float4 sum = 0; 
+        int count = 0;
+
+        // Loop through the surrounding pixels
+        for (int y = -radius; y &lt;= radius; ++y)
+        {
+            for (int x = -radius; x &lt;= radius; ++x)
+            {
+                // Access the pixel at the offset (x, y) from the current pixel
+                sum += src(x, y); 
+                count++;
+            }
+        }
+
+        // Calculate the average of the surrounding pixels
+        dst() = sum / count; 
+    }
+}
+</pre>
+
+<p>
+Use code with caution.
+</p>
+
+<div id="Neighborhood processing in BlinkScript-Set up your kernel-Explanation"><h3 id="Explanation" class="header"><a href="#Neighborhood processing in BlinkScript-Set up your kernel-Explanation">Explanation</a></h3></div>
+
+<ul>
+<li>
+Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src;
+
+<ul>
+<li>
+eRead indicates that the image is for reading.
+
+<li>
+eAccessRanged2D enables accessing a specific range of pixels around the current pixel, effectively defining your "neighborhood".
+
+<li>
+eEdgeClamped handles pixels at the image edges, effectively extending the image by repeating the edge pixels.
+
+</ul>
+<li>
+param: int radius = 1;
+
+<ul>
+<li>
+This defines a user-facing parameter in the BlinkScript node, allowing you to control the size of your neighborhood box.
+
+</ul>
+<li>
+src.setRange(-radius, -radius, radius, radius);
+
+<ul>
+<li>
+In the init() function, you define the range of pixels that will be accessible within the process() function.
+
+<li>
+For a radius of 1, the code sets a range of (-1, -1) to (1, 1), effectively defining a 3x3 neighborhood around the current pixel.
+
+</ul>
+<li>
+src(x, y);
+
+<ul>
+<li>
+Within the process() function, you access the surrounding pixels using the src(x, y) operator, where x and y represent the offset from the current pixel.
+
+<li>
+So, src(0,0) refers to the current pixel, src(1,0) refers to the pixel to the right, src(-1,-1) refers to the bottom-left pixel in the 3x3 neighborhood, and so on. 
+
+</ul>
+</ul>
+<div id="Neighborhood processing in BlinkScript-Set up your kernel-Custom evaluation"><h3 id="Custom evaluation" class="header"><a href="#Neighborhood processing in BlinkScript-Set up your kernel-Custom evaluation">Custom evaluation</a></h3></div>
+
+<p>
+The provided example calculates the average of the surrounding pixels, similar to a blur filter. You can easily replace this with your own custom evaluation logic to achieve different effects, like finding the minimum/maximum value within the neighborhood or implementing more complex algorithms. 
+</p>
+
+<pre blinkscript>
+// Example: find the maximum red channel value in the neighborhood
+float maxRed = 0.0f; 
+for (int y = -radius; y &lt;= radius; ++y)
+{
+    for (int x = -radius; x &lt;= radius; ++x)
+    {
+        maxRed = max(maxRed, src(x, y).r); 
+    }
+}
+dst().r = maxRed; // Output the maximum red value
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<p>
+This approach allows you to implement a wide range of image processing operations, from simple blurring to more advanced custom filters. Remember to experiment and explore the different functionalities of BlinkScript to unlock its full potential for your image manipulation needs. 
+</p>
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
