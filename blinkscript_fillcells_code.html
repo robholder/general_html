@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>blinkscript_fillcells_code</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a>
+</p>
+
+<div id="BlinkScript - FillCells - My First BlinkScript"><h1 id="BlinkScript - FillCells - My First BlinkScript" class="header"><a href="#BlinkScript - FillCells - My First BlinkScript">BlinkScript - FillCells - My First BlinkScript</a></h1></div>
+
+<p>
+This BlinkScript takes in an Animation 'cell' (with inklines removed, revealing underlying flat cell colors) and fills the gaps where the inklines would be with surrounding colors.
+</p>
+
+<pre cpp>
+// BlinkScript FillCells
+//
+//   - Robert Holder
+//
+// version 1.0.0 - 250807
+//   - initial release.
+// version 1.0.1 - 250807
+//   - reduced MAX_UNIQUE_COLORS constant to 64;
+//   - omit colors with a black alpha from color candidates.
+
+kernel FillCellsKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src;
+  Image&lt;eWrite&gt; dst;
+  
+  param:
+    //int spread;
+    float spreadSlider;
+  
+  local:
+    int spread;
+
+  void define() {
+    defineParam(spreadSlider, "Spread", 10.0f);
+  }
+  
+  void init() {
+      src.setRange(-spread, spread, -spread, spread);
+  }
+  
+void process(int2 pos) {
+    int spread = int(spreadSlider); //Cast slider to integer
+    spread = max(1, spread); //Ensure minimum value is 1
+
+
+    float4 output = 0;
+    float alpha = src(0,0).w; // Get the alpha of the current pixel
+
+    // Using a constant for array size, consider if this is always sufficient
+    const int MAX_UNIQUE_COLORS = 64;
+    float4 uniqueColors[MAX_UNIQUE_COLORS];
+    int colorCounts[MAX_UNIQUE_COLORS];
+    int numUniqueColors = 0;
+
+    const float EPSILON = 0.001f; // For floating-point comparisons
+
+    if (spread &gt; 0) {
+        // Iterate through the neighborhood
+        for(int Y = -spread; Y &lt;= spread; Y++) {
+            for(int X = -spread; X &lt;= spread; X++) {
+
+                // Only examine surrounding pixels IF the current pixel's alpha is 0
+                if (fabs(alpha) &lt; EPSILON) { // Using epsilon for alpha check
+
+                    // Access the pixel within the neighborhood at offset (X, Y)
+                    float4 neighborhoodPixel = src(X,Y);
+
+                    if (neighborhoodPixel.w &gt; EPSILON) {
+
+                        // Check if this neighborhood pixel has already been recorded
+                        bool found = false;
+                        for (int i = 0; i &lt; numUniqueColors; ++i) {
+                            if (fabs(uniqueColors[i].x - neighborhoodPixel.x) &lt; EPSILON &amp;&amp;
+                                fabs(uniqueColors[i].y - neighborhoodPixel.y) &lt; EPSILON &amp;&amp;
+                                fabs(uniqueColors[i].z - neighborhoodPixel.z) &lt; EPSILON &amp;&amp;
+                                fabs(uniqueColors[i].w - neighborhoodPixel.w) &lt; EPSILON) {
+
+                                colorCounts[i]++;
+                                found = true;
+                                break;
+                            }
+                        }
+                   
+
+                        // If it's a new unique color, add it to our list
+                        if (!found &amp;&amp; numUniqueColors &lt; MAX_UNIQUE_COLORS) {
+                            uniqueColors[numUniqueColors] = neighborhoodPixel; // Assign all components at once
+                            colorCounts[numUniqueColors] = 1;
+                            numUniqueColors++;
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // If spread is 0, just pass through the current pixel
+        output = src(0,0);
+    }
+
+    // Find the most frequent color among the unique colors found
+    float4 mostFrequentColor = src(0,0); // Initialize with current pixel, to handle cases with no surrounding colors
+    int maxCount = -1;
+
+    // Handle case where no unique colors were found in the neighborhood
+    // (e.g., if the alpha was not 0 or spread was 0)
+    if (numUniqueColors &gt; 0) {
+        for (int i = 0; i &lt; numUniqueColors; ++i) {
+            if (colorCounts[i] &gt; maxCount) {
+                maxCount = colorCounts[i];
+                mostFrequentColor = uniqueColors[i];
+            }
+        }
+    }
+
+    dst() = mostFrequentColor;
+  }
+};
+</pre>
+
+
+<p>
+<a href="nuke_blinkscript_index.html">Nuke - Blinkscript</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
