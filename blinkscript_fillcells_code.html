@@ -387,12 +387,17 @@ Use code with caution.
 
 <div id="AI Suggested Improvements-Optimized Color Comparison (If Possible)"><h2 id="Optimized Color Comparison (If Possible)" class="header"><a href="#AI Suggested Improvements-Optimized Color Comparison (If Possible)">Optimized Color Comparison (If Possible)</a></h2></div>
 
-<p>
+<ul>
+<li>
 Observation: The code performs four float comparisons (x, y, z, w) for each color comparison in the inner loop.
-Potential Improvement: In some cases, using the raw integer representation of floats for comparison can be faster, but this is highly dependent on the architecture. It is best to use direct float comparisons unless profiling shows a bottleneck here and the implications are understood.
-Alternative Consideration: If the colors are always normalized (0-1), calculating the squared Euclidean distance between colors could be a simpler approach. This can be more robust and potentially faster if the underlying math library has optimized distance functions or SIMD instructions can be leveraged. 
-</p>
 
+<li>
+Potential Improvement: In some cases, using the raw integer representation of floats for comparison can be faster, but this is highly dependent on the architecture. It is best to use direct float comparisons unless profiling shows a bottleneck here and the implications are understood.
+
+<li>
+Alternative Consideration: If the colors are always normalized (0-1), calculating the squared Euclidean distance between colors could be a simpler approach. This can be more robust and potentially faster if the underlying math library has optimized distance functions or SIMD instructions can be leveraged. 
+
+</ul>
 <p>
 Example (Using Squared Euclidean Distance for Comparison):
 </p>
@@ -424,21 +429,33 @@ Use code with caution.
 
 <div id="AI Suggested Improvements-Array Size and Early Exit for MAX_UNIQUE_COLORS"><h2 id="Array Size and Early Exit for MAX_UNIQUE_COLORS" class="header"><a href="#AI Suggested Improvements-Array Size and Early Exit for MAX_UNIQUE_COLORS">Array Size and Early Exit for MAX_UNIQUE_COLORS</a></h2></div>
 
-<p>
+<ul>
+<li>
 Observation: Iteration occurs up to MAX_UNIQUE_COLORS (64) each time the code checks if a color is unique.
-Improvement: Consider the distribution of colors in the images. If many unique colors are expected in a small spread, MAX_UNIQUE_COLORS might be necessary or require a larger value. However, if the images are relatively flat or have fewer colors in a given neighborhood, MAX_UNIQUE_COLORS could potentially be reduced to save memory, although this might not provide a significant speedup.
-Improvement (early exit for unique colors): An early exit with break already exists once a color is found, which is beneficial. Also, the check if (!found &amp;&amp; numUniqueColors &lt; MAX_UNIQUE_COLORS) ensures the array bounds are not exceeded. 
-</p>
 
+<li>
+Improvement: Consider the distribution of colors in the images. If many unique colors are expected in a small spread, MAX_UNIQUE_COLORS might be necessary or require a larger value. However, if the images are relatively flat or have fewer colors in a given neighborhood, MAX_UNIQUE_COLORS could potentially be reduced to save memory, although this might not provide a significant speedup.
+
+<li>
+Improvement (early exit for unique colors): An early exit with break already exists once a color is found, which is beneficial. Also, the check if (!found &amp;&amp; numUniqueColors &lt; MAX_UNIQUE_COLORS) ensures the array bounds are not exceeded. 
+
+</ul>
 <div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)"><h2 id="Loop Unrolling (Manual or Compiler-Driven)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)">Loop Unrolling (Manual or Compiler-Driven)</a></h2></div>
 
-<p>
+<ul>
+<li>
 Observation: The inner loops for iterating through the neighborhood and finding unique colors are small and predictable.
-Potential Improvement: For small spread values (e.g., 1 or 2), the loops could be manually unrolled. This might reduce loop overhead and potentially allow the compiler to generate more efficient SIMD instructions.
-Rationale: This reduces the overhead of loop control and can expose opportunities for instruction-level parallelism.
-Consideration: Compilers are often very good at loop unrolling automatically. It is often best to trust the compiler first. If profiling indicates a bottleneck, manual unrolling could be investigated. 
-</p>
 
+<li>
+Potential Improvement: For small spread values (e.g., 1 or 2), the loops could be manually unrolled. This might reduce loop overhead and potentially allow the compiler to generate more efficient SIMD instructions.
+
+<li>
+Rationale: This reduces the overhead of loop control and can expose opportunities for instruction-level parallelism.
+
+<li>
+Consideration: Compilers are often very good at loop unrolling automatically. It is often best to trust the compiler first. If profiling indicates a bottleneck, manual unrolling could be investigated. 
+
+</ul>
 <p>
 Example (for spread = 1):
 </p>
@@ -455,36 +472,56 @@ Use code with caution.
 
 <div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-SIMD Optimization (BlinkScript and Compiler)"><h3 id="SIMD Optimization (BlinkScript and Compiler)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-SIMD Optimization (BlinkScript and Compiler)">SIMD Optimization (BlinkScript and Compiler)</a></h3></div>
 
-<p>
+<ul>
+<li>
 Observation: BlinkScript is designed to leverage SIMD (Single Instruction, Multiple Data) on CPUs and GPUs through OpenCL/CUDA.
-Improvement: Ensure the data is laid out efficiently to help with SIMD. Using float4 for colors is already a good practice. The compiler often handles SIMD vectorization automatically.
-Consideration: Avoid complex branching or memory access patterns that might hinder automatic vectorization. The color comparison loop with if statements could be a target for manual optimization if the compiler struggles, but this is advanced and often not necessary. Foundry Community discusses optimizing code for BlinkScript mentions that the sort sequence in a BlinkScript is so explicit it could be flattened for each member. 
-</p>
 
+<li>
+Improvement: Ensure the data is laid out efficiently to help with SIMD. Using float4 for colors is already a good practice. The compiler often handles SIMD vectorization automatically.
+
+<li>
+Consideration: Avoid complex branching or memory access patterns that might hinder automatic vectorization. The color comparison loop with if statements could be a target for manual optimization if the compiler struggles, but this is advanced and often not necessary. Foundry Community discusses optimizing code for BlinkScript mentions that the sort sequence in a BlinkScript is so explicit it could be flattened for each member. 
+
+</ul>
 <div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Reduce setRange Calls (If Applicable)"><h3 id="Reduce setRange Calls (If Applicable)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Reduce setRange Calls (If Applicable)">Reduce setRange Calls (If Applicable)</a></h3></div>
 
-<p>
+<ul>
+<li>
 Observation: src.setRange(-spread, spread, -spread, spread); is called inside init().
-Improvement: This is already the correct place. Since init() is called only once per kernel, calling setRange here is efficient. If the spread parameter were changed dynamically inside the process() function and the range recalculated, that would be inefficient. 
-</p>
 
+<li>
+Improvement: This is already the correct place. Since init() is called only once per kernel, calling setRange here is efficient. If the spread parameter were changed dynamically inside the process() function and the range recalculated, that would be inefficient. 
+
+</ul>
 <div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Pre-calculate (EPSILON * EPSILON)"><h3 id="Pre-calculate (EPSILON * EPSILON)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Pre-calculate (EPSILON * EPSILON)">Pre-calculate (EPSILON * EPSILON)</a></h3></div>
 
-<p>
+<ul>
+<li>
 Observation: The code compares colorDistanceSq(uniqueColors[i], neighborhoodPixel) &lt; (EPSILON * EPSILON).
-Minor Improvement: Pre-calculate EPSILON_SQ = EPSILON * EPSILON once, perhaps as a const or in init(), to avoid recomputing it for every comparison. A good compiler will likely optimize this anyway. 
-</p>
 
+<li>
+Minor Improvement: Pre-calculate EPSILON_SQ = EPSILON * EPSILON once, perhaps as a const or in init(), to avoid recomputing it for every comparison. A good compiler will likely optimize this anyway. 
+
+</ul>
 <div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-General BlinkScript Performance Considerations"><h3 id="General BlinkScript Performance Considerations" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-General BlinkScript Performance Considerations">General BlinkScript Performance Considerations</a></h3></div>
 
-<p>
+<ul>
+<li>
 Hardware: Set Nuke preferences to utilize the GPU if possible. Foundry Support mentions increasing the VRAM Nuke can use.
-Memory Access: BlinkScript performs well when memory access is coherent. Accessing pixels in a predictable pattern is generally good.
-Profiling: Utilize the built-in profiler to identify bottlenecks, if you have NukeX. This will indicate which parts of the code are taking the most time and guide optimization efforts. Optimizely notes that preview mode in Optimizely uses a different snippet than the one in production and is often slower.
-Complexity: Be aware of the complexity of the operations inside the inner loops. More complex calculations will take longer.
-Image Size: The larger the image, the longer it will take to process. 
-</p>
 
+<li>
+Memory Access: BlinkScript performs well when memory access is coherent. Accessing pixels in a predictable pattern is generally good.
+
+<li>
+Profiling: Utilize the built-in profiler to identify bottlenecks, if you have NukeX. This will indicate which parts of the code are taking the most time and guide optimization efforts. Optimizely notes that preview mode in Optimizely uses a different snippet than the one in production and is often slower.
+
+<li>
+Complexity: Be aware of the complexity of the operations inside the inner loops. More complex calculations will take longer.
+
+<li>
+Image Size: The larger the image, the longer it will take to process. 
+
+</ul>
 <p>
 Implementing some of these suggestions, especially the early exit for non-transparent pixels, should result in a performance boost in your FillCellsKernel. Always test and profile the changes to confirm they improve performance for your specific use cases.
 </p>
