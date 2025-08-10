@@ -137,6 +137,35 @@ void process(int2 pos) {
 };
 </pre>
 
+<div id="BlinkScript - FillCells - My First BlinkScript-To set slider limits (after BlinkScript compile)"><h4 id="To set slider limits (after BlinkScript compile)" class="header"><a href="#BlinkScript - FillCells - My First BlinkScript-To set slider limits (after BlinkScript compile)">To set slider limits (after BlinkScript compile)</a></h4></div>
+
+<pre python>
+# // TO SET SLIDER TO A SET RANGE LIMIT
+# // Select BlinkScript node and run the following:
+
+import nuke
+
+# Get the BlinkScript node (assuming it's selected)
+node = nuke.selectedNode()
+#  Or use:
+#node = nuke.toNode("BlinkScript_FillCells")
+
+if node and node.Class() == "BlinkScript": # Make sure it's a BlinkScript node
+    # Access the 'spreadSlider' knob
+    spread_knob = node.knob("FillCellsKernel_Spread")
+
+    if spread_knob:
+        # Set the slider range
+        spread_knob.setRange(1, 10)
+
+        print("Slider range set to 1-10 for FillCellsKernel_Spread.")
+    else:
+        print("Knob 'FillCellsKernel_Spread' not found.")
+else:
+    print("No BlinkScript node selected or node not found.")
+
+</pre>
+
 <div id="Explanation (Google AI's analysis of my script)"><h1 id="Explanation (Google AI's analysis of my script)" class="header"><a href="#Explanation (Google AI's analysis of my script)">Explanation (Google AI's analysis of my script)</a></h1></div>
 
 <p>
@@ -498,7 +527,135 @@ void process(int2 pos) {
 Use code with caution.
 </p>
 
-<div id="AI Suggested Improvements-Optimized Color Comparison (If Possible)"><h2 id="Optimized Color Comparison (If Possible)" class="header"><a href="#AI Suggested Improvements-Optimized Color Comparison (If Possible)">Optimized Color Comparison (If Possible)</a></h2></div>
+<div id="Updated Code v1.2.1"><h1 id="Updated Code v1.2.1" class="header"><a href="#Updated Code v1.2.1">Updated Code v1.2.1</a></h1></div>
+
+<pre cpp>
+// BlinkScript FillCells
+//
+//   - Created by: Robert Holder
+//
+// version 1.0.0 - 250807
+//   - initial release.
+// version 1.0.1 - 250807
+//   - reduced MAX_UNIQUE_COLORS constant to 64;
+//   - omit colors with a black alpha from color candidates.
+// version 1.2.0 - 250809
+//   - better logic (combining conditional for spread &gt; 0 and alpha condition)
+// version 1.2.1 - 250809
+//   - Corrected variable declarations (moved spread out of 'local:'). Added Python tweak at base
+
+kernel FillCellsKernel : ImageComputationKernel&lt;ePixelWise&gt;
+{
+  Image&lt;eRead, eAccessRanged2D, eEdgeClamped&gt; src;
+  Image&lt;eWrite&gt; dst;
+  
+  param:
+    float spreadSlider; // This parameter is accessible everywhere (init &amp; process)
+  
+  // local:
+  //   int spread; // Note to self: Don't use this 'local' member for 'spread'.
+  //               // It's often better to avoid local members if they're not truly shared
+  //               // between init/process in a way that requires their state to persist
+  //               // across the entire kernel's lifetime.
+
+  void define() {
+    defineParam(spreadSlider, "Spread", 2.0f);
+  }
+  
+  void init() {
+      // Get value directly from the slider parameter here (avoiding 'local:') for 'init'.
+      int spreadValueForRange = int(spreadSlider);
+      src.setRange(-spreadValueForRange, spreadValueForRange, -spreadValueForRange, spreadValueForRange);
+  }
+  
+void process(int2 pos) {
+    int spread = int(spreadSlider); // Gets the spreadSlider knob value directly for 'process'
+    spread = max(1, spread); //Ensure minimum value is 1
+
+    float4 currentPixel = src(0,0);
+    float alpha = currentPixel.w;
+
+    float4 output = currentPixel; 
+
+    const int MAX_UNIQUE_COLORS = 64;
+    const float EPSILON = 0.001f;
+
+    // Only proceed if spread &gt; 0 AND the current pixel is transparent
+    if (spread &gt; 0 &amp;&amp; fabs(alpha) &lt; EPSILON) {
+        float4 uniqueColors[MAX_UNIQUE_COLORS];
+        int colorCounts[MAX_UNIQUE_COLORS];
+        int numUniqueColors = 0;
+
+        for(int Y = -spread; Y &lt;= spread; Y++) {
+            for(int X = -spread; X &lt;= spread; X++) {
+                float4 neighborhoodPixel = src(X,Y);
+
+                if (neighborhoodPixel.w &gt; EPSILON) { // Only consider non-transparent neighborhood pixels
+                    bool found = false;
+                    for (int i = 0; i &lt; numUniqueColors; ++i) {
+                        if (fabs(uniqueColors[i].x - neighborhoodPixel.x) &lt; EPSILON &amp;&amp;
+                            fabs(uniqueColors[i].y - neighborhoodPixel.y) &lt; EPSILON &amp;&amp;
+                            fabs(uniqueColors[i].z - neighborhoodPixel.z) &lt; EPSILON &amp;&amp;
+                            fabs(uniqueColors[i].w - neighborhoodPixel.w) &lt; EPSILON) {
+                            colorCounts[i]++;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found &amp;&amp; numUniqueColors &lt; MAX_UNIQUE_COLORS) {
+                        uniqueColors[numUniqueColors] = neighborhoodPixel;
+                        colorCounts[numUniqueColors] = 1;
+                        numUniqueColors++;
+                    }
+                }
+            }
+        }
+
+        if (numUniqueColors &gt; 0) {
+            float4 mostFrequentColor = uniqueColors[0];
+            int maxCount = colorCounts[0];
+
+            for (int i = 1; i &lt; numUniqueColors; ++i) {
+                if (colorCounts[i] &gt; maxCount) {
+                    maxCount = colorCounts[i];
+                    mostFrequentColor = uniqueColors[i];
+                }
+            }
+            output = mostFrequentColor;
+        }
+    }
+
+    dst() = output;
+  }
+};
+
+// // TO SET SLIDER TO A SET RANGE LIMIT
+// // Select BlinkScript node and run the following:
+//
+//import nuke
+//
+//# Get the BlinkScript node (assuming it's selected)
+//node = nuke.selectedNode()
+//#  Or use:
+//#node = nuke.toNode("BlinkScript_FillCells")
+//
+//if node and node.Class() == "BlinkScript": # Make sure it's a BlinkScript node
+//    # Access the 'spreadSlider' knob
+//    spread_knob = node.knob("FillCellsKernel_Spread")
+//
+//    if spread_knob:
+//        # Set the slider range
+//        spread_knob.setRange(1, 10)
+//
+//        print("Slider range set to 1-10 for FillCellsKernel_Spread.")
+//    else:
+//        print("Knob 'FillCellsKernel_Spread' not found.")
+//else:
+//    print("No BlinkScript node selected or node not found.")
+//
+</pre>
+
+<div id="Updated Code v1.2.1-Optimized Color Comparison (If Possible)"><h2 id="Optimized Color Comparison (If Possible)" class="header"><a href="#Updated Code v1.2.1-Optimized Color Comparison (If Possible)">Optimized Color Comparison (If Possible)</a></h2></div>
 
 <ul>
 <li>
@@ -540,7 +697,7 @@ for (int i = 0; i &lt; numUniqueColors; ++i) {
 Use code with caution.
 </p>
 
-<div id="AI Suggested Improvements-Array Size and Early Exit for MAX_UNIQUE_COLORS"><h2 id="Array Size and Early Exit for MAX_UNIQUE_COLORS" class="header"><a href="#AI Suggested Improvements-Array Size and Early Exit for MAX_UNIQUE_COLORS">Array Size and Early Exit for MAX_UNIQUE_COLORS</a></h2></div>
+<div id="Updated Code v1.2.1-Array Size and Early Exit for MAX_UNIQUE_COLORS"><h2 id="Array Size and Early Exit for MAX_UNIQUE_COLORS" class="header"><a href="#Updated Code v1.2.1-Array Size and Early Exit for MAX_UNIQUE_COLORS">Array Size and Early Exit for MAX_UNIQUE_COLORS</a></h2></div>
 
 <ul>
 <li>
@@ -553,7 +710,7 @@ Improvement: Consider the distribution of colors in the images. If many unique c
 Improvement (early exit for unique colors): An early exit with break already exists once a color is found, which is beneficial. Also, the check if (!found &amp;&amp; numUniqueColors &lt; MAX_UNIQUE_COLORS) ensures the array bounds are not exceeded. 
 
 </ul>
-<div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)"><h2 id="Loop Unrolling (Manual or Compiler-Driven)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)">Loop Unrolling (Manual or Compiler-Driven)</a></h2></div>
+<div id="Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)"><h2 id="Loop Unrolling (Manual or Compiler-Driven)" class="header"><a href="#Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)">Loop Unrolling (Manual or Compiler-Driven)</a></h2></div>
 
 <ul>
 <li>
@@ -583,7 +740,7 @@ neighborhoodPixel = src(0,-1);    // ... process
 Use code with caution.
 </p>
 
-<div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-SIMD Optimization (BlinkScript and Compiler)"><h3 id="SIMD Optimization (BlinkScript and Compiler)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-SIMD Optimization (BlinkScript and Compiler)">SIMD Optimization (BlinkScript and Compiler)</a></h3></div>
+<div id="Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-SIMD Optimization (BlinkScript and Compiler)"><h3 id="SIMD Optimization (BlinkScript and Compiler)" class="header"><a href="#Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-SIMD Optimization (BlinkScript and Compiler)">SIMD Optimization (BlinkScript and Compiler)</a></h3></div>
 
 <ul>
 <li>
@@ -596,7 +753,7 @@ Improvement: Ensure the data is laid out efficiently to help with SIMD. Using fl
 Consideration: Avoid complex branching or memory access patterns that might hinder automatic vectorization. The color comparison loop with if statements could be a target for manual optimization if the compiler struggles, but this is advanced and often not necessary. Foundry Community discusses optimizing code for BlinkScript mentions that the sort sequence in a BlinkScript is so explicit it could be flattened for each member. 
 
 </ul>
-<div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Reduce setRange Calls (If Applicable)"><h3 id="Reduce setRange Calls (If Applicable)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Reduce setRange Calls (If Applicable)">Reduce setRange Calls (If Applicable)</a></h3></div>
+<div id="Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-Reduce setRange Calls (If Applicable)"><h3 id="Reduce setRange Calls (If Applicable)" class="header"><a href="#Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-Reduce setRange Calls (If Applicable)">Reduce setRange Calls (If Applicable)</a></h3></div>
 
 <ul>
 <li>
@@ -606,7 +763,7 @@ Observation: src.setRange(-spread, spread, -spread, spread); is called inside in
 Improvement: This is already the correct place. Since init() is called only once per kernel, calling setRange here is efficient. If the spread parameter were changed dynamically inside the process() function and the range recalculated, that would be inefficient. 
 
 </ul>
-<div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Pre-calculate (EPSILON * EPSILON)"><h3 id="Pre-calculate (EPSILON * EPSILON)" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-Pre-calculate (EPSILON * EPSILON)">Pre-calculate (EPSILON * EPSILON)</a></h3></div>
+<div id="Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-Pre-calculate (EPSILON * EPSILON)"><h3 id="Pre-calculate (EPSILON * EPSILON)" class="header"><a href="#Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-Pre-calculate (EPSILON * EPSILON)">Pre-calculate (EPSILON * EPSILON)</a></h3></div>
 
 <ul>
 <li>
@@ -616,7 +773,7 @@ Observation: The code compares colorDistanceSq(uniqueColors[i], neighborhoodPixe
 Minor Improvement: Pre-calculate EPSILON_SQ = EPSILON * EPSILON once, perhaps as a const or in init(), to avoid recomputing it for every comparison. A good compiler will likely optimize this anyway. 
 
 </ul>
-<div id="AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-General BlinkScript Performance Considerations"><h3 id="General BlinkScript Performance Considerations" class="header"><a href="#AI Suggested Improvements-Loop Unrolling (Manual or Compiler-Driven)-General BlinkScript Performance Considerations">General BlinkScript Performance Considerations</a></h3></div>
+<div id="Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-General BlinkScript Performance Considerations"><h3 id="General BlinkScript Performance Considerations" class="header"><a href="#Updated Code v1.2.1-Loop Unrolling (Manual or Compiler-Driven)-General BlinkScript Performance Considerations">General BlinkScript Performance Considerations</a></h3></div>
 
 <ul>
 <li>
