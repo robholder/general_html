@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_add_gui_expressions</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Adding $gui Expressions"><h1 id="Adding $gui Expressions" class="header"><a href="#Adding $gui Expressions">Adding $gui Expressions</a></h1></div>
+
+<p>
+Assign every BlinkScript’s gpu knob (<code>useGPUIfAvailable</code>) an expression (\(gui). That way in interactive sessions (\)gui=1) the GPU stays on, but in batch/farm runs ($gui=0) it’s automatically off.
+</p>
+
+
+<p>
+Apply $gui expression to all BlinkScript nodes in a Nuke script (including nested in Groups):
+</p>
+
+<pre python>
+def apply_gui_expression_to_blinkscripts(node_list):
+    """
+    Recursively scan node_list for BlinkScripts and
+    assign a $gui expression to their 'useGPUIfAvailable' knob.
+    $gui is 1 when in GUI (interface), 0 in batch mode (farm)
+    """
+    for node in node_list:
+        cls = node.Class()
+        if cls == "BlinkScript":
+            gpu_knob = node.knob("useGPUIfAvailable")
+            if gpu_knob:
+                # Attach the $gui expression;
+                gpu_knob.setExpression("$gui")
+                print(f"Applied $gui expression to: {node.name()}")
+        elif cls == "Group":
+            # Dive into every Group (recursive)
+            try:
+                apply_gui_expression_to_blinkscripts(node.nodes())
+            except Exception:
+                pass
+
+all_nodes = nuke.allNodes()
+apply_gui_expression_to_blinkscripts(all_nodes)
+</pre>
+
+<div id="Adding $gui Expressions-How This Works"><h4 id="How This Works" class="header"><a href="#Adding $gui Expressions-How This Works">How This Works</a></h4></div>
+
+<ul>
+<li>
+<code>$gui</code> is a built-in Nuke variable that’s 1 when the UI is present, 0 in batch mode.
+
+<li>
+knob.setExpression("$gui") makes the GPU checkbox driven by that variable.
+
+</ul>
+<p>
+The recursion into Group nodes ensures you catch BlinkScripts no matter how nested.
+</p>
+
+<p>
+You could make this automatic to every Nuke script in your environment with this addition (and placing it along with the function above, in the <code>menu.py</code> file):
+</p>
+
+<pre python>
+def on_script_load_callback():
+    """Apply expressions as soon as any script is loaded."""
+    apply_gui_expression_to_blinkscripts(nuke.root().nodes())
+
+# Register the callback so it runs on every script load (batch or GUI)
+nuke.addOnScriptLoad(on_script_load_callback)
+
+# If you want it to run immediately for an already-open script:
+if nuke.root().name() != "Root":
+    on_script_load_callback()
+</pre>
+
+<div id="Adding $gui Expressions-Extra Tips"><h3 id="Extra Tips" class="header"><a href="#Adding $gui Expressions-Extra Tips">Extra Tips</a></h3></div>
+
+<table>
+<tr>
+<td>
+UNTESTED AI
+</td>
+</tr>
+</table>
+
+<p>
+To lock these expressions so artists can’t accidentally override them, add the read-only flag:
+</p>
+
+<pre python>
+gpu_knob.setFlags(nuke.EXPRESSION_READ_ONLY)
+</pre>
+
+<p>
+If you need to remove the expression (e.g. for debugging), use:
+</p>
+
+<pre python>
+gpu_knob.clearAnimated()  # clears expressions and keys
+</pre>
+
+<p>
+You can quickly verify which BlinkScripts have an expression by running:
+</p>
+
+<pre python>
+[n.name() for n in nuke.allNodes("BlinkScript") 
+               if n.knob("gpu").hasExpression()]
+</pre>
+
+<p>
+For custom render farm setups, ensure your farm’s shell or job-unit doesn’t force $gui back to 1.
+</p>
+
+<div id="Adding $gui Expressions-Conditionally Applying $gui to BlinkScript GPU Knobs"><h2 id="Conditionally Applying $gui to BlinkScript GPU Knobs" class="header"><a href="#Adding $gui Expressions-Conditionally Applying $gui to BlinkScript GPU Knobs">Conditionally Applying $gui to BlinkScript GPU Knobs</a></h2></div>
+
+<p>
+Add to menu.py if you want it to be automatic. Just run the function call interactively if running per script.
+</p>
+
+<pre python>
+import nuke
+
+def apply_gui_to_blinkscripts(node_list=None):
+    """Apply $gui expression only if GPU isn’t already off or already driven."""
+    if node_list is None:
+        node_list = nuke.root().nodes()
+    
+    for n in node_list:
+        cls = n.Class()
+        if cls == "BlinkScript":
+            k = n.knob("useGPUIfAvailable")
+            # Skip if there’s already an expression or value is zero
+            if k is None or k.hasExpression() or k.value() == 0:
+                continue
+            # Otherwise drive it by $gui
+            k.setExpression("$gui")
+        elif cls == "Group":
+            # Recurse into group contents
+            try:
+                apply_gui_to_blinkscripts(n.nodes())
+            except Exception:
+                pass
+
+# Add to menu.py to run automatically
+# Run at script load
+nuke.addOnScriptLoad(lambda: apply_gui_to_blinkscripts())
+ 
+# Run now if a script is already open
+if nuke.root().name() != "Root":
+    apply_gui_to_blinkscripts()
+
+</pre>
+
+<div id="Adding $gui Expressions-Removing the $gui Expression and Resetting to Zero"><h2 id="Removing the $gui Expression and Resetting to Zero" class="header"><a href="#Adding $gui Expressions-Removing the $gui Expression and Resetting to Zero">Removing the $gui Expression and Resetting to Zero</a></h2></div>
+
+<p>
+If you later want to strip out the \(gui animation and force the knob to stay off, use this companion function. It only clears expressions that reference \)gui and then sets the value to zero:
+</p>
+
+<pre python>
+import nuke
+
+def remove_gui_from_blinkscripts(node_list=None):
+    """Clear any $gui expression on useGPUIfAvailable and force it to 0."""
+    if node_list is None:
+        node_list = nuke.root().nodes()
+    
+    for n in node_list:
+        cls = n.Class()
+        if cls == "BlinkScript":
+            k = n.knob("useGPUIfAvailable")
+            if k and k.hasExpression():
+                expr = k.expression().strip()
+                # Only clear if it’s the $gui expression
+                if expr == "$gui":
+                    k.clearAnimated()   # removes the expression
+                    k.setValue(0)       # locks GPU off
+        elif cls == "Group":
+            try:
+                remove_gui_from_blinkscripts(n.nodes())
+            except Exception:
+                pass
+
+# Expose a menu item for convenience
+nuke.menu("Nuke").addCommand(
+    "Custom/Disable BlinkScript GPU", 
+    remove_gui_from_blinkscripts
+)
+</pre>
+
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
