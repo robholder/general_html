@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_progressbar_for_loops</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Progress Bar for Loops"><h1 id="Progress Bar for Loops" class="header"><a href="#Progress Bar for Loops">Progress Bar for Loops</a></h1></div>
+
+<p>
+I used this instead of a <code>time.sleep()</code> function to slow down Nuke (when it failed to successfully work through a list of color changes via OOP).
+</p>
+
+
+<div id="Progress Bar for Loops-Using nuke.ProgressTask()"><h2 id="Using nuke.ProgressTask()" class="header"><a href="#Progress Bar for Loops-Using nuke.ProgressTask()">Using nuke.ProgressTask()</a></h2></div>
+
+<p>
+For long-running tasks, using <code>nuke.ProgressTask()</code> is the best practice. It provides a progress bar and allows the user to cancel the operation. The progress bar itself helps visualize the "pacing."
+</p>
+
+<pre python>
+import nuke
+
+def analyze_and_change_nodes_with_progress():
+    selected_nodes = nuke.selectedNodes()
+    if not selected_nodes:
+        nuke.message("Please select nodes.")
+        return
+
+    task = nuke.ProgressTask("Processing Nodes")
+    total_nodes = len(selected_nodes)
+
+    for i, node in enumerate(selected_nodes):
+        if task.isCancelled():
+            break
+
+        task.setMessage(f"Processing {node.name()}")
+        task.setProgress(int((i / total_nodes) * 100))
+
+        # Your analysis and modification code here
+        # For example:
+        try:
+            # This is where your code from before goes.
+            # No need for time.sleep()
+            if node.knob('tile_color'):
+                node.knob('tile_color').setValue((0.5, 0.5, 0.5))
+        except Exception as e:
+            print(f"Error on node {node.name()}: {e}")
+
+    task.setProgress(100)
+    del task
+
+analyze_and_change_nodes_with_progress()
+</pre>
+
+
+<div id="Progress Bar for Loops-Using nuke.ProgressTask()-Summary of strategies"><h3 id="Summary of strategies" class="header"><a href="#Progress Bar for Loops-Using nuke.ProgressTask()-Summary of strategies">Summary of strategies</a></h3></div>
+
+<table>
+<tr>
+<td>
+Strategy
+</td>
+<td>
+Pros
+</td>
+<td>
+Cons
+</td>
+<td>
+Best Used For
+</td>
+</tr>
+</table>
+<p>
+|time.sleep()|	Simple to implement|	Fragile, inefficient, potentially unpredictable	|Quick, one-off scripts where exact timing is not critical.
+<table>
+<tr>
+<td>
+nuke.callbacks
+</td>
+<td>
+Non-blocking, robust, allows for user interaction
+</td>
+<td>
+More complex code structure
+</td>
+<td>
+Pacing complex, multi-step scripts; managing heavy, UI-dependent tasks.
+</td>
+</tr>
+<tr>
+<td>
+nuke.ProgressTask()
+</td>
+<td>
+Shows progress, user-cancellable, built-in to Nuke
+</td>
+<td>
+Can have a slightly higher overhead for very small tasks
+</td>
+<td>
+Long-running processes, scripts on many nodes, or operations the user might want to cancel.
+</td>
+</tr>
+</table>
+</p>
+
+<div id="Robust Defense for Early Abort"><h1 id="Robust Defense for Early Abort" class="header"><a href="#Robust Defense for Early Abort">Robust Defense for Early Abort</a></h1></div>
+
+<p>
+If the script aborts, it leaves the process hanging.
+</p>
+
+<table>
+<tr>
+<td>
+How do I ensure the progress task is ended if the script goes wrong?
+</td>
+</tr>
+</table>
+
+<p>
+The nuke.ProgressTask object is closed when its Python object is deleted. However, when an unhandled exception occurs, Python keeps a reference to the ProgressTask object as part of the traceback, which prevents it from being deleted, leaving the progress bar hanging. 
+</p>
+
+<p>
+The best and most reliable way to ensure the ProgressTask is always cleaned up, regardless of whether your script completes successfully or crashes, is to use a try...finally block. 
+</p>
+
+<div id="Robust Defense for Early Abort-How try...finally works for cleanup"><h2 id="How try...finally works for cleanup" class="header"><a href="#Robust Defense for Early Abort-How try...finally works for cleanup">How try...finally works for cleanup</a></h2></div>
+
+<ul>
+<li>
+<code>try block</code>: Contains the code that might raise an exception.
+
+<li>
+<code>except block (optional)</code>: Contains the code to handle any exceptions that are caught.
+
+<li>
+<code>finally block</code>: This block is guaranteed to be executed, whether an exception occurred or not. 
+
+</ul>
+<p>
+By putting the code to delete your ProgressTask inside the finally block, you ensure that the progress bar will be cleaned up no matter what happens during your script's execution.
+</p>
+
+<div id="Robust Defense for Early Abort-How try...finally works for cleanup-Example using try...finally"><h4 id="Example using try...finally" class="header"><a href="#Robust Defense for Early Abort-How try...finally works for cleanup-Example using try...finally">Example using try...finally</a></h4></div>
+
+<p>
+Here is a revised version of the nuke.ProgressTask example with a robust cleanup routine:
+</p>
+
+<pre python>
+import nuke
+
+def analyze_and_change_nodes_safely():
+    selected_nodes = nuke.selectedNodes()
+    if not selected_nodes:
+        nuke.message("Please select nodes.")
+        return
+
+    # Sort nodes by position to ensure consistent order
+    sorted_nodes = sorted(selected_nodes, key=lambda node: node.ypos())
+    total_nodes = len(sorted_nodes)
+
+    task = nuke.ProgressTask("Processing Nodes")
+
+    try:
+        nuke.undo.begin("Analyze and Change Nodes")
+        
+        for i, node in enumerate(sorted_nodes):
+            if task.isCancelled():
+                # Allow for early exit by the user
+                break
+
+            task.setMessage(f"Processing {node.name()}")
+            task.setProgress(int((i / total_nodes) * 100))
+            
+            # --- Your analysis and modification logic here ---
+            # Simulate a potential error for demonstration
+            if node.name() == "BadNode":
+                raise RuntimeError("Something went wrong with this node!")
+            
+            # Change color
+            node.knob('tile_color').setValue(0x00ff00ff)
+            
+            # Explicitly reconnect the node to its original input
+            original_input = node.input(0)
+            if original_input:
+                node.setInput(0, original_input)
+            
+    except Exception as e:
+        # This block catches and handles any unexpected errors
+        nuke.message(f"An error occurred: {e}")
+        # Re-raise the exception after informing the user, if you want Nuke's
+        # console to show the full traceback for debugging.
+        raise
+        
+    finally:
+        # This block is *always* executed.
+        # It's where you put your cleanup code.
+        task.setProgress(100)
+        del task # The key line to ensure the progress bar is closed.
+        nuke.undo.end()
+
+# Example with a node that will cause an error
+nuke.nodes.Blur()
+nuke.nodes.ColorCorrect(name="BadNode")
+nuke.select(nuke.allNodes())
+
+analyze_and_change_nodes_safely()
+</pre>
+
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<div id="Robust Defense for Early Abort-How try...finally works for cleanup-Explanation of the fix"><h3 id="Explanation of the fix" class="header"><a href="#Robust Defense for Early Abort-How try...finally works for cleanup-Explanation of the fix">Explanation of the fix</a></h3></div>
+
+<ul>
+<li>
+The main body of the script, which can potentially fail, is placed within the try block.
+
+<li>
+Putting del task inside the finally block is critical. When Python executes del task, it deletes the reference to the ProgressTask object.
+
+<li>
+When the reference to the ProgressTask object is removed, Python's garbage collector can clean it up. The _<em>del</em>_ method of the ProgressTask object is then called, which handles closing the progress bar window.
+
+<li>
+Including an except block provides the opportunity to inform the user that something went wrong with a user-friendly message (nuke.message()) before the script terminates. Optionally, the exception can be re-raised to provide a full traceback for debugging in Nuke's scripting editor.
+
+<li>
+For robustness, the core logic should be wrapped in the nuke.undo.begin() block, and nuke.undo.end() should be placed in the finally block as well. This ensures that the undo block is properly closed, even if an error occurs. 
+
+</ul>
+ 
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>

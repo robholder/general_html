@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_python_pausing_iterations_with_callback</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Nuke UI Callback Pause"><h1 id="Nuke UI Callback Pause" class="header"><a href="#Nuke UI Callback Pause">Nuke UI Callback Pause</a></h1></div>
+
+
+<p>
+Robust alternatives to <code>time.sleep()</code> for pacing Nuke scripts
+</p>
+
+<div id="Nuke UI Callback Pause-The Nuke UI update loop"><h2 id="The Nuke UI update loop" class="header"><a href="#Nuke UI Callback Pause-The Nuke UI update loop">The Nuke UI update loop</a></h2></div>
+
+<p>
+A more reliable approach is to interact with Nuke's event loop directly. This allows you to pause your script without blocking the entire Nuke UI, so the user can still interact with the interface. The nuke.callbacks module can be used to achieve this.
+</p>
+
+<p>
+The following is a more advanced example. It is not as simple as time.sleep() but is far more stable for large-scale operations. 
+</p>
+
+<pre python>
+import nuke
+import time
+
+def process_node_and_yield_control(nodes_iterator):
+    """
+    A generator function that processes one node, yields control to Nuke's UI,
+    and then processes the next.
+    """
+    try:
+        node = next(nodes_iterator)
+        print(f"Processing node: {node.name()}")
+        # Your analysis and modification code here
+        node.knob('tile_color').setValue((0.5, 0.5, 0.5))
+
+    except StopIteration:
+        # Stop the callback when all nodes are processed
+        nuke.removeAfterBackgroundRender(process_node_and_yield_control)
+        print("Finished processing all nodes.")
+        return
+
+    # Yield control back to Nuke's UI to allow for updates
+    # This is a key part of "taking a rest" without a hard sleep
+    nuke.removeAfterBackgroundRender(process_node_and_yield_control) # remove previous callback
+    nuke.addAfterBackgroundRender(process_node_and_yield_control, args=(nodes_iterator,))
+
+
+def start_processing_nodes():
+    """Initializes the processing by creating a node iterator."""
+    selected_nodes = nuke.selectedNodes()
+    if not selected_nodes:
+        nuke.message("Please select nodes to process.")
+        return
+    
+    # Create an iterator from the list of nodes
+    nodes_iterator = iter(selected_nodes)
+    
+    # Start the process by adding the first callback
+    nuke.addAfterBackgroundRender(process_node_and_yield_control, args=(nodes_iterator,))
+
+# Call the function to start the process
+
+start_processing_nodes()
+</pre>
+
+<table>
+<tr>
+<td>
+UNTESTED: Use code with caution.
+</td>
+</tr>
+</table>
+
+
+<p>
+I used a Progress bar in my CopyColorPick.
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
