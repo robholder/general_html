@@ -257,6 +257,341 @@ This script provides a robust framework for managing your color swatch data in N
 
 <li>
 <span id="Import/Export ColorPick Colors-NodeColorData Class:-Mock Nuke Environment:-Here are a few suggestions for further development:-Undo Support"></span><strong id="Undo Support">Undo Support</strong>: For production scripts, it's good practice to wrap changes in a nuke.Undo.begin() and nuke.Undo.end() block to allow users to undo the import operation.
+<table>
+<tr>
+<td>
+RAW SUGGESTION - UNTESTED
+</td>
+</tr>
+</table>
+<pre python>
+import nuke
+import json
+import re
+import os
+
+# --- Helper Functions ---
+
+def get_base_node_name(node_name):
+    """
+    Extracts the base name of a node, ignoring trailing numbers or numbers preceded by an underscore.
+    Examples:
+    "my_node_a" -&gt; "my_node_a"
+    "my_node_a25" -&gt; "my_node_a"
+    "my_node_b_1" -&gt; "my_node_b"
+    "my_node_c_001_final" -&gt; "my_node_c_001_final" (only trailing numbers are stripped)
+    """
+    # Pattern to match numbers at the end of the string, optionally preceded by an underscore
+    match = re.match(r"^(.*?)(?:[_-]?\d+)?$", node_name)
+    if match:
+        return match.group(1).rstrip('_') # Remove any trailing underscore left by the regex
+    return node_name
+
+def get_color_swatch_knobs(node):
+    """
+    Retrieves all color swatch knob names and their current values from a given Nuke node.
+    Assumes color swatch knobs are 4-tuple (RGBA) floats.
+    """
+    color_knobs = {}
+    # Iterate through all knobs on the node
+    for knob_name in node.knobs():
+        knob = node[knob_name]
+        # Check if the knob is a color knob (e.g., a Color_Knob or has 4 channels)
+        # Nuke's built-in Color_Knob is the most common. We'll also check for 4-float knobs
+        # that might represent a color if they are explicitly desired.
+        if isinstance(knob, nuke.Color_Knob):
+            color_knobs[knob_name] = list(knob.value()) # Store as a list of RGBA floats
+        # You can extend this to include other 4-float knobs if they represent colors
+        # For example, if you have custom nodes with 'color' or 'tint' knobs that are just 4 floats:
+        # elif knob.Class() == 'Array_Knob' and knob.arraySize() == 4 and knob.type() == 'float':
+        #     if any(k in knob_name.lower() for k in ['color', 'tint', 'fill']):
+        #         color_knobs[knob_name] = list(knob.value())
+    return color_knobs
+
+# --- NodeColorData Class ---
+
+class NodeColorData:
+    """
+    Represents the color swatch data for a single Nuke node, providing
+    methods for loading, exporting, and updating.
+    """
+    def __init__(self, nuke_node):
+        """
+        Initializes the NodeColorData instance by extracting color swatch
+        knob values from the given Nuke node.
+        """
+        if not isinstance(nuke_node, nuke.Node):
+            raise TypeError("nuke_node must be a Nuke Node object.")
+
+        self.node_name = nuke_node.name()
+        self.base_name = get_base_node_name(self.node_name)
+        self.color_data = get_color_swatch_knobs(nuke_node)
+        self._nuke_node = nuke_node # Keep a reference to the actual Nuke node for updates
+
+    def to_json_data(self):
+        """
+        Returns the stored color data in a dictionary format suitable for JSON export.
+        """
+        return {
+            "node_name": self.node_name,
+            "base_name": self.base_name,
+            "colors": self.color_data
+        }
+
+    def update_node_from_data(self, data_to_apply):
+        """
+        Updates the Nuke node's color swatch knobs with the provided data.
+        """
+        if not isinstance(data_to_apply, dict) or "colors" not in data_to_apply:
+            print(f"Error: Invalid data format for node {self.node_name}. Skipping update.")
+            return
+
+        for knob_name, new_value in data_to_apply["colors"].items():
+            if knob_name in self._nuke_node.knobs():
+                knob = self._nuke_node[knob_name]
+                if isinstance(knob, nuke.Color_Knob):
+                    try:
+                        knob.setValue(new_value)
+                        print(f"Updated '{knob_name}' on '{self.node_name}' to {new_value}")
+                    except Exception as e:
+                        print(f"Could not set value for knob '{knob_name}' on node '{self.node_name}': {e}")
+                else:
+                    print(f"Warning: Knob '{knob_name}' on '{self.node_name}' is not a Color_Knob. Skipping.")
+            else:
+                print(f"Warning: Knob '{knob_name}' not found on node '{self.node_name}'. Skipping.")
+
+# --- Main Export/Import Functions ---
+
+def export_selected_node_color_data(file_path):
+    """
+    Exports color swatch data from all selected Nuke nodes to a JSON file.
+    """
+    selected_nodes = nuke.selectedNodes()
+    if not selected_nodes:
+        nuke.message("No nodes selected. Please select nodes to export.")
+        return
+
+    all_node_data = []
+    for node in selected_nodes:
+        node_color_instance = NodeColorData(node)
+        all_node_data.append(node_color_instance.to_json_data())
+
+    try:
+        with open(file_path, 'w') as f:
+            json.dump(all_node_data, f, indent=4)
+        nuke.message(f"Successfully exported color data for {len(selected_nodes)} nodes to:\n{file_path}")
+    except Exception as e:
+        nuke.message(f"Error exporting data: {e}")
+
+def import_color_data_to_selected_nodes(file_path):
+    """
+    Imports color swatch data from a JSON file and applies it to selected Nuke nodes.
+    It attempts to match nodes based on their base names.
+    """
+    selected_nodes = nuke.selectedNodes()
+    if not selected_nodes:
+        nuke.message("No nodes selected. Please select nodes to import data onto.")
+        return
+
+    if not os.path.exists(file_path):
+        nuke.message(f"Error: File not found at {file_path}")
+        return
+
+    try:
+        with open(file_path, 'r') as f:
+            imported_data = json.load(f)
+    except json.JSONDecodeError as e:
+        nuke.message(f"Error decoding JSON file: {e}")
+        return
+    except Exception as e:
+        nuke.message(f"Error reading file: {e}")
+        return
+
+    if not isinstance(imported_data, list):
+        nuke.message("Error: Imported JSON data is not in the expected list format.")
+        return
+
+    # Create a mapping from base_name to the actual data for quick lookup
+    data_map = {item["base_name"]: item for item in imported_data}
+
+    updated_count = 0
+    for node in selected_nodes:
+        target_base_name = get_base_node_name(node.name())
+
+        # Find the best match: direct base_name, or if not found, use the first matching base_name from the imported data
+        # This handles the "my_node_a" -&gt; "your_node_a" scenario
+        data_to_apply = data_map.get(target_base_name)
+
+        if not data_to_apply:
+            # Fallback for more generic mapping if direct base name not found.
+            # This is where "my_node_a" or "my_node_a56" can be applied to "your_node_a"
+            # It implies a 1-to-1 mapping based on a common root or manual intervention
+            # For simplicity, we'll try to match by exact base_name first.
+            # If the user wants a more complex mapping (e.g., 'source_A' -&gt; 'target_B'),
+            # they would need to manually choose the source data.
+            # For now, we match source base_name to target base_name.
+            print(f"No direct base name match for '{target_base_name}' in imported data. Skipping node {node.name()}")
+            continue
+
+        node_color_instance = NodeColorData(node) # Create an instance for the target node
+        node_color_instance.update_node_from_data(data_to_apply)
+        updated_count += 1
+
+    nuke.message(f"Successfully updated color data for {updated_count} out of {len(selected_nodes)} selected nodes.")
+
+# --- Nuke Menu Integration (Example - run this in Nuke's script editor) ---
+# Note: This part needs to be run in Nuke for the menu items to appear.
+def create_nuke_menu_items():
+    menubar = nuke.menu('Nuke')
+    nuke_python_menu = menubar.findItem('Python') or menubar.addMenu('Python')
+
+    # Check if menu items already exist to avoid duplicates if script is run multiple times
+    if not nuke_python_menu.findItem('Export Color Data'):
+        nuke_python_menu.addCommand(
+            'Export Color Data',
+            lambda: export_selected_node_color_data(
+                nuke.getFilename("Export Color Data", "*.json")
+            ),
+            'alt+e' # Optional hotkey
+        )
+
+    if not nuke_python_menu.findItem('Import Color Data'):
+        nuke_python_menu.addCommand(
+            'Import Color Data',
+            lambda: import_color_data_to_selected_nodes(
+                nuke.getFilename("Import Color Data", "*.json")
+            ),
+            'alt+i' # Optional hotkey
+        )
+    nuke.message("Nuke Color Data Manager menu items added to 'Python' menu.")
+
+# Call this function to set up the menu items when the script is loaded in Nuke.
+# If you put this script in your Nuke plugins folder, this call would typically
+# be at the end of the file, or called from your menu.py.
+# create_nuke_menu_items()
+
+# --- Mock Nuke Environment for Standalone Testing (DO NOT RUN IN NUKE) ---
+# This section is for demonstrating the logic outside of a running Nuke instance.
+# In a real Nuke environment, 'nuke' would be pre-defined.
+if 'nuke' not in globals():
+    class MockColorKnob:
+        def __init__(self, value=(1.0, 0.0, 0.0, 1.0)):
+            self._value = list(value)
+        def value(self):
+            return tuple(self._value)
+        def setValue(self, new_value):
+            if isinstance(new_value, (list, tuple)) and len(new_value) == 4:
+                self._value = list(new_value)
+                # print(f"MockColorKnob set to: {self._value}")
+            else:
+                raise ValueError("Color must be a 4-tuple/list.")
+
+    class MockNode:
+        def __init__(self, name, knobs_data=None):
+            self._name = name
+            self._knobs = {}
+            if knobs_data:
+                for k_name, k_value in knobs_data.items():
+                    self._knobs[k_name] = MockColorKnob(k_value)
+
+        def name(self):
+            return self._name
+
+        def knobs(self):
+            return self._knobs.keys()
+
+        def __getitem__(self, key):
+            if key in self._knobs:
+                return self._knobs[key]
+            raise KeyError(f"Knob '{key}' not found on node '{self._name}'")
+
+        def Class(self): # Mimic Nuke node's Class() method
+            return "SomeNodeType"
+
+    class MockNuke:
+        def __init__(self):
+            self._selected_nodes = []
+
+        def selectedNodes(self):
+            return self._selected_nodes
+
+        def setSelectedNodes(self, nodes):
+            self._selected_nodes = nodes
+
+        def message(self, msg):
+            print(f"[Nuke Message] {msg}")
+
+        def getFilename(self, title, filter):
+            # In a real Nuke env, this opens a file dialog. For mock, just return a dummy path.
+            print(f"[Nuke] Opened file dialog for: {title} ({filter})")
+            return "mock_color_data.json" # Return a default mock file name
+
+        def menu(self, name):
+            # Mock for menu creation
+            class MockMenu:
+                def findItem(self, item_name): return None # Always return None for simplicity
+                def addMenu(self, name): return self
+                def addCommand(self, name, command, hotkey): print(f"Mock Menu: Added '{name}'")
+            return MockMenu()
+
+    # Initialize mock Nuke
+    nuke = MockNuke()
+    print("--- Running in Mock Nuke Environment ---")
+
+    # --- Demo Usage with Mock Nodes ---
+    if __name__ == "__main__":
+        # Create some mock nodes
+        node1 = MockNode("my_node_a", {"tint_color": (0.8, 0.1, 0.2, 1.0), "bg_color": (0.1, 0.5, 0.9, 1.0)})
+        node2 = MockNode("my_node_a25", {"tint_color": (0.5, 0.5, 0.5, 1.0), "bg_color": (0.9, 0.8, 0.1, 1.0)})
+        node3 = MockNode("my_node_b", {"tint_color": (0.2, 0.3, 0.4, 1.0), "border_color": (0.9, 0.6, 0.3, 1.0)})
+        node4 = MockNode("my_node_c", {"tint_color": (0.0, 1.0, 0.0, 1.0)})
+
+        # Another set of nodes to import onto
+        target_node1 = MockNode("your_node_a", {"tint_color": (0.0, 0.0, 0.0, 1.0), "bg_color": (0.0, 0.0, 0.0, 1.0)})
+        target_node2 = MockNode("your_node_a 4", {"tint_color": (0.0, 0.0, 0.0, 1.0), "bg_color": (0.0, 0.0, 0.0, 1.0)})
+        target_node3 = MockNode("your_node_b", {"tint_color": (0.0, 0.0, 0.0, 1.0), "border_color": (0.0, 0.0, 0.0, 1.0)})
+        target_node4 = MockNode("another_node_z", {"tint_color": (0.0, 0.0, 0.0, 1.0)})
+
+
+        # --- Export Demo ---
+        print("\n--- Demo: Exporting Data ---")
+        nuke.setSelectedNodes([node1, node2, node3])
+        export_file = "exported_colors.json"
+        nuke.getFilename = lambda title, filter: export_file # Override getFilename for mock
+        export_selected_node_color_data(export_file)
+
+        print(f"\nContents of {export_file} after export:")
+        with open(export_file, 'r') as f:
+            print(json.dumps(json.load(f), indent=4))
+
+        # --- Import Demo ---
+        print("\n--- Demo: Importing Data ---")
+        nuke.setSelectedNodes([target_node1, target_node2, target_node3, target_node4])
+        import_file = "exported_colors.json" # Using the file just exported
+        nuke.getFilename = lambda title, filter: import_file # Override getFilename for mock
+        import_color_data_to_selected_nodes(import_file)
+
+        print("\nState of target_node1 after import:")
+        print(f"  tint_color: {target_node1['tint_color'].value()}")
+        print(f"  bg_color: {target_node1['bg_color'].value()}")
+
+        print("\nState of target_node2 (your_node_a 4) after import (should match my_node_a's data):")
+        print(f"  tint_color: {target_node2['tint_color'].value()}")
+        print(f"  bg_color: {target_node2['bg_color'].value()}")
+
+        print("\nState of target_node3 (your_node_b) after import (should match my_node_b's data):")
+        print(f"  tint_color: {target_node3['tint_color'].value()}")
+        print(f"  border_color: {target_node3['border_color'].value()}")
+
+        print("\nState of target_node4 (another_node_z) after import (no match, should be unchanged):")
+        print(f"  tint_color: {target_node4['tint_color'].value()}")
+
+
+        # Clean up mock file
+        if os.path.exists(export_file):
+            os.remove(export_file)
+            print(f"\nCleaned up mock file: {export_file}")
+</pre>
 
 </ul>
 <p>
