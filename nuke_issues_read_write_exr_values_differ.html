@@ -144,6 +144,172 @@ To minimize or eliminate precision differences, you can take a few steps:
 In summary, the floating-point number system is the reason for slight value changes, not a flaw in the EXR format itself. Choosing between 16-bit and 32-bit floats is a trade-off between file size and numerical precision.
 </p>
  
+<div id="Precision Limits-exr values not exactly the same read write-How can I export to EXR and guarantee that the EXR has a hard limit of 13.9 and not a read value of 13.900001?"><h4 id="How can I export to EXR and guarantee that the EXR has a hard limit of 13.9 and not a read value of 13.900001?" class="header"><a href="#Precision Limits-exr values not exactly the same read write-How can I export to EXR and guarantee that the EXR has a hard limit of 13.9 and not a read value of 13.900001?">How can I export to EXR and guarantee that the EXR has a hard limit of 13.9 and not a read value of 13.900001?</a></h4></div>
+
+<p>
+When using floating-point numbers like those in EXR, achieving a "hard limit" that is exactly <code>13.9</code> and not a tiny fraction more is impossible due to rounding errors.
+</p>
+
+<p>
+Even after clamping, the binary representation of <code>13.9</code> may not be perfectly accurate, and different software can interpret that binary slightly differently. The tiny variations you see <code>13.900001</code> are a fundamental aspect of floating-point arithmetic.
+</p>
+
+<p>
+To solve this, you must accept that absolute precision for a decimal value like <code>13.9</code> cannot be guaranteed and communicate with the digital intermediate (DI) process to define an acceptable tolerance.
+</p>
+
+<div id="Precision Limits-exr values not exactly the same read write-The technical issue explained"><h4 id="The technical issue explained" class="header"><a href="#Precision Limits-exr values not exactly the same read write-The technical issue explained">The technical issue explained</a></h4></div>
+
+<p>
+Your clamp node correctly performs a floating-point comparison, but it does so in memory with a high degree of precision (likely 32-bit float).
+</p>
+
+<p>
+When Nuke's Write node saves this data, it's converted to the file's specified format (e.g., 16-bit half or 32-bit float).
+</p>
+
+<p>
+This can introduce rounding.
+</p>
+
+<ul>
+<li>
+The number <code>13.9</code> cannot be perfectly represented by the base-2 system used for floating-point numbers. It is an approximation.
+
+<li>
+The clamped value in Nuke is a binary value very close to <code>13.9</code>.
+
+<li>
+When read by another application, that same binary value might be converted to a decimal string like <code>13.900001</code> because of its own floating-point logic, even though the underlying data is identical.
+
+</ul>
+<div id="Precision Limits-exr values not exactly the same read write-Solutions for your workflow"><h3 id="Solutions for your workflow" class="header"><a href="#Precision Limits-exr values not exactly the same read write-Solutions for your workflow">Solutions for your workflow</a></h3></div>
+
+<ul>
+<li>
+<span id="Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Method 1"></span><strong id="Method 1">Method 1</strong>: The standard production workflow
+
+<ul>
+<li>
+The most robust and standard solution is to define a small, acceptable range of tolerance with the DI team.
+
+<li>
+<span id="Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Define tolerance"></span><strong id="Define tolerance">Define tolerance</strong>: Consult with the DI vendor to establish a tolerance level for the maximum value. A tolerance of <code>+/- 0.0001</code> is often used for these checks.
+
+<li>
+DI process checks with tolerance: The DI process will check if a pixel value is is_less_than_or_equal_to (13.9 + tolerance), rather than a strict is_less_than_or_equal_to(13.9).
+
+<li>
+Validate your clamp: In your Nuke script, ensure you are clamping all required channels correctly. You can test for minor variations by using an Expression node to check for values over <code>13.9</code>.  A quick test expression for the red channel would be r&gt;13.9?1:0.
+
+</ul>
+<li>
+Method 2: Re-clamping at the DI stage If the DI process is unwilling to accept a tolerance, the cleanest solution is to have them clamp the values themselves as part of their ingest process.
+
+<ul>
+<li>
+Export the EXR as is: Write the EXR using your existing clamp node setup.
+
+<li>
+DI performs final clamp: The DI studio will apply a final clamp to the images at <code>13.9</code> during their data preparation. This moves the final rounding event into their system and avoids the issue of cross-software interpretation.
+
+<li>
+Confirm the strategy: Clearly communicate this plan with the DI team beforehand to ensure they are set up for this workflow.
+
+</ul>
+<li>
+Method 3: Using a custom Nuke expression to force-round
+
+</ul>
+<p>
+While generally not necessary, you could write a custom expression in Nuke to force a rounding down to a certain number of decimal places before the Write node. This is more of a workaround that may introduce other unwanted artifacts.
+</p>
+<ul>
+<li>
+Add an Expression node: Insert an Expression node immediately before your Write node.
+
+<li>
+Write the rounding expression: Use an expression to round the values down.
+
+</ul>
+<p>
+For example, to truncate values after six decimal places:floor(r * 1000000) / 1000000
+</p>
+
+
+<ul>
+<li>
+Be cautious: This is not a foolproof solution and may introduce banding, as it forces data loss. The tiny fluctuations you are seeing are often imperceptible and are a side effect of ensuring the widest possible dynamic range.
+
+<li>
+
+
+</ul>
+<div id="Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Final recommendation"><h4 id="Final recommendation" class="header"><a href="#Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Final recommendation">Final recommendation</a></h4></div>
+
+<p>
+For a professional pipeline, Method 1 (agreeing on a tolerance) or Method 2 (the DI team clamps on ingest) are the best approaches.
+They acknowledge the reality of floating-point math while providing a robust and repeatable process.
+In a high-end production, a minimal, non-perceptible difference like <code>13.900001</code> is almost never a problem, as long as it's not a hard-fail for the next stage.
+</p>
+
+<div id="Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Is there a number I could clamp to to ensure a read value of 13.9 or less? (Perhaps 13.89 or something?)"><h4 id="Is there a number I could clamp to to ensure a read value of 13.9 or less? (Perhaps 13.89 or something?)" class="header"><a href="#Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Is there a number I could clamp to to ensure a read value of 13.9 or less? (Perhaps 13.89 or something?)">Is there a number I could clamp to to ensure a read value of 13.9 or less? (Perhaps 13.89 or something?)</a></h4></div>
+
+<p>
+Unfortunately, clamping to a slightly lower value like 13.89 is not a reliable method to guarantee a read value of exactly 13.9 or less. Floating-point inaccuracies are not a fixed offset; they are a consequence of the binary representation, which means the rounding error is not consistent and can't be perfectly predicted by simply nudging the number.
+</p>
+
+<div id="Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Why clamping to 13.89 doesn't guarantee the result"><h4 id="Why clamping to 13.89 doesn't guarantee the result" class="header"><a href="#Precision Limits-exr values not exactly the same read write-Solutions for your workflow-Why clamping to 13.89 doesn't guarantee the result">Why clamping to 13.89 doesn't guarantee the result</a></h4></div>
+
+<ul>
+<li>
+Decimal to binary conversion: The decimal value <code>13.9</code> and a pre-adjusted value like <code>13.89</code> are both approximated in the binary floating-point system. Neither can be perfectly represented.
+
+<li>
+Rounding error variability: The rounding error is not a fixed number you can simply subtract. The amount of precision lost depends on the number's magnitude and the number of bits available. For half-float (16-bit) EXRs, precision decreases as values get brighter.
+
+<li>
+Cross-software interpretation: Even if you manage to clamp in Nuke in a way that your software interprets the result correctly, another application's floating-point math might interpret the same binary data differently, leading to the same problem.
+
+</ul>
+<div id="Precision Limits-exr values not exactly the same read write-Solutions for your workflow-The correct solutions for a professional workflow"><h4 id="The correct solutions for a professional workflow" class="header"><a href="#Precision Limits-exr values not exactly the same read write-Solutions for your workflow-The correct solutions for a professional workflow">The correct solutions for a professional workflow</a></h4></div>
+
+<p>
+Instead of trying to find a magic number, you should work with the inherent nature of floating-point math through these robust methods:
+</p>
+<ul>
+<li>
+Work with the DI facility to define a tolerance. This is the most reliable and standard solution for VFX pipelines.
+
+<ul>
+<li>
+Agree on a tolerance: Ask the DI facility for the acceptable tolerance. For example, they might accept values up to <code>13.9001</code>.
+
+<li>
+They can apply a clamp on their end: The DI studio can implement their own pre-processing that applies a very strict final clamp to exactly <code>13.9</code> as part of their ingest process.
+
+<li>
+This is a cooperative effort: This issue affects anyone dealing with floating-point data across different applications. Communicating and agreeing on a standard handling procedure is the professional way to proceed.
+
+</ul>
+<li>
+Use 32-bit float EXRs. If the file size is manageable and the DI facility supports it, rendering with 32-bit floats will significantly increase the precision. The rounding error will still exist but will be magnitudes smaller and less likely to cause issues with common clamping values.
+
+<li>
+Perform a secondary validation pass. In Nuke, you can create a test pass before the Write node to check for values that exceed your target with a small tolerance.
+
+<ul>
+<li>
+Add an Expression node: Insert an Expression node before your Write node.
+
+<li>
+Set the expression: For the rgb channels, use r&gt;13.90001?1:0.
+
+<li>
+Inspect the result: If you see any white pixels, it indicates a value that has crossed your threshold. This helps you identify if the issue is with the rounding on write or with a calculation upstream of your clamp. 
+
+</ul>
+</ul>
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
