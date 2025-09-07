@@ -766,6 +766,207 @@ Use code with caution.
 <span id="Line Tracing-ANSWER-Benefits of this approach-Robustness"></span><strong id="Robustness">Robustness</strong>: By using subprocess with full paths to the virtual environment's Python executable and a well-defined wrapper script, you eliminate the ambiguity that can arise from relative paths or inherited environment variables.
 
 </ul>
+<div id="Line Tracing-QUESTION"><h2 id="QUESTION" class="header"><a href="#Line Tracing-QUESTION">QUESTION</a></h2></div>
+
+<p>
+But what if I as a user on the company system would like to install the modules in a Virtual Environment that is NOT on the companywide system? Can I make Nuke see my local virtual setup?
+</p>
+
+<div id="Line Tracing-ANSWER"><h2 id="ANSWER" class="header"><a href="#Line Tracing-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, as a user, you can install Python modules in a local virtual environment and make them accessible to Nuke. There are two robust methods for achieving this, both of which are independent of the company-wide system. 
+</p>
+
+<div id="Line Tracing-ANSWER-Method 1: The recommended subprocess approach"><h3 id="Method 1: The recommended subprocess approach" class="header"><a href="#Line Tracing-ANSWER-Method 1: The recommended subprocess approach">Method 1: The recommended subprocess approach</a></h3></div>
+
+<p>
+This is the safest and most reliable method. It involves creating a local virtual environment and then calling a script within that environment from Nuke using subprocess, just like the company-wide solution but with paths pointing to your local setup.
+</p>
+
+<div id="Line Tracing-ANSWER-Method 1: The recommended subprocess approach-Advantages:"><h4 id="Advantages:" class="header"><a href="#Line Tracing-ANSWER-Method 1: The recommended subprocess approach-Advantages:">Advantages:</a></h4></div>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Method 1: The recommended subprocess approach-Advantages:-Safety"></span><strong id="Safety">Safety</strong>: It keeps your local environment completely isolated, preventing conflicts with Nuke's internal Python or any shared company tools.
+
+<li>
+<span id="Line Tracing-ANSWER-Method 1: The recommended subprocess approach-Advantages:-Portability"></span><strong id="Portability">Portability</strong>: The script can work on any machine with access to your home directory, making it a reliable personal tool.
+
+<li>
+<span id="Line Tracing-ANSWER-Method 1: The recommended subprocess approach-Advantages:-No Admin Rights Needed"></span><strong id="No Admin Rights Needed">No Admin Rights Needed</strong>: All installations are contained within your user space. 
+
+</ul>
+<div id="Line Tracing-ANSWER-Method 1: The recommended subprocess approach-How to set it up"><h4 id="How to set it up" class="header"><a href="#Line Tracing-ANSWER-Method 1: The recommended subprocess approach-How to set it up">How to set it up</a></h4></div>
+
+<p>
+Create a local virtual environment: In your home directory (e.g., ~/nuke_tools/vtracer_env), create a new virtual environment.
+</p>
+
+<pre sh>
+mkdir -p ~/nuke_tools
+python3 -m venv ~/nuke_tools/vtracer_env
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Install the packages: Activate your new environment and install vtracer.
+</p>
+
+<pre sh>
+source ~/nuke_tools/vtracer_env/bin/activate
+pip install vtracer pillow
+deactivate
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<ul>
+<li>
+Use the wrapper script: Reuse the same wrapper script from the previous answer, saved to your local tools directory (e.g., ~/nuke_tools/vtracer_wrapper.py).
+
+<li>
+Update the Nuke script: In your personal Nuke scripts (e.g., in ~/.nuke/menu.py or your Script Editor), update the paths to point to your local environment.
+
+</ul>
+  
+<pre python>
+import nuke
+import subprocess
+import os
+import tempfile
+
+def trace_local_venv(input_node):
+    if not isinstance(input_node, nuke.Read):
+        nuke.message("Please select a Read node.")
+        return
+
+    # --- User-defined paths ---
+    venv_python = os.path.expanduser("~/nuke_tools/vtracer_env/bin/python")
+    wrapper_script = os.path.expanduser("~/nuke_tools/vtracer_wrapper.py")
+    # --------------------------
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_png = os.path.join(temp_dir, "temp_input.png")
+        output_svg = os.path.join(temp_dir, "temp_output.svg")
+        final_png = os.path.join(temp_dir, "final_output.png")
+
+        nuke.render(input_node, filename=input_png)
+
+        try:
+            subprocess.run(
+                [venv_python, wrapper_script, "--input", input_png, "--output", output_svg],
+                check=True, capture_output=True, text=True
+            )
+            subprocess.run(["convert", "-density", "600", output_svg, final_png], check=True)
+
+            result_node = nuke.createNode("Read")
+            result_node["file"].setValue(final_png)
+            result_node["label"].setValue("VTraced (Local)")
+            print("Tracing complete.")
+
+        except subprocess.CalledProcessError as e:
+            nuke.message(f"Error during tracing:\n{e.stderr}")
+        except FileNotFoundError:
+            nuke.message("Command not found. Check your paths and installations.")
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<div id="Line Tracing-ANSWER-Method 2: The init.py direct import approach"><h3 id="Method 2: The init.py direct import approach" class="header"><a href="#Line Tracing-ANSWER-Method 2: The init.py direct import approach">Method 2: The init.py direct import approach</a></h3></div>
+
+<p>
+This method makes the local virtual environment's packages directly importable within Nuke's Script Editor. It's less isolated than the subprocess method but more convenient if you need to use the libraries directly in your Nuke Python code. 
+</p>
+
+<div id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-Advantages:"><h4 id="Advantages:" class="header"><a href="#Line Tracing-ANSWER-Method 2: The init.py direct import approach-Advantages:">Advantages:</a></h4></div>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-Advantages:-Convenience"></span><strong id="Convenience">Convenience</strong>: You can use import vtracer directly within your Nuke session.
+
+<li>
+<span id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-Advantages:-Full Integration"></span><strong id="Full Integration">Full Integration</strong>: Gives you access to all library functionality without the overhead of external processes. 
+
+</ul>
+<div id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-Drawbacks:"><h4 id="Drawbacks:" class="header"><a href="#Line Tracing-ANSWER-Method 2: The init.py direct import approach-Drawbacks:">Drawbacks:</a></h4></div>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-Drawbacks:-Less Isolation"></span><strong id="Less Isolation">Less Isolation</strong>: It modifies Nuke's sys.path, which has a small risk of causing conflicts, although this is unlikely with a well-contained virtual environment. 
+
+</ul>
+<div id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-How to set it up"><h4 id="How to set it up" class="header"><a href="#Line Tracing-ANSWER-Method 2: The init.py direct import approach-How to set it up">How to set it up</a></h4></div>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-How to set it up-Create the virtual environment"></span><strong id="Create the virtual environment">Create the virtual environment</strong>: Follow Step 1 from the subprocess method.
+
+<li>
+<span id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-How to set it up-Add path in init.py"></span><strong id="Add path in init.py">Add path in init.py</strong>: Find or create your personal init.py file. This is typically located in ~/.nuke/.
+
+<li>
+<span id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-How to set it up-Append site-packages to sys.path"></span><strong id="Append site-packages to sys.path">Append site-packages to sys.path</strong>: In your init.py, add the path to your virtual environment's site-packages folder.
+
+</ul>
+  
+<pre python>
+import sys
+import os
+
+# Resolve the path to your local virtual environment's site-packages
+venv_path = os.path.expanduser("~/nuke_tools/vtracer_env/lib/python3.x/site-packages")
+
+# Add it to the system path
+if os.path.isdir(venv_path):
+    sys.path.append(venv_path)
+    print(f"Added local virtual environment to Nuke's Python path: {venv_path}")
+else:
+    print(f"Warning: Local virtual environment not found at {venv_path}")
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+_Note: Replace <code>python3.x</code> with your Python version (e.g., `python3.11)._
+</p>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-How to set it up-Run Nuke script"></span><strong id="Run Nuke script">Run Nuke script</strong>: Restart Nuke. You can now use import vtracer directly in the Script Editor or any of your Python files that Nuke executes. 
+
+</ul>
+<div id="Line Tracing-ANSWER-Method 2: The init.py direct import approach-Which method should you choose?"><h4 id="Which method should you choose?" class="header"><a href="#Line Tracing-ANSWER-Method 2: The init.py direct import approach-Which method should you choose?">Which method should you choose?</a></h4></div>
+
+<ul>
+<li>
+Use the <code>subprocess</code> approach (Method 1) for maximum stability. In a production environment with strict rules about software stability, this is the safest path. It ensures that any version changes or dependency conflicts in your local toolchain don't affect Nuke's core functionality.
+
+<li>
+Use the <code>init.py</code> import approach (Method 2) for direct scripting convenience. If you prioritize ease of development and want to interact with the libraries more fluidly in your Python scripts, this is a good option. The risks are minimal for well-isolated libraries like vtracer.
+
+</ul>
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
