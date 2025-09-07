@@ -1031,9 +1031,13 @@ Unpack the source.
 tar -xzf ImageMagick-*.tar.gz
 cd ImageMagick-*/
 </pre>
-<p>
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <ul>
 <li>
@@ -1044,9 +1048,13 @@ Configure for a local install. When running ./configure, specify a local install
 <pre sh>
 ./configure --prefix=$HOME/imagemagick-local
 </pre>
-<p>
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <ul>
 <li>
@@ -1058,9 +1066,13 @@ Compile and install.
 make
 make install
 </pre>
-<p>
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <ul>
 <li>
@@ -1071,9 +1083,13 @@ Add to your shell's PATH. To ensure your system can find the convert command, yo
 <pre sh>
 export PATH="$HOME/imagemagick-local/bin:$PATH"
 </pre>
-<p>
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <ul>
 <li>
@@ -1084,9 +1100,13 @@ Add to library path (if necessary). You may also need to add the library directo
 <pre sh>
 export LD_LIBRARY_PATH="$HOME/imagemagick-local/lib:$LD_LIBRARY_PATH"
 </pre>
-<p>
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <ul>
 <li>
@@ -1124,9 +1144,13 @@ Create a Conda environment.
 <pre sh>
 conda create -n my-imagemagick-env
 </pre>
-<p>
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <p>
 Install ImageMagick via conda-forge.
@@ -1136,9 +1160,13 @@ Install ImageMagick via conda-forge.
 conda activate my-imagemagick-env
 conda install -c conda-forge imagemagick
 </pre>
-<p>
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <p>
 Use the script. In your Nuke script, you can activate this Conda environment within your subprocess call to access the ImageMagick tools. 
@@ -1166,6 +1194,106 @@ If it shows up, you can simply use the <code>subprocess</code> approach without 
 </p>
 
 
+<div id="Note on Potrace"><h1 id="Note on Potrace" class="header"><a href="#Note on Potrace">Note on Potrace</a></h1></div>
+
+<div id="QUESTION"><h1 id="QUESTION" class="header"><a href="#QUESTION">QUESTION</a></h1></div>
+
+<p>
+Can potrace be installed via pip in Python3?
+</p>
+
+<div id="QUESTION-ANSWER"><h2 id="ANSWER" class="header"><a href="#QUESTION-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You cannot install the original, command-line potrace program directly via pip. However, a Python port of the Potrace algorithm called potracer is available on PyPI and can be installed with pip. This pure Python version allows you to use the Potrace functionality within a Python script without relying on the external command-line tool. 
+</p>
+
+<div id="QUESTION-ANSWER-Using the Python port: potracer"><h4 id="Using the Python port: potracer" class="header"><a href="#QUESTION-ANSWER-Using the Python port: potracer">Using the Python port: potracer</a></h4></div>
+
+<p>
+Install potracer into your virtual environment:
+</p>
+
+<pre sh>
+pip install potracer
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Use it directly in your Python code within Nuke, eliminating the need for subprocess. The workflow would involve using the Pillow library (which you can also install via pip) to handle image input and then passing the data to potracer. 
+</p>
+
+<div id="QUESTION-ANSWER-Here is an updated Nuke script using the potracer library directly."><h4 id="Here is an updated Nuke script using the potracer library directly." class="header"><a href="#QUESTION-ANSWER-Here is an updated Nuke script using the potracer library directly.">Here is an updated Nuke script using the potracer library directly.</a></h4></div>
+
+<p>
+Updated Nuke script using the potracer library
+</p>
+<pre python>
+import nuke
+import os
+import tempfile
+from PIL import Image
+from potracer import Bitmap
+
+def trace_local_potracer(input_node):
+    """
+    Traces a black-and-white image from a Nuke node using the potracer library.
+    """
+    if not isinstance(input_node, nuke.Read):
+        nuke.message("Please select a Read node.")
+        return
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_png = os.path.join(temp_dir, "temp_input.png")
+        output_svg = os.path.join(temp_dir, "temp_output.svg")
+
+        # Step 1: Render the Nuke node's output to a temporary PNG
+        nuke.render(input_node, filename=input_png)
+        
+        try:
+            # Step 2: Use the potracer library to convert PNG to SVG
+            print(f"Tracing '{input_png}' using potracer library...")
+            image = Image.open(input_png)
+            bm = Bitmap(image)
+            plist = bm.trace()
+            plist.svg(output_svg)
+            
+            # Step 3: Create a new Read node in Nuke with the resulting SVG
+            result_node = nuke.createNode("Read")
+            result_node["file"].setValue(output_svg)
+            result_node["label"].setValue("Potracer (Lib)")
+            
+            print("Successfully created a new node with the traced SVG.")
+
+        except Exception as e:
+            nuke.message(f"An error occurred during tracing: {e}")
+
+# Example usage: trace_local_potracer(nuke.selectedNode())
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<div id="QUESTION-ANSWER-Comparing potracer to the command-line version"><h4 id="Comparing potracer to the command-line version" class="header"><a href="#QUESTION-ANSWER-Comparing potracer to the command-line version">Comparing potracer to the command-line version</a></h4></div>
+
+<ul>
+<li>
+<span id="QUESTION-ANSWER-Comparing potracer to the command-line version-Performance"></span><strong id="Performance">Performance</strong>: The pure Python potracer library can be significantly slower (up to 500x slower) than the original potrace C program for very complex, large images. For typical usage with logos or line art, the speed difference may not be a major issue.
+
+<li>
+<span id="QUESTION-ANSWER-Comparing potracer to the command-line version-Convenience"></span><strong id="Convenience">Convenience</strong>: Installing potracer via pip is much simpler than compiling the original potrace from source, especially for a non-admin user on a company system. It also removes the dependency on an external executable.
+
+</ul>
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
