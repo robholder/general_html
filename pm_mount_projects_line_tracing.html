@@ -512,6 +512,204 @@ Use code with caution.
 <span id="Line Tracing-ANSWER:-How to use the script-Key features of the script-Intermediate File Cleanup"></span><strong id="Intermediate File Cleanup">Intermediate File Cleanup</strong>: It automatically deletes the intermediate SVG files, keeping the output directory clean. 
 
 </ul>
+<div id="Line Tracing-QUESTION"><h2 id="QUESTION" class="header"><a href="#Line Tracing-QUESTION">QUESTION</a></h2></div>
+
+<p>
+If using Nuke on Linux and a companywide administration, is it possible to set up a local or virtual environment for Python, that Nuke can still 'see' or access by 'subprocess'?
+</p>
+
+<div id="Line Tracing-ANSWER"><h2 id="ANSWER" class="header"><a href="#Line Tracing-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, Nuke on Linux can absolutely use a local or virtual Python environment through subprocess, which is a robust and common practice in studio pipelines. Since you are in a company-wide administration, this is an excellent approach because it avoids installing packages directly into Nuke's core environment, which could cause instability or version conflicts. 
+</p>
+
+<p>
+Here is a step-by-step guide on how to set this up.
+</p>
+
+<div id="Line Tracing-ANSWER-Step 1: Create the virtual environment"><h4 id="Step 1: Create the virtual environment" class="header"><a href="#Line Tracing-ANSWER-Step 1: Create the virtual environment">Step 1: Create the virtual environment</a></h4></div>
+
+<p>
+The virtual environment should be created in a central, shared location that all artists on the network can access. The company's pipeline administrators will typically manage this.
+</p>
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Step 1: Create the virtual environment-Choose a central location"></span><strong id="Choose a central location">Choose a central location</strong>: Pick a shared path on your company network for the virtual environment. Example: /mnt/projects/tools/vtracer_env.
+
+<li>
+<span id="Line Tracing-ANSWER-Step 1: Create the virtual environment-Use venv or conda"></span><strong id="Use venv or conda">Use venv or conda</strong>: Create the virtual environment using a standard Python installation.
+
+</ul>
+  
+<pre sh>
+python3 -m venv /mnt/projects/tools/vtracer_env
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Step 1: Create the virtual environment-Install dependencies"></span><strong id="Install dependencies">Install dependencies</strong>: Install vtracer and any other required Python packages into this environment.
+
+</ul>
+  
+<pre sh>
+# Activate the environment to use its pip
+source /mnt/projects/tools/vtracer_env/bin/activate
+
+# Install the packages
+pip install vtracer pillow
+
+# Deactivate the environment
+deactivate
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<div id="Line Tracing-ANSWER-Step 2: Write a wrapper script for the subprocess call"><h4 id="Step 2: Write a wrapper script for the subprocess call" class="header"><a href="#Line Tracing-ANSWER-Step 2: Write a wrapper script for the subprocess call">Step 2: Write a wrapper script for the subprocess call</a></h4></div>
+
+<p>
+Instead of calling <code>vtracer</code> directly from Nuke, you will write a separate Python script that runs within your virtual environment. This script will perform the tracing, and the Nuke script will call this wrapper via subprocess. This is more robust than trying to activate the environment within the subprocess call itself. 
+</p>
+
+<p>
+File: /mnt/projects/tools/vtracer_wrapper.py
+</p>
+
+<pre python>
+import argparse
+import vtracer
+import os
+
+def trace_with_vtracer(input_path, output_path, args):
+    """Traces an image using vtracer with customizable arguments."""
+    try:
+        vtracer_options = {
+            "input_path": input_path,
+            "output_path": output_path,
+            "colormode": "bw", # Enforce binary color mode
+        }
+        # Add any other arguments passed from the command line
+        vtracer_options.update(args)
+
+        vtracer.convert_image_to_svg_py(**vtracer_options)
+        return 0 # Success
+    except Exception as e:
+        print(f"Error during tracing: {e}")
+        return 1 # Error
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Wrapper script for vtracer to be called via subprocess."
+    )
+    parser.add_argument("--input", required=True, help="Input image file.")
+    parser.add_argument("--output", required=True, help="Output SVG file.")
+    parser.add_argument("--mode", default="spline", help="Tracing mode (e.g., spline, polygon).")
+    parser.add_argument("--filter-speckle", type=int, default=4, help="Filter speckles smaller than this size.")
+    # Add any other vtracer arguments you want to expose
+
+    parsed_args, _ = parser.parse_known_args()
+    
+    exit_code = trace_with_vtracer(
+        input_path=parsed_args.input,
+        output_path=parsed_args.output,
+        args=vars(parsed_args)
+    )
+    exit(exit_code)
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<p>
+This script acts as the clean interface between Nuke and the complex vtracer library.
+</p>
+
+<div id="Line Tracing-ANSWER-Step 3: Call the wrapper script from Nuke via subprocess"><h4 id="Step 3: Call the wrapper script from Nuke via subprocess" class="header"><a href="#Line Tracing-ANSWER-Step 3: Call the wrapper script from Nuke via subprocess">Step 3: Call the wrapper script from Nuke via subprocess</a></h4></div>
+
+<p>
+Now, the Nuke script simply needs to call the Python interpreter inside the virtual environment and pass the arguments to the wrapper script. 
+</p>
+
+<pre python>
+import nuke
+import subprocess
+import os
+import tempfile
+
+def trace_from_nuke_with_venv(input_node):
+    """
+    Traces a black-and-white image from a Nuke node using a venv and a wrapper script.
+    """
+    if not isinstance(input_node, nuke.Read):
+        nuke.message("Please select a Read node.")
+        return
+
+    # Paths managed by pipeline administrators
+    venv_python = "/mnt/projects/tools/vtracer_env/bin/python"
+    wrapper_script = "/mnt/projects/tools/vtracer_wrapper.py"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_png = os.path.join(temp_dir, "temp_input.png")
+        output_svg = os.path.join(temp_dir, "temp_output.svg")
+        final_png = os.path.join(temp_dir, "final_output.png")
+
+        # Step 1: Render the Nuke node's output to a temporary PNG
+        nuke.render(input_node, filename=input_png)
+        
+        # Step 2: Call the wrapper script via subprocess
+        try:
+            print(f"Tracing '{input_png}' using venv...")
+            subprocess.run(
+                [venv_python, wrapper_script, "--input", input_png, "--output", output_svg, "--mode", "spline"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            
+            # Step 3: Rasterize the SVG using ImageMagick (assuming it's in the system PATH)
+            print(f"Rasterizing '{output_svg}'...")
+            subprocess.run(["convert", "-density", "600", output_svg, final_png], check=True)
+            
+            # Step 4: Create a new Read node in Nuke with the final PNG
+            result_node = nuke.createNode("Read")
+            result_node["file"].setValue(final_png)
+            result_node["label"].setValue("VTraced (Venv)")
+            
+            print("Successfully created a new node with the traced image.")
+        
+        except subprocess.CalledProcessError as e:
+            nuke.message(f"Error during subprocess call:\nStdout: {e.stdout}\nStderr: {e.stderr}")
+        except FileNotFoundError:
+            nuke.message(f"Error: '{venv_python}', '{wrapper_script}', or 'convert' not found.")
+        except Exception as e:
+            nuke.message(f"An unexpected error occurred: {e}")
+
+# Example usage: trace_from_nuke_with_venv(nuke.selectedNode())
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<div id="Line Tracing-ANSWER-Benefits of this approach"><h3 id="Benefits of this approach" class="header"><a href="#Line Tracing-ANSWER-Benefits of this approach">Benefits of this approach</a></h3></div>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER-Benefits of this approach-Isolation"></span><strong id="Isolation">Isolation</strong>: Your Nuke installation remains clean and unchanged. The virtual environment contains all the dependencies, preventing conflicts.
+
+<li>
+<span id="Line Tracing-ANSWER-Benefits of this approach-Version Control"></span><strong id="Version Control">Version Control</strong>: The pipeline team can control the exact versions of vtracer and other libraries used by Nuke scripts simply by managing the virtual environment.
+
+<li>
+<span id="Line Tracing-ANSWER-Benefits of this approach-Portability"></span><strong id="Portability">Portability</strong>: This setup is highly portable across different Linux workstations, as long as they can access the shared network path.
+
+<li>
+<span id="Line Tracing-ANSWER-Benefits of this approach-Robustness"></span><strong id="Robustness">Robustness</strong>: By using subprocess with full paths to the virtual environment's Python executable and a well-defined wrapper script, you eliminate the ambiguity that can arise from relative paths or inherited environment variables.
+
+</ul>
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
