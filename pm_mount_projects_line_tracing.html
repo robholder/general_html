@@ -284,190 +284,235 @@ If vtracer is installed on the system, can a more robust Python script be writte
 
 <p>
 Yes, a robust Python script can be written to batch process directories of files using vtracer, with command-line arguments to control the tracing parameters. The script will use Python's built-in modules for file system navigation (os), running external commands (subprocess), and parsing command-line parameters (argparse). 
-The complete Python script
+</p>
+
+<div id="Line Tracing-ANSWER:-The complete Python script"><h4 id="The complete Python script" class="header"><a href="#Line Tracing-ANSWER:-The complete Python script">The complete Python script</a></h4></div>
+
+<p>
 This script will:
+</p>
+<ul>
+<li>
 Use os.walk() to recursively find all .png images in a directory.
+
+<li>
 Allow customization of vtracer and convert parameters via command-line arguments.
+
+<li>
 Output the new PNG files into a specified output directory, mirroring the input directory structure.
+
+<li>
 Print progress to the console. 
+
+</ul>
+<p>
 Note: You must have both vtracer and ImageMagick installed on your system for this script to work.
+</p>
+
+<p>
 File: batch_tracer.py
-python
+</p>
+<pre python>
 import os
 import subprocess
 import argparse
 from pathlib import Path
-</p>
 
-<p>
 def trace_and_rasterize(input_file, output_svg, output_png, vtracer_args, imagemagick_density):
-</p>
-<pre><code>"""Traces a PNG to SVG with vtracer and then rasterizes the SVG to a new PNG."""
-try:
-</pre></code>
-<ul>
-<li>
-Step 1: Run vtracer to convert PNG to SVG
+    """Traces a PNG to SVG with vtracer and then rasterizes the SVG to a new PNG."""
+    try:
+        # Step 1: Run vtracer to convert PNG to SVG
         print(f"Tracing '{input_file}' to SVG...")
         vtracer_command = [
-<pre><code>"vtracer",
-"--input", str(input_file),
-"--output", str(output_svg),
-"--colormode", "bw" # Ensure binary color mode for black and white
-]
-# Add any additional vtracer arguments from the user
-vtracer_command.extend(vtracer_args)
+            "vtracer",
+            "--input", str(input_file),
+            "--output", str(output_svg),
+            "--colormode", "bw" # Ensure binary color mode for black and white
+        ]
+        # Add any additional vtracer arguments from the user
+        vtracer_command.extend(vtracer_args)
+        
+        subprocess.run(vtracer_command, check=True, capture_output=True, text=True)
+        
+        # Step 2: Run ImageMagick to convert SVG back to a high-res PNG
+        print(f"Rasterizing '{output_svg}' to PNG...")
+        imagemagick_command = [
+            "convert",
+            "-density", str(imagemagick_density),
+            str(output_svg),
+            str(output_png)
+        ]
+        subprocess.run(imagemagick_command, check=True, capture_output=True, text=True)
+        
+        print(f"✅ Successfully processed '{input_file}' -&gt; '{output_png}'")
+        
+        # Clean up the intermediate SVG file
+        os.remove(output_svg)
+    
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error processing '{input_file}':")
+        print(f"  Stdout: {e.stdout}")
+        print(f"  Stderr: {e.stderr}")
+    except FileNotFoundError:
+        print("❌ Error: 'vtracer' or 'convert' command not found. Ensure they are installed and in your PATH.")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
 
-subprocess.run(vtracer_command, check=True, capture_output=True, text=True)
-
-# Step 2: Run ImageMagick to convert SVG back to a high-res PNG
-print(f"Rasterizing '{output_svg}' to PNG...")
-imagemagick_command = [
-"convert",
-"-density", str(imagemagick_density),
-str(output_svg),
-str(output_png)
-]
-subprocess.run(imagemagick_command, check=True, capture_output=True, text=True)
-
-print(f"✅ Successfully processed '{input_file}' -&gt; '{output_png}'")
-
-# Clean up the intermediate SVG file
-os.remove(output_svg)
-
-except subprocess.CalledProcessError as e:
-print(f"❌ Error processing '{input_file}':")
-print(f"  Stdout: {e.stdout}")
-print(f"  Stderr: {e.stderr}")
-except FileNotFoundError:
-print("❌ Error: 'vtracer' or 'convert' command not found. Ensure they are installed and in your PATH.")
-except Exception as e:
-print(f"❌ An unexpected error occurred: {e}")
-</code></pre>
-
-</ul>
-</code></pre>
-<p>
 def main():
-</p>
-<pre><code>"""Main function to parse arguments and process all files in a directory."""
-parser = argparse.ArgumentParser(
-description="Batch process PNG images: trace to SVG with vtracer, then rasterize back to PNG."
-)
-parser.add_argument(
-"input_directory",
-help="Path to the directory containing input PNG files."
-)
-parser.add_argument(
-"output_directory",
-help="Path to the directory for output PNG files."
-)
-parser.add_argument(
-"--density",
-type=int,
-default=600,
-help="Resolution (in DPI) for rasterizing the SVG output. Higher values result in sharper images. (Default: 600)"
-)
-parser.add_argument(
-"--vtracer-args",
-nargs=argparse.REMAINDER,
-default=[],
-help="Additional arguments for the 'vtracer' command. For example: --vtracer-args --mode spline"
-)
-
-args = parser.parse_args()
-
-input_dir = Path(args.input_directory).resolve()
-output_dir = Path(args.output_directory).resolve()
-
-if not input_dir.is_dir():
-print(f"Error: Input directory '{input_dir}' does not exist.")
-return
-
-if not output_dir.exists():
-output_dir.mkdir(parents=True)
-print(f"Created output directory: '{output_dir}'")
-
-for root, _, files in os.walk(input_dir):
-for filename in files:
-if filename.endswith(".png"):
-input_file = Path(root) / filename
-</pre></code>
-<ul>
-<li>
-Construct the output file paths, preserving directory structure
+    """Main function to parse arguments and process all files in a directory."""
+    parser = argparse.ArgumentParser(
+        description="Batch process PNG images: trace to SVG with vtracer, then rasterize back to PNG."
+    )
+    parser.add_argument(
+        "input_directory",
+        help="Path to the directory containing input PNG files."
+    )
+    parser.add_argument(
+        "output_directory",
+        help="Path to the directory for output PNG files."
+    )
+    parser.add_argument(
+        "--density",
+        type=int,
+        default=600,
+        help="Resolution (in DPI) for rasterizing the SVG output. Higher values result in sharper images. (Default: 600)"
+    )
+    parser.add_argument(
+        "--vtracer-args",
+        nargs=argparse.REMAINDER,
+        default=[],
+        help="Additional arguments for the 'vtracer' command. For example: --vtracer-args --mode spline"
+    )
+    
+    args = parser.parse_args()
+    
+    input_dir = Path(args.input_directory).resolve()
+    output_dir = Path(args.output_directory).resolve()
+    
+    if not input_dir.is_dir():
+        print(f"Error: Input directory '{input_dir}' does not exist.")
+        return
+        
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True)
+        print(f"Created output directory: '{output_dir}'")
+    
+    for root, _, files in os.walk(input_dir):
+        for filename in files:
+            if filename.endswith(".png"):
+                input_file = Path(root) / filename
+                
+                # Construct the output file paths, preserving directory structure
                 relative_path = input_file.relative_to(input_dir)
                 output_svg = output_dir / relative_path.with_suffix(".svg")
                 output_png = output_dir / relative_path
+                
+                # Ensure output subdirectory exists
+                output_svg.parent.mkdir(parents=True, exist_ok=True)
+                
+                trace_and_rasterize(
+                    input_file, 
+                    output_svg, 
+                    output_png, 
+                    args.vtracer_args,
+                    args.density
+                )
 
-</ul>
-<pre><code>
-</pre></code>
+if __name__ == "__main__":
+    main()
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<div id="Line Tracing-ANSWER:-How to use the script"><h3 id="How to use the script" class="header"><a href="#Line Tracing-ANSWER:-How to use the script">How to use the script</a></h3></div>
+
 <ul>
 <li>
-Ensure output subdirectory exists
-                output_svg.parent.mkdir(parents=True, exist_ok=True)
+<span id="Line Tracing-ANSWER:-How to use the script-Save the file"></span><strong id="Save the file">Save the file</strong>: Save the code above as batch_tracer.py.
+
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Make it executable"></span><strong id="Make it executable">Make it executable</strong>: On Linux/macOS, open a terminal and run chmod +x batch_tracer.py.
+
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Run the script"></span><strong id="Run the script">Run the script</strong>:
+
+<ul>
+<li>
+Basic usage: To process all PNGs in a directory called input_images and save the results to output_images, run:
 
 </ul>
-<pre><code>
-trace_and_rasterize(
-input_file, 
-output_svg, 
-output_png, 
-args.vtracer_args,
-args.density
-)
-</code></pre>
-
-<p>
-if _<em>name</em>_ == "_<em>main</em>_":
-</p>
-<pre><code>main()
-</code></pre>
-<p>
-Use code with caution.
-</p>
-
-<p>
-How to use the script
-Save the file: Save the code above as batch_tracer.py.
-Make it executable: On Linux/macOS, open a terminal and run chmod +x batch_tracer.py.
-Run the script:
-Basic usage: To process all PNGs in a directory called input_images and save the results to output_images, run:
-sh
+</ul>
+  
+<pre sh>
 ./batch_tracer.py input_images output_images
+</pre>
+<p>
 Use code with caution.
 </p>
 
-<p>
+<ul>
+<li>
 With vtracer arguments: To use the spline mode for potentially smoother lines, run:
-sh
+
+</ul>
+  
+<pre sh>
 ./batch_tracer.py input_images output_images --vtracer-args --mode spline
+</pre>
+<p>
 Use code with caution.
 </p>
 
-<p>
+<ul>
+<li>
 Specify density: To control the output resolution (e.g., 900 DPI), use the --density flag:
-sh
+
+</ul>
+  
+<pre sh>
 ./batch_tracer.py input_images output_images --density 900
+</pre>
+<p>
 Use code with caution.
 </p>
 
-<p>
+<ul>
+<li>
 Combine arguments: You can combine all arguments as needed.
-sh
+
+</ul>
+  
+<pre sh>
 ./batch_tracer.py input_images output_images --density 900 --vtracer-args --mode spline --filter-speckle 8
+</pre>
+<p>
 Use code with caution.
 </p>
 
+<div id="Line Tracing-ANSWER:-How to use the script-Key features of the script"><h4 id="Key features of the script" class="header"><a href="#Line Tracing-ANSWER:-How to use the script-Key features of the script">Key features of the script</a></h4></div>
+
+<ul>
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Key features of the script-Command-line Interface (argparse)"></span><strong id="Command-line Interface (argparse)">Command-line Interface (argparse)</strong>: The script has a user-friendly interface that explains its usage and options.
+
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Key features of the script-File System Traversal (os.walk)"></span><strong id="File System Traversal (os.walk)">File System Traversal (os.walk)</strong>: It automatically finds all .png files in the input directory and all its subdirectories, making it easy to process large batches.
+
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Key features of the script-Directory Management (pathlib)"></span><strong id="Directory Management (pathlib)">Directory Management (pathlib)</strong>: It creates the output directory and subdirectories as needed, preserving the original file structure.
+
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Key features of the script-External Command Execution (subprocess)"></span><strong id="External Command Execution (subprocess)">External Command Execution (subprocess)</strong>: It uses subprocess.run with check=True to ensure that any errors from vtracer or convert are caught and reported, making the process robust.
+
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Key features of the script-Error Handling"></span><strong id="Error Handling">Error Handling</strong>: It catches file not found errors for vtracer or convert and provides helpful messages.
+
+<li>
+<span id="Line Tracing-ANSWER:-How to use the script-Key features of the script-Intermediate File Cleanup"></span><strong id="Intermediate File Cleanup">Intermediate File Cleanup</strong>: It automatically deletes the intermediate SVG files, keeping the output directory clean. 
+
+</ul>
 <p>
-Key features of the script
-Command-line Interface (argparse): The script has a user-friendly interface that explains its usage and options.
-File System Traversal (os.walk): It automatically finds all .png files in the input directory and all its subdirectories, making it easy to process large batches.
-Directory Management (pathlib): It creates the output directory and subdirectories as needed, preserving the original file structure.
-External Command Execution (subprocess): It uses subprocess.run with check=True to ensure that any errors from vtracer or convert are caught and reported, making the process robust.
-Error Handling: It catches file not found errors for vtracer or convert and provides helpful messages.
-Intermediate File Cleanup: It automatically deletes the intermediate SVG files, keeping the output directory clean. 
 <a href="pmount_index.html">PMount</a>
 </p>
 
