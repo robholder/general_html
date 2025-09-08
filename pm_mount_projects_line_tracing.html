@@ -261,6 +261,81 @@ Example:
 magick input.png pbm:- | potrace --svg -o output_brew.svg &amp;&amp; magick -density 96 output_brew.svg output_brew_96dpi.png
 </pre>
 
+<div id="QUESTION-ANSWER-Frontend options-Example with Nuke (Python)"><h4 id="Example with Nuke (Python)" class="header"><a href="#QUESTION-ANSWER-Frontend options-Example with Nuke (Python)">Example with Nuke (Python)</a></h4></div>
+
+<p>
+Python script example for Nuke
+</p>
+
+<p>
+This script provides a function that takes a Nuke read node, renders its output to a temporary file, calls potrace, and then creates a new read node with the resulting SVG.
+</p>
+<pre>
+import nuke
+import subprocess
+import os
+import tempfile
+
+def trace_with_potrace(input_node):
+    """
+    Traces a black-and-white image from a Nuke node using potrace via subprocess.
+    Requires potrace and ImageMagick to be installed system-wide.
+    """
+    if not isinstance(input_node, nuke.Read):
+        nuke.message("Please select a Read node.")
+        return
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Define temporary file paths
+        input_file_png = os.path.join(temp_dir, "input_temp.png")
+        input_file_pbm = os.path.join(temp_dir, "input_temp.pbm")
+        output_file_svg = os.path.join(temp_dir, "output_result.svg")
+        
+        # 1. Render the Nuke node's output to a temporary PNG file
+        nuke.execute(input_node.name(), nuke.frame(), nuke.frame(), file=input_file_png)
+        
+        # 2. Convert the PNG to PBM format for potrace
+        try:
+            print("Converting PNG to PBM with ImageMagick...")
+            subprocess.run(["convert", input_file_png, input_file_pbm], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            nuke.message(f"Error with ImageMagick conversion: {e}\nIs 'convert' installed and in your PATH?")
+            return
+
+        # 3. Run potrace with custom arguments
+        try:
+            print("Tracing PBM to SVG with potrace...")
+            subprocess.run(
+                [
+                    "potrace",
+                    "-s",                    # Output as SVG
+                    "-o", output_file_svg,   # Specify output file
+                    "-t", "4",               # Filter out small speckles
+                    "-a", "0.8",             # Adjust corner threshold
+                    input_file_pbm,          # Input PBM file
+                ],
+                check=True
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            nuke.message(f"Error with potrace: {e}\nIs 'potrace' installed and in your PATH?")
+            return
+
+        # 4. Create a new Read node for the resulting SVG
+        if os.path.exists(output_file_svg):
+            result_node = nuke.createNode("Read")
+            result_node["file"].setValue(output_file_svg)
+            result_node["label"].setValue("Potrace Result")
+            print("Successfully created new Read node with traced SVG.")
+        else:
+            nuke.message("Potrace failed to produce an SVG file.")
+
+# Example usage:
+# Select a Read node in Nuke and run this function from the Script Editor
+# trace_with_potrace(nuke.selectedNode())
+</pre>
+<p>
+Use code with caution.
+</p>
 
 <div id="QUESTION-Method 2: Using vtracer and ImageMagick"><h2 id="Method 2: Using vtracer and ImageMagick" class="header"><a href="#QUESTION-Method 2: Using vtracer and ImageMagick">Method 2: Using vtracer and ImageMagick</a></h2></div>
 
