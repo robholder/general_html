@@ -261,7 +261,80 @@ Example:
 magick input.png pbm:- | potrace --svg -o output_brew.svg &amp;&amp; magick -density 96 output_brew.svg output_brew_96dpi.png
 </pre>
 
-<div id="QUESTION-ANSWER-Frontend options-Example with Nuke (Python)"><h4 id="Example with Nuke (Python)" class="header"><a href="#QUESTION-ANSWER-Frontend options-Example with Nuke (Python)">Example with Nuke (Python)</a></h4></div>
+<div id="QUESTION-RGB"><h2 id="RGB" class="header"><a href="#QUESTION-RGB">RGB</a></h2></div>
+
+<p>
+The command above results in single channel grayscale PNGs. To produce RGB files, try the following.
+</p>
+
+<p>
+By default, when ImageMagick processes a single-channel image (like a PBM or a black-and-white SVG from Potrace), it optimizes the output to a grayscale PNG, which is not what Nuke needs. 
+</p>
+
+<p>
+To force ImageMagick to output a three-channel RGB PNG, you need to explicitly set the output color space and type.
+</p>
+
+<div id="QUESTION-RGB-The solution: Set the output color space and type"><h4 id="The solution: Set the output color space and type" class="header"><a href="#QUESTION-RGB-The solution: Set the output color space and type">The solution: Set the output color space and type</a></h4></div>
+
+<p>
+Add the -colorspace RGB and -type TrueColor options to your final convert command.
+</p>
+
+<p>
+Modified command:
+</p>
+<pre sh>
+convert input.png pbm:- | potrace --svg - -o output.svg &amp;&amp; convert -density 96 -colorspace RGB -type TrueColor output.svg output.png
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<div id="QUESTION-RGB-Breakdown of the new options"><h4 id="Breakdown of the new options" class="header"><a href="#QUESTION-RGB-Breakdown of the new options">Breakdown of the new options</a></h4></div>
+
+<ul>
+<li>
+<code>-colorspace RGB</code>: Tells ImageMagick to treat the color information as an RGB color space. Without this, it defaults to grayscale or sRGB based on the input data.
+
+<li>
+<code>-type TrueColor</code>: Forces the output image to be an uncompressed, 24-bit (8 bits per channel) RGB image. This prevents any optimizations to grayscale or indexed color that ImageMagick might try to apply. 
+
+</ul>
+<div id="QUESTION-RGB-Complete, robust command"><h4 id="Complete, robust command" class="header"><a href="#QUESTION-RGB-Complete, robust command">Complete, robust command</a></h4></div>
+
+<p>
+For a production environment, you should also include the image dimensions to ensure the rasterization has the correct size and resolution, as discussed previously.
+</p>
+
+<pre sh>
+#!/usr/bin/env zsh
+
+INPUT_PNG="input.png"
+OUTPUT_SVG="output.svg"
+OUTPUT_PNG="output.png"
+
+# Get original dimensions for accurate rasterization
+ORIGINAL_SIZE=$(identify -ping -format '%wx%h' "$INPUT_PNG")
+
+# Trace the image, then rasterize the SVG to a 24-bit RGB PNG
+convert "$INPUT_PNG" pbm:- | \
+potrace --svg - -o "$OUTPUT_SVG" &amp;&amp; \
+convert -density 96 -resize "$ORIGINAL_SIZE" -background none \
+        -colorspace RGB -type TrueColor "$OUTPUT_SVG" "$OUTPUT_PNG"
+
+# Clean up temporary SVG
+rm "$OUTPUT_SVG"
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<p>
+This updated command ensures that even though your input is black and white, the final PNG output is a full RGB file, which is what Nuke requires for proper processing.
+</p>
+
+<div id="QUESTION-RGB-Example with Nuke (Python)"><h4 id="Example with Nuke (Python)" class="header"><a href="#QUESTION-RGB-Example with Nuke (Python)">Example with Nuke (Python)</a></h4></div>
 
 <p>
 Python script example for Nuke
