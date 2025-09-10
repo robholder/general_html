@@ -310,7 +310,7 @@ This is a shell script (zsh) to use the commandline above:
 <table>
 <tr>
 <td>
-TESTED ON MAC OS
+TESTED ON MACOS - OK
 </td>
 </tr>
 </table>
@@ -328,44 +328,39 @@ INPUT_SUFFIX=".png"
 mkdir -p "$OUTPUT_DIR"
 
 # Ensure globbing works correctly for the pattern
-setopt extended_glob
+setopt extended_glob nullglob
 
 # Loop through all files that match the padded sequence pattern
 for input_file in "$INPUT_DIR"/"$INPUT_PREFIX"[0-9]#"$INPUT_SUFFIX"; do
-    # Check if the file actually exists
-    if [[ -f "$input_file" ]]; then
-        echo "Processing $input_file..."
+    echo "Processing $input_file..."
 
-        # 1. Extract the frame number with padding
-        # Removes the prefix and suffix from the filename
-        frame_number_padded=${input_file##*.}
-        frame_number_padded=${frame_number_padded%%.*}
+    # 1. Get the base filename with padded number
+    # This removes the INPUT_DIR path
+    basename_padded=$(basename "$input_file")
 
-        # 2. Define output file paths
-        output_svg="$OUTPUT_DIR/$OUTPUT_PREFIX$frame_number_padded.svg"
-        output_png="$OUTPUT_DIR/$OUTPUT_PREFIX$frame_number_padded.png"
+    # 2. Construct the output filenames
+    # Replace the INPUT_PREFIX with OUTPUT_PREFIX
+    output_png_name=${basename_padded/#"$INPUT_PREFIX"/"$OUTPUT_PREFIX"}
+    output_png="$OUTPUT_DIR/$output_png_name"
 
-        # 3. Get original dimensions for accurate rasterization
-        ORIGINAL_SIZE=$(identify -ping -format '%wx%h' "$input_file")
-        if [[ -z "$ORIGINAL_SIZE" ]]; then
-            echo "  Error: Could not get dimensions of $input_file. Skipping."
-            continue
-        fi
+    # Define the SVG path based on the output PNG name
+    output_svg="$OUTPUT_DIR/${output_png_name%.*}.svg"
 
-        # 4. Invert, trace, and rasterize the image
-        convert "$input_file" -negate pbm:- | \
-        potrace --svg - -o "$output_svg" &amp;&amp; \
-        convert -size "$ORIGINAL_SIZE" -density 300 -background none \
-                -colorspace RGB -type TrueColor "$output_svg" "$output_png"
+    # 3. Invert, trace, and rasterize the image
+    convert "$input_file" pbm:- | \
+    potrace --svg - -o "$output_svg" &amp;&amp; \
+    convert -density 96 -colorspace RGB -type TrueColor "$output_svg" "$output_png"
 
-        # 5. Clean up the temporary SVG file
-        rm "$output_svg"
+    # 4. Clean up the temporary SVG file
+    rm "$output_svg"
 
-        echo "  Done. Saved to $output_png."
-    fi
+    echo "  Done. Saved to $output_png."
 done
 
 echo "Batch processing complete."
+
+#convert input.png pbm:- | potrace --svg -o output.svg &amp;&amp; convert -density 96 -colorspace RGB -type TrueColor output.svg output.png
+#
 </pre>
 
 
