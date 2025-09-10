@@ -258,7 +258,7 @@ Example:
 </p>
 
 <pre sh>
-magick input.png pbm:- | potrace --svg -o output_brew.svg &amp;&amp; magick -density 96 output_brew.svg output_brew_96dpi.png
+magick input.png pbm:- | potrace --svg -o output_brew.svg &amp;&amp; magick -density 96 output_brew.svg output.png
 </pre>
 
 <div id="QUESTION-RGB"><h2 id="RGB" class="header"><a href="#QUESTION-RGB">RGB</a></h2></div>
@@ -285,7 +285,7 @@ Add the -colorspace RGB and -type TrueColor options to your final convert comman
 Modified command:
 </p>
 <pre sh>
-convert input.png pbm:- | potrace --svg - -o output.svg &amp;&amp; convert -density 96 -colorspace RGB -type TrueColor output.svg output.png
+convert input.png pbm:- | potrace --svg -o output.svg &amp;&amp; convert -density 96 -colorspace RGB -type TrueColor output.svg output.png
 </pre>
 <p>
 Use code with caution.
@@ -304,31 +304,70 @@ Use code with caution.
 <div id="QUESTION-RGB-Complete, robust command"><h4 id="Complete, robust command" class="header"><a href="#QUESTION-RGB-Complete, robust command">Complete, robust command</a></h4></div>
 
 <p>
-For a production environment, you should also include the image dimensions to ensure the rasterization has the correct size and resolution, as discussed previously.
+This is a shell script (zsh) to use the commandline above:
 </p>
-
 <pre sh>
+<table>
+<tr>
+<td>
+TESTED ON MAC OS
+</td>
+</tr>
+</table>
 #!/usr/bin/env zsh
 
-INPUT_PNG="input.png"
-OUTPUT_SVG="output.svg"
-OUTPUT_PNG="output.png"
+# --- Configuration ---
+INPUT_DIR="./2850_0025_orig"
+OUTPUT_DIR="./2850_0025_done"
+INPUT_PREFIX="orig_lines_2speed."
+OUTPUT_PREFIX="new_lines_2speed."
+INPUT_SUFFIX=".png"
+# --- End Configuration ---
 
-# Get original dimensions for accurate rasterization
-ORIGINAL_SIZE=$(identify -ping -format '%wx%h' "$INPUT_PNG")
+# Create the output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR"
 
-# Trace the image, then rasterize the SVG to a 24-bit RGB PNG
-convert "$INPUT_PNG" pbm:- | \
-potrace --svg - -o "$OUTPUT_SVG" &amp;&amp; \
-convert -density 96 -resize "$ORIGINAL_SIZE" -background none \
-        -colorspace RGB -type TrueColor "$OUTPUT_SVG" "$OUTPUT_PNG"
+# Ensure globbing works correctly for the pattern
+setopt extended_glob
 
-# Clean up temporary SVG
-rm "$OUTPUT_SVG"
+# Loop through all files that match the padded sequence pattern
+for input_file in "$INPUT_DIR"/"$INPUT_PREFIX"[0-9]#"$INPUT_SUFFIX"; do
+    # Check if the file actually exists
+    if [[ -f "$input_file" ]]; then
+        echo "Processing $input_file..."
+
+        # 1. Extract the frame number with padding
+        # Removes the prefix and suffix from the filename
+        frame_number_padded=${input_file##*.}
+        frame_number_padded=${frame_number_padded%%.*}
+
+        # 2. Define output file paths
+        output_svg="$OUTPUT_DIR/$OUTPUT_PREFIX$frame_number_padded.svg"
+        output_png="$OUTPUT_DIR/$OUTPUT_PREFIX$frame_number_padded.png"
+
+        # 3. Get original dimensions for accurate rasterization
+        ORIGINAL_SIZE=$(identify -ping -format '%wx%h' "$input_file")
+        if [[ -z "$ORIGINAL_SIZE" ]]; then
+            echo "  Error: Could not get dimensions of $input_file. Skipping."
+            continue
+        fi
+
+        # 4. Invert, trace, and rasterize the image
+        convert "$input_file" -negate pbm:- | \
+        potrace --svg - -o "$output_svg" &amp;&amp; \
+        convert -size "$ORIGINAL_SIZE" -density 300 -background none \
+                -colorspace RGB -type TrueColor "$output_svg" "$output_png"
+
+        # 5. Clean up the temporary SVG file
+        rm "$output_svg"
+
+        echo "  Done. Saved to $output_png."
+    fi
+done
+
+echo "Batch processing complete."
 </pre>
-<p>
-Use code with caution.
-</p>
+
 
 <p>
 This updated command ensures that even though your input is black and white, the final PNG output is a full RGB file, which is what Nuke requires for proper processing.
@@ -347,7 +386,7 @@ Here is the updated version of your full command, including the inversion step.
 </p>
 
 <pre sh>
-convert input.png -negate pbm:- | potrace --svg - -o output.svg &amp;&amp; convert -density 96 -colorspace RGB -type TrueColor output.svg output.png
+convert input.png -negate pbm:- | potrace --svg -o output.svg &amp;&amp; convert -density 96 -colorspace RGB -type TrueColor output.svg output.png
 </pre>
 <p>
 Use code with caution.
