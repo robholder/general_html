@@ -291,9 +291,14 @@ Modified command:
 <pre sh>
 convert input.png pbm:- | potrace --svg -o output.svg &amp;&amp; convert -density 96 -colorspace RGB -type TrueColor output.svg output.png
 </pre>
-<p>
+
+<table>
+<tr>
+<td>
 Use code with caution.
-</p>
+</td>
+</tr>
+</table>
 
 <div id="QUESTION-RGB-Breakdown of the new options"><h4 id="Breakdown of the new options" class="header"><a href="#QUESTION-RGB-Breakdown of the new options">Breakdown of the new options</a></h4></div>
 
@@ -1898,6 +1903,121 @@ for file in *.svg; do
     inkscape --export-filename="${file%.svg}.png" --export-type=png --export-width=512 "$file"
 done
 </pre>
+
+<p>
+To export a PNG from Inkscape with the same dimensions as the original bitmap image you used for tracing with Potrace, you need to specify the exact dimensions or the correct DPI from the command line. Since the SVG created by Potrace doesn't retain the original bitmap's resolution information, you must manually provide the dimensions during the Inkscape export command.
+</p>
+
+<div id="Using Inkscape to batch Rasterize-Getting the Original Dimensions"><h4 id="Getting the Original Dimensions" class="header"><a href="#Using Inkscape to batch Rasterize-Getting the Original Dimensions">Getting the Original Dimensions</a></h4></div>
+
+<p>
+First, you need to know the width and height of your original PNG file. You can use a command-line tool like identify from ImageMagick to quickly get this information.
+</p>
+
+<pre sh>
+identify -format "%wx%h" original.png
+</pre>
+<p>
+This command will output the dimensions in the format widthxheight (e.g., 800x600).
+</p>
+
+<div id="Using Inkscape to batch Rasterize-Inkscape Command for Exporting"><h4 id="Inkscape Command for Exporting" class="header"><a href="#Using Inkscape to batch Rasterize-Inkscape Command for Exporting">Inkscape Command for Exporting</a></h4></div>
+
+<p>
+Once you have the dimensions, you can use Inkscape's command-line interface to export the SVG to a PNG file at a specific size. Use the --export-width and --export-height flags to set the pixel dimensions.
+</p>
+
+<p>
+Here's the basic command structure:
+</p>
+
+<pre sh>
+inkscape --export-filename=output.png --export-width=WIDTH --export-height=HEIGHT input.svg
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<ul>
+<li>
+<code>--export-filename=output.png</code>: Specifies the name of the output file.
+
+<li>
+<code>--export-width=WIDTH</code>: Sets the desired width in pixels.
+
+<li>
+<code>--export-height=HEIGHT</code>: Sets the desired height in pixels.
+
+<li>
+<code>input.svg</code>: The name of the SVG file you want to convert.
+
+</ul>
+<div id="Using Inkscape to batch Rasterize-Batch Conversion Script"><h4 id="Batch Conversion Script" class="header"><a href="#Using Inkscape to batch Rasterize-Batch Conversion Script">Batch Conversion Script</a></h4></div>
+
+<p>
+To automate this for a directory of files, you'll need to write a simple shell script that:
+</p>
+
+<ul>
+<li>
+Loops through the original PNG files to get their dimensions.
+
+<li>
+Finds the corresponding SVG file (assuming the SVG has the same base name).
+
+<li>
+Runs the Inkscape export command for each pair of files.
+
+</ul>
+<p>
+Here is an example bash script for this task:
+</p>
+
+<pre sh>
+#!/bin/bash
+
+# Loop through all PNG files in the current directory
+for png_file in *.png; do
+    # Extract the base name (e.g., from 'image1.png' to 'image1')
+    base_name="${png_file%.png}"
+    
+    # Define the corresponding SVG file
+    svg_file="${base_name}.svg"
+
+    # Check if the SVG file exists before processing
+    if [ -f "$svg_file" ]; then
+        # Use ImageMagick's identify to get the dimensions of the original PNG
+        dimensions=$(identify -format "%wx%h" "$png_file")
+        width=$(echo "$dimensions" | cut -d'x' -f1)
+        height=$(echo "$dimensions" | cut -d'x' -f2)
+
+        # Define the output PNG filename
+        output_png="${base_name}_converted.png"
+
+        # Run Inkscape to export the SVG with the original PNG's dimensions
+        inkscape --export-filename="$output_png" --export-width="$width" --export-height="$height" "$svg_file"
+
+        echo "Converted $svg_file to $output_png with dimensions ${width}x${height}."
+    else
+        echo "No corresponding SVG file found for $png_file. Skipping."
+    fi
+done
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Note: This script assumes your original PNG files and the Potrace-generated SVG files share the same base name (e.g., image1.png and image1.svg). It's a robust way to ensure that your rasterized SVG output matches the exact pixel dimensions of your original source files.
+</p>
 
 <p>
 <a href="pmount_index.html">PMount</a>
