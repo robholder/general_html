@@ -273,6 +273,260 @@ def read_image_with_oiio(file_path):
 You would then call this function within your main loop and feed the resulting array to the clustering steps.
 </p>
 
+<table>
+<tr>
+<td>
+I won't know the number of colors for each image sequence, but I know they will be relatively low in number. How can I change the code to expect any number of colors?
+</td>
+</tr>
+</table>
+
+<p>
+That's a key challenge when using K-Means Clustering! If you don't know the optimal number of clusters (K), you need an automated way to estimate it for each frame.
+</p>
+
+<p>
+You can modify the code to use the Elbow Method to dynamically determine the best K for a given image, making the process adaptive to your comic book style sequences.
+</p>
+
+<div id="Reading Colors to JSON-The Strategy: The Elbow Method 📐"><h2 id="The Strategy: The Elbow Method 📐" class="header"><a href="#Reading Colors to JSON-The Strategy: The Elbow Method 📐">The Strategy: The Elbow Method 📐</a></h2></div>
+
+<p>
+The Elbow Method is a heuristic used to find the optimal number of clusters (K) in K-Means.
+</p>
+
+<ul>
+<li>
+<span id="Reading Colors to JSON-The Strategy: The Elbow Method 📐-Calculate Distortion"></span><strong id="Calculate Distortion">Calculate Distortion</strong>: Run K-Means multiple times, increasing K (e.g., from 5 to 50). For each run, record the distortion (the sum of squared distances between each point and its assigned centroid).
+
+<li>
+<span id="Reading Colors to JSON-The Strategy: The Elbow Method 📐-Find the &quot;Elbow&quot;"></span><strong id="Find the &quot;Elbow&quot;">Find the "Elbow"</strong>: Plot K (x-axis) vs. Distortion (y-axis). The distortion will decrease sharply as K increases, then slow down dramatically. The point where the curve bends, resembling an "elbow," is the optimal number of clusters, as adding more clusters provides diminishing returns.
+
+</ul>
+<p>
+Since your color counts are low (around 30), we can define a reasonable search range for K.
+</p>
+
+<div id="Reading Colors to JSON-Modified Python Code with Dynamic K-Selection"><h2 id="Modified Python Code with Dynamic K-Selection" class="header"><a href="#Reading Colors to JSON-Modified Python Code with Dynamic K-Selection">Modified Python Code with Dynamic K-Selection</a></h2></div>
+
+<p>
+This modified script uses the scipy.spatial.distance.cdist function (often necessary for distortion calculation) and the MiniBatchKMeans inertia (which is equivalent to distortion) over a range of possible K values.
+</p>
+
+<pre python>
+import numpy as np
+import cv2  # or OIIO, as discussed
+from sklearn.cluster import MiniBatchKMeans
+from scipy.spatial.distance import cdist
+import json
+import glob
+import os
+
+def determine_optimal_k(pixels_data, k_range=(5, 50)):
+    """
+    Uses the Elbow Method (via inertia) to find the optimal number of clusters (K).
+    
+    Args:
+        pixels_data (np.ndarray): Reshaped image pixels (N, 3).
+        k_range (tuple): (min K, max K) to search within.
+        
+    Returns:
+        int: The estimated optimal number of clusters.
+    """
+    k_min, k_max = k_range
+    inertias = []
+    
+    # Run MiniBatchKMeans for a range of K values
+    for k in range(k_min, k_max + 1, 5): # Check every 5th K for speed
+        kmeans = MiniBatchKMeans(n_clusters=k, n_init='auto', random_state=42)
+        kmeans.fit(pixels_data)
+        inertias.append(kmeans.inertia_)
+    
+    # --- Simplified Elbow Detection ---
+    # This is often done visually, but we can approximate by looking for the 
+    # point where the rate of decrease in inertia slows down.
+    
+    # Calculate the percentage change in inertia
+    changes = np.diff(inertias)
+    percent_drops = np.abs(changes / inertias[:-1])
+    
+    # Find the index where the drop (gain in information) falls below a threshold (e.g., 5%)
+    # This threshold may need adjustment based on your image style.
+    threshold = 0.05 
+    
+    # Add 1 to the index because diff/changes array is one element shorter
+    elbow_index = np.where(percent_drops &lt; threshold)[0]
+    
+    if len(elbow_index) &gt; 0:
+        # The elbow is typically the first index where the drop slows down
+        return k_range[0] + (elbow_index[0] + 1) * 5 
+    else:
+        # If no elbow is clearly found, default to the max K in the range
+        return k_max
+
+def extract_dominant_colors_sequence_dynamic(sequence_path, k_search_range=(5, 50), frames=None):
+    """
+    Extracts dominant colors, dynamically determining the optimal K for each frame.
+    """
+    all_dominant_colors = {}
+    
+    # --- Setup file/frame list logic (omitted for brevity, assume same as before) ---
+    # NOTE: You'd implement your file iteration here. For this example, we'll
+    # assume the input is a list of file paths named 'file_frame_pairs'.
+    
+    # Placeholder for file iteration based on a single sample frame:
+    
+    # Example to load the first file in the sequence as a test:
+    # file_list = sorted(glob.glob(sequence_path.replace('%04d', '*')))
+    # file_frame_pairs = zip(file_list, [os.path.basename(f).split('.')[1] for f in file_list])
+    
+    # --- Main Loop ---
+    # We will assume a single image file for demonstration
+    file_path = "path/to/single/image.jpg" # Replace with actual file iteration
+    frame_num_str = "001" 
+    
+    # 1. Load Image
+    img = cv2.imread(file_path) 
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    pixels = img.reshape((-1, 3))
+    pixels = np.float32(pixels)
+
+    # 2. Determine Optimal K
+    optimal_k = determine_optimal_k(pixels, k_search_range)
+    print(f"Frame {frame_num_str}: Optimal K estimated at {optimal_k}")
+
+    # 3. Final K-Means with Optimal K
+    kmeans = MiniBatchKMeans(n_clusters=optimal_k, n_init='auto', random_state=42)
+    kmeans.fit(pixels)
+    dominant_colors = kmeans.cluster_centers_
+
+    # 4. Format Output
+    color_list = dominant_colors.astype(int).tolist()
+    all_dominant_colors[frame_num_str] = color_list
+        
+    json_output = json.dumps(all_dominant_colors, indent=4)
+    return json_output
+
+# --- Considerations ---
+# 1. The range for K_RANGE (5, 50) is a guess. Adjust based on how many
+#    unique colors your images actually contain.
+# 2. The ELBOW DETECTION THRESHOLD (0.05) is a heuristic. It may need tuning.
+# 3. For faster processing, you might want to run the K-Means on a 
+#    *downscaled* version of the image (e.g., resize to 500x500 pixels) 
+#    before calculating the elbow and the final colors.
+</pre>
+
+<table>
+<tr>
+<td>
+I believe the RGB values would need to be in the same units/representation as used in Nuke - zero to one for standard black to white (while HDR images are possible). Would I forego the conversion to 0 - 255?
+</td>
+</tr>
+</table>
+
+<p>
+Yes, you are absolutely correct and should forego the conversion to the 0-255 range if you intend to use the resulting RGB values directly within Nuke (or any standard VFX application). 💡
+</p>
+
+<p>
+Nuke and OpenEXR/HDR pipelines natively operate on floating-point color values where standard dynamic range is represented by 0.0 to 1.0.
+</p>
+
+<div id="Reading Colors to JSON-The Necessary Adjustment to the Code"><h2 id="The Necessary Adjustment to the Code" class="header"><a href="#Reading Colors to JSON-The Necessary Adjustment to the Code">The Necessary Adjustment to the Code</a></h2></div>
+
+<p>
+You need to ensure two things in your processing pipeline:
+</p>
+<ul>
+<li>
+<span id="Reading Colors to JSON-The Necessary Adjustment to the Code-Image Read"></span><strong id="Image Read">Image Read</strong>: The image data is loaded directly as floating-point numbers.
+
+<li>
+<span id="Reading Colors to JSON-The Necessary Adjustment to the Code-K-Means Processing"></span><strong id="K-Means Processing">K-Means Processing</strong>: The clustering algorithm runs on the 0.0−1.0 floating-point data.
+
+<li>
+<span id="Reading Colors to JSON-The Necessary Adjustment to the Code-Output"></span><strong id="Output">Output</strong>: The final cluster centers are outputted as floating-point numbers.
+
+</ul>
+<p>
+If you are using OpenImageIO (OIIO), this is much simpler as it defaults to reading data as float (or whatever the file precision is) and gives you the 0.0−1.0 data naturally. If you are using OpenCV or Pillow, you must explicitly ensure the conversion to float and division by 255 does not happen, or handle the data type correctly.
+</p>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OIIO (Recommended)"><h2 id="Corrected Code Snippet using OIIO (Recommended)" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OIIO (Recommended)">Corrected Code Snippet using OIIO (Recommended)</a></h2></div>
+
+<p>
+Since OIIO is designed for VFX, it's the most reliable for float data.
+</p>
+
+<pre python>
+import OpenImageIO as OIIO
+import numpy as np
+# ... (rest of your imports)
+
+def read_image_with_oiio(file_path):
+    """Loads an image into a NumPy array using OpenImageIO as float32 (0.0 - 1.0 range)."""
+    
+    img_input = OIIO.ImageInput.open(file_path)
+    if not img_input:
+        raise IOError(f"Could not open image with OIIO: {OIIO.geterror()}")
+
+    spec = img_input.spec()
+    
+    # Read pixel data directly as float32
+    # OIIO reads data in its native float range (0.0-1.0 or HDR range for EXR)
+    pixel_data = np.empty((spec.height, spec.width, spec.nchannels), dtype=np.float32)
+    img_input.read_image(0, 0, spec.nchannels, OIIO.TypeDesc.FLOAT, pixel_data)
+    img_input.close()
+    
+    # Return R, G, B channels in 0.0-1.0 (or HDR float) range
+    return pixel_data[:, :, :3] # Keep R, G, B and discard others
+
+# --- The clustering function remains the same, but operates on float data ---
+
+# Inside extract_dominant_colors_sequence_dynamic:
+# 1. Load Image
+img_float_data = read_image_with_oiio(file_path) 
+
+# 2. Reshape Pixel Data (already float, no normalization needed)
+pixels = img_float_data.reshape((-1, 3))
+# pixels is now np.float32 in 0.0-1.0+ range
+# ... (Proceed with determine_optimal_k and MiniBatchKMeans on 'pixels')
+
+# 3. Final Output (NO .astype(int) conversion!)
+# Keep the cluster centers as a float list for JSON output
+# color_list = dominant_colors.astype(int).tolist()  &lt;-- DELETE THIS LINE
+color_list = dominant_colors.tolist() 
+</pre>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)"><h2 id="Corrected Code Snippet using OpenCV (If Used)" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)">Corrected Code Snippet using OpenCV (If Used)</a></h2></div>
+
+<p>
+If you must use OpenCV (or Pillow), the key is to load the image and manually convert to float in the correct range, then bypass any conversion back to integer.
+</p>
+
+<pre python>
+# Using OpenCV
+img = cv2.imread(file_path) 
+img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+# Convert to float and normalize to 0.0 - 1.0 range
+# Assumes the input image is 8-bit (0-255). If it's a 16-bit TIFF, this is wrong.
+pixels = img.reshape((-1, 3))
+pixels = np.float32(pixels) / 255.0  
+# For true HDR/float files, you must use OIIO or specialized readers like OpenEXR.
+
+# ... (Proceed with clustering)
+
+# Final Output (still must output as float list)
+color_list = dominant_colors.tolist() 
+</pre>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Crucial Takeaway:"><h3 id="Crucial Takeaway:" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Crucial Takeaway:">Crucial Takeaway:</a></h3></div>
+
+<p>
+By removing the .astype(int) and .astype(int) conversions and ensuring the input array is already in the float (0.0 - 1.0+) range, your resulting JSON will contain values ready to be pasted directly into a Nuke node's RGB color field.
+</p>
+
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
