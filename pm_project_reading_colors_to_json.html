@@ -527,9 +527,515 @@ color_list = dominant_colors.tolist()
 By removing the .astype(int) and .astype(int) conversions and ensuring the input array is already in the float (0.0 - 1.0+) range, your resulting JSON will contain values ready to be pasted directly into a Nuke node's RGB color field.
 </p>
 
+<table>
+<tr>
+<td>
+Can Open Image IO read data from TGA and PNG files?
+</td>
+</tr>
+</table>
+
+<p>
+Yes, OpenImageIO (OIIO) can read data from both TGA (Truevision Targa) and PNG (Portable Network Graphics) files.
+</p>
+
+<p>
+OIIO is designed specifically for the visual effects (VFX) and animation industry, meaning it supports a wide variety of formats commonly used in production pipelines, which includes these two.
+</p>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Key Points for VFX Work:"><h3 id="Key Points for VFX Work:" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Key Points for VFX Work:">Key Points for VFX Work:</a></h3></div>
+
+<ul>
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Key Points for VFX Work:-TGA Support"></span><strong id="TGA Support">TGA Support</strong>: TGA files are a legacy format but are fully supported by OIIO for both reading and writing.
+
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Key Points for VFX Work:-PNG Support"></span><strong id="PNG Support">PNG Support</strong>: PNG is widely supported and OIIO handles it reliably.
+
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Key Points for VFX Work:-Data Handling"></span><strong id="Data Handling">Data Handling</strong>: The main benefit of using OIIO, particularly in your case, is its format-agnostic API and its focus on using floating-point data for internal image representation. When reading, OIIO will automatically convert the integer-based data from 8-bit or 16-bit TGA/PNG files into the 0.0 to 1.0 floating-point range (or higher for HDR files like OpenEXR). This eliminates the need for manual normalization steps like dividing by 255.0
+<table>
+<tr>
+<td>
+When these image files are imported into Nuke through the Read nodes, will the colorspace settings affect the values? (In other words, will getting a list of colors from the files be accurate once the images have been ingested or imported into a Nuke scene?
+</td>
+</tr>
+</table>
+
+</ul>
+<p>
+Yes, the colorspace settings on the Nuke Read node will absolutely affect the pixel values read into the scene. ⚠️ This is a crucial consideration for your color extraction script.
+</p>
+
+<p>
+The goal in a Nuke pipeline is usually to convert all incoming image data into a single, standardized Working Colorspace (often linear sRGB/Rec. 709 or ACEScg). The Read node performs this conversion.
+</p>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-How Nuke Read Nodes Affect Pixel Values"><h3 id="How Nuke Read Nodes Affect Pixel Values" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-How Nuke Read Nodes Affect Pixel Values">How Nuke Read Nodes Affect Pixel Values</a></h3></div>
+
+<p>
+The Nuke Read node is responsible for two main actions:
+</p>
+<ul>
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-How Nuke Read Nodes Affect Pixel Values-Reading Data"></span><strong id="Reading Data">Reading Data</strong>: It takes the raw digital values from the file (e.g., the 8-bit integer data from a PNG or TGA).
+
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-How Nuke Read Nodes Affect Pixel Values-Colorspace Transformation"></span><strong id="Colorspace Transformation">Colorspace Transformation</strong>: It applies a color transformation to convert the file's native colorspace (e.g., sRGB, Rec. 709, or Log) into the scene's working colorspace (usually linear).
+
+</ul>
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node"><h3 id="The Inaccuracy of Extracting Color Post-Read Node" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node">The Inaccuracy of Extracting Color Post-Read Node</a></h3></div>
+
+<p>
+If you run your Python script on the image before it enters Nuke (as intended with OIIO), your script is operating on the file's native colorspace data (e.g., sRGB).
+</p>
+
+<p>
+If you were to sample the colors inside Nuke (e.g., using an expression or Python in the Nuke script itself), the values you get would be the linearized values.
+</p>
+
+<table>
+<tr>
+<td>
+Stage
+</td>
+<td>
+Operation
+</td>
+<td>
+Colorspace of Pixel Values
+</td>
+<td>
+Resulting Values
+</td>
+</tr>
+<tr>
+<td>
+File on Disk
+</td>
+<td>
+None
+</td>
+<td>
+sRGB (or similar standard)
+</td>
+<td>
+Non-linear, 0.0−1.0 (or 0−255)
+</td>
+</tr>
+<tr>
+<td>
+Your Python/OIIO Script
+</td>
+<td>
+Normalization (OIIO)
+</td>
+<td>
+sRGB (or similar standard)
+</td>
+<td>
+Non-linear, 0.0−1.0
+</td>
+</tr>
+<tr>
+<td>
+Nuke Read Node Output
+</td>
+<td>
+Conversion to Linear
+</td>
+<td>
+Linear (Working Space)
+</td>
+<td>
+Linear, 0.0−1.0+
+</td>
+</tr>
+</table>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Conclusion for Your Workflow"><h4 id="Conclusion for Your Workflow" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Conclusion for Your Workflow">Conclusion for Your Workflow</a></h4></div>
+
+<p>
+The colorspace transformation means that the floating-point RGB values you extract from the raw files (which are in the sRGB/Rec. 709 gamma space) will NOT numerically match the pixel values you see in the Nuke Viewer or are used by Nuke nodes (which are in the linear space), except for pure black (0,0,0) and pure white (1,1,1).
+</p>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Recommended Solution: Use Linear Data for Clustering"><h4 id="Recommended Solution: Use Linear Data for Clustering" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Recommended Solution: Use Linear Data for Clustering">Recommended Solution: Use Linear Data for Clustering</a></h4></div>
+
+<p>
+For maximum accuracy and consistency with the Nuke scene, you should perform your K-Means clustering in linear color space.
+</p>
+
+<p>
+This means you need to modify your image loading/preprocessing to perform the same colorspace transformation that Nuke is doing:
+</p>
+<ul>
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Recommended Solution: Use Linear Data for Clustering-Read the File (OIIO)"></span><strong id="Read the File (OIIO)">Read the File (OIIO)</strong>: Get the non-linear pixel data in the 0.0−1.0 float range.
+
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Recommended Solution: Use Linear Data for Clustering-Linearize the Data"></span><strong id="Linearize the Data">Linearize the Data</strong>: Apply a colorspace conversion (usually the inverse of the sRGB or Rec. 709 transfer function, which is a power 2.2 or 2.4 function) to put the data into linear light.
+
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Recommended Solution: Use Linear Data for Clustering-Run K-Means"></span><strong id="Run K-Means">Run K-Means</strong>: Cluster the linear data.
+
+<li>
+<span id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-The Inaccuracy of Extracting Color Post-Read Node-Recommended Solution: Use Linear Data for Clustering-Output Colors"></span><strong id="Output Colors">Output Colors</strong>: The resulting cluster centers will be in the scene's linear working space, ready for direct use in Nuke.
+
+</ul>
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Code Adjustment for Linearization"><h3 id="Code Adjustment for Linearization" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Code Adjustment for Linearization">Code Adjustment for Linearization</a></h3></div>
+
+<p>
+If you are confident your image files are standard sRGB (which most PNGs and JPEGs are):
+</p>
+
+<pre python>
+def read_image_and_linearize(file_path):
+    # 1. Load Image using OIIO (assumes 0.0-1.0 non-linear data)
+    img_non_linear = read_image_with_oiio(file_path) 
+    
+    # 2. Linearize the data using the inverse sRGB EOTF (roughly a power 2.2 function)
+    # The simple power 2.2 is a good approximation for sRGB/Rec. 709:
+    # Value_Linear = Value_Non_Linear ^ 2.2
+    
+    # We apply the power function to only the color channels (R, G, B)
+    # np.power(img_non_linear, 2.2) is the standard approximation
+    img_linear = np.power(img_non_linear, 2.2) 
+    
+    return img_linear # The data is now in the Nuke working space
+    
+# In your main extraction function:
+# pixels = img_float_data.reshape((-1, 3))  &lt;-- CHANGE THIS
+img_linear_data = read_image_and_linearize(file_path)
+pixels = img_linear_data.reshape((-1, 3))
+</pre>
+
+<p>
+This approach ensures that your extracted dominant colors are numerically equivalent to the colors that Nuke is actually using for compositing, which is usually what you want.
+</p>
+
+<table>
+<tr>
+<td>
+Is there an alternative to using the conventional Python libraries? I don't have the facility to add Numpy to Nuke if that takes another install.
+</td>
+</tr>
+</table>
+
+<p>
+That's a very common constraint in production environments! 😫
+</p>
+
+<p>
+Yes, there is an alternative to using NumPy and scikit-learn's MiniBatchKMeans for K-Means clustering, but it will require writing the clustering logic yourself using only Nuke's native Python libraries and basic data structures.
+</p>
+
+<p>
+Since you can't install NumPy, you also won't be able to use the scipy.spatial or the numpy.power functions mentioned in the previous solutions.
+</p>
+
+<div id="Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Alternative: Pure Python K-Means Clustering"><h3 id="Alternative: Pure Python K-Means Clustering" class="header"><a href="#Reading Colors to JSON-Corrected Code Snippet using OpenCV (If Used)-Alternative: Pure Python K-Means Clustering">Alternative: Pure Python K-Means Clustering</a></h3></div>
+
+<p>
+You can implement a basic, unoptimized K-Means algorithm using only core Python libraries. This will be slower than the NumPy/scikit-learn version, but it is necessary if external libraries are forbidden.
+</p>
+
+<p>
+Here's how to adapt the logic to pure Python, including the dynamic K (Elbow Method) and the necessary colorspace conversions.
+</p>
+
+<div id="Reading Colors to JSON-Pure Python K-Means Function"><h2 id="Pure Python K-Means Function" class="header"><a href="#Reading Colors to JSON-Pure Python K-Means Function">Pure Python K-Means Function</a></h2></div>
+
+<p>
+This function replaces the MiniBatchKMeans from scikit-learn.
+</p>
+
+<pre python>
+import random
+
+def pure_python_kmeans(pixels, k, max_iterations=30):
+    """
+    Basic K-Means implementation using pure Python lists.
+    
+    Args:
+        pixels (list of lists): The input pixel data [[R, G, B], ...].
+        k (int): The number of clusters (colors).
+        max_iterations (int): Maximum loops to run before stopping.
+        
+    Returns:
+        list of lists: The final cluster centers [[R, G, B], ...].
+    """
+    if not pixels or len(pixels) &lt; k:
+        return []
+
+    # 1. Initialize K centroids randomly
+    centroids = random.sample(pixels, k)
+    
+    for i in range(max_iterations):
+        # 2. Assignment Step: Create K empty lists for the clusters
+        clusters = [[] for _ in range(k)]
+        
+        # Calculate Euclidean distance (squared distance for speed)
+        for pixel in pixels:
+            distances = []
+            for centroid in centroids:
+                # Euclidean distance squared: (R2-R1)^2 + (G2-G1)^2 + (B2-B1)^2
+                dist_sq = sum([(p - c)**2 for p, c in zip(pixel, centroid)])
+                distances.append(dist_sq)
+            
+            # Find the index of the closest centroid
+            closest_index = distances.index(min(distances))
+            clusters[closest_index].append(pixel)
+            
+        # 3. Update Step: Calculate new centroids
+        new_centroids = []
+        is_converged = True
+        
+        for j, cluster in enumerate(clusters):
+            if cluster:
+                # Calculate the mean of the cluster (the new centroid)
+                # Sum the R, G, B components, then divide by the cluster size
+                sum_rgb = [sum(dim) for dim in zip(*cluster)]
+                new_centroid = [s / len(cluster) for s in sum_rgb]
+                
+                # Check for convergence (simplified: if any centroid moves significantly)
+                # The minimum change threshold is set very low to be robust
+                if sum([(p - c)**2 for p, c in zip(new_centroid, centroids[j])]) &gt; 1e-4:
+                    is_converged = False
+                    
+                new_centroids.append(new_centroid)
+            else:
+                # Handle empty cluster: re-initialize it randomly
+                new_centroids.append(random.choice(pixels))
+                
+        centroids = new_centroids
+        if is_converged:
+            break
+            
+    return centroids
+
+# Note: The 'distortion' required for the Elbow Method is the sum of all 'dist_sq' values.
+</pre>
+
+<div id="Reading Colors to JSON-Pure Python K-Means Function-Replacing the Elbow Method (Pure Python)"><h3 id="Replacing the Elbow Method (Pure Python)" class="header"><a href="#Reading Colors to JSON-Pure Python K-Means Function-Replacing the Elbow Method (Pure Python)">Replacing the Elbow Method (Pure Python)</a></h3></div>
+
+<p>
+Calculating the full Elbow Method in pure Python for a large number of frames would be very slow. Since you know the number of colors is low, you can use a fast heuristic instead of a full cluster analysis:
+</p>
+
+<div id="Reading Colors to JSON-Pure Python K-Means Function-Replacing the Elbow Method (Pure Python)-Heuristic Alternative: Fixed K-range and a Simple Threshold"><h4 id="Heuristic Alternative: Fixed K-range and a Simple Threshold" class="header"><a href="#Reading Colors to JSON-Pure Python K-Means Function-Replacing the Elbow Method (Pure Python)-Heuristic Alternative: Fixed K-range and a Simple Threshold">Heuristic Alternative: Fixed K-range and a Simple Threshold</a></h4></div>
+
+<p>
+Instead of relying on the mathematical "elbow," you could define a narrow, reasonable search range (e.g., K=10 to K=30) and simply check a few common K values, perhaps picking the one that provides a high-enough compression ratio or the one that minimizes the distortion per pixel most effectively.
+</p>
+
+<p>
+A simpler approach for production is to pre-set a maximum K value (e.g., K=30) and rely on the fact that K-Means will naturally group similar colors even if you request more clusters than strictly necessary.
+</p>
+<ul>
+<li>
+<span id="Reading Colors to JSON-Pure Python K-Means Function-Replacing the Elbow Method (Pure Python)-Heuristic Alternative: Fixed K-range and a Simple Threshold-Recommendation"></span><strong id="Recommendation">Recommendation</strong>: If performance is critical, use a fixed, slightly generous K (like K=30) and skip the dynamic Elbow Method entirely.
+
+</ul>
+<div id="Reading Colors to JSON-Pure Python K-Means Function-Pure Python Colorspace and JSON Handling"><h3 id="Pure Python Colorspace and JSON Handling" class="header"><a href="#Reading Colors to JSON-Pure Python K-Means Function-Pure Python Colorspace and JSON Handling">Pure Python Colorspace and JSON Handling</a></h3></div>
+
+<p>
+You will replace NumPy's methods with pure Python math.
+</p>
+
+<pre python>
+# Assuming you have the linear RGB color list from pure_python_kmeans
+linear_rgb = [0.88, 0.35, 0.35]
+
+# --- 1. Linear-to-Display Conversion (Replacing numpy.power) ---
+# Goal: Value_Display = Value_Linear ^ (1.0 / 2.2)
+
+# Using the built-in pow() function for the gamma correction
+gamma = 1.0 / 2.2 
+
+display_rgb = []
+for val in linear_rgb:
+    # Use max(0, val) for safety, as pow() on a negative linear value is undefined
+    display_val = pow(max(0, val), gamma)
+    
+    # Clip to 0.0 - 1.0, as node colors don't support HDR
+    clipped_val = min(1.0, max(0.0, display_val))
+    display_rgb.append(clipped_val)
+    
+# display_rgb is now ready to be packed into the tile_color integer
+
+# --- 2. JSON Handling ---
+# The standard Python 'json' library is almost always available in Nuke's environment
+# You'd use the 'json' module to load and parse the data exactly as previously shown:
+# extracted_colors = json.loads(json_string) 
+</pre>
+
+<div id="Reading Colors to JSON-Pure Python K-Means Function-Summary of Changes:"><h3 id="Summary of Changes:" class="header"><a href="#Reading Colors to JSON-Pure Python K-Means Function-Summary of Changes:">Summary of Changes:</a></h3></div>
+
+<table>
+<tr>
+<td>
+Functionality
+</td>
+<td>
+Standard Python (Nuke's Environment)
+</td>
+<td>
+Conventional Python
+</td>
+</tr>
+<tr>
+<td>
+Clustering
+</td>
+<td>
+Custom pure_python_kmeans function
+</td>
+<td>
+sklearn.cluster.MiniBatchKMeans
+</td>
+</tr>
+<tr>
+<td>
+Math/Vectors
+</td>
+<td>
+zip, List comprehensions, sum, pow()
+</td>
+<td>
+numpy (arrays and functions)
+</td>
+</tr>
+<tr>
+<td>
+Elbow Method
+</td>
+<td>
+Pre-set K (e.g., K=30) or custom, slow logic
+</td>
+<td>
+scipy.spatial.distance.cdist (Inertia)
+</td>
+</tr>
+</table>
+
+<p>
+|Sorry, I don't think I communicated my question well enough. Your answer is very useful however! I think I can use this information.
+The better framed question would be, can I implement the colorspace conversion from the JSON color sets and Nuke's Node Graph colors without an additional library in Nuke's standard Python libraries?|
+</p>
+
+<p>
+I apologize for misinterpreting the initial constraint. Your question is perfectly clear now: Can you perform the color space conversion (linear to display) within Nuke's Python environment without using an external library like NumPy?
+</p>
+
+<p>
+The answer is Yes, absolutely. You can use the built-in math module and core Python functions to achieve the same result as NumPy for the sRGB linearization inverse (the View Transform).
+</p>
+
+<div id="Reading Colors to JSON-Pure Python K-Means Function-Pure Python Colorspace Conversion"><h3 id="Pure Python Colorspace Conversion" class="header"><a href="#Reading Colors to JSON-Pure Python K-Means Function-Pure Python Colorspace Conversion">Pure Python Colorspace Conversion</a></h3></div>
+
+<p>
+The required conversion is the simple power function:
+</p>
+
+<pre>
+Value Display=Value Linear 1/2.2 ​	
+</pre>
+ 
+<p>
+You can use Python's built-in math.pow() function for this calculation, which is included in Nuke's standard Python installation and requires no external packages.
+</p>
+
+<pre python>
+import nuke
+import math
+import json
+# You would also need the pure_python_kmeans function if extracting colors within Nuke
+
+def convert_linear_to_display_color(linear_rgb_list):
+    """
+    Converts a linear [R, G, B] color (0.0-1.0+) to a display-ready 
+    [R, G, B] color (0.0-1.0) using the sRGB/Rec. 709 gamma (1/2.2).
+    
+    Args:
+        linear_rgb_list (list): A list of three floats representing the linear RGB values.
+        
+    Returns:
+        list: A list of three floats representing the display-ready RGB values.
+    """
+    
+    # Reciprocal of 2.2 (the gamma value)
+    gamma_correction = 1.0 / 2.2 
+    
+    display_rgb = []
+    
+    for val in linear_rgb_list:
+        # Nuke nodes don't support HDR, so we must clamp positive values.
+        # We also ensure the base of pow() is non-negative.
+        clamped_linear_val = max(0.0, val)
+        
+        # Apply the power function
+        display_val = math.pow(clamped_linear_val, gamma_correction)
+        
+        # Clip the result to 0.0 - 1.0 for the 8-bit color space used by tile_color
+        clipped_display_val = min(1.0, display_val)
+        
+        display_rgb.append(clipped_display_val)
+        
+    return display_rgb
+
+def float_to_packed_int(r, g, b, a=1.0):
+    """Packs float RGB values (0.0-1.0) into Nuke's single tile_color integer."""
+    r_int = int(r * 255)
+    g_int = int(g * 255)
+    b_int = int(b * 255)
+    a_int = int(a * 255)
+    
+    # Nuke uses the format 0xAABBGGRR (little-endian)
+    return (a_int &lt;&lt; 24) + (b_int &lt;&lt; 16) + (g_int &lt;&lt; 8) + r_int
+
+# --- Example Usage in Nuke ---
+# This is a linear red that looks dark and washed out if used directly
+linear_red = [0.8, 0.1, 0.1] 
+
+# Convert to the color that visually matches the Nuke Viewer
+display_red = convert_linear_to_display_color(linear_red) 
+
+# Pack the color for the node property
+r, g, b = display_red[0], display_red[1], display_red[2]
+packed_color = float_to_packed_int(r, g, b)
+
+# node = nuke.selectedNode() 
+# node['tile_color'].setValue(packed_color)
+</pre>
+
+<div id="Reading Colors to JSON-Pure Python K-Means Function-Using Nuke's Native Color Functions (Advanced)"><h3 id="Using Nuke's Native Color Functions (Advanced)" class="header"><a href="#Reading Colors to JSON-Pure Python K-Means Function-Using Nuke's Native Color Functions (Advanced)">Using Nuke's Native Color Functions (Advanced)</a></h3></div>
+
+<p>
+If you need a more robust, OCIO-aware solution—one that respects Nuke's actual project settings (which may not be a simple power 2.2)—you can use Nuke's internal color conversion functions. This is the most accurate way to match the Nuke Viewer, as it utilizes the exact Viewer Process configuration.
+</p>
+
+<p>
+The function you would use is nuke.to and nuke.from:
+</p>
+
+<pre python>
+# WARNING: This method is highly accurate but slightly more complex.
+# The 'to' and 'from' commands are primarily used for getting/setting metadata,
+# but can be adapted for color conversion if needed, though the simple 
+# math.pow() is usually sufficient for tile_color.
+
+# For simplicity and performance, stick to the math.pow() method above 
+# unless your pipeline uses a custom view transform that deviates significantly from sRGB.
+</pre>
+
+<p>
+<span id="Reading Colors to JSON-Pure Python K-Means Function-Using Nuke's Native Color Functions (Advanced)-Conclusion"></span><strong id="Conclusion">Conclusion</strong>: Stick with the math.pow() approach for setting node colors. It's clean, fast, accurate enough for the visual purpose of node coloring, and relies only on the Python modules guaranteed to be available in Nuke.
+</p>
+
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
+
 
 <p>
 <a href="index.html">Index</a>
