@@ -1904,6 +1904,381 @@ def apply_colors_to_selected_read_node():
             nuke.critical(f"Failed to apply color to {node.name()}: {e}")
 </pre>
 
+<div id="Reading Colors to JSON-QUESTION"><h2 id="QUESTION" class="header"><a href="#Reading Colors to JSON-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+How much faster than the regular looped 'sample' method would the K-Means method be (using the standard Nuke Python library modules)?
+</td>
+</tr>
+</table>
+
+<p>
+That's a great question about performance! However, there's a misunderstanding of how the two methods relate in the context of the script provided.
+</p>
+
+<p>
+The K-Means method is not an alternative to the pixel sampling method; it's a process that requires the pixel sampling method.
+</p>
+
+<p>
+Therefore, the K-Means process will be significantly slower than simply sampling pixels, as it involves a complex mathematical clustering calculation on top of the pixel extraction time.
+</p>
+
+<div id="Reading Colors to JSON-QUESTION-Comparison of Processing Time"><h3 id="Comparison of Processing Time" class="header"><a href="#Reading Colors to JSON-QUESTION-Comparison of Processing Time">Comparison of Processing Time</a></h3></div>
+
+<p>
+Here's a breakdown of the time complexity for the two processes:
+</p>
+
+<table>
+<tr>
+<td>
+Process
+</td>
+<td>
+Core Operation
+</td>
+<td>
+Purpose
+</td>
+<td>
+Time Complexity (Relative)
+</td>
+</tr>
+<tr>
+<td>
+1. Sampling Pixels
+</td>
+<td>
+crop.sample() / Looping
+</td>
+<td>
+Reads all N pixels from a frame into memory.
+</td>
+<td>
+Baseline (Requires O(N) time)
+</td>
+</tr>
+<tr>
+<td>
+2. K-Means Clustering
+</td>
+<td>
+Iterative centroid calculation
+</td>
+<td>
+Compresses the N pixels into K dominant colors.
+</td>
+<td>
+Much Slower (Requires ≈O(T⋅N⋅K) time)
+</td>
+</tr>
+</table>
+
+<p>
+Where:
+</p>
+<ul>
+<li>
+N is the total number of pixels (Width × Height).
+
+<li>
+K is the number of clusters (e.g., 30).
+
+<li>
+T is the number of iterations (e.g., 50).
+
+</ul>
+<div id="Reading Colors to JSON-QUESTION-The Bottleneck: Pixel Extraction"><h3 id="The Bottleneck: Pixel Extraction" class="header"><a href="#Reading Colors to JSON-QUESTION-The Bottleneck: Pixel Extraction">The Bottleneck: Pixel Extraction</a></h3></div>
+
+<p>
+The operation crop.sample() is the fundamental I/O and processing step for getting pixel data from the Nuke graph into Python memory. Both the regular looped sample (if you were just logging every pixel) and the K-Means method must perform this step.
+</p>
+
+<p>
+In the provided script:
+</p>
+
+<ul>
+<li>
+get_linear_pixels_from_node() calls crop.sample() and converts the data structure. This is O(N).
+
+<li>
+pure_python_kmeans() then processes this list of N pixels. This is the slowest part of the entire analysis, at about O(T⋅N⋅K).
+
+</ul>
+<div id="Reading Colors to JSON-QUESTION-The Bottleneck: Pixel Extraction-Conclusion on Speed"><h4 id="Conclusion on Speed" class="header"><a href="#Reading Colors to JSON-QUESTION-The Bottleneck: Pixel Extraction-Conclusion on Speed">Conclusion on Speed</a></h4></div>
+
+<p>
+If you are comparing:
+</p>
+<ul>
+<li>
+A basic loop to read and discard all pixels (e.g., just to prove you can access them)
+
+<li>
+The full K-Means extraction process (reading pixels + clustering)
+
+</ul>
+<p>
+The K-Means process will be orders of magnitude slower because it performs complex iterative math (T iterations, checking N points against K centers) on the very large list of N pixels extracted from the node.
+</p>
+
+<p>
+Using pure Python (without NumPy/SciPy/Scikit-learn) makes the K-Means calculation even slower than it would be in a fully optimized environment, as the math must be done iteratively on lists instead of vectorized operations on arrays.
+</p>
+
+<p>
+The purpose of K-Means is data reduction (finding the average color), not speed. The speed gain comes later, where you store a small JSON file per frame, saving you from having to run this slow analysis ever again.
+</p>
+
+<div id="Reading Colors to JSON-QUESTION"><h2 id="QUESTION" class="header"><a href="#Reading Colors to JSON-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+Then can you suggest an alternative script (but much the same functionality) where we look through image pixels sequentially, and store the found colors? I would think that skipping pixels (every other pixel or every fourth pixel) would suffice to find all colors in an image sequence (as found in a selected Read Node).
+</td>
+</tr>
+</table>
+
+<p>
+That's an excellent approach to drastically improve performance while still gathering color information! You are moving from a complex, iterative clustering method (K-Means) to a fast sampling/histogramming method.
+</p>
+
+<p>
+The core change will be replacing the slow, iterative pure_python_kmeans function with a much faster Sequential Sampling routine that uses a simple data structure to aggregate unique colors (or near-unique colors).
+</p>
+
+<p>
+Here is the alternative script incorporating:
+</p>
+<ul>
+<li>
+<span id="Reading Colors to JSON-QUESTION-Sequential Pixel Sampling"></span><strong id="Sequential Pixel Sampling">Sequential Pixel Sampling</strong>: Looping through pixels with a stride (e.g., skipping every 4 
+
+</ul>
+<p>
+th pixel) to reduce N.
+</p>
+<ul>
+<li>
+<span id="Reading Colors to JSON-QUESTION-Color Aggregation (Quantization)"></span><strong id="Color Aggregation (Quantization)">Color Aggregation (Quantization)</strong>: To prevent the script from storing millions of slightly different float values, we'll implement a simple form of color quantization (rounding) to group near-identical colors.
+
+<li>
+<span id="Reading Colors to JSON-QUESTION-Frequency Analysis"></span><strong id="Frequency Analysis">Frequency Analysis</strong>: The final colors will be sorted by frequency (how many times they were sampled) to identify the "dominant" color, similar to what K-Means provides.
+
+</ul>
+<p>
+This completely eliminates the O(T⋅N⋅K) complexity of K-Means.
+</p>
+
+<div id="Reading Colors to JSON-QUESTION-Alternative Pure Python Script: Sequential Sampling &amp; Quantization"><h3 id="Alternative Pure Python Script: Sequential Sampling &amp; Quantization" class="header"><a href="#Reading Colors to JSON-QUESTION-Alternative Pure Python Script: Sequential Sampling &amp; Quantization">Alternative Pure Python Script: Sequential Sampling &amp; Quantization</a></h3></div>
+
+<p>
+This script uses the same Nuke API functions for pixel extraction and colorspace conversion, but replaces the K-Means logic with a much faster sampling and counting method.
+</p>
+
+<pre python>
+import nuke
+import math
+import random
+import json
+import os
+import glob
+from collections import defaultdict, Counter # Counter is great for frequency analysis
+
+# --- CORE 1: COLOR SAMPLING &amp; QUANTIZATION ---
+
+# Define the quantization level: 
+# This determines how close two float colors must be to be counted as the same.
+# Higher value = fewer unique colors found (faster, but less accurate for subtle colors).
+# A power of 10 is usually a good choice, e.g., 100 rounds to 2 decimal places.
+QUANTIZE_FACTOR = 1000
+
+def sample_and_aggregate_colors(linear_pixels, pixel_stride=4, color_quantization_factor=QUANTIZE_FACTOR):
+    """
+    Sequentially samples pixels, quantizes the linear RGB values, and counts their frequency.
+    
+    Args:
+        linear_pixels (list of lists): The input linear pixel data [[R, G, B], ...].
+        pixel_stride (int): Samples every Nth pixel (e.g., 4 = samples 1/4 of pixels).
+        color_quantization_factor (int): Multiplier used for rounding float colors to integers.
+        
+    Returns:
+        list of lists: Dominant linear colors, sorted by frequency (most frequent first).
+    """
+    pixel_count = len(linear_pixels)
+    if pixel_count == 0:
+        return [[0.0, 0.0, 0.0]]
+
+    quantized_colors = []
+    
+    # 1. Sample Pixels and Quantize
+    for i in range(0, pixel_count, pixel_stride):
+        r, g, b = linear_pixels[i]
+        
+        # Quantization: Multiply by a factor, round to integer, convert to a hashable tuple
+        q_r = int(round(r * color_quantization_factor))
+        q_g = int(round(g * color_quantization_factor))
+        q_b = int(round(b * color_quantization_factor))
+        
+        quantized_colors.append((q_r, q_g, q_b))
+        
+    # 2. Count Frequencies and Sort
+    # Counter is highly optimized for this.
+    color_frequencies = Counter(quantized_colors)
+    
+    # Sort by frequency (the count, which is the second item in the tuple) in descending order
+    sorted_frequencies = color_frequencies.most_common() 
+    
+    # 3. De-quantize back to linear float RGB and return
+    dominant_colors_linear = []
+    for (q_r, q_g, q_b), count in sorted_frequencies:
+        # Divide by the factor to get the float color back
+        linear_r = q_r / color_quantization_factor
+        linear_g = q_g / color_quantization_factor
+        linear_b = q_b / color_quantization_factor
+        
+        dominant_colors_linear.append([linear_r, linear_g, linear_b])
+
+    # Return only the top 'k' colors (e.g., first 30) for a consistent JSON output
+    # We use a fixed limit (e.g., 30) for consistency with the K-Means script's JSON format.
+    # The first element [0] is always the single most dominant color.
+    return dominant_colors_linear[:30]
+
+
+# --- CORE 2 &amp; 3: NUKE API / I/O FUNCTIONS (Mostly Unchanged) ---
+
+def get_linear_pixels_from_node(read_node, frame):
+    """Reads ALL linear pixel data directly from a Nuke node (OIIO replacement)."""
+    # This function is unchanged from the OIIO-free script
+    crop = nuke.nodes.Crop(inputs=[read_node], postage_stamp=False)
+    crop['box'].setValue([0, 0, read_node.width(), read_node.height()])
+    
+    pixels = []
+    width = read_node.width()
+    height = read_node.height()
+    
+    try:
+        data = crop.sample('red', 0, 0, width, height, frame=frame)
+        data += crop.sample('green', 0, 0, width, height, frame=frame)
+        data += crop.sample('blue', 0, 0, width, height, frame=frame)
+        
+        num_pixels = width * height
+        
+        for i in range(num_pixels):
+            r = data[i]
+            g = data[i + num_pixels]
+            b = data[i + 2 * num_pixels]
+            pixels.append([r, g, b])
+            
+    finally:
+        nuke.delete(crop)
+        
+    return pixels
+
+def get_sequence_info(read_node):
+    # This function is unchanged
+    file_path_full = read_node['file'].value()
+    # ... [rest of get_sequence_info implementation] ...
+    # (Leaving the rest of the implementation short for brevity)
+    
+    if '%' in file_path_full:
+        dir_path = os.path.dirname(file_path_full)
+        base_name_pattern = os.path.basename(file_path_full)
+        json_file_name = base_name_pattern.split('.')[0] + ".json"
+        start = int(read_node['first'].value())
+        end = int(read_node['last'].value())
+        frame_list = range(start, end + 1)
+    else:
+        dir_path = os.path.dirname(file_path_full)
+        base_name = os.path.basename(file_path_full)
+        json_file_name = os.path.splitext(base_name)[0] + ".json"
+        frame_list = [int(nuke.root()['first_frame'].value())]
+
+    json_path = os.path.join(dir_path, json_file_name)
+    return frame_list, dir_path, json_path
+
+
+# -------------------------------------------------------------
+# FUNCTION 1: EXPORT COLORS FROM SELECTED READ NODES
+# -------------------------------------------------------------
+
+def export_colors_from_selected_read_nodes(pixel_stride=16):
+    """
+    Reads selected Read nodes, extracts dominant linear colors using sampling,
+    and exports a JSON file.
+    """
+    selected_nodes = nuke.selectedNodes('Read')
+    if not selected_nodes:
+        nuke.message("Please select one or more Read nodes.")
+        return
+
+    for node in selected_nodes:
+        frame_list, dir_path, json_path = get_sequence_info(node)
+        all_dominant_colors = {}
+        
+        if not frame_list:
+            nuke.warning(f"Skipping {node.name()}: Invalid frame range.")
+            continue
+
+        nuke.message(f"Processing {len(frame_list)} frames for {node.name()} with stride {pixel_stride}...")
+
+        original_frame = nuke.frame() 
+        
+        for frame in frame_list:
+            nuke.frame(frame)
+            try:
+                # 1. Get ALL Linear Pixel Data from Nuke API
+                linear_pixels = get_linear_pixels_from_node(node, frame)
+                
+                # 2. Sample, Quantize, and Aggregate Dominant Colors
+                # Note: We now use the pixel_stride here. For a 4K image (8 million pixels), 
+                # a stride of 16 reduces the aggregated list size to 500,000 pixels.
+                dominant_colors_linear = sample_and_aggregate_colors(linear_pixels, pixel_stride=pixel_stride)
+                
+                # 3. Store Results (as linear floats)
+                all_dominant_colors[str(frame)] = dominant_colors_linear
+
+            except Exception as e:
+                nuke.warning(f"Error processing frame {frame} for {node.name()}: {e}")
+                continue
+        
+        nuke.frame(original_frame)
+                
+        # 4. Save JSON file to disk
+        try:
+            with open(json_path, 'w') as f:
+                json.dump(all_dominant_colors, f, indent=4)
+            nuke.message(f"Successfully exported {len(dominant_colors_linear)} dominant linear colors per frame to:\n{json_path}")
+        except Exception as e:
+            nuke.critical(f"Failed to save JSON file at {json_path}: {e}")
+</pre>
+
+<div id="Reading Colors to JSON-QUESTION-Performance Analysis"><h3 id="Performance Analysis" class="header"><a href="#Reading Colors to JSON-QUESTION-Performance Analysis">Performance Analysis</a></h3></div>
+
+<p>
+This new method is dramatically faster than the K-Means approach because:
+</p>
+
+<ul>
+<li>
+Elimination of Iteration: We're no longer looping 50 times to refine centroids. We just do one pass.
+
+<li>
+Reduction of Data N: The pixel_stride parameter (e.g., set to 16 in the example) directly cuts the number of items being processed and counted by a factor of 16.
+
+<li>
+Optimization with Counter: The collections.Counter module is a highly optimized C implementation in Python, making the counting step extremely fast compared to manual list manipulation.
+
+</ul>
+<p>
+The main time spent is now in get_linear_pixels_from_node() (Nuke's I/O) and the single loop inside sample_and_aggregate_colors(). This is the best performance you can achieve without stepping outside the standard Nuke Python environment.
+</p>
+
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
