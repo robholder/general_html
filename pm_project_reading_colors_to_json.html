@@ -2489,6 +2489,140 @@ If your "flat" colors have minor variations due to image processing (e.g., one p
 Recommendation: Stick with a high but reasonable factor like 1000 or 10000 to ensure you capture the discrete, intended colors. You can then also increase the pixel_stride (e.g., from 16 to 32 or 64) for even greater speed, as the colors are guaranteed to be consistent across large areas.
 </p>
 
+<div id="Reading Colors to JSON-QUESTION"><h2 id="QUESTION" class="header"><a href="#Reading Colors to JSON-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+Would adding an artificially hight count limit here help catch a user error where a regular image is accidentally analyzed? Maybe 200 to allow for exceptional cases?
+</td>
+</tr>
+</table>
+
+<p>
+That's an excellent idea for robustness and error detection. Since you know your images should contain at most ≈50 unique colors, setting a hard upper limit, such as 200, provides a critical safety check without unduly restricting your clean, flat-colored footage.
+</p>
+
+<p>
+I absolutely recommend adding this limit.
+</p>
+
+<div id="Reading Colors to JSON-QUESTION-Recommended Script Adjustment"><h3 id="Recommended Script Adjustment" class="header"><a href="#Reading Colors to JSON-QUESTION-Recommended Script Adjustment">Recommended Script Adjustment</a></h3></div>
+
+<p>
+You should modify the sample_and_aggregate_colors function to accept an optional max_colors argument and apply the slice at the end. A limit of 200 is generous enough to handle a highly noisy "flat" plate but restrictive enough to prevent analyzing a full 16.7 million-color image that was accidentally dragged into the graph.
+</p>
+
+<p>
+Here is the modified function with the added safeguard:
+</p>
+
+<p>
+{{python
+</p>
+<ul>
+<li>
+Define a robust limit for safety check
+
+</ul>
+<p>
+SAFEGUARD_COLOR_LIMIT = 200
+</p>
+
+<p>
+def sample_and_aggregate_colors(linear_pixels, pixel_stride=16, color_quantization_factor=1000, max_colors=SAFEGUARD_COLOR_LIMIT):
+</p>
+<pre><code>"""
+Sequentially samples pixels, quantizes the linear RGB values, counts frequency,
+and includes a safeguard against analyzing standard, highly-varied images.
+"""
+pixel_count = len(linear_pixels)
+if pixel_count == 0:
+return <a href="0.0, 0.0, 0.0.html">0.0, 0.0, 0.0</a>
+</code></pre>
+<pre><code>quantized_colors = []
+</pre></code>
+<ul>
+<li>
+1. Sample Pixels and Quantize
+    for i in range(0, pixel_count, pixel_stride):
+<pre><code>r, g, b = linear_pixels[i]
+
+# Quantization: Multiply by a factor, round to integer, convert to a hashable tuple
+q_r = int(round(r * color_quantization_factor))
+q_g = int(round(g * color_quantization_factor))
+q_b = int(round(b * color_quantization_factor))
+
+quantized_colors.append((q_r, q_g, q_b))
+
+# 2. Count Frequencies and Sort
+color_frequencies = Counter(quantized_colors)
+sorted_frequencies = color_frequencies.most_common() 
+
+# 3. De-quantize back to linear float RGB
+dominant_colors_linear = []
+for (q_r, q_g, q_b), count in sorted_frequencies:
+# Divide by the factor to get the float color back
+linear_r = q_r / color_quantization_factor
+linear_g = q_g / color_quantization_factor
+linear_b = q_b / color_quantization_factor
+
+dominant_colors_linear.append([linear_r, linear_g, linear_b])
+</code></pre>
+# 4. SAFETY CHECK AND LIMITATION:
+# This limits the output to prevent massive JSON files if a user runs the script
+# on a photographic image (which might yield thousands of unique, quantized colors).
+if len(dominant_colors_linear) &gt; max_colors:
+nuke.warning(f"Warning: Image contained {len(dominant_colors_linear)} unique colors. Limiting export to the top {max_colors} colors to prevent excessively large data files.")
+
+return dominant_colors_linear[:max_colors]
+
+</ul>
+</code></pre>
+<p>
+}}}    
+</p>
+
+<div id="Reading Colors to JSON-QUESTION-Benefits of the max_colors=200 Safeguard"><h3 id="Benefits of the max_colors=200 Safeguard" class="header"><a href="#Reading Colors to JSON-QUESTION-Benefits of the max_colors=200 Safeguard">Benefits of the max_colors=200 Safeguard</a></h3></div>
+
+<table>
+<tr>
+<td>
+Benefit
+</td>
+<td>
+Explanation
+</td>
+</tr>
+<tr>
+<td>
+Error Prevention
+</td>
+<td>
+If a complex, photographic image is used, the brute-force method can still generate thousands of unique, quantized colors, leading to a huge JSON file and a very slow export. Limiting it to 200 prevents this file size bloat.
+</td>
+</tr>
+<tr>
+<td>
+User Feedback
+</td>
+<td>
+The added nuke.warning provides immediate feedback that the source footage does not conform to the expected "flat color" template.
+</td>
+</tr>
+<tr>
+<td>
+Guaranteed Structure
+</td>
+<td>
+The downstream function apply_colors_to_selected_read_node is guaranteed to be working with a predictable, finite data structure, enhancing stability.
+</td>
+</tr>
+</table>
+
+<p>
+Setting the limit to 200 is a perfect compromise: it's well above your expected 50 colors, but far below the thousands you'd get from a regular production image.
+</p>
 
 <p>
 <a href="pmount_index.html">PMount</a>
