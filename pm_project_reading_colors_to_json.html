@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pm_project_reading_colors_to_json</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+
+<p>
+I want to get a list of common colors in a sequence of images. I'm bringing in sequences of images with around 30 colors per sequence (they are comic book style). I want to make a json list of RGB colors. I can do this in Nuke using the 'sample' method in Python, but it's slow. Can I use some other tool (inside or outside Nuke) to achieve this more efficiently and faster. For example I've heard the 'Open Image IO' may be faster. I'm open to any ideas.
+The slow performance of Nuke's Python sample method is a common issue because it incurs overhead from the Nuke evaluation engine. To achieve this more efficiently and faster, you should move the image processing outside of the Nuke Python API and use high-performance, dedicated Python libraries.
+</p>
+
+<p>
+The best approach for finding a limited set of dominant colors is to use a Machine Learning/Statistical Clustering method, specifically K-Means Clustering, which is highly optimized in popular scientific libraries.
+</p>
+
+<p>
+Here is the most efficient solution, combining fast I/O and statistical processing:
+</p>
+
+<p>
+Recommended Solution: External Python with NumPy + Scikit-learn
+This method is significantly faster because it uses optimized C/C++ backend libraries (like NumPy) for file reading and computation, bypassing Nuke's slower internal Python wrappers.
+</p>
+
+<ol>
+<li>
+The Strategy: K-Means Clustering
+
+</ol>
+<p>
+Since your images are "comic book style" with a naturally limited number of distinct colors (around 30), K-Means Clustering is the ideal algorithm.
+</p>
+
+<p>
+How it works: It groups all the pixels in an image into K clusters (where K is the number of colors you expect, e.g., K=30). The center of each cluster (centroid) is one of your dominant colors.
+</p>
+
+<p>
+Speed: Libraries like Scikit-learn or OpenCV implement K-Means using highly optimized algorithms that can process millions of pixels quickly.
+</p>
+
+<ol>
+<li>
+The Tools
+
+</ol>
+<p>
+Tool	Purpose	Why it's Fast
+NumPy	High-performance, low-level array manipulation.	Core of Python scientific computing, operates on pre-compiled C/C++ code.
+OpenCV (cv2) or PIL/Pillow	Fast image loading and pixel access.	Optimized for reading and writing large image data efficiently.
+Scikit-learn (sklearn)	Implements the fast K-Means Clustering algorithm.	Excellent, robust, and fast statistical library.
+OpenImageIO (OIIO)	Optional. The Python bindings are great for VFX file formats (EXR, TIFF, etc.), offering fast, consistent I/O, as you suspected.	Specifically designed for high-performance reading of image sequences in a production pipeline.
+Python Code Example (K-Means)
+This script iterates through your sequence, processes each frame for K=30 colors, and aggregates the results.
+</p>
+
+<p>
+Python
+import numpy as np
+import cv2  # You could use Pillow or OIIO instead of OpenCV
+from sklearn.cluster import MiniBatchKMeans
+import json
+import glob
+import os
+</p>
+
+<p>
+def extract_dominant_colors_sequence(sequence_path, num_colors=30, frames=None):
+</p>
+<pre><code>"""
+Extracts the dominant RGB colors from a sequence of images using MiniBatchKMeans.
+
+Args:
+sequence_path (str): File path pattern (e.g., '/path/to/img.%04d.exr').
+num_colors (int): The target number of dominant colors (K).
+frames (list): Optional list of frame numbers to process (e.g., [1, 10, 20]).
+
+Returns:
+dict: A dictionary mapping frame numbers to a list of RGB color lists.
+"""
+
+all_dominant_colors = {}
+
+if not frames:
+</pre></code>
+<ul>
+<li>
+Simple glob to find all files if frame list isn't provided
+
+<li>
+NOTE: This part needs careful handling for frame number parsing if not using Nuke's native Read node features
+        print("Warning: Processing a basic file glob. Consider using OIIO for robust sequence handling.")
+        file_list = sorted(glob.glob(sequence_path.replace('%04d', '*')))
+
+</ul>
+<pre><code>
+</pre></code>
+<ul>
+<li>
+Simple frame number extraction for file_list:
+        frame_list = [os.path.basename(f).split('.')[1] for f in file_list]
+        file_frame_pairs = zip(file_list, frame_list)
+
+</ul>
+<pre><code>
+else:
+</pre></code>
+<ul>
+<li>
+Use nuke.frame() functionality replacement for a range of frames
+        def get_frame_path(frame_num):
+
+<ul>
+<li>
+Assumes the sequence path uses Nuke-style padding (e.g., %04d)
+            return sequence_path % frame_num
+
+</ul>
+</ul>
+<pre><code>
+file_frame_pairs = [(get_frame_path(f), str(f)) for f in frames]
+</code></pre>
+<pre><code>for file_path, frame_num_str in file_frame_pairs:
+try:
+</pre></code>
+<ul>
+<li>
+1. Load Image (using OpenCV for speed)
+
+<li>
+flag=1 loads as BGR (color), flag=-1 loads all channels including alpha
+            img = cv2.imread(file_path)
+            if img is None:
+<pre><code>print(f"Skipping frame {frame_num_str}: Could not load image.")
+continue
+</code></pre>
+# Convert BGR (OpenCV default) to RGB
+img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+# 2. Reshape and Normalize Pixel Data
+# Reshape the image array to a list of pixels (N rows, 3 columns for R, G, B)
+pixels = img.reshape((-1, 3))
+pixels = np.float32(pixels)
+</code></pre>
+# 3. Apply K-Means Clustering (using MiniBatchKMeans for even more speed)
+# This finds 'num_colors' representative colors
+kmeans = MiniBatchKMeans(n_clusters=num_colors, n_init='auto', random_state=42)
+kmeans.fit(pixels)
+
+# The cluster centers are the dominant colors
+dominant_colors = kmeans.cluster_centers_
+</code></pre>
+# 4. Format Output: Convert float RGB (0-255) to integer list
+# The result is a list of [R, G, B] lists
+color_list = dominant_colors.astype(int).tolist()
+
+all_dominant_colors[frame_num_str] = color_list
+print(f"Processed frame {frame_num_str}: Found {len(color_list)} colors.")
+</code></pre>
+except Exception as e:
+print(f"Error processing frame {frame_num_str}: {e}")
+
+# 5. Output to JSON
+json_output = json.dumps(all_dominant_colors, indent=4)
+return json_output
+</code></pre>
+</code></pre>
+
+</ul>
+<li>
+--- Example Usage ---
+
+<li>
+NOTE: Replace 'read_node_file_path' with the actual file sequence path.
+
+<li>
+Example path with Nuke-style padding:
+
+<li>
+read_node_file_path = '/path/to/my/comic/scene_1.shot_01.%04d.exr'
+
+<li>
+frames_to_process = list(range(101, 201))  # Process frames 101 through 200
+
+<li>
+# Run the function
+
+<li>
+json_data = extract_dominant_colors_sequence(read_node_file_path, num_colors=30, frames=frames_to_process)
+
+<li>
+# Save the JSON file
+
+<li>
+with open('comic_palette.json', 'w') as f:
+
+<li>
+    f.write(json_data)
+
+<p>
+The OpenImageIO (OIIO) Option
+You specifically mentioned OpenImageIO. This is an excellent idea, especially if your pipeline uses complex file formats like OpenEXR, TIFF, or DPX.
+</p>
+
+<p>
+Integration: Use the Python bindings for OIIO (import OpenImageIO as OIIO).
+</p>
+
+<p>
+Fast Reading: Replace cv2.imread(file_path) with OIIO code to read the image data into a NumPy array (which OIIO handles natively).
+</p>
+
+<p>
+Process: Pass the NumPy array directly to the K-Means clustering step (as shown above).
+</p>
+
+<p>
+This separates the fast I/O (OIIO) from the fast computation (NumPy/Scikit-learn), maximizing efficiency.
+</p>
+
+<p>
+OIIO Replacement for cv2.imread:
+</p>
+
+<p>
+Python
+import OpenImageIO as OIIO
+import numpy as np
+</p>
+<ul>
+<li>
+... (rest of your imports)
+
+</ul>
+<p>
+def read_image_with_oiio(file_path):
+</p>
+<pre><code>"""Loads an image into a NumPy array using OpenImageIO."""
+</pre></code>
+<ul>
+<li>
+1. Read the image and spec
+    img_input = OIIO.ImageInput.open(file_path)
+    if not img_input:
+<pre><code>raise IOError(f"Could not open image with OIIO: {OIIO.geterror()}")
+</code></pre>
+spec = img_input.spec()
+
+# 2. Create NumPy array and read pixel data
+# Read as float type and get R, G, B channels
+pixel_data = np.empty((spec.height, spec.width, spec.nchannels), dtype=np.float32)
+img_input.read_image(0, 0, spec.nchannels, OIIO.TypeDesc.FLOAT, pixel_data)
+img_input.close()
+
+# Only return the first 3 channels (R, G, B), dropping Alpha if present
+return (pixel_data[:, :, :3] * 255.0).astype(np.uint8) # Convert to 0-255 range for clustering
+
+</ul>
+</code></pre>
+<p>
+You would then call this function within your main loop and feed the resulting array to the clustering steps.
+</p>
+
+</body>
+</html>
