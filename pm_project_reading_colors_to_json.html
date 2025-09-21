@@ -2607,6 +2607,282 @@ The downstream function apply_colors_to_selected_read_node is guaranteed to be w
 Setting the limit to 200 is a perfect compromise: it's well above your expected 50 colors, but far below the thousands you'd get from a regular production image.
 </p>
 
+<div id="Reading Colors to JSON-QUESTION"><h2 id="QUESTION" class="header"><a href="#Reading Colors to JSON-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+Can you add that updated function into the latest script (so that I don't introduce errors)?
+</td>
+</tr>
+</table>
+
+<p>
+Certainly. Here is the complete, updated script.
+</p>
+
+<p>
+This version replaces the slow K-Means logic with the fast Sampled Quantization method, uses Nuke's Python API (no OpenImageIO dependency), and includes the max_colors=200 safeguard to prevent errors from accidentally analyzing high-detail images.
+</p>
+
+<p>
+Complete Nuke Script (Sampled Quantization)
+</p>
+
+<pre python>
+import nuke
+import math
+import random
+import json
+import os
+import glob
+from collections import defaultdict, Counter 
+
+# --- CONFIGURATION CONSTANTS ---
+PIXEL_STRIDE = 16          # Samples 1/16th of the pixels for speed
+QUANTIZE_FACTOR = 1000     # Groups colors by rounding to 3 decimal places (0.001)
+SAFEGUARD_COLOR_LIMIT = 200 # Max number of unique colors to save in the JSON
+
+# --- CORE 1: COLOR SAMPLING &amp; QUANTIZATION (UPDATED) ---
+
+def sample_and_aggregate_colors(linear_pixels, pixel_stride=PIXEL_STRIDE, color_quantization_factor=QUANTIZE_FACTOR, max_colors=SAFEGUARD_COLOR_LIMIT):
+    """
+    Sequentially samples pixels, quantizes the linear RGB values, counts frequency,
+    and includes a safeguard against analyzing standard, highly-varied images.
+    """
+    pixel_count = len(linear_pixels)
+    if pixel_count == 0:
+        return [[0.0, 0.0, 0.0]]
+
+    quantized_colors = []
+    
+    # 1. Sample Pixels and Quantize
+    for i in range(0, pixel_count, pixel_stride):
+        r, g, b = linear_pixels[i]
+        
+        # Quantization: Multiply by a factor, round to integer, convert to a hashable tuple
+        q_r = int(round(r * color_quantization_factor))
+        q_g = int(round(g * color_quantization_factor))
+        q_b = int(round(b * color_quantization_factor))
+        
+        quantized_colors.append((q_r, q_g, q_b))
+        
+    # 2. Count Frequencies and Sort (Most dominant first)
+    color_frequencies = Counter(quantized_colors)
+    sorted_frequencies = color_frequencies.most_common() 
+    
+    # 3. De-quantize back to linear float RGB
+    dominant_colors_linear = []
+    for (q_r, q_g, q_b), count in sorted_frequencies:
+        # Divide by the factor to get the float color back
+        linear_r = q_r / color_quantization_factor
+        linear_g = q_g / color_quantization_factor
+        linear_b = q_b / color_quantization_factor
+        
+        dominant_colors_linear.append([linear_r, linear_g, linear_b])
+
+    # 4. SAFETY CHECK AND LIMITATION:
+    # If the number of unique colors exceeds the safeguard limit, issue a warning 
+    # and only return the top 'max_colors'.
+    if len(dominant_colors_linear) &gt; max_colors:
+        nuke.warning(f"Warning: Image contained {len(dominant_colors_linear)} unique colors. Limiting export to the top {max_colors} colors to prevent excessively large data files.")
+        
+    # Returns all colors found (sorted by dominance), sliced to the safety limit.
+    return dominant_colors_linear[:max_colors]
+
+
+# --- CORE 2: NUKE API PIXEL EXTRACTION ---
+
+def get_linear_pixels_from_node(read_node, frame):
+    """
+    Reads ALL linear pixel data directly from a Nuke node for a single frame.
+    Uses nuke.sample() which is in the scene's linear working space.
+    """
+    # Create a temporary, invisible output pipe to sample the pixels
+    crop = nuke.nodes.Crop(inputs=[read_node], postage_stamp=False)
+    crop['box'].setValue([0, 0, read_node.width(), read_node.height()])
+    
+    pixels = []
+    width = read_node.width()
+    height = read_node.height()
+    
+    try:
+        # Request the channel data (R, G, B) as a flat list of floats
+        data = crop.sample('red', 0, 0, width, height, frame=frame)
+        data += crop.sample('green', 0, 0, width, height, frame=frame)
+        data += crop.sample('blue', 0, 0, width, height, frame=frame)
+        
+        num_pixels = width * height
+        
+        # Reshape the flat data (R...R, G...G, B...B) into [R, G, B] triplets
+        for i in range(num_pixels):
+            r = data[i]
+            g = data[i + num_pixels]
+            b = data[i + 2 * num_pixels]
+            pixels.append([r, g, b])
+            
+    finally:
+        # Clean up the temporary node immediately
+        nuke.delete(crop)
+        
+    return pixels
+
+def get_sequence_info(read_node):
+    """Gets the file path, directory, and JSON path from a Read node."""
+    file_path_full = read_node['file'].value()
+    
+    if '%' in file_path_full:
+        dir_path = os.path.dirname(file_path_full)
+        base_name_pattern = os.path.basename(file_path_full)
+        json_file_name = base_name_pattern.split('.')[0] + ".json"
+        start = int(read_node['first'].value())
+        end = int(read_node['last'].value())
+        frame_list = range(start, end + 1)
+    else:
+        dir_path = os.path.dirname(file_path_full)
+        base_name = os.path.basename(file_path_full)
+        json_file_name = os.path.splitext(base_name)[0] + ".json"
+        frame_list = [int(nuke.root()['first_frame'].value())]
+
+    json_path = os.path.join(dir_path, json_file_name)
+    return frame_list, dir_path, json_path
+
+
+# -------------------------------------------------------------
+# FUNCTION 1: EXPORT COLORS FROM SELECTED READ NODES
+# -------------------------------------------------------------
+
+def export_colors_from_selected_read_nodes():
+    """
+    Reads selected Read nodes, extracts dominant linear colors using sampling,
+    and exports a JSON file.
+    """
+    selected_nodes = nuke.selectedNodes('Read')
+    if not selected_nodes:
+        nuke.message("Please select one or more Read nodes.")
+        return
+
+    for node in selected_nodes:
+        frame_list, dir_path, json_path = get_sequence_info(node)
+        all_dominant_colors = {}
+        
+        if not frame_list:
+            nuke.warning(f"Skipping {node.name()}: Invalid frame range.")
+            continue
+
+        nuke.message(f"Processing {len(frame_list)} frames for {node.name()} with stride {PIXEL_STRIDE}...")
+
+        original_frame = nuke.frame() 
+        
+        for frame in frame_list:
+            nuke.frame(frame)
+            try:
+                # 1. Get ALL Linear Pixel Data from Nuke API
+                linear_pixels = get_linear_pixels_from_node(node, frame)
+                
+                # 2. Sample, Quantize, and Aggregate Dominant Colors
+                dominant_colors_linear = sample_and_aggregate_colors(linear_pixels)
+                
+                # 3. Store Results (as linear floats)
+                all_dominant_colors[str(frame)] = dominant_colors_linear
+
+            except Exception as e:
+                nuke.warning(f"Error processing frame {frame} for {node.name()}: {e}")
+                continue
+        
+        nuke.frame(original_frame)
+                
+        # 4. Save JSON file to disk
+        try:
+            with open(json_path, 'w') as f:
+                json.dump(all_dominant_colors, f, indent=4)
+            nuke.message(f"Successfully exported {len(dominant_colors_linear)} dominant linear colors per frame to:\n{json_path}")
+        except Exception as e:
+            nuke.critical(f"Failed to save JSON file at {json_path}: {e}")
+
+
+# -------------------------------------------------------------
+# FUNCTION 2: APPLY COLORS TO SELECTED READ NODE
+# -------------------------------------------------------------
+
+def convert_linear_to_display_color(linear_rgb_list):
+    """Converts a linear RGB color to a display-ready color (for node 'tile_color')."""
+    gamma_correction = 1.0 / 2.2
+    display_rgb = []
+    
+    for val in linear_rgb_list:
+        clamped_linear_val = max(0.0, val)
+        display_val = math.pow(clamped_linear_val, gamma_correction)
+        clipped_display_val = min(1.0, display_val)
+        display_rgb.append(clipped_display_val)
+        
+    return display_rgb
+
+def float_to_packed_int(r, g, b, a=1.0):
+    """Packs float RGB values (0.0-1.0) into Nuke's single tile_color integer."""
+    r_int = int(r * 255)
+    g_int = int(g * 255)
+    b_int = int(b * 255)
+    a_int = int(a * 255)
+    return (a_int &lt;&lt; 24) + (b_int &lt;&lt; 16) + (g_int &lt;&lt; 8) + r_int
+
+def set_node_color_from_linear_rgb(node, linear_rgb_color):
+    """Sets a Nuke node's tile_color based on a linear RGB list, applying conversion."""
+    display_rgb = convert_linear_to_display_color(linear_rgb_color)
+    r, g, b = display_rgb[0], display_rgb[1], display_rgb[2]
+    packed_color = float_to_packed_int(r, g, b)
+    node['tile_color'].setValue(packed_color)
+
+def apply_colors_to_selected_read_node():
+    """
+    Reads the associated JSON color data and sets the tile_color of the 
+    selected Read node based on the most dominant color of the current frame.
+    """
+    selected_nodes = nuke.selectedNodes('Read')
+    if not selected_nodes:
+        nuke.message("Please select one or more Read nodes.")
+        return
+
+    current_frame = nuke.frame()
+    
+    for node in selected_nodes:
+        frame_list, dir_path, json_path = get_sequence_info(node)
+        
+        if not os.path.exists(json_path):
+            nuke.message(f"Color JSON file not found for {node.name()}:\n{json_path}\n\nRun 'Export Colors' first.")
+            continue
+            
+        try:
+            with open(json_path, 'r') as f:
+                color_data = json.load(f)
+            
+            frame_key = str(current_frame) 
+            
+            # Find the key, handling padded vs unpadded frame numbers
+            matching_key = None
+            if frame_key in color_data:
+                matching_key = frame_key
+            else:
+                for key in color_data:
+                    if key.lstrip('0') == frame_key.lstrip('0'):
+                        matching_key = key
+                        break
+            
+            if not matching_key:
+                nuke.warning(f"No color data found for frame {current_frame} in {json_path}")
+                continue
+
+            # The most dominant color is always the first one in the list [0]
+            linear_rgb_color = color_data[matching_key][0]
+            
+            # Set the node's tile_color with colorspace conversion
+            set_node_color_from_linear_rgb(node, linear_rgb_color)
+            
+        except Exception as e:
+            nuke.critical(f"Failed to apply color to {node.name()}: {e}")
+            
+</pre>
+
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
