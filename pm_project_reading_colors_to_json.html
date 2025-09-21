@@ -2279,6 +2279,216 @@ Optimization with Counter: The collections.Counter module is a highly optimized 
 The main time spent is now in get_linear_pixels_from_node() (Nuke's I/O) and the single loop inside sample_and_aggregate_colors(). This is the best performance you can achieve without stepping outside the standard Nuke Python environment.
 </p>
 
+<div id="Reading Colors to JSON-QUESTION"><h2 id="QUESTION" class="header"><a href="#Reading Colors to JSON-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+I don't really understand where the K-Means method would be of advantage. Could you explain why that might be used over a brute force looped 'sample'? Would I be right in thinking it's a way of getting dominant color values until extra colors with minimal representation would be omitted in the cause of minimal data collection?
+</td>
+</tr>
+</table>
+
+<p>
+That's an insightful way to put it! You're absolutely right: the primary advantage of K-Means over a brute-force sampled approach is quality-controlled data reduction, which ensures minimal representation colors are omitted in favor of the truly dominant ones.
+</p>
+
+<p>
+Here is a breakdown of why K-Means is often preferred, despite being slower.
+</p>
+
+<div id="Reading Colors to JSON-K-Means vs. Sampled Quantization"><h2 id="K-Means vs. Sampled Quantization" class="header"><a href="#Reading Colors to JSON-K-Means vs. Sampled Quantization">K-Means vs. Sampled Quantization</a></h2></div>
+ 
+<div id="Reading Colors to JSON-K-Means vs. Sampled Quantization-The Goal of K-Means: Finding True Averages"><h3 id="The Goal of K-Means: Finding True Averages" class="header"><a href="#Reading Colors to JSON-K-Means vs. Sampled Quantization-The Goal of K-Means: Finding True Averages">The Goal of K-Means: Finding True Averages</a></h3></div>
+
+<p>
+Your brute-force sampled method (with quantization) is essentially creating a histogram of the pixel values. It tells you that "Red 0.8" appeared 10,000 times, and "Red 0.801" appeared 9,999 times.
+</p>
+
+<div id="Reading Colors to JSON-K-Means vs. Sampled Quantization-The Goal of K-Means: Finding True Averages-K-Means (Clustering) goes further:"><h4 id="K-Means (Clustering) goes further:" class="header"><a href="#Reading Colors to JSON-K-Means vs. Sampled Quantization-The Goal of K-Means: Finding True Averages-K-Means (Clustering) goes further:">K-Means (Clustering) goes further:</a></h4></div>
+
+<ul>
+<li>
+<span id="Reading Colors to JSON-K-Means vs. Sampled Quantization-The Goal of K-Means: Finding True Averages-K-Means (Clustering) goes further:-It calculates the mathematical average"></span><strong id="It calculates the mathematical average">It calculates the mathematical average</strong>: K-Means will recognize that "Red 0.8" and "Red 0.801" are visually the same, and it will combine them into a single, representative color (a centroid). If your image has a large, smooth color gradient (e.g., a blue sky fading from light blue to dark blue), the K-Means algorithm will find 30 distinct, representative shades of blue that are the average of thousands of similar colors along that gradient.
+
+<li>
+<span id="Reading Colors to JSON-K-Means vs. Sampled Quantization-The Goal of K-Means: Finding True Averages-K-Means (Clustering) goes further:-It adapts to the data"></span><strong id="It adapts to the data">It adapts to the data</strong>: It doesn't rely on a fixed, arbitrary quantization factor (QUANTIZE_FACTOR). Instead, it dynamically adjusts the centroid positions to minimize the total error (distortion) across the entire image.
+<table>
+<tr>
+<td>
+Scenario
+</td>
+<td>
+Sampled Quantization (Your Method)
+</td>
+<td>
+K-Means Clustering
+</td>
+</tr>
+<tr>
+<td>
+Smooth Gradient (e.g., sky)
+</td>
+<td>
+You might get 50 different "unique" blues, all very close, because the quantization factor isn't fine enough to group them, or too fine, grouping too few.
+</td>
+<td>
+You explicitly ask for 30 colors (K=30). K-Means guarantees those 30 colors are the most mathematically representative averages of the entire gradient.
+</td>
+</tr>
+<tr>
+<td>
+Noise/Grain
+</td>
+<td>
+Random noise added to a uniform wall can create thousands of unique, low-frequency colors that clutter your list.
+</td>
+<td>
+The algorithm treats the noisy pixel as a slight deviation from the true average color of the wall, pulling the centroid toward the pure color and effectively filtering the noise.
+</td>
+</tr>
+<tr>
+<td>
+Dominance
+</td>
+<td>
+Dominance is based purely on the number of times a rounded color value appeared.
+</td>
+<td>
+Dominance is based on the size of the cluster that the centroid represents—it's a measure of volume and influence, not just raw count.
+</td>
+</tr>
+</table>
+
+</ul>
+ 
+<div id="Reading Colors to JSON-K-Means vs. Sampled Quantization-When to Use Which Method"><h3 id="When to Use Which Method" class="header"><a href="#Reading Colors to JSON-K-Means vs. Sampled Quantization-When to Use Which Method">When to Use Which Method</a></h3></div>
+
+<table>
+<tr>
+<td>
+Method
+</td>
+<td>
+Performance (Time)
+</td>
+<td>
+Accuracy/Quality of Dominance
+</td>
+<td>
+Best Use Case
+</td>
+</tr>
+<tr>
+<td>
+Sampled Quantization (Your Method)
+</td>
+<td>
+Very Fast (Best performance)
+</td>
+<td>
+Good enough, but sensitive to noise and quantization factor.
+</td>
+<td>
+When you must have speed, have a low-noise image, or just need the general "ballpark" colors.
+</td>
+</tr>
+<tr>
+<td>
+K-Means Clustering
+</td>
+<td>
+Slow (High computational cost)
+</td>
+<td>
+High Quality (Mathematically optimized representation).
+</td>
+<td>
+When you need the most accurate, mathematically proven set of dominant colors for critical analysis or art direction.
+</td>
+</tr>
+</table>
+
+<p>
+You are absolutely correct that both methods aim to find dominant color values while omitting colors with minimal representation. The difference lies in how they achieve this:
+</p>
+
+<ul>
+<li>
+Sampled Quantization uses a brute-force count and filter based on fixed buckets (quantization).
+
+<li>
+K-Means uses an iterative optimization process to mathematically define the best possible buckets (centroids) for a desired K number of colors.
+
+<li>
+In a professional VFX pipeline, K-Means (or similar clustering) is often preferred for analysis tasks because the mathematical guarantee of finding the most representative average is worth the upfront computational cost.
+
+</ul>
+<div id="Reading Colors to JSON-QUESTION"><h2 id="QUESTION" class="header"><a href="#Reading Colors to JSON-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+My images will have very strict 'flat' and limited color palette (maybe 50 colors max). I think a brute force approach would be preferred. Do you agree?
+</td>
+</tr>
+</table>
+
+<p>
+Yes, I absolutely agree. Given your constraint of having images with a very strict, flat, and limited color palette (50 colors max), the brute-force sampling and quantization approach is highly preferred over K-Means clustering.
+</p>
+
+<p>
+Here's why, and the one crucial step to ensure its success:
+</p>
+
+<div id="Reading Colors to JSON-QUESTION-Why Brute-Force is Better for a Limited Palette"><h3 id="Why Brute-Force is Better for a Limited Palette" class="header"><a href="#Reading Colors to JSON-QUESTION-Why Brute-Force is Better for a Limited Palette">Why Brute-Force is Better for a Limited Palette</a></h3></div>
+
+<p>
+The advantage of K-Means—its ability to find the average representative color in a gradient or noisy area—becomes a disadvantage when your palette is already flat and strictly limited.
+</p>
+
+<ul>
+<li>
+<span id="Reading Colors to JSON-QUESTION-Why Brute-Force is Better for a Limited Palette-Speed Dominates"></span><strong id="Speed Dominates">Speed Dominates</strong>: Since your goal is minimal data collection and your images are simple, the performance gain from avoiding the iterative K-Means algorithm far outweighs any marginal quality difference. The brute-force method is significantly faster.
+
+<li>
+<span id="Reading Colors to JSON-QUESTION-Why Brute-Force is Better for a Limited Palette-No Averaging Needed"></span><strong id="No Averaging Needed">No Averaging Needed</strong>: Because your colors are "flat" (meaning there are large areas of uniform color rather than smooth gradients), there is little need for K-Means to calculate an average. If a wall is pure Red 0.8, K-Means will find Red 0.8. Your sampled approach will also find Red 0.8. K-Means offers no benefit here, only delay.
+
+<li>
+<span id="Reading Colors to JSON-QUESTION-Why Brute-Force is Better for a Limited Palette-Strictly Limited Data"></span><strong id="Strictly Limited Data">Strictly Limited Data</strong>: With a known limit of 50 colors, your brute-force method functions as a perfect histogram generator. It will accurately count the frequency of each of those 50 colors, giving you the true dominance order without the computational overhead of clustering.
+
+</ul>
+<div id="Reading Colors to JSON-QUESTION-The Crucial Step: Adjusting Quantization"><h3 id="The Crucial Step: Adjusting Quantization" class="header"><a href="#Reading Colors to JSON-QUESTION-The Crucial Step: Adjusting Quantization">The Crucial Step: Adjusting Quantization</a></h3></div>
+
+<p>
+The only potential pitfall with the brute-force approach is setting the quantization factor correctly. Since you have a strict palette, you want the quantization to be fine enough to distinguish between your 50 colors, but coarse enough to group any minor floating-point variations (which happen with compression/decompression).
+</p>
+
+<p>
+In the previous script:
+</p>
+
+<pre>
+QUANTIZE_FACTOR=1000
+</pre>
+
+<p>
+This factor rounds float values (like 0.12345) to an integer based on three decimal places (123).
+</p>
+<ul>
+<li>
+If your "flat" colors are exactly uniform (e.g., exactly [0.8, 0.1, 0.1]), a high factor like 10,000 is safe.
+
+<li>
+If your "flat" colors have minor variations due to image processing (e.g., one pixel is 0.800001 and the next is 0.799998), a factor of 1000 is usually sufficient to group these into the same bucket.
+
+</ul>
+<p>
+Recommendation: Stick with a high but reasonable factor like 1000 or 10000 to ensure you capture the discrete, intended colors. You can then also increase the pixel_stride (e.g., from 16 to 32 or 64) for even greater speed, as the colors are guaranteed to be consistent across large areas.
+</p>
+
+
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
