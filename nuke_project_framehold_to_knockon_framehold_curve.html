@@ -910,8 +910,14 @@ def strobe_comp_with_framehold(src_node, dst_node, knob_name='first_frame'):
 <p>
 Usage example:
 </p>
-
 <pre python>
+<table>
+<tr>
+<td>
+THIS WORKS
+</td>
+</tr>
+</table>
 src = nuke.toNode('FrameHold_Input')        # your Read→FrameHold1
 dst = nuke.createNode('FrameHold', inpanel=False)
 strobe_comp_with_framehold(src, dst)
@@ -934,6 +940,124 @@ On the output FH it keys those exact script-times (t) as values (t), with consta
 Now your roto/paint/animation in the comp will strobe in perfect sync with the original Read→FrameHold stutters—without ever touching the source node.
 </p>
 
+<div id="NOTHING WORKED-QUESTION"><h2 id="QUESTION" class="header"><a href="#NOTHING WORKED-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+I don't understand this part of the working script - specifically what 't' is representing and why it is set as a tuple of (t, t). Can you elaborate what the numbers are and what they represent when applied to the dst_curve.setKey()?
+</td>
+</tr>
+</table>
+
+<div id="NOTHING WORKED-QUESTION-Understanding t and dst_curve.setKey(t, t)"><h3 id="Understanding t and dst_curve.setKey(t, t)" class="header"><a href="#NOTHING WORKED-QUESTION-Understanding t and dst_curve.setKey(t, t)">Understanding t and dst_curve.setKey(t, t)</a></h3></div>
+
+<div id="NOTHING WORKED-QUESTION-Understanding t and dst_curve.setKey(t, t)-What Is t?"><h4 id="What Is t?" class="header"><a href="#NOTHING WORKED-QUESTION-Understanding t and dst_curve.setKey(t, t)-What Is t?">What Is t?</a></h4></div>
+
+<p>
+In the loop:
+</p>
+
+<pre python>
+for src_key in src_curve.keys():
+    t = src_key.x
+src_key.x is the script-frame (timeline frame) where your input FrameHold jumps to a new image.
+</pre>
+<p>
+For your example holds (1→5, 6→9, 10→15, 16→30), t will take on the values 1, 6, 10, 16.
+</p>
+
+<div id="NOTHING WORKED-QUESTION-The call"><h3 id="The call" class="header"><a href="#NOTHING WORKED-QUESTION-The call">The call</a></h3></div>
+
+<pre python>
+dst_key = dst_curve.setKey(t, t)
+</pre>
+<p>
+...is passing two separate arguments to setKey(time, value):
+</p>
+
+<ul>
+<li>
+<code>time (t)</code>: when in the script timeline that key is placed.
+
+<li>
+<code>value (t)</code>: which frame the FrameHold should freeze at that moment.
+
+</ul>
+<p>
+By using the same t for both:
+</p>
+<ul>
+<li>
+You place a key at script-frame 1 telling the new FrameHold: “Freeze whatever your composite looks like at frame 1.”
+
+<li>
+You place a key at script-frame 6 telling it: “Now switch and freeze the comp at frame 6,” and so on.
+
+</ul>
+<div id="NOTHING WORKED-QUESTION-The call-What These Numbers Represent in Practice"><h4 id="What These Numbers Represent in Practice" class="header"><a href="#NOTHING WORKED-QUESTION-The call-What These Numbers Represent in Practice">What These Numbers Represent in Practice</a></h4></div>
+
+<table>
+<tr>
+<td>
+Argument
+</td>
+<td>
+Meaning
+</td>
+</tr>
+<tr>
+<td>
+time = t
+</td>
+<td>
+“Insert a key into the curve at timeline frame t.”
+</td>
+</tr>
+<tr>
+<td>
+value = t
+</td>
+<td>
+“Set the FrameHold’s output frame to t, then hold constant.”
+</td>
+</tr>
+</table>
+
+<p>
+So for your 4-image/30-frame example:
+</p>
+
+<ul>
+<li>
+<code>setKey(1, 1)</code> holds the comp’s appearance at frame 1 through frame 5.
+
+<li>
+<code>setKey(6, 6)</code> then holds that look at frame 6 through frame 9.
+
+<li>
+<code>setKey(10, 10)</code> holds frame 10 appearance through frame 15.
+
+<li>
+<code>setKey(16, 16)</code> holds frame 16 through frame 30.
+
+</ul>
+<div id="NOTHING WORKED-QUESTION-The call-When You’d Use a Different Value"><h4 id="When You’d Use a Different Value" class="header"><a href="#NOTHING WORKED-QUESTION-The call-When You’d Use a Different Value">When You’d Use a Different Value</a></h4></div>
+
+<p>
+If instead you wanted your end-comp to freeze exactly on the input image number (not the timeline frame), you’d swap in the source key’s value:
+</p>
+
+<pre python>
+# using the input image index as the hold value:
+dst_key = dst_curve.setKey(t, src_key.y)
+dst_key.interpolation = nuke.CONSTANT
+</pre>
+
+<p>
+Here, src_key.y is the image-index from your Read (1, 2, 3, 4), so at timeline frame 6 you’d freeze on input frame 2, etc.
+</p>
+
 <div id="NOTHING WORKED-My Response"><h2 id="My Response" class="header"><a href="#NOTHING WORKED-My Response">My Response</a></h2></div>
 
 <table>
@@ -943,6 +1067,8 @@ That is incredible!! Thank you!!
 </td>
 </tr>
 </table>
+
+<div id="NOTHING WORKED-ANSWER"><h2 id="ANSWER" class="header"><a href="#NOTHING WORKED-ANSWER">ANSWER</a></h2></div>
 
 <p>
 I’m really glad it’s working for you! Now that you’ve got the core “strobe in step” logic nailed, here are a few ways you might take this even further:
@@ -964,6 +1090,17 @@ Extend to other knobs • You could drive any animatable knob—color wheels, tr
 <p>
 Which of those sounds most useful for your workflow? I can share boilerplate for a PySide panel, menu setup, batch routine—or dive into any other feature you have in mind.
 </p>
+
+
+<div id="NOTHING WORKED-QUESTION"><h2 id="QUESTION" class="header"><a href="#NOTHING WORKED-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+The Batch processing seems interesting.
+</td>
+</tr>
+</table>
 
 <div id="NOTHING WORKED-ANSWER"><h2 id="ANSWER" class="header"><a href="#NOTHING WORKED-ANSWER">ANSWER</a></h2></div>
 
