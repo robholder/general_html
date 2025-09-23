@@ -1239,163 +1239,13 @@ Allow users to select arbitrary source/destination nodes in the UI instead of re
 Batch-process only selected nodes by filtering nuke.selectedNodes('FrameHold') rather than all nodes
 
 </ul>
-<div id="NOTHING WORKED-QUESTION"><h2 id="QUESTION" class="header"><a href="#NOTHING WORKED-QUESTION">QUESTION</a></h2></div>
-
-<table>
-<tr>
-<td>
-The "Batch-process or template pipelines" option is very interesting.
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td>
-UNTESTED
-</td>
-</tr>
-</table>
-
-<div id="NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script"><h3 id="Batch-Processing FrameHold Strobes Across Your Script" class="header"><a href="#NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script">Batch-Processing FrameHold Strobes Across Your Script</a></h3></div>
-
-<p>
-Here’s a drop-in utility that finds every “input” FrameHold with animated holds and auto-creates (or reuses) a matching “output” FrameHold at the end of your comp. It then applies the strobe logic to all pairs in one go.
-</p>
-
-<pre python>
-<table>
-<tr>
-<td>
-UNTESTED
-</td>
-</tr>
-</table>
-import nuke
-
-def batch_strobe_frameholds(src_suffix='_Input', dst_suffix='_Strobe', knob_name='first_frame'):
-    """
-    For every FrameHold node whose name ends with src_suffix:
-      • find or create a matching FrameHold ending with dst_suffix
-      • drive its holds to match the source’s key times
-    """
-    for src in nuke.allNodes('FrameHold'):
-        if not src.name().endswith(src_suffix):
-            continue
-        src_knob = src[knob_name]
-        if not src_knob.isAnimated():
-            continue
-
-        # determine destination node name
-        dst_name = src.name()[:-len(src_suffix)] + dst_suffix
-        dst = nuke.toNode(dst_name)
-        if not dst:
-            dst = nuke.createNode('FrameHold', name=dst_name, inpanel=False)
-
-        # apply strobe logic
-        dst_knob = dst[knob_name]
-        dst_knob.clearAnimated()
-        dst_knob.setAnimated()
-
-        src_curve = src_knob.animation(0)
-        dst_curve = dst_knob.animation(0)
-        for src_key in src_curve.keys():
-            t = src_key.x
-            dst_key = dst_curve.setKey(t, t)
-            dst_key.interpolation = nuke.CONSTANT
-
-        # stretch last hold to end of script
-        last_t = src_curve.keys()[-1].x
-        last_frame = int(nuke.root().lastFrame())
-        if last_t &lt; last_frame:
-            end_key = dst_curve.setKey(last_frame, last_t)
-            end_key.interpolation = nuke.CONSTANT
-
-# run the batch operation
-batch_strobe_frameholds()
-</pre>
-
-<div id="NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-How this works"><h4 id="How this works" class="header"><a href="#NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-How this works">How this works</a></h4></div>
-
-<ul>
-<li>
-It loops over all FrameHold nodes whose names end with “_Input”
-
-<li>
-For each one it either finds or builds a corresponding “_Strobe” node
-
-<li>
-It reads every key-time from the source and writes a constant-hold key at the same time/value in the destination
-
-<li>
-It adds a final key at the script’s last frame so the last hold carries through
-
-</ul>
-<div id="NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-Integrating into Your Pipeline"><h4 id="Integrating into Your Pipeline" class="header"><a href="#NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-Integrating into Your Pipeline">Integrating into Your Pipeline</a></h4></div>
-
-<ul>
-<li>
-Add this snippet to your studio’s menu.py so it’s always one menu click away:
-
-</ul>
-  
-<pre python>
-<table>
-<tr>
-<td>
-UNTESTED
-</td>
-</tr>
-</table>
-import batch_strobe  # assuming you saved the code as batch_strobe.py
-nuke.menu('Nuke').addCommand('Custom/Strobe All FrameHolds',
-                              'batch_strobe.batch_strobe_frameholds()')
-</pre>
-
-<ul>
-<li>
-Adopt a naming convention in your template comps: • Name your input retime holds …_Input • Reserve …_Strobe for the automatic outputs
-
-<li>
-For custom suffixes, call:
-
-</ul>
-  
-<pre python>
-<table>
-<tr>
-<td>
-UNTESTED
-</td>
-</tr>
-</table>
-batch_strobe_frameholds(src_suffix='_Retime', dst_suffix='_Hold')
-</pre>
-
-<div id="NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-Next-Level Enhancements"><h4 id="Next-Level Enhancements" class="header"><a href="#NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-Next-Level Enhancements">Next-Level Enhancements</a></h4></div>
-
-<ul>
-<li>
-Build a PySide panel that scans for all matching pairs, lets you adjust suffixes on the fly, and preview key-times before applying
-
-<li>
-Allow users to select arbitrary source/destination nodes in the UI instead of relying on naming
-
-<li>
-Batch-process only selected nodes by filtering nuke.selectedNodes('FrameHold') rather than all nodes
-
-</ul>
-<p>
-Let me know which direction you’d like to explore further—boilerplate for a panel, selection-based batch, or deeper error handling!
-</p>
-
-<div id="NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-Integrating Batch FrameHold Strobes into Your Pipeline"><h4 id="Integrating Batch FrameHold Strobes into Your Pipeline" class="header"><a href="#NOTHING WORKED-QUESTION-Batch-Processing FrameHold Strobes Across Your Script-Integrating Batch FrameHold Strobes into Your Pipeline">Integrating Batch FrameHold Strobes into Your Pipeline</a></h4></div>
+<div id="NOTHING WORKED-ANSWER-Integrating Batch FrameHold Strobes into Your Pipeline"><h4 id="Integrating Batch FrameHold Strobes into Your Pipeline" class="header"><a href="#NOTHING WORKED-ANSWER-Integrating Batch FrameHold Strobes into Your Pipeline">Integrating Batch FrameHold Strobes into Your Pipeline</a></h4></div>
 
 <p>
 Here’s a step-by-step plan to turn the “batch strobe” logic into a one-click tool in your studio’s Nuke pipeline.
 </p>
 
-<div id="NOTHING WORKED-QUESTION-Create a Utility Module"><h3 id="Create a Utility Module" class="header"><a href="#NOTHING WORKED-QUESTION-Create a Utility Module">Create a Utility Module</a></h3></div>
+<div id="NOTHING WORKED-ANSWER-Create a Utility Module"><h3 id="Create a Utility Module" class="header"><a href="#NOTHING WORKED-ANSWER-Create a Utility Module">Create a Utility Module</a></h3></div>
 
 <p>
 In your ~/.nuke/ folder, save a file named batch_strobe.py with this content:
@@ -1447,7 +1297,7 @@ def batch_strobe_frameholds(src_suffix='_Input', dst_suffix='_Strobe', knob_name
             ek.interpolation = nuke.CONSTANT
 </pre>
 
-<div id="NOTHING WORKED-QUESTION-Create a Utility Module-Hook It into Your Menu"><h4 id="Hook It into Your Menu" class="header"><a href="#NOTHING WORKED-QUESTION-Create a Utility Module-Hook It into Your Menu">Hook It into Your Menu</a></h4></div>
+<div id="NOTHING WORKED-ANSWER-Create a Utility Module-Hook It into Your Menu"><h4 id="Hook It into Your Menu" class="header"><a href="#NOTHING WORKED-ANSWER-Create a Utility Module-Hook It into Your Menu">Hook It into Your Menu</a></h4></div>
 
 <ul>
 <li>
@@ -1481,7 +1331,7 @@ men.addCommand(
 Restart Nuke. You’ll now have Custom → Batch Strobe FrameHolds (or hit Ctrl + Alt + S).
 
 </ul>
-<div id="NOTHING WORKED-QUESTION-Create a Utility Module-Optional: User-Prompted Suffixes"><h4 id="Optional: User-Prompted Suffixes" class="header"><a href="#NOTHING WORKED-QUESTION-Create a Utility Module-Optional: User-Prompted Suffixes">Optional: User-Prompted Suffixes</a></h4></div>
+<div id="NOTHING WORKED-ANSWER-Create a Utility Module-Optional: User-Prompted Suffixes"><h4 id="Optional: User-Prompted Suffixes" class="header"><a href="#NOTHING WORKED-ANSWER-Create a Utility Module-Optional: User-Prompted Suffixes">Optional: User-Prompted Suffixes</a></h4></div>
 
 <p>
 If different teams use different naming conventions, wrap the call in a tiny panel:
@@ -1523,7 +1373,7 @@ men.addCommand(
 )
 </pre>
 
-<div id="NOTHING WORKED-QUESTION-Create a Utility Module-Selection-Based Batch"><h4 id="Selection-Based Batch" class="header"><a href="#NOTHING WORKED-QUESTION-Create a Utility Module-Selection-Based Batch">Selection-Based Batch</a></h4></div>
+<div id="NOTHING WORKED-ANSWER-Create a Utility Module-Selection-Based Batch"><h4 id="Selection-Based Batch" class="header"><a href="#NOTHING WORKED-ANSWER-Create a Utility Module-Selection-Based Batch">Selection-Based Batch</a></h4></div>
 
 <p>
 To limit processing only to selected FrameHold nodes, modify the loop:
@@ -1545,7 +1395,7 @@ for src in nuke.selectedNodes('FrameHold'):
 This makes it easier when you only want a few shots at a time.
 </p>
 
-<div id="NOTHING WORKED-QUESTION-Create a Utility Module-Automate on Script Save or Load"><h4 id="Automate on Script Save or Load" class="header"><a href="#NOTHING WORKED-QUESTION-Create a Utility Module-Automate on Script Save or Load">Automate on Script Save or Load</a></h4></div>
+<div id="NOTHING WORKED-ANSWER-Create a Utility Module-Automate on Script Save or Load"><h4 id="Automate on Script Save or Load" class="header"><a href="#NOTHING WORKED-ANSWER-Create a Utility Module-Automate on Script Save or Load">Automate on Script Save or Load</a></h4></div>
 
 <p>
 You can attach a callback so the batch runs whenever a script is loaded or saved:
@@ -1569,7 +1419,7 @@ nuke.addOnScriptLoad(on_script_load)
 Drop that into menu.py if you want every comp to auto-strobe its holds without a menu click.
 </p>
 
-<div id="NOTHING WORKED-QUESTION-Create a Utility Module-Next Steps"><h4 id="Next Steps" class="header"><a href="#NOTHING WORKED-QUESTION-Create a Utility Module-Next Steps">Next Steps</a></h4></div>
+<div id="NOTHING WORKED-ANSWER-Create a Utility Module-Next Steps"><h4 id="Next Steps" class="header"><a href="#NOTHING WORKED-ANSWER-Create a Utility Module-Next Steps">Next Steps</a></h4></div>
 
 <ul>
 <li>
