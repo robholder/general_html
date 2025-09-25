@@ -3334,7 +3334,7 @@ You're correct; when querying thousands or millions of pixels across multiple fr
 </p>
 
 <p>
-To achieve speeds closer to the CurveTool, you must leverage Nuke's internal vectorized processing using the nuke.buffers module or OIIO (OpenImageIO), which are specifically designed to minimize the Python bottleneck by processing large blocks of data at once.
+To achieve speeds closer to the CurveTool, you must leverage Nuke's internal vectorized processing using the nuke.buffers module (AI GARBAGE - DOESN'T EXIST) or OIIO (OpenImageIO), which are specifically designed to minimize the Python bottleneck by processing large blocks of data at once.
 </p>
 
 <p>
@@ -3343,73 +3343,17 @@ Here are the two fastest approaches, which avoid the per-pixel Python overhead:
 
 <div id="Further Dev-QUESTION-Using nuke.buffers.getImage() (The Fastest Nuke-Native Way)"><h4 id="Using nuke.buffers.getImage() (The Fastest Nuke-Native Way)" class="header"><a href="#Further Dev-QUESTION-Using nuke.buffers.getImage() (The Fastest Nuke-Native Way)">Using nuke.buffers.getImage() (The Fastest Nuke-Native Way)</a></h4></div>
 
-<p>
-The nuke.buffers module allows you to directly access the raw pixel data from the image plane in a NumPy array. This bypasses the Nuke/Python conversion loop and lets NumPy (which is C-based) handle the large-scale data manipulation very quickly.
-</p>
-
-<div id="Further Dev-QUESTION-Workflow"><h4 id="Workflow" class="header"><a href="#Further Dev-QUESTION-Workflow">Workflow</a></h4></div>
-<ul>
-<li>
-<span id="Further Dev-QUESTION-Workflow-Get the Plane Data"></span><strong id="Get the Plane Data">Get the Plane Data</strong>: Use nuke.buffers.getImage() to dump the pixel data for a specified region and frame into a NumPy array.
-
-<li>
-<span id="Further Dev-QUESTION-Workflow-Process with NumPy"></span><strong id="Process with NumPy">Process with NumPy</strong>: Use NumPy's highly optimized methods to calculate statistics (mean, variance, mode) or filter the data.
-
-<li>
-<span id="Further Dev-QUESTION-Workflow-Convert to JSON"></span><strong id="Convert to JSON">Convert to JSON</strong>: Process the final statistical results into your JSON dictionary.
-
-</ul>
-<p>
-Example Code
-</p>
-<pre python>
 <table>
 <tr>
 <td>
-UNTESTED
+AI Garbage deleted.
 </td>
 </tr>
 </table>
 
-import nuke
-import numpy as np
-
-def fast_sample_data(node, frame, channels=['red', 'green', 'blue']):
-    # 1. Ensure the node is calculated at the specific frame
-    nuke.toNode(node).frame(frame)
-    
-    # 2. Get the bounding box of the image (Area Of Interest)
-    format = nuke.toNode(node).format()
-    bbox = (format.x(), format.y(), format.r(), format.t())
-    
-    # 3. Dump the pixel data into a NumPy array
-    try:
-        data = nuke.buffers.getImage(
-            node, 
-            channels, 
-            bbox[0], bbox[1], bbox[2], bbox[3]
-        )
-    except Exception as e:
-        print(f"Error getting image data: {e}")
-        return {}
-
-    # 4. Process the data using NumPy for speed
-    # 'data' is a 2D array: [pixel_index, channel_index]
-    
-    # Example: Calculate the mean color value for the entire image
-    mean_values = np.mean(data, axis=0)
-    
-    # 5. Build the final JSON-like dictionary
-    results = {}
-    for i, channel in enumerate(channels):
-        results[channel] = float(mean_values[i])
-        
-    return results
-
-# Example Usage:
-# stats = fast_sample_data('Read1', 101)
-# print(stats) 
-</pre>
+<p>
+Methods don't exist.
+</p>
 
 <div id="Further Dev-QUESTION-Using Nuke's CurveTool Itself (The &quot;No Code&quot; Solution)"><h3 id="Using Nuke's CurveTool Itself (The &quot;No Code&quot; Solution)" class="header"><a href="#Further Dev-QUESTION-Using Nuke's CurveTool Itself (The &quot;No Code&quot; Solution)">Using Nuke's CurveTool Itself (The "No Code" Solution)</a></h3></div>
 
@@ -3496,33 +3440,50 @@ Yes, you can absolutely leverage the technique of processing pixel data in large
 </p>
 
 <p>
-The recommended approach is to use NumPy via the nuke.buffers module (Method 1 from the previous answer), as it allows you to get all pixel data into an array at once, making it very quick to find all unique colors.
-</p>
-
-<p>
 Efficiently Gathering Unique Colors (The NumPy Method)
 This method avoids the Python per-pixel loop entirely, which is essential for speed.
 </p>
 
 <div id="Further Dev-QUESTION-🐍 Workflow"><h4 id="🐍 Workflow" class="header"><a href="#Further Dev-QUESTION-🐍 Workflow">🐍 Workflow</a></h4></div>
 
+
+<table>
+<tr>
+<td>
+AI Garbage deleted
+</td>
+</tr>
+</table>
+
+
+<div id="PyOpenImageIO (PyIOP)"><h1 id="PyOpenImageIO (PyIOP)" class="header"><a href="#PyOpenImageIO (PyIOP)">PyOpenImageIO (PyIOP)</a></h1></div>
+
+<p>
+To gather the set of unique colors quickly, you must access the raw image data and process it using a fast, external library like NumPy. We can use the library Nuke relies on for image I/O: PyOpenImageIO (PyIOP).
+</p>
+
+<div id="PyOpenImageIO (PyIOP)-🐍 Workflow"><h2 id="🐍 Workflow" class="header"><a href="#PyOpenImageIO (PyIOP)-🐍 Workflow">🐍 Workflow</a></h2></div>
+
 <ul>
 <li>
-Get Raw Data: Extract the entire image's pixel data into a NumPy array using nuke.buffers.getImage().
+<span id="PyOpenImageIO (PyIOP)-🐍 Workflow-Force Data into Memory"></span><strong id="Force Data into Memory">Force Data into Memory</strong>: Use a nuke.execute() call on a temporary Write node to force the image data to be rendered into a temporary file on disk.
 
 <li>
-Combine Channels: Reshape or combine the Red, Green, and Blue channels for each pixel into a single, unique identifier (or just treat each pixel as a 3-element vector).
+<span id="PyOpenImageIO (PyIOP)-🐍 Workflow-Read with PyIOP"></span><strong id="Read with PyIOP">Read with PyIOP</strong>: Use OpenImageIO.ImageBuf to read the entire image file into memory.
 
 <li>
-Find Unique Rows: Use the highly optimized NumPy function np.unique to quickly find every unique color vector present in the image.
+<span id="PyOpenImageIO (PyIOP)-🐍 Workflow-Convert to NumPy"></span><strong id="Convert to NumPy">Convert to NumPy</strong>: Convert the ImageBuf data into a NumPy array.
 
 <li>
-Format Output: Convert the resulting unique color array into your desired Python dictionary or JSON format.
+<span id="PyOpenImageIO (PyIOP)-🐍 Workflow-Find Unique Colors"></span><strong id="Find Unique Colors">Find Unique Colors</strong>: Use the highly optimized numpy.unique function to find the color set.
 
 </ul>
+<div id="PyOpenImageIO (PyIOP)-Corrected Example Code"><h2 id="Corrected Example Code" class="header"><a href="#PyOpenImageIO (PyIOP)-Corrected Example Code">Corrected Example Code</a></h2></div>
+
 <p>
-Example Code
+This code requires a temporary file write, but the processing speed is still vastly superior to using per-pixel nuke.sample().
 </p>
+
 <pre python>
 <table>
 <tr>
@@ -3533,71 +3494,74 @@ UNTESTED
 </table>
 
 import nuke
+import OpenImageIO as oiio
 import numpy as np
+import tempfile
+import os
 
-def get_unique_colors(node_name, frame, max_colors=50):
-    node = nuke.toNode(node_name)
+def get_unique_colors_fast(input_node, frame, max_colors=50):
+    node = nuke.toNode(input_node)
     if not node:
-        return {"error": f"Node '{node_name}' not found."}
+        return {"error": f"Node '{input_node}' not found."}
 
-    # 1. Prepare for data extraction
-    # Ensure the node is evaluated at the frame
-    nuke.frame(frame)
+    # 1. SET UP AND RENDER TO A TEMPORARY FILE
+    # Use a high-precision format (e.g., .exr) for color fidelity
+    temp_file = os.path.join(tempfile.gettempdir(), f"nuke_temp_colors_{os.getpid()}.exr")
     
-    # Get the bounding box (ROI)
-    format = node.format()
-    bbox = (format.x(), format.y(), format.r(), format.t())
-    channels = ['red', 'green', 'blue']
+    # Create a temporary Write node
+    w = nuke.createNode('Write', inpanel=False)
+    w['file'].setValue(temp_file)
+    w['file_type'].setValue('exr')
+    w.setInput(0, node)
 
-    # 2. Dump the pixel data into a NumPy array
     try:
-        # data will be a 2D array: [Number of Pixels, Number of Channels]
-        data = nuke.buffers.getImage(
-            node_name, 
-            channels, 
-            bbox[0], bbox[1], bbox[2], bbox[3]
-        )
-    except Exception as e:
-        return {"error": f"Failed to get buffer data: {e}"}
+        # Execute the write to render the image to the temp file
+        nuke.execute(w, frame, frame)
 
-    # 3. Find unique colors efficiently
-    # np.unique with axis=0 finds unique ROWS (i.e., unique [R, G, B] vectors)
-    # The 'return_counts=True' is optional but useful for verifying.
-    unique_colors, counts = np.unique(data, axis=0, return_counts=True)
-    
-    if len(unique_colors) &gt; max_colors:
-        # Optimization: If it has more than 50 colors, stop and return an error/warning
-        return {"warning": f"Image has {len(unique_colors)} unique colors, exceeding the limit of {max_colors}."}
-    
-    # 4. Format the output dictionary
-    color_dict = {}
-    for i, color_vector in enumerate(unique_colors):
-        # Convert NumPy float array to a list/tuple of standard Python floats
-        r, g, b = color_vector.tolist()
+        # 2. READ THE DATA WITH OPENIMAGEIO (OIIO)
+        image_buf = oiio.ImageBuf(temp_file)
+        if not image_buf.initialized:
+            return {"error": "Failed to read temporary image file."}
+            
+        # 3. CONVERT TO NUMPY
+        # Read the RGB channel data into a NumPy array
+        # This is the fastest way to get pixel data in Nuke
+        data = image_buf.get_pixels(oiio.TypeDesc.FLOAT) 
         
-        # Use the RGB tuple as the key (or format as a string for JSON keys)
-        # Using a string key here for JSON compatibility
-        color_key = f"({r:.6f}, {g:.6f}, {b:.6f})"
-        color_dict[color_key] = {
-            "r": r,
-            "g": g,
-            "b": b,
-            "count": int(counts[i]) # Number of pixels with this color
-        }
+        # OIIO returns [Height, Width, Channels]. Reshape to [Pixels, Channels]
+        # We only need the first 3 channels (RGB)
+        data_2d = data.reshape(-1, data.shape[-1])[:, :3] 
 
-    return {"unique_colors": color_dict}
+        # 4. FIND UNIQUE COLORS
+        unique_colors, counts = np.unique(data_2d, axis=0, return_counts=True)
+        
+        if len(unique_colors) &gt; max_colors:
+            return {"warning": f"Image has {len(unique_colors)} unique colors, exceeding limit."}
 
-# Example Usage (assuming you have a node named 'Read1'):
-# results = get_unique_colors('Read1', 1)
+        # 5. FORMAT OUTPUT
+        color_dict = {}
+        for i, color_vector in enumerate(unique_colors):
+            r, g, b = color_vector.tolist()
+            color_key = f"({r:.6f}, {g:.6f}, {b:.6f})"
+            color_dict[color_key] = {
+                "r": r,
+                "g": g,
+                "b": b,
+                "count": int(counts[i])
+            }
+        
+        return {"unique_colors": color_dict}
+
+    finally:
+        # Clean up the temporary Write node and file
+        nuke.delete(w)
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+# Example Usage:
+# results = get_unique_colors_fast('Read1', 101)
 # print(results)
 </pre>
-
-
-<p>
-This NumPy-based approach performs the massive data reduction (finding unique elements) using highly optimized C code, making it dramatically faster than sampling or looping in Python.
-</p>
-
-
 
 <p>
 <a href="pmount_index.html">PMount</a>
