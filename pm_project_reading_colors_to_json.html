@@ -4255,8 +4255,189 @@ def get_unique_colors_fast(input_node, frame, max_colors=50):
             os.remove(temp_file)
 </pre>
 
+<div id="PyOpenImageIO (PyIOP)-QUESTION"><h2 id="QUESTION" class="header"><a href="#PyOpenImageIO (PyIOP)-QUESTION">QUESTION</a></h2></div>
 
-<div id="PyOpenImageIO (PyIOP)-Count the Number of Unique Colors-Add Support for Alpha or Other Channels"><h4 id="Add Support for Alpha or Other Channels" class="header"><a href="#PyOpenImageIO (PyIOP)-Count the Number of Unique Colors-Add Support for Alpha or Other Channels">Add Support for Alpha or Other Channels</a></h4></div>
+<table>
+<tr>
+<td>
+If this were intended to be run on the Read node's input frame range, how would the code change? Would another calling function be the best way ahead (to call the 'per frame' function, or would just adding a range to the arguments for the existing function suffice? And how would you determine how many frames were being read by the Read node? Using a separate calling function is the best and most idiomatic way to handle a frame range in Nuke. The existing get_unique_colors_fast function is well-designed as a single-frame operation, and adding a loop to a separate function keeps the logic clean and reusable.
+</td>
+</tr>
+</table>
+
+<div id="PyOpenImageIO (PyIOP)-QUESTION-ANSWER"><h3 id="ANSWER" class="header"><a href="#PyOpenImageIO (PyIOP)-QUESTION-ANSWER">ANSWER</a></h3></div>
+
+<p>
+Here's how to determine the frame range of the Read node and the code changes required.
+</p>
+
+<div id="PyOpenImageIO (PyIOP)-QUESTION-Determining the Read Node's Frame Range"><h3 id="Determining the Read Node's Frame Range" class="header"><a href="#PyOpenImageIO (PyIOP)-QUESTION-Determining the Read Node's Frame Range">Determining the Read Node's Frame Range</a></h3></div>
+
+<p>
+You can determine the frame range of a Nuke node (like a Read node) by querying its first and last knobs.
+</p>
+
+<pre python>
+node = nuke.toNode('Read1') # Example node name
+
+if node and node.Class() == 'Read':
+    first_frame = int(node['first'].value())
+    last_frame = int(node['last'].value())
+    
+    # Or, use the global settings if the Read node is set to 'frame range' 'input'
+    # nuke.root()['first_frame'].value() 
+    # nuke.root()['last_frame'].value()
+    
+    print(f"Read node frame range: {first_frame} to {last_frame}")
+</pre>
+
+<p>
+For robust analysis, you typically want the frame range defined by the node itself (the first and last knobs), as this is the data it is capable of providing.
+</p>
+
+<div id="PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function"><h3 id="Implementing the Multi-Frame Caller Function" class="header"><a href="#PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function">Implementing the Multi-Frame Caller Function</a></h3></div>
+
+<p>
+We'll create a new function, analyze_range, that loops through the desired frame range and calls your existing get_unique_colors_fast for each frame, aggregating the results.
+</p>
+
+<div id="PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function-Modified Code Structure"><h4 id="Modified Code Structure" class="header"><a href="#PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function-Modified Code Structure">Modified Code Structure</a></h4></div>
+
+<p>
+Here is the complete, recommended structure:
+</p>
+
+<pre python>
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
+import nuke
+import OpenImageIO as oiio
+import numpy as np
+import tempfile
+import os
+import uuid # Using uuid for better robustness as discussed
+
+# ----------------------------------------------------------------------
+# A. SINGLE-FRAME PROCESSING FUNCTION (Updated for robustness)
+# ----------------------------------------------------------------------
+def get_unique_colors_fast(input_node, frame, max_colors=50):
+    node = nuke.toNode(input_node)
+    if not node:
+        # Note: If called from outside Nuke's GUI, nuke.toNode may not work as expected.
+        return {"error": f"Node '{input_node}' not found."}
+
+    # 1. SET UP AND RENDER TO A TEMPORARY FILE
+    # Use uuid.uuid4() for unique filenames per call (robustness)
+    temp_file = os.path.join(tempfile.gettempdir(), f"nuke_temp_colors_{uuid.uuid4().hex}.exr")
+    
+    w = nuke.createNode('Write', inpanel=False)
+    w['file'].setValue(temp_file)
+    w['file_type'].setValue('exr')
+    w.setInput(0, node)
+
+    try:
+        # Execute the write to render the image to the temp file
+        # The frame argument tells Nuke which frame to process
+        nuke.execute(w, frame, frame)
+
+        # 2. READ THE DATA AND PROCESS (Steps 2-5 remain the same)
+        image_buf = oiio.ImageBuf(temp_file)
+        if not image_buf.initialized:
+            return {"error": "Failed to read temporary image file."}
+            
+        data = image_buf.get_pixels(oiio.FLOAT)
+        data_2d = data.reshape(-1, data.shape[-1])[:, :3] 
+
+        unique_colors, counts = np.unique(data_2d, axis=0, return_counts=True)
+        total_unique_colors = len(unique_colors)
+        
+        if total_unique_colors &gt; max_colors:
+             # Returning a warning instead of full processing to save memory/time
+             return {"warning": f"Image has {total_unique_colors} unique colors, exceeding limit of {max_colors}."}
+
+        color_dict = {}
+        for i, color_vector in enumerate(unique_colors):
+            r, g, b = color_vector.tolist()
+            color_key = f"({r:.6f}, {g:.6f}, {b:.6f})"
+            color_dict[color_key] = {
+                "r": r, "g": g, "b": b, "count": int(counts[i])
+            }
+        
+        return {
+            "total_unique_colors": total_unique_colors,
+            "unique_colors": color_dict
+        }
+
+    finally:
+        # Clean up the temporary Write node and file
+        nuke.delete(w)
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+
+# ----------------------------------------------------------------------
+# B. MULTI-FRAME CALLER FUNCTION (New Function)
+# ----------------------------------------------------------------------
+def analyze_range(input_node_name, max_colors=50):
+    """
+    Analyzes the unique colors for every frame in the input node's
+    defined frame range.
+    """
+    node = nuke.toNode(input_node_name)
+    if not node:
+        return {"error": f"Node '{input_node_name}' not found."}
+    
+    # 1. DETERMINE FRAME RANGE
+    # Get the frame range from the node's knobs (e.g., Read node 'first' and 'last')
+    try:
+        first_frame = int(node['first'].value())
+        last_frame = int(node['last'].value())
+    except NameError:
+        return {"error": f"Node '{input_node_name}' does not have 'first'/'last' frame knobs."}
+
+    print(f"Starting analysis for {input_node_name} from frame {first_frame} to {last_frame}...")
+    
+    range_results = {}
+    
+    # 2. LOOP THROUGH FRAMES
+    for frame in range(first_frame, last_frame + 1):
+        print(f"Processing frame: {frame}...")
+        
+        # Call the single-frame function
+        result = get_unique_colors_fast(input_node_name, frame, max_colors)
+        
+        # Store the result keyed by the frame number
+        range_results[frame] = result
+
+    print("Analysis complete.")
+    return {"full_analysis": range_results}
+
+
+# Example Usage for a Read node named 'Read1':
+# results_over_range = analyze_range('Read1')
+# print(results_over_range)
+</pre>
+
+<div id="PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function-Why a Separate Function is Best"><h4 id="Why a Separate Function is Best" class="header"><a href="#PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function-Why a Separate Function is Best">Why a Separate Function is Best</a></h4></div>
+
+<ul>
+<li>
+<span id="PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function-Why a Separate Function is Best-Separation of Concerns"></span><strong id="Separation of Concerns">Separation of Concerns</strong>: get_unique_colors_fast is now responsible only for processing a single frame, making it easier to test and debug. analyze_range is responsible only for managing the sequence (looping and aggregation).
+
+<li>
+<span id="PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function-Why a Separate Function is Best-Flexibility"></span><strong id="Flexibility">Flexibility</strong>: The get_unique_colors_fast function can still be called directly for single-frame testing or custom needs.
+
+<li>
+<span id="PyOpenImageIO (PyIOP)-QUESTION-Implementing the Multi-Frame Caller Function-Why a Separate Function is Best-Clarity"></span><strong id="Clarity">Clarity</strong>: The caller function clearly defines the control flow (looping over the range), making the script's intent immediately obvious.
+
+</ul>
+<div id="PyOpenImageIO (PyIOP)-Add Support for Alpha or Other Channels"><h2 id="Add Support for Alpha or Other Channels" class="header"><a href="#PyOpenImageIO (PyIOP)-Add Support for Alpha or Other Channels">Add Support for Alpha or Other Channels</a></h2></div>
+
 <p>
 If needed, you can extend the slicing logic to include alpha or other channels:
 </p>
@@ -4265,7 +4446,7 @@ If needed, you can extend the slicing logic to include alpha or other channels:
 data_2d = data.reshape(-1, data.shape[-1])[:, :4]  # RGBA
 </pre>
 
-<div id="PyOpenImageIO (PyIOP)-Count the Number of Unique Colors-🧪 Optional Enhancements"><h4 id="🧪 Optional Enhancements" class="header"><a href="#PyOpenImageIO (PyIOP)-Count the Number of Unique Colors-🧪 Optional Enhancements">🧪 Optional Enhancements</a></h4></div>
+<div id="PyOpenImageIO (PyIOP)-Add Support for Alpha or Other Channels-🧪 Optional Enhancements"><h4 id="🧪 Optional Enhancements" class="header"><a href="#PyOpenImageIO (PyIOP)-Add Support for Alpha or Other Channels-🧪 Optional Enhancements">🧪 Optional Enhancements</a></h4></div>
 
 <ul>
 <li>
