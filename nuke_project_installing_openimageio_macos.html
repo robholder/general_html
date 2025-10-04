@@ -63,6 +63,197 @@ In my case, it returned the following:
 /opt/homebrew/opt/openimageio
 </pre>
 
+<div id="Gemini Circle Back to MY System Issues"><h1 id="Gemini Circle Back to MY System Issues" class="header"><a href="#Gemini Circle Back to MY System Issues">Gemini Circle Back to MY System Issues</a></h1></div>
+
+<div id="Gemini Circle Back to MY System Issues-QUESTION"><h2 id="QUESTION" class="header"><a href="#Gemini Circle Back to MY System Issues-QUESTION">QUESTION</a></h2></div>
+<table>
+<tr>
+<td>
+Ok, this is a mess on my machine. I use Pyenv to manage my python environment. My system is set to the default MacOS python (version 3.9.6). My Nuke is using 3.11.7. Running 'brew install openimageio' seems to have installed it to 3.13 (by reading the terminal lines such as these: /opt/homebrew/lib/python3.13/site-packages/pip/ Why is 'brew' installing to a particular python version? How to I install specifically for Nuke's access? How can I fix this?
+</td>
+</tr>
+</table>
+
+<p>
+This is a classic "dependency hell" scenario caused by a mix of system Python, Homebrew Python, and a Python version manager like Pyenv. Here is why this happens and how you can fix it. 
+</p>
+
+<div id="Gemini Circle Back to MY System Issues-Why brew installs to a particular Python version"><h2 id="Why brew installs to a particular Python version" class="header"><a href="#Gemini Circle Back to MY System Issues-Why brew installs to a particular Python version">Why brew installs to a particular Python version</a></h2></div>
+
+<p>
+Homebrew's philosophy is to manage its own dependencies in a self-contained manner. When you run brew install openimageio, Homebrew finds the latest stable Python it manages (currently 3.13) and installs the Python bindings for OpenImageIO using that version. It does not interact with your Pyenv-managed environments or your macOS system Python, which is intended to prevent conflicts. 
+</p>
+
+<div id="Gemini Circle Back to MY System Issues-How to fix this for Nuke 16 (Python 3.11.7)"><h2 id="How to fix this for Nuke 16 (Python 3.11.7)" class="header"><a href="#Gemini Circle Back to MY System Issues-How to fix this for Nuke 16 (Python 3.11.7)">How to fix this for Nuke 16 (Python 3.11.7)</a></h2></div>
+
+<p>
+Since Nuke comes with its own isolated Python interpreter, the Homebrew-installed bindings for Python 3.13 are useless to it. You have two primary options: 
+</p>
+
+<div id="Gemini Circle Back to MY System Issues-How to fix this for Nuke 16 (Python 3.11.7)-Option 1: The correct (manual) way"><h4 id="Option 1: The correct (manual) way" class="header"><a href="#Gemini Circle Back to MY System Issues-How to fix this for Nuke 16 (Python 3.11.7)-Option 1: The correct (manual) way">Option 1: The correct (manual) way</a></h4></div>
+<p>
+This approach is more work but is the most robust and avoids all dependency conflicts by compiling OpenImageIO specifically for Nuke's Python.
+Uninstall the Homebrew version of OpenImageIO to clean up your system.
+</p>
+
+<pre sh>
+brew uninstall openimageio
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Ensure Nuke's Python version is installed with Pyenv. Nuke 16.0v4 uses Python 3.11.7. If you don't have it installed with Pyenv, do so now.
+</p>
+
+<pre sh>
+pyenv install 3.11.7
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Get the OpenImageIO source code. Clone the OIIO repository from GitHub.
+</p>
+
+<pre sh>
+git clone https://github.com/OpenImageIO/oiio.git
+cd oiio
+</pre>
+<p>
+Us|e code with caution.|
+</p>
+
+<p>
+Configure and build OIIO with CMake. Crucially, you must explicitly point CMake to use Nuke's Python interpreter for the bindings.
+</p>
+
+<pre sh>
+# Navigate into a build directory
+mkdir build &amp;&amp; cd build
+
+# Run CMake. You may need to specify the path to OpenEXR and other dependencies
+# if you don't have them installed system-wide or via Homebrew.
+cmake .. -DUSE_PYTHON=On \
+    -DPYTHON_EXECUTABLE=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/python.app/Contents/MacOS/python \
+    -DCMAKE_INSTALL_PREFIX=$(pwd)/install
+
+# Compile and install
+make -j$(sysctl -n hw.ncpu)
+make install
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Copy the bindings to a known location. Your Python bindings will now be in ./install/python. Copy or move this directory to a permanent, safe location, for example, your .nuke directory.
+</p>
+
+<pre sh>
+# Assuming your install is in `oiio/build/install`
+cp -R oiio/build/install/python/OpenImageIO ~/.nuke/
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Add the path to init.py. Modify your ~/.nuke/init.py to point to the directory where you copied the bindings.
+</p>
+
+<pre python>
+import sys
+sys.path.append("/Users/YourUsername/.nuke/python")
+</pre>
+<p>
+|Use code with caution.}
+</p>
+
+<div id="Gemini Circle Back to MY System Issues-Option 2: The hacky (but easier) way"><h2 id="Option 2: The hacky (but easier) way" class="header"><a href="#Gemini Circle Back to MY System Issues-Option 2: The hacky (but easier) way">Option 2: The hacky (but easier) way</a></h2></div>
+
+<p>
+This method relies on creating a hard link to the Homebrew-installed bindings and is less robust but requires less effort. It works because Homebrew installs the binaries in a way that is compatible with Apple Silicon.
+Find the installed OIIO bindings. You can find the path by inspecting the Homebrew installation.
+</p>
+
+<pre sh>
+brew info openimageio
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+Look for a line mentioning the installation path, which typically contains a python3.13 subdirectory. Example: /opt/homebrew/lib/python3.13/site-packages/OpenImageIO.so.
+</p>
+
+<p>
+Determine Nuke's site-packages location. Open the Nuke Script Editor and run:
+</p>
+
+<pre python>
+import site
+print(site.getsitepackages())
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<p>
+The output should be the path you need to copy the bindings to. Example: /Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/python.app/Contents/Resources/lib/python3.11/site-packages.
+</p>
+
+<p>
+Copy the OpenImageIO bindings. Copy the .so file from Homebrew's install directory to Nuke's site-packages.
+</p>
+
+<pre sh>
+# Note: Use `cp` to copy, not link, to avoid breaking it with Homebrew updates.
+cp /opt/homebrew/lib/python3.13/site-packages/OpenImageIO.so \
+"/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/python.app/Contents/Resources/lib/python3.11/site-packages/"
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<div id="Gemini Circle Back to MY System Issues-Recommendation"><h2 id="Recommendation" class="header"><a href="#Gemini Circle Back to MY System Issues-Recommendation">Recommendation</a></h2></div>
+
+<p>
+For production stability, Option 1 (building from source) is the recommended approach. It guarantees that the OpenImageIO bindings are compiled specifically for Nuke's Python 3.11.7 interpreter, eliminating any potential version incompatibilities or future issues caused by Homebrew updates. It also ensures you don't break any of your existing Python environments managed by Pyenv.
+</p>
+
+<div id="BACK TO INITIAL CONVERSATION"><h1 id="BACK TO INITIAL CONVERSATION" class="header"><a href="#BACK TO INITIAL CONVERSATION">BACK TO INITIAL CONVERSATION</a></h1></div>
 <div id="Gemini Response to Installing OpenImageIO for Nuke on MacOS"><h1 id="Gemini Response to Installing OpenImageIO for Nuke on MacOS" class="header"><a href="#Gemini Response to Installing OpenImageIO for Nuke on MacOS">Gemini Response to Installing OpenImageIO for Nuke on MacOS</a></h1></div>
 
 <p>
