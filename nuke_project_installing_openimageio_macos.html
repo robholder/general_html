@@ -30,6 +30,38 @@ Ended up with a location with the OpenImageIO stuff to reference, and a launcher
 <div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 1: System setup"><h3 id="Part 1: System setup" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 1: System setup">Part 1: System setup</a></h3></div>
 
 <p>
+Install the same version of Python as in Nuke with Pyenv (since I use Pyenv to manage my Python installs):
+</p>
+
+<p>
+Find the correct version in Nuke's Script Editor with:
+</p>
+
+<pre python>
+import sys
+print(sys.version)
+</pre>
+
+<p>
+...or in the Terminal:
+</p>
+
+<pre sh>
+/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/python -c "import sys; print(sys.version)"
+# My response:
+# 3.11.7 (remotes/origin/foundry/v3.11.7:88283f3425, Oct  8 2024, 09:50:25) [Clang 14.0.0 (clang-1400.0.29.202)]
+</pre>
+
+
+<p>
+Install the same version with Pyenv:
+</p>
+
+<pre sh>
+pyenv install 3.11.7
+</pre>
+
+<p>
 Install Homebrew: If you haven't already, install the Homebrew package manager.
 </p>
 
@@ -50,6 +82,22 @@ Install dependencies: Use Homebrew to install the necessary build tools and libr
 
 <pre sh>
 brew install cmake openexr libtiff jpeg-turbo pybind11 opencolorio
+</pre>
+
+<p>
+Install 'cmake':
+</p>
+
+<pre sh>
+brew install cmake
+</pre>
+
+<p>
+Verify:
+</p>
+<pre sh>
+cmake --version
+#cmake version 4.1.2
 </pre>
 
 <p>
@@ -87,10 +135,13 @@ These were the paths established from digging around a lot
 </td>
 </tr>
 </table>
+cd ~/Documents/Projects/Projects_apps/Nuke/oiio/build
 cmake .. \
-    -DPYTHON_EXECUTABLE=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/python \
-    -DPython_INCLUDE_DIR=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/Frameworks/Python.framework/Versions/3.11/Headers \
-    -DPython_LIBRARY=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/Frameworks/Python.framework/Versions/3.11/Python \
+    -DUSE_PYTHON=On \
+    -DPython3_ROOT_DIR=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/Frameworks/Python.framework/Versions/3.11 \
+    -DPython3_EXECUTABLE=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/python \
+    -DPython3_FIND_STRATEGY=LOCATION \
+    -DPython3_FIND_VIRTUALENV=ONLY \
     -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
     -DCMAKE_PREFIX_PATH=/opt/homebrew \
     -DOpenImageIO_BUILD_MISSING_DEPS=all
@@ -137,16 +188,19 @@ install_name_tool -add_rpath "/Users/&lt;username&gt;/Documents/Projects/Project
 <p>
 Create a launch script: This script sets the PYTHONPATH correctly and launches Nuke.
 </p>
+
 <pre sh>
 #!/bin/sh
 
-export PYTHONPATH="/Users/&lt;username&gt;/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib/python3.11/site-packages:${PYTHONPATH}"
+# Add your custom built OpenImageIO Python path
+export PYTHONPATH="/Users/noddy/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib/python3.11/site-packages:${PYTHONPATH}"
 
-/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/Nuke16.0v4 "$@"
+# Launch Nuke
+/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/Nuke16.0 "$@"
 </pre>
 
 <p>
-Save the script as launch_nuke_with_oiio.sh in your Projects_apps/Nuke directory.
+Save the script as launch_nuke_with_oiio.sh in your Projects_apps/Nuke directory. (Or anywhere really - I saved it to the desktop.)
 </p>
 
 <p>
@@ -158,7 +212,21 @@ cd ~/Documents/Projects/Projects_apps/Nuke
 chmod +x launch_nuke_with_oiio.sh
 </pre>
 
-<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 5: Launch Nuke and test"><h3 id="Part 5: Launch Nuke and test" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 5: Launch Nuke and test">Part 5: Launch Nuke and test</a></h3></div>
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 5: Add paths to the init.py"><h3 id="Part 5: Add paths to the init.py" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 5: Add paths to the init.py">Part 5: Add paths to the init.py</a></h3></div>
+
+<pre python>
+print("Executing Nuke init.py...")
+import sys
+# Add the path to your custom-built OpenImageIO bindings
+oiio_path = "/Users/noddy/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib/python3.11/site-packages"
+
+if oiio_path not in sys.path:
+    sys.path.append(oiio_path)
+
+print(f"Added OpenImageIO path to sys.path: {oiio_path}")
+</pre>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 6: Launch Nuke and test"><h3 id="Part 6: Launch Nuke and test" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 6: Launch Nuke and test">Part 6: Launch Nuke and test</a></h3></div>
 
 <p>
 Launch Nuke: Run the launch script from your terminal.
