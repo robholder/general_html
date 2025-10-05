@@ -19,7 +19,155 @@
 
 <div id="Installing OpenImageIO in Nuke - MacOS"><h1 id="Installing OpenImageIO in Nuke - MacOS" class="header"><a href="#Installing OpenImageIO in Nuke - MacOS">Installing OpenImageIO in Nuke - MacOS</a></h1></div>
 
-<div id="Installing OpenImageIO in Nuke - MacOS-Find Version Of Python in Nuke"><h2 id="Find Version Of Python in Nuke" class="header"><a href="#Installing OpenImageIO in Nuke - MacOS-Find Version Of Python in Nuke">Find Version Of Python in Nuke</a></h2></div>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO"><h1 id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO">This is Gemini's summary of what got my system working with Nuke and OpenImageIO</a></h1></div>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4"><h2 id="macOS 15.6.1 on M3, Nuke 16.0v4" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4">macOS 15.6.1 on M3, Nuke 16.0v4</a></h2></div>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 1: System setup"><h3 id="Part 1: System setup" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 1: System setup">Part 1: System setup</a></h3></div>
+
+<p>
+Install Homebrew: If you haven't already, install the Homebrew package manager.
+</p>
+
+<pre sh>
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+</pre>
+
+<p>
+Install dependencies: Use Homebrew to install the necessary build tools and libraries.
+</p>
+
+<pre sh>
+brew install cmake openexr libtiff jpeg-turbo pybind11 opencolorio
+</pre>
+
+<p>
+Get OpenImageIO source code: Clone the source code from GitHub.
+</p>
+
+<pre sh>
+cd ~/Documents/Projects/Projects_apps/Nuke
+git clone https://github.com/OpenImageIO/oiio.git
+</pre>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 2: Compile OpenImageIO for Nuke"><h3 id="Part 2: Compile OpenImageIO for Nuke" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 2: Compile OpenImageIO for Nuke">Part 2: Compile OpenImageIO for Nuke</a></h3></div>
+
+<p>
+Create a build directory: Use a separate directory for the build process to keep the source clean.
+</p>
+
+<pre sh>
+cd ~/Documents/Projects/Projects_apps/Nuke/oiio
+mkdir build
+cd build
+</pre>
+
+<p>
+Run CMake to configure the build: This command explicitly points CMake to Nuke's Python 3.11, preventing it from defaulting to another version.
+</p>
+
+<pre sh>
+cmake .. \
+    -DPYTHON_EXECUTABLE=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/python \
+    -DPython_INCLUDE_DIR=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/Frameworks/Python.framework/Versions/3.11/Headers \
+    -DPython_LIBRARY=/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/Frameworks/Python.framework/Versions/3.11/Python \
+    -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+    -DCMAKE_PREFIX_PATH=/opt/homebrew \
+    -DOpenImageIO_BUILD_MISSING_DEPS=all
+</pre>
+
+<p>
+Compile the source code: This will build all components of OpenImageIO.
+</p>
+
+<pre sh>
+make -j$(sysctl -n hw.ncpu)
+</pre>
+
+<p>
+Install the compiled files: This copies the compiled binaries, libraries, and Python bindings to the install subdirectory.
+</p>
+
+<pre sh>
+make install
+</pre>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 3: Fix runtime paths (rpath)"><h3 id="Part 3: Fix runtime paths (rpath)" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 3: Fix runtime paths (rpath)">Part 3: Fix runtime paths (rpath)</a></h3></div>
+
+<p>
+Fix the core OIIO library: Add the custom installation path to the RPATH of the core library.
+</p>
+
+<pre sh>
+cd ~/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib
+install_name_tool -add_rpath "/Users/&lt;username&gt;/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib" libOpenImageIO.3.2.0.dylib
+</pre>
+
+<p>
+Fix the Python binding: Add the custom installation path to the RPATH of the Python binding.
+</p>
+
+<pre sh>
+cd ~/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib/python3.11/site-packages/OpenImageIO
+install_name_tool -add_rpath "/Users/&lt;username&gt;/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib" OpenImageIO.cpython-311-darwin.so
+</pre>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 4: Create a Nuke launch script"><h3 id="Part 4: Create a Nuke launch script" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 4: Create a Nuke launch script">Part 4: Create a Nuke launch script</a></h3></div>
+
+<p>
+Create a launch script: This script sets the PYTHONPATH correctly and launches Nuke.
+</p>
+<pre sh>
+#!/bin/sh
+
+export PYTHONPATH="/Users/&lt;username&gt;/Documents/Projects/Projects_apps/Nuke/oiio/build/install/lib/python3.11/site-packages:${PYTHONPATH}"
+
+/Applications/Nuke16.0v4/Nuke16.0v4.app/Contents/MacOS/Nuke16.0v4 "$@"
+</pre>
+
+<p>
+Save the script as launch_nuke_with_oiio.sh in your Projects_apps/Nuke directory.
+</p>
+
+<p>
+Make the script executable:
+</p>
+
+<pre sh>
+cd ~/Documents/Projects/Projects_apps/Nuke
+chmod +x launch_nuke_with_oiio.sh
+</pre>
+
+<div id="This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 5: Launch Nuke and test"><h3 id="Part 5: Launch Nuke and test" class="header"><a href="#This is Gemini's summary of what got my system working with Nuke and OpenImageIO-macOS 15.6.1 on M3, Nuke 16.0v4-Part 5: Launch Nuke and test">Part 5: Launch Nuke and test</a></h3></div>
+
+<p>
+Launch Nuke: Run the launch script from your terminal.
+</p>
+<pre sh>
+./launch_nuke_with_oiio.sh
+</pre>
+
+<p>
+Run the test code: In Nuke's Script Editor, run the following to verify the installation.
+</p>
+<pre python>
+import OpenImageIO as oiio
+print("OpenImageIO version:", oiio.VERSION)
+ 
+# Verify OpenImageIO functionality by reading image info
+# (Replace 'path/to/image.exr' with a valid image file)
+image_path = "/path/to/your/test_image.exr"
+if oiio.ImageInput.open(image_path):
+    print(f"Successfully opened {image_path} with OpenImageIO.")
+else:
+    print(f"Failed to open image: {oiio.geterror()}")
+</pre>
+
+
+<div id="Long Meandering Conversation..."><h1 id="Long Meandering Conversation..." class="header"><a href="#Long Meandering Conversation...">Long Meandering Conversation...</a></h1></div>
+
+<div id="Long Meandering Conversation...-Find Version Of Python in Nuke"><h2 id="Find Version Of Python in Nuke" class="header"><a href="#Long Meandering Conversation...-Find Version Of Python in Nuke">Find Version Of Python in Nuke</a></h2></div>
 
 <p>
 Find and confirm Python version and architecture of Nuke's own Python interpreter.
@@ -40,7 +188,7 @@ My instance returned the following:
 arm64
 </pre>
 
-<div id="Installing OpenImageIO in Nuke - MacOS-Brew Install OpenImageIO"><h2 id="Brew Install OpenImageIO" class="header"><a href="#Installing OpenImageIO in Nuke - MacOS-Brew Install OpenImageIO">Brew Install OpenImageIO</a></h2></div>
+<div id="Long Meandering Conversation...-Brew Install OpenImageIO"><h2 id="Brew Install OpenImageIO" class="header"><a href="#Long Meandering Conversation...-Brew Install OpenImageIO">Brew Install OpenImageIO</a></h2></div>
 <table>
 <tr>
 <td>
