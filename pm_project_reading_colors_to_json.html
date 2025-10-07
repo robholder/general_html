@@ -5660,7 +5660,7 @@ Updated get_unique_colors_fast function
 <table>
 <tr>
 <td>
-UNTESTED
+FAILED - SEE ADJUSTMENT BELOW
 </td>
 </tr>
 </table>
@@ -5820,6 +5820,178 @@ The main changes are in the get_unique_colors_fast_tiled function, replacing the
 <p>
 This approach offers a significant memory improvement for high-resolution images by never holding all pixel data in memory at once.
 </p>
+
+<div id="Corrected script for tiled and scanline images"><h1 id="Corrected script for tiled and scanline images" class="header"><a href="#Corrected script for tiled and scanline images">Corrected script for tiled and scanline images</a></h1></div>
+
+<p>
+This script includes the robust temporary file handling and the fix for reading both tiled and scanline-based EXR images. The error handling for the OpenImageIO read operation has also been improved. 
+</p>
+
+<div id="Corrected script for tiled and scanline images-Key changes:"><h4 id="Key changes:" class="header"><a href="#Corrected script for tiled and scanline images-Key changes:">Key changes:</a></h4></div>
+
+<ul>
+<li>
+<span id="Corrected script for tiled and scanline images-Key changes:-Combined logic for tiled and scanline"></span><strong id="Combined logic for tiled and scanline">Combined logic for tiled and scanline</strong>: The get_unique_colors_fast_tiled function has been updated to check the image specification (spec.tile_width) to determine whether to use read_tile() or read_scanline().
+
+<li>
+<span id="Corrected script for tiled and scanline images-Key changes:-Improved debugging"></span><strong id="Improved debugging">Improved debugging</strong>: print statements have been added to track the rendering and file-reading process, and the os.path.getsize() check helps identify empty or corrupted files immediately.
+
+<li>
+<span id="Corrected script for tiled and scanline images-Key changes:-Error capture"></span><strong id="Error capture">Error capture</strong>: oiio.geterror() is used to retrieve more specific OpenImageIO error messages. 
+
+</ul>
+  
+<pre python>
+<table>
+<tr>
+<td>
+VERBOSE BUT WORKS - (MacOS)
+</td>
+</tr>
+</table>
+import nuke
+import OpenImageIO as oiio
+import numpy as np
+import tempfile
+import os
+import uuid
+
+# ----------------------------------------------------------------------
+# A. SINGLE-FRAME PROCESSING FUNCTION (Optimized for Large Images)
+# ----------------------------------------------------------------------
+def get_unique_colors_fast_tiled(input_node, frame, max_colors=50):
+    """
+    Analyzes unique colors in a single frame using a tiled or scanline-based
+    approach for memory efficiency with large images.
+    """
+    node = nuke.toNode(input_node)
+    if not node:
+        return {"error": f"Node '{input_node}' not found."}
+
+    # Use a robust, temporary filename
+    temp_file = os.path.join(tempfile.gettempdir(), f"nuke_temp_colors_{uuid.uuid4().hex}.exr")
+    
+    # Create and configure the Nuke Write node
+    w = nuke.createNode('Write', inpanel=False)
+    w['file'].setValue(temp_file)
+    w['file_type'].setValue('exr')
+    w.setInput(0, node)
+
+    try:
+        # 1. RENDER TO A TEMPORARY FILE
+        print(f"Rendering frame {frame} to temporary file: {temp_file}")
+        nuke.execute(w, frame, frame)
+
+        # Check if the file was created successfully and is not empty
+        if not os.path.exists(temp_file) or os.path.getsize(temp_file) == 0:
+            return {"error": f"Temporary file was not created or is empty for frame {frame}."}
+        
+        # 2. READ THE DATA IN TILES OR SCANLINES AND PROCESS
+        input_file = oiio.ImageInput.open(temp_file)
+        if not input_file:
+            # Get specific OIIO error message if file opening fails
+            error_message = oiio.geterror()
+            return {"error": f"Failed to open temporary image file with OpenImageIO. OIIO Error: {error_message}"}
+        
+        spec = input_file.spec()
+        width, height, channels = spec.width, spec.height, spec.nchannels
+        all_pixels = []
+
+        # Logic for scanline-based images
+        if spec.tile_width == 0:
+            print(f"Image is scanline-based. Using read_scanline() for frame {frame}.")
+            for y in range(height):
+                scanline_data = input_file.read_scanline(y, 0, oiio.FLOAT)
+                if scanline_data is not None:
+                    # Reshape and slice the scanline data
+                    data_2d = scanline_data.reshape(-1, channels)[:, :3]
+                    all_pixels.append(data_2d)
+                else:
+                    print(f"Warning: Failed to read scanline {y} for frame {frame}.")
+        
+        # Logic for tiled images
+        else:
+            print(f"Image is tiled. Using read_tile() for frame {frame}.")
+            tile_width, tile_height = spec.tile_width, spec.tile_height
+            for y in range(0, height, tile_height):
+                for x in range(0, width, tile_width):
+                    tile_data = input_file.read_tile(x, y, 0, oiio.FLOAT)
+                    if tile_data is not None:
+                        # Reshape and slice the tile data
+                        data_2d = tile_data.reshape(-1, channels)[:, :3]
+                        all_pixels.append(data_2d)
+                    else:
+                        print(f"Warning: Failed to read tile at ({x}, {y}) for frame {frame}.")
+
+        input_file.close()
+
+        if not all_pixels:
+            return {"error": f"No pixel data could be read from the image for frame {frame}."}
+            
+        full_image_data = np.concatenate(all_pixels, axis=0)
+
+        # 3. ANALYZE UNIQUE COLORS
+        unique_colors, counts = np.unique(full_image_data, axis=0, return_counts=True)
+        total_unique_colors = len(unique_colors)
+        
+        if total_unique_colors &gt; max_colors:
+             return {"warning": f"Image has {total_unique_colors} unique colors, exceeding limit of {max_colors}."}
+
+        color_dict = {}
+        for i, color_vector in enumerate(unique_colors):
+            r, g, b = color_vector.tolist()
+            color_key = f"({r:.6f}, {g:.6f}, {b:.6f})"
+            color_dict[color_key] = {
+                "r": r, "g": g, "b": b, "count": int(counts[i])
+            }
+        
+        return {
+            "total_unique_colors": total_unique_colors,
+            "unique_colors": color_dict
+        }
+
+    finally:
+        # Clean up the temporary Write node and file
+        nuke.delete(w)
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+# ----------------------------------------------------------------------
+# B. MULTI-FRAME CALLER FUNCTION
+# ----------------------------------------------------------------------
+def analyze_range(input_node_name, max_colors=50):
+    """
+    Analyzes the unique colors for every frame in the input node's
+    defined frame range.
+    """
+    node = nuke.toNode(input_node_name)
+    if not node:
+        return {"error": f"Node '{input_node_name}' not found."}
+    
+    try:
+        first_frame = int(node['first'].value())
+        last_frame = int(node['last'].value())
+    except NameError:
+        return {"error": f"Node '{input_node_name}' does not have 'first'/'last' frame knobs."}
+
+    print(f"Starting analysis for {input_node_name} from frame {first_frame} to {last_frame}...")
+    
+    range_results = {}
+    
+    for frame in range(first_frame, last_frame + 1):
+        print(f"Processing frame: {frame}...")
+        # Call the new tile-based function
+        result = get_unique_colors_fast_tiled(input_node_name, frame, max_colors)
+        range_results[frame] = result
+
+    print("Analysis complete.")
+    return {"full_analysis": range_results}
+
+
+# Example Usage for a Read node named 'Read1':
+# results_over_range = analyze_range('Read1')
+# print(results_over_range)
+</pre>
 
 <p>
 <a href="pmount_index.html">PMount</a>
