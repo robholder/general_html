@@ -5413,30 +5413,54 @@ The returned structure would look like:
     101: {...}
   }
 }
+</pre>
 
-=== ⚡ Enhancements You Could Add ===
+<div id="Understanding data.shape-Batch Processing Frames-⚡ Enhancements You Could Add"><h3 id="⚡ Enhancements You Could Add" class="header"><a href="#Understanding data.shape-Batch Processing Frames-⚡ Enhancements You Could Add">⚡ Enhancements You Could Add</a></h3></div>
 
-* Progress reporting: print or log which frame/node is being processed.
-* Parallelization: use Python’s concurrent.futures to process frames in parallel (careful with Nuke’s thread safety).
-* Aggregation: instead of returning per‑frame results, you could merge counts across frames to get a “global palette.”
-* Top‑N filtering: store only the most frequent colors per frame to keep results manageable.
+<ul>
+<li>
+Progress reporting: print or log which frame/node is being processed.
 
+<li>
+Parallelization: use Python’s concurrent.futures to process frames in parallel (careful with Nuke’s thread safety).
+
+<li>
+Aggregation: instead of returning per‑frame results, you could merge counts across frames to get a “global palette.”
+
+<li>
+Top‑N filtering: store only the most frequent colors per frame to keep results manageable.
+
+</ul>
+<p>
 ✨ In short: batch processing turns your single‑frame color analysis into a timeline‑ or sequence‑level tool, letting you track palettes across shots or compare multiple sources.
+</p>
 
+<p>
 Would you like me to sketch out how to aggregate across frames (e.g. “give me the top 10 colors across the whole sequence” instead of per‑frame breakdowns)?
+</p>
 
 
-== QUESTION ==
+<div id="Understanding data.shape-QUESTION"><h2 id="QUESTION" class="header"><a href="#Understanding data.shape-QUESTION">QUESTION</a></h2></div>
 
-| What I want is a list off all colors present from across all frames. My image sequences will never have more than 50 colors. |
+<table>
+<tr>
+<td>
+What I want is a list off all colors present from across all frames. My image sequences will never have more than 50 colors.
+</td>
+</tr>
+</table>
 
+<p>
 Perfect — since you know your sequences will never exceed ~50 unique colors, you can simplify things a lot. Instead of analyzing each frame separately and then merging, you can accumulate unique colors across all frames into one set/dictionary. That way you end up with a single palette for the whole sequence.
+</p>
 
-==== 🛠 How to Do It ====
+<div id="Understanding data.shape-QUESTION-🛠 How to Do It"><h4 id="🛠 How to Do It" class="header"><a href="#Understanding data.shape-QUESTION-🛠 How to Do It">🛠 How to Do It</a></h4></div>
 
+<p>
 Here’s a sketch of how you could adapt your function:
+</p>
 
-{{{python
+<pre python>
 def get_all_unique_colors(input_node, frames, max_colors=50):
     node = nuke.toNode(input_node)
     if not node:
@@ -5485,7 +5509,7 @@ def get_all_unique_colors(input_node, frames, max_colors=50):
     return {"unique_colors": color_dict}
 </pre>
 
-<div id="Understanding data.shape-Batch Processing Frames-🛠 How to Implement It-📊 Example Usage"><h4 id="📊 Example Usage" class="header"><a href="#Understanding data.shape-Batch Processing Frames-🛠 How to Implement It-📊 Example Usage">📊 Example Usage</a></h4></div>
+<div id="Understanding data.shape-QUESTION-📊 Example Usage"><h4 id="📊 Example Usage" class="header"><a href="#Understanding data.shape-QUESTION-📊 Example Usage">📊 Example Usage</a></h4></div>
 
 <pre python>
 # Analyze frames 100–110
@@ -5497,7 +5521,7 @@ print(results)
 This will give you one dictionary of all unique colors across the entire frame range, with counts aggregated.
 </p>
 
-<div id="Understanding data.shape-Batch Processing Frames-🛠 How to Implement It-✨ Why This Works Well for You"><h4 id="✨ Why This Works Well for You" class="header"><a href="#Understanding data.shape-Batch Processing Frames-🛠 How to Implement It-✨ Why This Works Well for You">✨ Why This Works Well for You</a></h4></div>
+<div id="Understanding data.shape-QUESTION-✨ Why This Works Well for You"><h4 id="✨ Why This Works Well for You" class="header"><a href="#Understanding data.shape-QUESTION-✨ Why This Works Well for You">✨ Why This Works Well for You</a></h4></div>
 
 <ul>
 <li>
@@ -5614,6 +5638,188 @@ Counts aggregated.
 Sorted by dominance.
 
 </ul>
+<div id="Using Tile instead of Whole Image"><h1 id="Using Tile instead of Whole Image" class="header"><a href="#Using Tile instead of Whole Image">Using Tile instead of Whole Image</a></h1></div>
+<table>
+<tr>
+<td>
+With the tile options, and also the reshape method (both of which can reduce memory usage), can you suggest and update the code?
+</td>
+</tr>
+</table>
+
+<p>
+Here is an updated version of your code that uses OpenImageIO's tile-based processing. This approach is more memory-efficient for large images, as it avoids loading the entire pixel data into memory at once. It reads the image in smaller chunks (tiles), processes each tile, and aggregates the results. 
+</p>
+
+<p>
+Updated get_unique_colors_fast function
+</p>
+
+<pre python>
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
+import nuke
+import OpenImageIO as oiio
+import numpy as np
+import tempfile
+import os
+import uuid
+
+# ----------------------------------------------------------------------
+# A. SINGLE-FRAME PROCESSING FUNCTION (Optimized for Large Images)
+# ----------------------------------------------------------------------
+def get_unique_colors_fast_tiled(input_node, frame, max_colors=50):
+    node = nuke.toNode(input_node)
+    if not node:
+        return {"error": f"Node '{input_node}' not found."}
+
+    # 1. SET UP AND RENDER TO A TEMPORARY FILE
+    temp_file = os.path.join(tempfile.gettempdir(), f"nuke_temp_colors_{uuid.uuid4().hex}.exr")
+    
+    w = nuke.createNode('Write', inpanel=False)
+    w['file'].setValue(temp_file)
+    w['file_type'].setValue('exr')
+    w.setInput(0, node)
+
+    try:
+        nuke.execute(w, frame, frame)
+
+        # 2. READ THE DATA IN TILES AND PROCESS
+        input_file = oiio.ImageInput.open(temp_file)
+        if not input_file:
+            return {"error": "Failed to read temporary image file with OpenImageIO."}
+        
+        spec = input_file.spec()
+        width, height, channels = spec.width, spec.height, spec.nchannels
+        
+        # Determine tile size, using OIIO's native if available, otherwise a sensible default
+        tile_width = spec.tile_width if spec.tile_width else 64
+        tile_height = spec.tile_height if spec.tile_height else 64
+        
+        all_pixels = []
+        
+        # Loop over tiles and process each one
+        for y in range(0, height, tile_height):
+            for x in range(0, width, tile_width):
+                # Clamp coordinates to ensure we don't read past the image boundaries
+                x_end = min(x + tile_width, width)
+                y_end = min(y + tile_height, height)
+                
+                # Read a single tile as a float NumPy array
+                tile_data = input_file.read_tile(x, y, 0, oiio.FLOAT)
+                
+                if tile_data is not None:
+                    # Reshape and slice the tile data
+                    data_2d = tile_data.reshape(-1, tile_data.shape[-1])[:, :3]
+                    all_pixels.append(data_2d)
+
+        input_file.close()
+
+        # Combine all tile pixel data into a single array
+        if not all_pixels:
+            return {"error": "No pixel data could be read from the image."}
+            
+        full_image_data = np.concatenate(all_pixels, axis=0)
+
+        # 3. ANALYZE UNIQUE COLORS
+        unique_colors, counts = np.unique(full_image_data, axis=0, return_counts=True)
+        total_unique_colors = len(unique_colors)
+        
+        if total_unique_colors &gt; max_colors:
+             return {"warning": f"Image has {total_unique_colors} unique colors, exceeding limit of {max_colors}."}
+
+        color_dict = {}
+        for i, color_vector in enumerate(unique_colors):
+            r, g, b = color_vector.tolist()
+            color_key = f"({r:.6f}, {g:.6f}, {b:.6f})"
+            color_dict[color_key] = {
+                "r": r, "g": g, "b": b, "count": int(counts[i])
+            }
+        
+        return {
+            "total_unique_colors": total_unique_colors,
+            "unique_colors": color_dict
+        }
+
+    finally:
+        nuke.delete(w)
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+# ----------------------------------------------------------------------
+# B. MULTI-FRAME CALLER FUNCTION
+# ----------------------------------------------------------------------
+# The caller function does not need to be changed. It simply calls the new
+# tile-based processing function instead of the old one.
+def analyze_range(input_node_name, max_colors=50):
+    node = nuke.toNode(input_node_name)
+    if not node:
+        return {"error": f"Node '{input_node_name}' not found."}
+    
+    try:
+        first_frame = int(node['first'].value())
+        last_frame = int(node['last'].value())
+    except NameError:
+        return {"error": f"Node '{input_node_name}' does not have 'first'/'last' frame knobs."}
+
+    print(f"Starting analysis for {input_node_name} from frame {first_frame} to {last_frame}...")
+    
+    range_results = {}
+    
+    for frame in range(first_frame, last_frame + 1):
+        print(f"Processing frame: {frame}...")
+        result = get_unique_colors_fast_tiled(input_node_name, frame, max_colors) # Call the new function
+        range_results[frame] = result
+
+    print("Analysis complete.")
+    return {"full_analysis": range_results}
+
+
+# Example Usage (assuming a Read node named 'Read1' exists)
+# results_over_range = analyze_range('Read1')
+# print(results_over_range)
+</pre>
+<p>
+Use code with caution.
+</p>
+
+<div id="Using Tile instead of Whole Image-Summary of updates"><h3 id="Summary of updates" class="header"><a href="#Using Tile instead of Whole Image-Summary of updates">Summary of updates</a></h3></div>
+
+<p>
+The main changes are in the get_unique_colors_fast_tiled function, replacing the direct get_pixels() call with a tiled approach.
+</p>
+<ul>
+<li>
+<span id="Using Tile instead of Whole Image-Summary of updates-Read ImageInput"></span><strong id="Read ImageInput">Read ImageInput</strong>: Instead of using oiio.ImageBuf, the code opens a oiio.ImageInput. This object provides lower-level access, which is necessary for reading tiles.
+
+<li>
+<span id="Using Tile instead of Whole Image-Summary of updates-Get image spec"></span><strong id="Get image spec">Get image spec</strong>: It retrieves the image's specifications (spec = input_file.spec()) to get details like image and tile dimensions.
+
+<li>
+<span id="Using Tile instead of Whole Image-Summary of updates-Determine tile size"></span><strong id="Determine tile size">Determine tile size</strong>: The code checks if the image format is natively tiled (spec.tile_width). If not, it defaults to a reasonable tile size (e.g., 64x64).
+
+<li>
+<span id="Using Tile instead of Whole Image-Summary of updates-Loop over tiles"></span><strong id="Loop over tiles">Loop over tiles</strong>: A nested loop iterates through the image, reading one tile at a time. The input_file.read_tile(x, y, 0, oiio.FLOAT) call gets a chunk of the image as a NumPy array.
+
+<li>
+<span id="Using Tile instead of Whole Image-Summary of updates-Process tiles individually"></span><strong id="Process tiles individually">Process tiles individually</strong>: The same reshape and slicing logic is applied to each smaller tile array.
+
+<li>
+<span id="Using Tile instead of Whole Image-Summary of updates-Aggregate results"></span><strong id="Aggregate results">Aggregate results</strong>: The processed tiles are appended to a list (all_pixels). After the loop, they are combined using np.concatenate into a single array for the final np.unique analysis.
+
+<li>
+<span id="Using Tile instead of Whole Image-Summary of updates-Close the file"></span><strong id="Close the file">Close the file</strong>: The input_file is explicitly closed after reading is complete. 
+
+</ul>
+<p>
+This approach offers a significant memory improvement for high-resolution images by never holding all pixel data in memory at once.
+</p>
+
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
