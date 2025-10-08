@@ -62,6 +62,13 @@ Your Python script will load the template, find the placeholder nodes, and apply
 </p>
 
 <pre python>
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
 import nuke
 
 def create_templated_network(template_path, user_prefix, input_node=None):
@@ -207,7 +214,181 @@ Every node needs hardcoded node.setXpos() and node.setYpos() calls.
 </tr>
 </table>
 
+<div id="Custom Ink/Paint Template-QUESTION"><h2 id="QUESTION" class="header"><a href="#Custom Ink/Paint Template-QUESTION">QUESTION</a></h2></div>
+<table>
+<tr>
+<td>
+I'm looking into creating a script based mechanism to import a template into Nuke, whereby the template has a placeholder string in some nodes' parameters and names. I'm wondering if rather than searching for and assigning values to knobs, whether I could import the template and parse the template as a string and search/replace a placeholder string before importing/pasting the contents of the template.
+</td>
+</tr>
+</table>
 
+<p>
+Yes, performing a string search and replace on the raw .nk template file is a more flexible and robust approach than iterating over knobs after pasting. This method allows you to: 
+</p>
+
+<ul>
+<li>
+Rename nodes and replace text within knob values simultaneously.
+
+<li>
+Handle placeholders in multiple knobs, even if you don't know their names in advance.
+
+<li>
+Process parts of the file that aren't exposed through the standard Python API. 
+
+</ul>
+<p>
+The Nuke .nk file format is a plain text script, which makes it well-suited for this kind of manipulation. 
+</p>
+
+<p>
+Here is an updated version of your script that reads the template file, performs a string replacement, and then pastes the modified script. 
+</p>
+
+<div id="Custom Ink/Paint Template-QUESTION-Updated code with string replacement"><h3 id="Updated code with string replacement" class="header"><a href="#Custom Ink/Paint Template-QUESTION-Updated code with string replacement">Updated code with string replacement</a></h3></div>
+
+<pre python>
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
+import nuke
+import tempfile
+import os
+import uuid
+
+def create_templated_network_string_replace(template_path, replace_map, input_node=None):
+    """
+    Loads a Nuke node network from a template file, performs string replacements,
+    and then pastes the modified script.
+
+    :param template_path: Full path to the .nk template file.
+    :param replace_map: A dictionary where keys are the placeholder strings
+                        and values are the replacement strings.
+    :param input_node: Optional node to connect the template's input to.
+    :return: List of all nodes created by loading the template.
+    """
+    
+    # 1. Read the template file as a string
+    try:
+        with open(template_path, 'r') as f:
+            template_content = f.read()
+    except FileNotFoundError:
+        nuke.message(f"Error: Template file not found at {template_path}")
+        return []
+
+    # 2. Perform string replacements
+    modified_content = template_content
+    for placeholder, replacement in replace_map.items():
+        modified_content = modified_content.replace(placeholder, replacement)
+        
+    # 3. Write the modified content to a temporary file
+    temp_file = os.path.join(tempfile.gettempdir(), f"nuke_temp_{uuid.uuid4().hex}.nk")
+    try:
+        with open(temp_file, 'w') as f:
+            f.write(modified_content)
+    except IOError:
+        nuke.message(f"Error: Failed to write to temporary file {temp_file}")
+        return []
+    
+    # --- 4. Load the Template (.nk) from the temp file ---
+    
+    initial_selection = set(nuke.selectedNodes())
+    
+    # The actual nuke.nodePaste happens here
+    nuke.nodePaste(temp_file)
+    
+    # Get all nodes that are NOW selected (i.e., the nodes that were just pasted)
+    newly_pasted_nodes = nuke.selectedNodes()
+    
+    # Deselect all the newly pasted nodes
+    for node in newly_pasted_nodes:
+        node.setSelected(False) 
+    
+    # 5. Handle Connections and Cleanup (if necessary)
+    
+    # Find the node that acts as the network's input
+    if input_node is not None:
+        for node in newly_pasted_nodes:
+            # You will still need to identify the placeholder node for connection.
+            # This is done by searching its new, replaced name.
+            if 'INPUT_PLACEHOLDER' in node.name().upper():
+                node.setInput(0, input_node)
+                print(f"Connected template input to {input_node.name()}")
+    
+    # 6. Cleanup the temporary file
+    if os.path.exists(temp_file):
+        os.remove(temp_file)
+        
+    print(f"Successfully created network from template: {template_path}")
+    return newly_pasted_nodes
+
+# --- EXAMPLE USAGE ---
+
+# 1. Define the path to your saved .nk template
+TEMPLATE_FILE = "/path/to/your/my_processing_template.nk" 
+
+# 2. Define the user's chosen prefix and other replacements
+USER_CHOSEN_PREFIX = "AssetA_V01"
+
+# The replacement mapping for the script.
+# Use unique strings like '!!!PREFIX!!!' to avoid accidental replacements.
+# Also good for readability.
+REPLACEMENT_MAP = {
+    '!!!PREFIX!!!': USER_CHOSEN_PREFIX,
+    '!!!RENDER_PATH!!!': f"/path/to/renders/{USER_CHOSEN_PREFIX}",
+    '!!!VERSION!!!': "v01"
+}
+
+# 3. Get the node the user wants to plug the template into
+USER_INPUT_NODE = nuke.toNode('Grade1') # Replace 'Grade1' with the correct node
+
+# 4. Create the network
+created_nodes = create_templated_network_string_replace(
+    TEMPLATE_FILE,
+    REPLACEMENT_MAP,
+    USER_INPUT_NODE
+)
+</pre>
+<table>
+<tr>
+<td>
+Use code with caution.
+</td>
+</tr>
+</table>
+
+<div id="Custom Ink/Paint Template-QUESTION-How to create your template file"><h3 id="How to create your template file" class="header"><a href="#Custom Ink/Paint Template-QUESTION-How to create your template file">How to create your template file</a></h3></div>
+
+<ul>
+<li>
+Build the template network in Nuke with dummy nodes.
+
+<li>
+Use unique placeholder text for any names or knob values you want to replace. For example:
+
+<ul>
+<li>
+Node Name: !!!PREFIX!!!_Merge
+
+<li>
+Write Node file Knob: /path/to/renders/!!!PREFIX!!!_Final.exr
+
+<li>
+Any other knob, like a Text node's message knob: Project: !!!PREFIX!!!
+
+</ul>
+<li>
+Select all nodes in the template.
+
+<li>
+Go to File &gt; Export ToolSet and save the template with a .nk extension. This saves the selected nodes and their connections as a plain text file, ready for your script to modify.
+
+</ul>
 <p>
 <a href="pmount_index.html">PMount</a>
 </p>
