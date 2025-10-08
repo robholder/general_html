@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>pm_project_char_ink_paint_template</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="pmount_index.html">PMount</a>
+</p>
+
+<div id="Custom Ink/Paint Template"><h1 id="Custom Ink/Paint Template" class="header"><a href="#Custom Ink/Paint Template">Custom Ink/Paint Template</a></h1></div>
+
+<div id="Custom Ink/Paint Template-QUESTION"><h2 id="QUESTION" class="header"><a href="#Custom Ink/Paint Template-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+I want to create a template consisting of a collection of Nuke nodes - a network with connections and backdrops. What's the best way of scripting a creation of this sort? Would you construct each node with positions and connections, or have a separate template that is referenced and modified to satisfy the scripts parameters? I need to set the names of nodes and create writes and postagestamps with the user's chosen prefix.
+</td>
+</tr>
+</table>
+
+
+<p>
+The best and most maintainable way to script the creation of a complex Nuke node network (a template) is to use a separate template file (.nk) and then use Python to load it and modify the nodes. Constructing every node from scratch using nuke.createNode() is extremely verbose, error-prone, and difficult to update.
+</p>
+
+<p>
+Here is the step-by-step approach using a template file, which is often referred to as a ToolSet in Nuke.
+</p>
+
+<div id="Custom Ink/Paint Template-Create the Template (.nk) File"><h2 id="Create the Template (.nk) File" class="header"><a href="#Custom Ink/Paint Template-Create the Template (.nk) File">Create the Template (.nk) File</a></h2></div>
+
+<p>
+First, you'll need to create the template itself:
+</p>
+
+<ul>
+<li>
+<span id="Custom Ink/Paint Template-Create the Template (.nk) File-Build the Network"></span><strong id="Build the Network">Build the Network</strong>: In a new Nuke script, build your entire network (including nodes, connections, and backdrops).
+
+<li>
+<span id="Custom Ink/Paint Template-Create the Template (.nk) File-Add Placeholders"></span><strong id="Add Placeholders">Add Placeholders</strong>: Use placeholder nodes that your script will find and modify. For example, use a NoOp node named USER_PREFIX_INPUT where the user's input will attach, and a NoOp node named USER_PREFIX_OUTPUT to easily locate the downstream end of the template.
+
+<li>
+<span id="Custom Ink/Paint Template-Create the Template (.nk) File-Save as a ToolSet"></span><strong id="Save as a ToolSet">Save as a ToolSet</strong>: Select all the nodes and go to File &gt; Export Selected Nodes... and save the file with a descriptive name (e.g., my_processing_template.nk). This creates a clean, minimal Nuke script containing only the selected network.
+
+</ul>
+<div id="Custom Ink/Paint Template-Script the Template Instantiation"><h2 id="Script the Template Instantiation" class="header"><a href="#Custom Ink/Paint Template-Script the Template Instantiation">Script the Template Instantiation</a></h2></div>
+
+<p>
+Your Python script will load the template, find the placeholder nodes, and apply the user's settings.
+</p>
+
+<pre python>
+import nuke
+
+def create_templated_network(template_path, user_prefix, input_node=None):
+    """
+    Loads a Nuke node network from a template file and customizes it.
+
+    :param template_path: Full path to the .nk template file.
+    :param user_prefix: Prefix to apply to all relevant node names.
+    :param input_node: Optional node to connect the template's input to.
+    :return: List of all nodes created by loading the template.
+    """
+    
+    # --- 1. Load the Template (.nk) ---
+    
+    # Get the names of the currently selected nodes to find the newly pasted nodes later
+    initial_selection = set(nuke.selectedNodes())
+    
+    # Load the template (ToolSet). This pastes the nodes into the current script.
+    # The nodes will automatically be selected after being pasted.
+    nuke.nodePaste(template_path)
+    
+    # Get all nodes that are NOW selected (i.e., the nodes that were just pasted)
+    newly_pasted_nodes = nuke.selectedNodes()
+    
+    # Deselect all the newly pasted nodes
+    for node in newly_pasted_nodes:
+        node.setSelected(False) 
+        
+    # --- 2. Iterate and Customize Nodes ---
+    
+    write_nodes = []
+    
+    for node in newly_pasted_nodes:
+        
+        # 2a. Set Node Names
+        # Rename ALL nodes with the user's prefix for organization
+        new_name = f"{user_prefix}_{node.name()}"
+        node.setName(new_name)
+        
+        # 2b. Customize Write Nodes
+        # We look for nodes whose class is 'Write'
+        if node.Class() == 'Write':
+            # Store it for connection later if needed
+            write_nodes.append(node)
+            
+            # Example: Set file path to include the prefix and a standard output name
+            # NOTE: You'll need to define a proper file path logic here.
+            # node['file'].setValue(f"/path/to/renders/{user_prefix}_Final.exr")
+            
+        # 2c. Set Postage Stamp
+        # Enable postage stamp on the new write nodes
+        if node.Class() == 'Write':
+            try:
+                node['postage_stamp'].setValue(True)
+            except NameError:
+                # Handle cases where the knob might not exist (e.g., not all nodes have it)
+                pass
+
+        # 2d. Find and Handle Placeholders (Connections)
+        # Find the node that acts as the network's input
+        if 'INPUT_PLACEHOLDER' in node.name().upper() and input_node is not None:
+             # Connect the template's placeholder input (node) to the user's node (input_node)
+             node.setInput(0, input_node)
+             print(f"Connected template input to {input_node.name()}")
+
+    # --- 3. Finalize and Return ---
+    
+    print(f"Successfully created network with prefix: {user_prefix}")
+    return newly_pasted_nodes
+
+# --- EXAMPLE USAGE ---
+
+# 1. Define the path to your saved .nk template
+TEMPLATE_FILE = "/path/to/your/my_processing_template.nk" 
+
+# 2. Define the user's chosen prefix
+USER_CHOSEN_PREFIX = "AssetA_V01"
+
+# 3. Get the node the user wants to plug the template into (e.g., the last Grade node)
+USER_INPUT_NODE = nuke.toNode('Grade1') # Replace 'Grade1' with a function to get the actual node
+
+# 4. Create the network
+created_nodes = create_templated_network(TEMPLATE_FILE, USER_CHOSEN_PREFIX, USER_INPUT_NODE)
+</pre>
+
+<div id="Custom Ink/Paint Template-Script the Template Instantiation-Why the Template Approach is Superior ✨"><h3 id="Why the Template Approach is Superior ✨" class="header"><a href="#Custom Ink/Paint Template-Script the Template Instantiation-Why the Template Approach is Superior ✨">Why the Template Approach is Superior ✨</a></h3></div>
+
+<table>
+<tr>
+<td>
+Feature
+</td>
+<td>
+Template (.nk) Approach
+</td>
+<td>
+Manual nuke.createNode() Approach
+</td>
+</tr>
+<tr>
+<td>
+Complexity
+</td>
+<td>
+Handles complex connections, curves, and backdrops easily.
+</td>
+<td>
+Requires hundreds of lines of code to define positions, curve data, and connections.
+</td>
+</tr>
+<tr>
+<td>
+Maintenance
+</td>
+<td>
+Update the template in the GUI and save; the Python script remains the same.
+</td>
+<td>
+Any network change requires updating dozens of Python lines.
+</td>
+</tr>
+<tr>
+<td>
+Connections
+</td>
+<td>
+All internal connections are preserved automatically on paste.
+</td>
+<td>
+Every connection must be manually coded using node.setInput(index, other_node).
+</td>
+</tr>
+<tr>
+<td>
+Positioning
+</td>
+<td>
+Nodes retain their relative positions automatically.
+</td>
+<td>
+Every node needs hardcoded node.setXpos() and node.setYpos() calls.
+</td>
+</tr>
+</table>
+
+
+<p>
+<a href="pmount_index.html">PMount</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+</body>
+</html>
