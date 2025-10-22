@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_linear_color_to_srgb_ui_color</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)"><h1 id="Linear To sRGB (UI) Color Spaces (And Back Again)" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)">Linear To sRGB (UI) Color Spaces (And Back Again)</a></h1></div>
+
+
+<table>
+<tr>
+<td>
+I would like to take color swatches (on the color picker knobs) within Nuke, and transfer the colors to things like the Nuke interface colors of nodes and other items.
+</td>
+</tr>
+</table>
+
+<p>
+This is a classic problem in Nuke because the two color systems are using operate in different color spaces. The solution is to manually linearize the color swatch values and then convert them into the hexadecimal integer format that Nuke's UI nodes use.
+</p>
+
+<p>
+Here is the exact method to take a color from the Viewer/color picker and apply it to a node color (like tile_color on a Backdrop, Sticky, or Node) to make them match on your monitor:
+</p>
+
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)-Understand the Color Space Difference"><h3 id="Understand the Color Space Difference" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)-Understand the Color Space Difference">Understand the Color Space Difference</a></h3></div>
+
+<ul>
+<li>
+<span id="Linear To sRGB (UI) Color Spaces (And Back Again)-Understand the Color Space Difference-Image/Swatch Color"></span><strong id="Image/Swatch Color">Image/Swatch Color</strong>: The values you see in a color picker (like a Grade node) are in Nuke's native working space, which is linear. These values are mathematically correct for light energy but look too dark for direct display. The Viewer applies a View LUT (usually sRGB or Rec.709) to correct this for your monitor.
+
+<li>
+<span id="Linear To sRGB (UI) Color Spaces (And Back Again)-Understand the Color Space Difference-UI/Node Color"></span><strong id="UI/Node Color">UI/Node Color</strong>: Nuke's interface colors (the tile_color of nodes, Backdrops, etc.) are based on your monitor's space, which is typically sRGB. These values are expected to be in the display-referred, non-linear sRGB space.
+
+</ul>
+<p>
+To match them, you must undo the View LUT from the linear swatch, resulting in the correct sRGB value.
+</p>
+
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)-The Conversion Formula"><h3 id="The Conversion Formula" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)-The Conversion Formula">The Conversion Formula</a></h3></div>
+
+<p>
+You need to convert the linear RGB values to non-linear sRGB values. In Nuke, you can do this by applying a gamma correction of 2.2.
+</p>
+
+<pre>
+sRGB=Linear (power) 1/2.2
+</pre>
+ 
+<p>
+In Nuke's properties, a Gamma knob with a value of 2.2 applies a gamma of 2.2 (i.e., Input (power) 2.2
+ ). To do the inverse (which is what you need to go from linear to sRGB), you use a gamma value of 0.4545 (since 1/2.2 ≈0.4545).
+</p>
+
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)-Step-by-Step Procedure"><h3 id="Step-by-Step Procedure" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)-Step-by-Step Procedure">Step-by-Step Procedure</a></h3></div>
+
+<p>
+Get the Linear RGB Values:
+</p>
+<ul>
+<li>
+Use the color picker on your source image (or a constant node set to your target color).
+
+<li>
+Read the R, G, and B values from the color picker. These are your linear values (let's call them RL, GL, BL), typically between 0 and 1.
+
+</ul>
+<p>
+Calculate the Non-Linear sRGB Values:
+</p>
+<ul>
+<li>
+For each channel, apply the 0.4545 gamma correction (or just 1/22). 
+
+<ul>
+<li>
+RsRGB = RL 0.4545
+
+<li>
+GsRGB = GL 0.4545
+
+<li>
+BsRGB = BL 0.4545
+
+</ul>
+</ul>
+ 
+<p>
+Convert to 8-Bit Integer (0-255):
+</p>
+<ul>
+<li>
+Nuke's UI colors are stored as 8-bit integers (0-255) for R, G, B, and Alpha.
+
+<li>
+Multiply each sRGB value by 255 and round to the nearest whole number.
+
+<ul>
+<li>
+RInt = Round(RsRGB × 255)
+
+<li>
+GInt = Round(GsRGB × 255)
+
+<li>
+BInt = Round(BsRGB × 255)
+
+</ul>
+</ul>
+ 
+<p>
+Create the Hexadecimal Integer Value:
+</p>
+<ul>
+<li>
+Nuke's tile_color knob uses a single 32-bit hexadecimal integer of the format AABBGGRR (yes, it's backwards: Alpha, Blue, Green, Red).
+
+<li>
+Convert your RInt, GInt, BInt values to their two-digit hexadecimal form (e.g., 128→80).
+
+<li>
+The final integer will be FF+BB+GG+RR (where FF is the default opaque Alpha).
+
+</ul>
+<p>
+Color Integer = 0xFF + BHex +GHex + RHex
+</p>
+ 
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)-Alternative Method (Using the Nuke nuke.getColor() Function)"><h3 id="Alternative Method (Using the Nuke nuke.getColor() Function)" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)-Alternative Method (Using the Nuke nuke.getColor() Function)">Alternative Method (Using the Nuke nuke.getColor() Function)</a></h3></div>
+
+<p>
+The easiest and most reliable way, which avoids manual math and hex conversion, is to use a simple Python command:
+</p>
+
+<ul>
+<li>
+In the Script Editor (or a Python prompt), type:
+
+</ul>
+  
+<pre python>
+col = nuke.getColor()
+print(col)
+</pre>
+
+<ul>
+<li>
+Run the command. A Color Picker window will appear.
+
+<li>
+In this floating window, use the eyedropper to sample the color from the Viewer (where you see your target image color). The Viewer is correctly displaying the sRGB version of your linear data.
+
+<li>
+Click OK.
+
+<li>
+The Python script will print a single large integer value (e.g., 4278255615) to the Script Editor. This is the AABBGGRR integer value, which is in the correct sRGB space for the UI.
+
+<li>
+Copy this integer value.
+
+<li>
+Paste this value into the tile_color knob of your Backdrop, Sticky Note, or node.
+
+</ul>
+<p>
+This method handles all the colorspace and hex conversion for you and is the recommended professional approach.
+</p>
+
+
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)-Python Solutions"><h2 id="Python Solutions" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)-Python Solutions">Python Solutions</a></h2></div>
+
+
+<p>
+The conversion between Nuke's linear image color (used in swatches) and the sRGB integer (used for node UI colors) can be handled directly in Python, entirely bypassing manual calculations.
+</p>
+
+<p>
+Here is the complete Python code for both directions, which you can run in Nuke's Script Editor.
+</p>
+
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)-Python Solutions-Linear RGB Swatch to UI Integer (AABBGGRR)"><h3 id="Linear RGB Swatch to UI Integer (AABBGGRR)" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)-Python Solutions-Linear RGB Swatch to UI Integer (AABBGGRR)">Linear RGB Swatch to UI Integer (AABBGGRR)</a></h3></div>
+
+<p>
+This is the primary function you need to set a node color from a color picker's linear value. It takes a list of linear RGB values (0 to 1) and converts them to the sRGB integer Nuke uses for UI elements.
+</p>
+
+<pre python>
+import nuke
+import math
+
+def linear_to_ui_color_int(linear_rgb_list):
+    """
+    Converts a linear RGB color (0.0-1.0) to a Nuke UI color integer (AABBGGRR format).
+
+    Args:
+        linear_rgb_list (list/tuple): A list/tuple of [R, G, B] values in linear space (0.0 to 1.0).
+
+    Returns:
+        int: The 32-bit integer color value for tile_color or backdrop color.
+    """
+    r_linear, g_linear, b_linear = linear_rgb_list
+
+    # 1. Apply inverse gamma (sRGB EOTF) to convert from linear to sRGB display space (gamma ~2.2 or 0.4545)
+    r_srgb = math.pow(r_linear, 0.4545)
+    g_srgb = math.pow(g_linear, 0.4545)
+    b_srgb = math.pow(b_linear, 0.4545)
+
+    # 2. Convert 0-1 sRGB floats to 8-bit integers (0-255)
+    # We also clamp to ensure values are within 0-255 range.
+    r_int = int(nuke.clampedCurve(r_srgb * 255))
+    g_int = int(nuke.clampedCurve(g_srgb * 255))
+    b_int = int(nuke.clampedCurve(b_srgb * 255))
+
+    # 3. Assemble the AABBGGRR integer (Alpha is always FF/255 for opaque UI color)
+    # The format is (Alpha &lt;&lt; 24) | (Blue &lt;&lt; 16) | (Green &lt;&lt; 8) | Red
+    # Nuke uses this specific BGR-A order for node colors.
+    ui_int = (255 &lt;&lt; 24) | (b_int &lt;&lt; 16) | (g_int &lt;&lt; 8) | r_int
+
+    return ui_int
+
+# --- EXAMPLE USAGE ---
+# Example linear RGB values (a bright orange from a Nuke Color node with R=1, G=0.5, B=0)
+linear_color = [1.0, 0.5, 0.0]
+ui_color_int = linear_to_ui_color_int(linear_color)
+
+print(f"Linear Color (R,G,B): {linear_color}")
+print(f"UI Integer (AABBGGRR): {ui_color_int}")
+
+# To apply this to a selected node:
+selected_node = nuke.selectedNode()
+selected_node['tile_color'].setValue(ui_color_int)
+print(f"Applied to node: {selected_node.name()}")
+</pre>
+
+<div id="Linear To sRGB (UI) Color Spaces (And Back Again)-Python Solutions-UI Integer to Linear RGB Swatch (For Reference)"><h3 id="UI Integer to Linear RGB Swatch (For Reference)" class="header"><a href="#Linear To sRGB (UI) Color Spaces (And Back Again)-Python Solutions-UI Integer to Linear RGB Swatch (For Reference)">UI Integer to Linear RGB Swatch (For Reference)</a></h3></div>
+
+<p>
+This conversion is useful if you want to sample an existing node's color and recreate it in the image space (e.g., in a Constant or Color node).
+</p>
+
+<pre python>
+
+import nuke
+import math
+
+def ui_color_int_to_linear(ui_int):
+    """
+    Converts a Nuke UI color integer (AABBGGRR) back to linear RGB (0.0-1.0).
+
+    Args:
+        ui_int (int): The 32-bit integer color value from tile_color.
+
+    Returns:
+        list: A list of [R, G, B] values in linear space (0.0 to 1.0).
+    """
+    # 1. Separate the AABBGGRR integer into 8-bit R, G, B, A components
+    # The bitwise AND (&amp;) masks the relevant byte, and the shift (&gt;&gt;) moves it to the 0-255 range.
+    # Note: Nuke's node colors are stored as AABBGGRR!
+    r_int = (ui_int &gt;&gt; 0) &amp; 0xFF  # Red is the first byte
+    g_int = (ui_int &gt;&gt; 8) &amp; 0xFF  # Green is the second byte
+    b_int = (ui_int &gt;&gt; 16) &amp; 0xFF # Blue is the third byte
+    # Alpha (ui_int &gt;&gt; 24) &amp; 0xFF is usually 255
+
+    # 2. Convert 8-bit integers (0-255) to sRGB floats (0-1)
+    r_srgb = r_int / 255.0
+    g_srgb = g_int / 255.0
+    b_srgb = b_int / 255.0
+
+    # 3. Apply the sRGB forward gamma (EOTF) to convert from sRGB display space to linear space
+    # This is the standard gamma of 2.2
+    r_linear = math.pow(r_srgb, 2.2)
+    g_linear = math.pow(g_srgb, 2.2)
+    b_linear = math.pow(b_srgb, 2.2)
+
+    return [r_linear, g_linear, b_linear]
+
+# --- EXAMPLE USAGE ---
+# Example UI Integer (e.g., from a selected node's 'tile_color' knob)
+ui_color_int = 4294901760  # This integer represents a very bright orange
+
+linear_color_out = ui_color_int_to_linear(ui_color_int)
+
+print(f"UI Integer: {ui_color_int}")
+print(f"Linear Color (R,G,B): {linear_color_out}")
+
+# To apply this to a new Color node:
+constant_node = nuke.createNode('Constant')
+constant_node['color'].setValue(linear_color_out)
+print(f"Set Constant node color to: {linear_color_out}")
+</pre>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
