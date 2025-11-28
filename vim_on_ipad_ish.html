@@ -368,6 +368,220 @@ Your HTML exports live in ~/vimwiki_html.
 You can commit/push/pull directly from iSH, or use vim-fugitive inside Vim for Git commands.
 
 </ul>
+<div id="iSH and Alpine Linux on iPad.-Running GitHub commands"><h2 id="Running GitHub commands" class="header"><a href="#iSH and Alpine Linux on iPad.-Running GitHub commands">Running GitHub commands</a></h2></div>
+
+<div id="iSH and Alpine Linux on iPad.-Running GitHub commands-QUESTION"><h3 id="QUESTION" class="header"><a href="#iSH and Alpine Linux on iPad.-Running GitHub commands-QUESTION">QUESTION</a></h3></div>
+<table>
+<tr>
+<td>
+On a Mac (using bash), I run this user bin shell script to git push/pull. I call it via a shortcut in my vimrc. Can this be repliacted for ash on the iPad? #!/usr/bin/env bash # Generate vimwiki html and push to Github pages # Adapted from: <a href="http://wiki.qiaoanran.com/vimwiki.html">http://wiki.qiaoanran.com/vimwiki.html</a> GIT=<code>which git</code> COMMIT_TIMESTAMP=<code>date +'%y%m%d_%H%M_%Z'</code> # convert wiki files to html files # This next line is causing a major error in MacVim: #vim +VimwikiTabIndex +VimwikiAll2HTML +qall cd ~/vimwiki_dir/general \({GIT} add --all . \){GIT} commit -am "Automated update at \({COMMIT_TIMESTAMP}" \){GIT} push origin master cd ~/vimwiki_dir/general_html \({GIT} add --all . \){GIT} commit -am "Automated update at \({COMMIT_TIMESTAMP}" \){GIT} push origin master
+</td>
+</tr>
+</table>
+
+<div id="iSH and Alpine Linux on iPad.-Running GitHub commands-ANSWER"><h3 id="ANSWER" class="header"><a href="#iSH and Alpine Linux on iPad.-Running GitHub commands-ANSWER">ANSWER</a></h3></div>
+
+<p>
+Yes — you can replicate this workflow in ash inside iSH. The good news is that ash is POSIX‑compliant, so most of your Bash script will run unchanged. The main differences are:
+</p>
+
+<p>
+No Bash‑specific features:
+</p>
+
+<ul>
+<li>
+<code>$(...)</code> command substitution works, but backticks <code>...</code> are safer in ash.
+
+<li>
+Arrays, <code>[[ ... ]]</code> conditionals, and advanced Bashisms won’t work.
+
+<li>
+<span id="iSH and Alpine Linux on iPad.-Running GitHub commands-ANSWER-Environment"></span><strong id="Environment">Environment</strong>: You’ll be root in iSH, so your home is /root, not /Users/... like on macOS.
+
+<li>
+<span id="iSH and Alpine Linux on iPad.-Running GitHub commands-ANSWER-Shebang"></span><strong id="Shebang">Shebang</strong>: Use #!/bin/sh instead of #!/usr/bin/env bash because ash is the default shell.
+
+</ul>
+<div id="iSH and Alpine Linux on iPad.-Running GitHub commands-✅ Example ash‑compatible script"><h3 id="✅ Example ash‑compatible script" class="header"><a href="#iSH and Alpine Linux on iPad.-Running GitHub commands-✅ Example ash‑compatible script">✅ Example ash‑compatible script</a></h3></div>
+
+<p>
+Save this as ~/bin/vimwiki-sync.sh (make sure ~/bin is in your $PATH):
+</p>
+
+<pre sh>
+#!/bin/sh
+
+# Generate vimwiki html and push to Github pages
+
+GIT=$(which git)
+COMMIT_TIMESTAMP=$(date +'%y%m%d_%H%M_%Z')
+
+# If you want to generate HTML inside Vim, uncomment:
+# vim +VimwikiTabIndex +VimwikiAll2HTML +qall
+
+# Sync wiki source
+cd ~/vimwiki_dir/general || exit 1
+$GIT add --all .
+$GIT commit -am "Automated update at $COMMIT_TIMESTAMP"
+$GIT push origin master
+
+# Sync HTML output
+cd ~/vimwiki_dir/general_html || exit 1
+$GIT add --all .
+$GIT commit -am "Automated update at $COMMIT_TIMESTAMP"
+$GIT push origin master
+</pre>
+
+<div id="iSH and Alpine Linux on iPad.-Running GitHub commands-🔧 Setup Notes"><h3 id="🔧 Setup Notes" class="header"><a href="#iSH and Alpine Linux on iPad.-Running GitHub commands-🔧 Setup Notes">🔧 Setup Notes</a></h3></div>
+
+<p>
+Make it executable:
+</p>
+
+<pre sh>
+chmod +x ~/bin/vimwiki-sync.sh
+</pre>
+
+<p>
+Call it from Vim with a shortcut in your ~/.vimrc:
+</p>
+
+<pre vim>
+nnoremap &lt;Leader&gt;gs :!~/bin/vimwiki-sync.sh&lt;CR&gt;
+</pre>
+
+<p>
+Adjust paths: in iSH your home is /root, so if your repo is cloned into /root/vimwiki_dir, use that path.
+</p>
+
+<div id="iSH and Alpine Linux on iPad.-Running GitHub commands-🚀 Workflow"><h3 id="🚀 Workflow" class="header"><a href="#iSH and Alpine Linux on iPad.-Running GitHub commands-🚀 Workflow">🚀 Workflow</a></h3></div>
+
+<ul>
+<li>
+Edit wiki files in Vim (~/vimwiki_dir/general).
+
+<li>
+Run your shortcut (&lt;Leader&gt;gs) to:
+
+<ul>
+<li>
+Commit changes.
+
+<li>
+Push to GitHub.
+
+<li>
+Commit/push generated HTML.
+
+</ul>
+</ul>
+<p>
+👉 The only real change from your Mac script is the shebang line (#!/bin/sh) and making sure paths match iSH’s filesystem (/root/...). Everything else works the same.
+</p>
+
+<div id="iSH and Alpine Linux on iPad.-Headless HTML"><h2 id="Headless HTML" class="header"><a href="#iSH and Alpine Linux on iPad.-Headless HTML">Headless HTML</a></h2></div>
+
+<p>
+Let’s make your sync script automatically run the Vimwiki HTML export step without opening Vim interactively. The trick is to call Vim in headless mode (-es or -c commands) so it executes the Vimwiki commands and quits.
+</p>
+
+<p>
+Here’s an ash‑compatible script you can use in iSH:
+</p>
+
+<pre sh>
+#!/bin/sh
+
+# Automated Vimwiki sync: convert to HTML, commit, and push
+
+GIT=$(which git)
+COMMIT_TIMESTAMP=$(date +'%y%m%d_%H%M_%Z')
+
+# Step 1: Generate HTML from wiki files
+# Run Vim headless, execute Vimwiki commands, then quit
+vim -es -u ~/.vimrc \
+    +VimwikiIndex \
+    +VimwikiAll2HTML \
+    +qall
+
+# Step 2: Sync wiki source repo
+cd ~/vimwiki_dir/general || exit 1
+$GIT add --all .
+$GIT commit -am "Automated update at $COMMIT_TIMESTAMP"
+$GIT push origin master
+
+# Step 3: Sync HTML output repo
+cd ~/vimwiki_dir/general_html || exit 1
+$GIT add --all .
+$GIT commit -am "Automated update at $COMMIT_TIMESTAMP"
+$GIT push origin master
+</pre>
+
+<div id="iSH and Alpine Linux on iPad.-Headless HTML-🔧 Key Points"><h3 id="🔧 Key Points" class="header"><a href="#iSH and Alpine Linux on iPad.-Headless HTML-🔧 Key Points">🔧 Key Points</a></h3></div>
+
+<ul>
+<li>
+<code>vim -es</code> → runs Vim in “silent” mode (no UI).
+
+<li>
+<code>-u ~/.vimrc</code> → ensures your config (with Vimwiki plugin) is loaded.
+
+<li>
+<code>+VimwikiIndex +VimwikiAll2HTML +qall</code> → executes commands in sequence:
+
+<li>
+Open Vimwiki index.
+
+<li>
+Convert all pages to HTML.
+
+<li>
+Quit all.
+
+</ul>
+<div id="iSH and Alpine Linux on iPad.-Headless HTML-🚀 Usage"><h3 id="🚀 Usage" class="header"><a href="#iSH and Alpine Linux on iPad.-Headless HTML-🚀 Usage">🚀 Usage</a></h3></div>
+
+<ul>
+<li>
+Save as <code>~/bin/vimwiki-sync.sh</code>
+
+<li>
+Make executable:
+
+</ul>
+  
+<pre sh>
+chmod +x ~/bin/vimwiki-sync.sh
+</pre>
+
+<p>
+Add a shortcut in your ~/.vimrc:
+</p>
+
+<pre vim>
+nnoremap &lt;Leader&gt;gs :!~/bin/vimwiki-sync.sh&lt;CR&gt;
+</pre>
+
+<p>
+Press &lt;Leader&gt;gs in Vim to:
+</p>
+<ul>
+<li>
+Generate HTML.
+
+<li>
+Commit/push wiki files.
+
+<li>
+Commit/push HTML files.
+
+</ul>
+<p>
+✨ With this, you’ve got a one‑command sync workflow on iPad/iSH: edit → export → push.
+</p>
+
+
 <p>
 <a href="index.html">index</a>
 </p>
