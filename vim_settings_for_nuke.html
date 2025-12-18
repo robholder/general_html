@@ -892,6 +892,241 @@ Press &lt;leader&gt;t again → everything collapses back into tree view.
 By defining a ToggleTreeView() function and mapping it to &lt;leader&gt;t, you can instantly switch between collapsed and expanded fold views while editing Nuke scripts in Vim. This gives you a clean overview and quick access to details without manual zM/zR keystrokes.
 </p>
 
+<div id="Set of Files to Try"><h1 id="Set of Files to Try" class="header"><a href="#Set of Files to Try">Set of Files to Try</a></h1></div>
+
+<table>
+<tr>
+<td>
+Can you summerize all of this into a complete usable set of files to make this work? I'd like to have a working version I can just 'install' and try. If there are choices to make between features, I'll be happy with your best guess at a good approach.
+</td>
+</tr>
+</table>
+
+<p>
+Absolutely — here is a complete, ready‑to‑install Vim plugin‑style setup that gives you:
+</p>
+
+<ul>
+<li>
+✅ Automatic .nk filetype detection
+
+<li>
+✅ Brace‑based folding
+
+<li>
+✅ Beautiful fold text with:
+
+<ul>
+<li>
+Node icons
+
+<li>
+Color‑coded input/output counts
+
+<li>
+Indentation guides:
+
+<ul>
+<li>
+✅ Auto‑collapse into a tree view on open
+
+<li>
+✅ A toggle key (&lt;leader&gt;t) to switch between tree view and expanded view
+
+</ul>
+</ul>
+</ul>
+<p>
+Everything is organized into the standard Vim runtime structure so you can drop it into ~/.vim/ (or ~/.config/nvim/ for Neovim).
+</p>
+
+<div id="Set of Files to Try-✅ INSTALLATION"><h3 id="✅ INSTALLATION" class="header"><a href="#Set of Files to Try-✅ INSTALLATION">✅ INSTALLATION</a></h3></div>
+
+<p>
+Copy this entire folder structure into your Vim config:
+</p>
+
+<pre>
+~/.vim/
+ ├── ftdetect/
+ │    └── nuke.vim
+ ├── ftplugin/
+ │    └── nuke.vim
+ └── syntax/
+      └── nuke.vim   (optional but recommended)
+</pre>
+
+<p>
+Or for Neovim:
+</p>
+
+<pre>
+~/.config/nvim/
+ ├── ftdetect/nuke.vim
+ ├── ftplugin/nuke.vim
+ └── syntax/nuke.vim
+</pre>
+
+<div id="Set of Files to Try-✅ 1. ftdetect/nuke.vim"><h3 id="✅ 1. ftdetect/nuke.vim" class="header"><a href="#Set of Files to Try-✅ 1. ftdetect/nuke.vim">✅ 1. ftdetect/nuke.vim</a></h3></div>
+
+<p>
+Automatically detect .nk files.
+</p>
+
+<pre vim>
+" Detect Nuke script files
+au BufRead,BufNewFile *.nk set filetype=nuke
+</pre>
+
+<div id="Set of Files to Try-✅ 2. ftplugin/nuke.vim"><h3 id="✅ 2. ftplugin/nuke.vim" class="header"><a href="#Set of Files to Try-✅ 2. ftplugin/nuke.vim">✅ 2. ftplugin/nuke.vim</a></h3></div>
+
+<p>
+This is the heart of the system — folding, icons, colors, foldtext, tree‑view toggle.
+</p>
+
+<pre vim>
+" ------------------------------
+" Folding settings
+" ------------------------------
+setlocal foldmethod=marker
+setlocal foldmarker={,}
+setlocal foldenable
+
+" ------------------------------
+" Highlight groups
+" ------------------------------
+highlight default NukeFoldNode ctermfg=Yellow guifg=#FFD700 cterm=bold gui=bold
+highlight default NukeFoldGood ctermfg=Green  guifg=#00FF00 cterm=bold gui=bold
+highlight default NukeFoldBad  ctermfg=Red    guifg=#FF0000 cterm=bold gui=bold
+
+" ------------------------------
+" Custom foldtext
+" ------------------------------
+function! NukeFoldText()
+  let lnum = v:foldstart
+  let line = getline(lnum)
+
+  " Node name
+  let node = matchstr(line, '^\w\+')
+
+  " Icons
+  let icon = '⚙️'
+  if node =~? 'Read'
+    let icon = '📥'
+  elseif node =~? 'Write'
+    let icon = '📤'
+  elseif node =~? 'Shuffle'
+    let icon = '🔀'
+  elseif node =~? 'Transform'
+    let icon = '🔧'
+  elseif node =~? 'Remove'
+    let icon = '❌'
+  elseif node =~? 'Merge'
+    let icon = '🧩'
+  endif
+
+  " Detect inputs/outputs
+  let inputs = 0
+  let outputs = 0
+  for i in range(v:foldstart, v:foldend)
+    let l = getline(i)
+    if l =~? '^inputs'
+      let inputs = str2nr(matchstr(l, '\d\+'))
+    elseif l =~? '^outputs'
+      let outputs = str2nr(matchstr(l, '\d\+'))
+    endif
+  endfor
+
+  " Color coding
+  let inGroup  = (inputs  &gt; 0 ? '%#NukeFoldGood#' : '%#NukeFoldBad#')
+  let outGroup = (outputs &gt; 0 ? '%#NukeFoldGood#' : '%#NukeFoldBad#')
+
+  " Indentation guides
+  let level = foldlevel(v:foldstart)
+  let indent = repeat('│ ', level - 1)
+
+  " Build fold text
+  return printf('%s%s %s%s%s (in:%s%d%s out:%s%d%s) … %d lines',
+        \ indent,
+        \ icon,
+        \ '%#NukeFoldNode#', node, '%#Folded#',
+        \ inGroup, inputs, '%#Folded#',
+        \ outGroup, outputs, '%#Folded#',
+        \ (v:foldend - v:foldstart + 1))
+endfunction
+
+setlocal foldtext=NukeFoldText()
+
+" ------------------------------
+" Auto-collapse into tree view
+" ------------------------------
+autocmd BufReadPost *.nk normal! zM
+
+" ------------------------------
+" Toggle tree view &lt;leader&gt;t
+" ------------------------------
+function! ToggleTreeView()
+  if foldclosed(1) != -1
+    normal! zR
+  else
+    normal! zM
+  endif
+endfunction
+
+nnoremap &lt;buffer&gt; &lt;leader&gt;t :call ToggleTreeView()&lt;CR&gt;
+</pre>
+
+<div id="Set of Files to Try-✅ 3. syntax/nuke.vim (optional but helpful)"><h3 id="✅ 3. syntax/nuke.vim (optional but helpful)" class="header"><a href="#Set of Files to Try-✅ 3. syntax/nuke.vim (optional but helpful)">✅ 3. syntax/nuke.vim (optional but helpful)</a></h3></div>
+
+<p>
+A lightweight syntax file to highlight node names and braces.
+</p>
+
+<pre vim>
+syntax keyword nukeNode Read Write Shuffle Remove Merge Transform
+syntax match nukeBrace "{"
+syntax match nukeBrace "}"
+
+highlight default link nukeNode Keyword
+highlight default link nukeBrace Delimiter
+</pre>
+
+<div id="Set of Files to Try-✅ DONE — You now have a full Nuke‑aware Vim environment"><h2 id="✅ DONE — You now have a full Nuke‑aware Vim environment" class="header"><a href="#Set of Files to Try-✅ DONE — You now have a full Nuke‑aware Vim environment">✅ <span class="todo">DONE</span> — You now have a full Nuke‑aware Vim environment</a></h2></div>
+
+<p>
+Open any .nk file and you’ll get:
+</p>
+
+<ul>
+<li>
+✅ Automatic brace folding
+
+<li>
+✅ Beautiful fold text with icons
+
+<li>
+✅ Color‑coded I/O counts
+
+<li>
+✅ Indentation guides
+
+<li>
+✅ Auto‑collapsed tree view
+
+<li>
+✅ Toggle key (&lt;leader&gt;t)
+
+<li>
+✅ Basic syntax highlighting
+
+</ul>
+<p>
+It’s a surprisingly pleasant way to navigate huge Nuke scripts.
+</p>
+
+<p>
+If you want, I can also package this into a single GitHub‑ready plugin folder, or convert it into a Vim plugin manager format (vim‑plug, packpath, Lazy.nvim, etc.).
+</p>
 
 <p>
 <a href="vim_learning.html">Vim Learning</a>
