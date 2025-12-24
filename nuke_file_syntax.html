@@ -44,13 +44,17 @@ Root {
 <ul>
 <li>
 <span id="Nuke File Syntax-Core Syntax Elements-Parameters (Knobs)"></span><strong id="Parameters (Knobs)">Parameters (Knobs)</strong>: Node parameters, referred to as "knobs" in Nuke, are defined within the node's braces using the format parameter_name value. String values may require quotes if they contain spaces.
+
+</ul>
+  
 <pre tcl>
 ColorBars {
  inputs 0
  name ColorBars1
 }
 </pre>
-
+  
+<ul>
 <li>
 <span id="Nuke File Syntax-Core Syntax Elements-Connections"></span><strong id="Connections">Connections</strong>: Node connections are managed via a stack system using set and push commands, though these are often abstracted in a saved .nk file by the inputs keyword.
 
@@ -68,10 +72,13 @@ Merge2 {
  # Input A is empty/nothing pushed, Input B is the Read node that was just pushed
 }
 </pre>
-
+  
 <ul>
 <li>
 <span id="Nuke File Syntax-Core Syntax Elements-Groups"></span><strong id="Groups">Groups</strong>: Group nodes (Group {}) contain their own nested structure and form new group stacks. The end_group keyword marks the end of a group definition.
+
+</ul>
+  
 <pre tcl>
 Group {
  name Group1
@@ -81,6 +88,7 @@ Group {
 end_group 
 </pre>
 
+<ul>
 <li>
 <span id="Nuke File Syntax-Core Syntax Elements-Tcl Expressions"></span><strong id="Tcl Expressions">Tcl Expressions</strong>: Nuke allows Tcl expressions to be used in nearly any knob field to create dynamic links and automation. Square brackets [] trigger Tcl evaluation within a knob's value.
 
@@ -142,6 +150,16 @@ These commands allow Nuke to handle complex branching or non-linear connections 
 <code>push 0</code>: This clears the stack (or pushes a "null" entry), ensuring the next node created does not automatically connect to whatever was previously on top. 
 
 </ul>
+<div id="How the Stack Works-The Role of set and push-Note on 'clear the stack'"><h4 id="Note on 'clear the stack'" class="header"><a href="#How the Stack Works-The Role of set and push-Note on 'clear the stack'">Note on 'clear the stack'</a></h4></div>
+
+<p>
+In a Nuke .nk file, push 0 inserts a "null" or "empty" entry onto the stack; it does not clear the entire stack. 
+</p>
+
+<p>
+While some legacy documentation colloquially refers to it as "clearing" the stack, its function within the Tcl parser is to manage specific input indices. 
+</p>
+
 <div id="How the Stack Works-Group Hierarchy and the Stack"><h3 id="Group Hierarchy and the Stack" class="header"><a href="#How the Stack Works-Group Hierarchy and the Stack">Group Hierarchy and the Stack</a></h3></div>
 
 <p>
@@ -166,6 +184,81 @@ In a Nuke .nk file, the command push 0 is used to push a "null" or "empty" slot 
 This is a critical flow-control tool that serves two primary purposes:
 </p>
 
+<div id="How the Stack Works-More on Push-How push 0 Operates on the Stack"><h4 id="How push 0 Operates on the Stack" class="header"><a href="#How the Stack Works-More on Push-How push 0 Operates on the Stack">How push 0 Operates on the Stack</a></h4></div>
+
+<p>
+Nuke maintains a Last-In, First-Out (LIFO) stack where the most recently created or pushed item is at index 0. 
+</p>
+<ul>
+<li>
+<span id="How the Stack Works-More on Push-How push 0 Operates on the Stack-Inserting a Placeholder"></span><strong id="Inserting a Placeholder">Inserting a Placeholder</strong>: When Nuke executes push 0, it adds an "empty" slot to the top of the stack (index 0).
+
+<li>
+<span id="How the Stack Works-More on Push-How push 0 Operates on the Stack-Shifting Indices"></span><strong id="Shifting Indices">Shifting Indices</strong>: Any existing nodes on the stack are shifted down. What was at index 0 moves to index 1, and so on.
+
+<li>
+<span id="How the Stack Works-More on Push-How push 0 Operates on the Stack-Input Consumption"></span><strong id="Input Consumption">Input Consumption</strong>: When a node with inputs 2 is created, it pops the two topmost items from the stack to fill its inputs.
+
+<ul>
+<li>
+If the stack is [0, Read1], the node's Input A (index 0) connects to the "null" entry, and Input B (index 1) connects to Read1. 
+
+</ul>
+</ul>
+<div id="How the Stack Works-More on Push-Why this distinction matters for troubleshooting"><h4 id="Why this distinction matters for troubleshooting" class="header"><a href="#How the Stack Works-More on Push-Why this distinction matters for troubleshooting">Why this distinction matters for troubleshooting</a></h4></div>
+
+<p>
+If push 0 actually cleared the stack, you could never have a node with multiple inputs where one input is empty but the other is connected. By pushing a "null" entry, Nuke precisely controls which node connects to which specific pipe (A, B, Mask, etc.). 
+</p>
+
+<table>
+<tr>
+<td>
+Command
+</td>
+<td>
+Effect on Stack
+</td>
+</tr>
+<tr>
+<td>
+Node definition
+</td>
+<td>
+Creates node, pops required inputs, then pushes itself to the top.
+</td>
+</tr>
+<tr>
+<td>
+push $Var
+</td>
+<td>
+Pushes a reference to a specific node onto the top.
+</td>
+</tr>
+<tr>
+<td>
+push 0
+</td>
+<td>
+Pushes a "null" entry onto the top.
+</td>
+</tr>
+<tr>
+<td>
+pop
+</td>
+<td>
+Removes items from the top of the stack.
+</td>
+</tr>
+</table>
+
+<ul>
+<li>
+<span id="How the Stack Works-More on Push-Why this distinction matters for troubleshooting-Repair Tip"></span><strong id="Repair Tip">Repair Tip</strong>: If a file is corrupt because a Merge node has the wrong inputs, check for an extra or missing push 0 just before the node definition. Adding a push 0 will "bump" the intended node from Input A to Input B.
+
+</ul>
 <div id="How the Stack Works-More on Push-1. Breaking the Chain (Isolation)"><h3 id="1. Breaking the Chain (Isolation)" class="header"><a href="#How the Stack Works-More on Push-1. Breaking the Chain (Isolation)">1. Breaking the Chain (Isolation)</a></h3></div>
 
 <p>
