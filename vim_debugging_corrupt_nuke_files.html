@@ -633,6 +633,287 @@ Vim handles regex slightly differently than languages like Python or JavaScript.
 <span id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Troubleshooting Regex in Vim-Escaping"></span><strong id="Escaping">Escaping</strong>: If your group name uses literal parentheses like Group (Main), you must escape them: Group\s*(.*).
 
 </ul>
+<div id="Check for Non-Nested Groups"><h1 id="Check for Non-Nested Groups" class="header"><a href="#Check for Non-Nested Groups">Check for Non-Nested Groups</a></h1></div>
+
+<p>
+Your current function already detects:
+</p>
+
+<ul>
+<li>
+orphaned end_group
+
+<li>
+leftover unclosed Group {
+
+</ul>
+<p>
+But you’re missing one key rule you mentioned:
+</p>
+
+<div id="❗ You want to forbid nested Group { blocks."><h1 id="❗ You want to forbid nested Group { blocks." class="header"><a href="#❗ You want to forbid nested Group { blocks.">❗ You want to forbid nested Group { blocks.</a></h1></div>
+
+<p>
+Right now, your function allows this:
+</p>
+
+<pre vim>
+Group {
+    Group {
+    end_group
+end_group
+</pre>
+
+<p>
+…because the stack just grows and shrinks.
+</p>
+
+<p>
+You want this to be flagged as corrupt, because Nuke TCL does not allow nested groups.
+</p>
+
+<div id="❗ You want to forbid nested Group { blocks.-✅ Here is your function, upgraded to enforce non‑nested groups"><h4 id="✅ Here is your function, upgraded to enforce non‑nested groups" class="header"><a href="#❗ You want to forbid nested Group { blocks.-✅ Here is your function, upgraded to enforce non‑nested groups">✅ Here is your function, upgraded to enforce non‑nested groups</a></h4></div>
+
+<p>
+I’ll keep your structure, cursor movement, and messaging exactly as you wrote them — just adding the missing logic.
+</p>
+
+<pre vim>
+function! CheckGroups()
+    let stack = []
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        " Opening block
+        if line =~ '^\s*Group\s*{'
+            " NEW RULE: no nesting allowed
+            if !empty(stack)
+                call cursor(lnum, 1)
+                norm! zz
+                echohl ErrorMsg
+                echom "Error: Nested 'Group {' found at line " . lnum
+                echohl None
+                return
+            endif
+
+            call add(stack, lnum)
+        endif
+
+        " Closing block
+        if line =~ '^\s*end_group\s*$'
+            if empty(stack)
+                " Orphaned closing tag
+                call cursor(lnum, 1)
+                norm! zz
+                echohl ErrorMsg
+                echom "Error: Extra 'end_group' (no matching opener) at line " . lnum
+                echohl None
+                return
+            endif
+
+            call remove(stack, -1)
+        endif
+    endfor
+
+    " If stack not empty, we have an unclosed Group {
+    if !empty(stack)
+        let error_line = stack[-1]
+        call cursor(error_line, 1)
+        norm! zz
+        echohl ErrorMsg
+        echom "Error: Unclosed 'Group {' found at line " . error_line
+        echohl None
+    else
+        echom "All groups valid"
+    endif
+endfunction
+</pre>
+
+<div id="❗ You want to forbid nested Group { blocks.-✅ What this version now detects"><h3 id="✅ What this version now detects" class="header"><a href="#❗ You want to forbid nested Group { blocks.-✅ What this version now detects">✅ What this version now detects</a></h3></div>
+
+<div id="❗ You want to forbid nested Group { blocks.-✅ What this version now detects-✔ Unclosed Group {"><h4 id="✔ Unclosed Group {" class="header"><a href="#❗ You want to forbid nested Group { blocks.-✅ What this version now detects-✔ Unclosed Group {">✔ Unclosed Group {</a></h4></div>
+
+<pre vim>
+Group {
+    foo
+# end_group missing
+</pre>
+
+<div id="❗ You want to forbid nested Group { blocks.-✅ What this version now detects-✔ Orphaned end_group"><h4 id="✔ Orphaned end_group" class="header"><a href="#❗ You want to forbid nested Group { blocks.-✅ What this version now detects-✔ Orphaned end_group">✔ Orphaned end_group</a></h4></div>
+
+<pre>
+end_group
+</pre>
+
+<div id="❗ You want to forbid nested Group { blocks.-✅ What this version now detects-✔ Nested groups (NEW)"><h4 id="✔ Nested groups (NEW)" class="header"><a href="#❗ You want to forbid nested Group { blocks.-✅ What this version now detects-✔ Nested groups (NEW)">✔ Nested groups (NEW)</a></h4></div>
+
+<pre vim>
+Group {
+    Group {
+{{{
+
+==== ✔ Correctly matched blocks ====
+
+{{{
+Group {
+    foo
+}
+end_group
+</pre>
+
+<div id="❗ You want to forbid nested Group { blocks.-✅ What this version now detects-Why this works"><h4 id="Why this works" class="header"><a href="#❗ You want to forbid nested Group { blocks.-✅ What this version now detects-Why this works">Why this works</a></h4></div>
+
+<p>
+You already had a stack.
+</p>
+
+<p>
+To forbid nesting, we simply check:
+</p>
+
+<pre>
+if !empty(stack)
+    " already inside a Group {
+</pre>
+
+
+<p>
+If the stack is non‑empty when we see a new Group {, that means we’re already inside a block → invalid.
+</p>
+
+<div id="More Feedback on an Error Detected"><h1 id="More Feedback on an Error Detected" class="header"><a href="#More Feedback on an Error Detected">More Feedback on an Error Detected</a></h1></div>
+
+<p>
+Right now, your function does jump to the offending Group { line, but it only prints a single error message in the command area. If you blink, you can miss it. Nothing else in the buffer visually changes.
+</p>
+
+<p>
+Let me walk you through exactly what happens and how to make the feedback clearer.
+</p>
+
+<div id="More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group"><h2 id="What your current function does when a Group { is missing its end_group" class="header"><a href="#More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group">What your current function does when a Group { is missing its end_group</a></h2></div>
+
+<p>
+When the loop finishes and the stack is not empty:
+</p>
+
+<ul>
+<li>
+It takes the last unmatched Group { line number
+
+<li>
+Moves the cursor there
+
+<li>
+Centers the window (zz)
+
+<li>
+Prints this message:
+
+</ul>
+  
+<pre>
+Error: Unclosed 'Group {' found at line X
+</pre>
+
+<p>
+That’s all.
+</p>
+
+<p>
+No highlighting, no list of errors, no context — just a jump and a message.
+</p>
+
+<p>
+So yes: you only see the cursor sitting on the Group { line.
+</p>
+
+<div id="More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group-If you want clearer feedback, here are two easy upgrades"><h3 id="If you want clearer feedback, here are two easy upgrades" class="header"><a href="#More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group-If you want clearer feedback, here are two easy upgrades">If you want clearer feedback, here are two easy upgrades</a></h3></div>
+
+<div id="More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group-If you want clearer feedback, here are two easy upgrades-1. Highlight the offending line"><h4 id="1. Highlight the offending line" class="header"><a href="#More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group-If you want clearer feedback, here are two easy upgrades-1. Highlight the offending line">1. Highlight the offending line</a></h4></div>
+
+<p>
+Add this right before the return in the unclosed‑group section:
+</p>
+
+<pre vim>
+call matchadd('ErrorMsg', '\%' . error_line . 'l')
+</pre>
+
+<p>
+This highlights the entire line in red.
+</p>
+
+<p>
+Your unclosed‑group block becomes:
+</p>
+
+<pre vim>
+if !empty(stack)
+    let error_line = stack[-1]
+    call cursor(error_line, 1)
+    norm! zz
+    call matchadd('ErrorMsg', '\%' . error_line . 'l')
+    echohl ErrorMsg
+    echom "Error: Unclosed 'Group {' found at line " . error_line
+    echohl None
+    return
+endif
+</pre>
+
+<p>
+Now the user gets:
+</p>
+<ul>
+<li>
+Cursor moved to the line
+
+<li>
+Window centered
+
+<li>
+Line highlighted
+
+<li>
+Error message printed
+
+</ul>
+<p>
+Much harder to miss.
+</p>
+
+<div id="More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group-If you want clearer feedback, here are two easy upgrades-2. Print all unclosed groups instead of only the last one"><h4 id="2. Print all unclosed groups instead of only the last one" class="header"><a href="#More Feedback on an Error Detected-What your current function does when a Group { is missing its end_group-If you want clearer feedback, here are two easy upgrades-2. Print all unclosed groups instead of only the last one">2. Print all unclosed groups instead of only the last one</a></h4></div>
+
+<p>
+Right now you only report the last unmatched opener.
+</p>
+
+<p>
+If you want to list them all:
+</p>
+
+<pre vim>
+if !empty(stack)
+    echohl ErrorMsg
+    echom "Unclosed Group blocks found:"
+    for lnum in stack
+        echom "  - at line " . lnum
+    endfor
+    echohl None
+
+    " Jump to the first one
+    call cursor(stack[0], 1)
+    norm! zz
+    return
+endif
+</pre>
+
+<p>
+This gives you a mini‑report in the message area.
+</p>
+
+
 <p>
 <a href="vim_learning.html">Vim Learning</a>
 </p>
