@@ -223,7 +223,7 @@ endfunction
 <code>call cursor(lnum, 1)</code>: This command takes the line number and the column number (1) and moves the cursor there instantly.
 
 <li>
-norm! zz`: This executes the "Normal mode" command zz, which scrolls the window so that the current line is right in the middle of your screen.
+<code>norm! zz</code>: This executes the "Normal mode" command zz, which scrolls the window so that the current line is right in the middle of your screen.
 
 <li>
 Instant Feedback: Instead of just reading a message and searching for the line number manually, you are now placed exactly where the fix needs to happen.
@@ -248,6 +248,389 @@ Would you like to turn this into a command (like :CheckGroups) so you don't have
 </td>
 </tr>
 </table>
+
+</ul>
+<div id="Custom Command"><h1 id="Custom Command" class="header"><a href="#Custom Command">Custom Command</a></h1></div>
+
+<p>
+To make this tool easy to use, you can define a custom command. By adding a single line to your .vimrc (or init.vim), you can simply type :CheckGroups in Normal mode.
+</p>
+
+<div id="Custom Command-The Full Setup"><h2 id="The Full Setup" class="header"><a href="#Custom Command-The Full Setup">The Full Setup</a></h2></div>
+
+<p>
+Add this entire block to your configuration file:
+</p>
+
+<pre vim>
+function! CheckGroups()
+    let stack = []
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        if line =~ '^Group {'
+            call add(stack, lnum)
+        elseif line =~ '^end_group$'
+            if empty(stack)
+                call cursor(lnum, 1)
+                norm! zz
+                echohl ErrorMsg 
+                echom "Error: Extra 'end_group' at line " . lnum 
+                echohl None
+                return
+            endif
+            call remove(stack, -1)
+        endif
+    endfor
+
+    if !empty(stack)
+        let error_line = stack[-1]
+        call cursor(error_line, 1)
+        norm! zz
+        echohl ErrorMsg 
+        echom "Error: Unclosed 'Group {' starting at line " . error_line 
+        echohl None
+    else
+        echom "All groups balanced"
+    endif
+endfunction
+
+" Create the command
+command! CheckGroups call CheckGroups()
+</pre>
+
+<div id="Custom Command-The Full Setup-How to use it:"><h4 id="How to use it:" class="header"><a href="#Custom Command-The Full Setup-How to use it:">How to use it:</a></h4></div>
+
+<ul>
+<li>
+Reload your config or restart Vim.
+
+<li>
+While editing your file, type: :CheckGroups
+
+</ul>
+<p>
+8 Vim will either say "All groups balanced" or warp your cursor directly to the line causing the issue.
+</p>
+
+<div id="Custom Command-The Full Setup-Pro-Tip: Adding a Keyboard Shortcut"><h4 id="Pro-Tip: Adding a Keyboard Shortcut" class="header"><a href="#Custom Command-The Full Setup-Pro-Tip: Adding a Keyboard Shortcut">Pro-Tip: Adding a Keyboard Shortcut</a></h4></div>
+
+<p>
+If you find yourself checking groups frequently, you can map it to a key (like &lt;leader&gt;g):
+</p>
+
+<pre vim>
+nnoremap &lt;leader&gt;g :CheckGroups&lt;CR&gt;
+</pre>
+
+<div id="Custom Command-The Full Setup-Why this is better than a simple search"><h4 id="Why this is better than a simple search" class="header"><a href="#Custom Command-The Full Setup-Why this is better than a simple search">Why this is better than a simple search</a></h4></div>
+
+<p>
+While you could use <code>/Group {</code> to find openings, a search doesn't understand hierarchy. This script understands that groups can be inside other groups. It uses the "Last-In, First-Out" logic of a stack to ensure every specific block is logically sound.
+</p>
+
+<table>
+<tr>
+<td>
+Would you like me to show you how to make this work for other types of brackets, like if/endif or {/}, as well?
+</td>
+</tr>
+</table>
+
+<div id="Other Types of Brackets"><h1 id="Other Types of Brackets" class="header"><a href="#Other Types of Brackets">Other Types of Brackets</a></h1></div>
+
+<p>
+To make this function universal, we can use a Dictionary (a map of key-value pairs) to define our "opening" and "closing" pairs. This allows the script to check for Group/end_group, if/endif, or even standard curly braces {/} all at the same time.
+</p>
+
+<div id="Other Types of Brackets-The Universal Checker"><h2 id="The Universal Checker" class="header"><a href="#Other Types of Brackets-The Universal Checker">The Universal Checker</a></h2></div>
+
+<pre>
+function! CheckBalance()
+    " Define our pairs: 'opener': 'closer'
+    let l:pairs = {
+    \ '^Group {': '^end_group$',
+    \ '^if\&gt;': '^endif$',
+    \ '^\s*{': '^\s*}'
+    \ }
+
+    let l:stack = []
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        " Check for any opening tag
+        for [opener, closer] in items(l:pairs)
+            if line =~ opener
+                call add(l:stack, {'line': lnum, 'expected': closer, 'text': opener})
+                break
+            endif
+
+            " Check for any closing tag
+            if line =~ closer
+                if empty(l:stack) || l:stack[-1].expected != closer
+                    call cursor(lnum, 1)
+                    norm! zz
+                    echohl ErrorMsg
+                    echom "Error: Unexpected closer '" . closer . "' at line " . lnum
+                    echohl None
+                    return
+                endif
+                call remove(l:stack, -1)
+                break
+            endif
+        endfor
+    endfor
+
+    if !empty(l:stack)
+        let last_err = l:stack[-1]
+        call cursor(last_err.line, 1)
+        norm! zz
+        echohl ErrorMsg
+        echom "Error: Unclosed '" . last_err.text . "' from line " . last_err.line
+        echohl None
+    else
+        echom "All structures are balanced!"
+    endif
+endfunction
+
+command! CheckBalance call CheckBalance()
+</pre>
+
+<div id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works"><h3 id="How the &quot;Dictionary Stack&quot; Works" class="header"><a href="#Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works">How the "Dictionary Stack" Works</a></h3></div>
+
+<p>
+In the previous version, we only stored the line number. Now, we store an Object (Dictionary) on the stack that looks like this: {'line': 10, 'expected': '^end_group$', 'text': 'Group {'}
+</p>
+
+<p>
+This allows the stack to remember exactly what it is looking for.
+</p>
+
+<ul>
+<li>
+<span id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Push"></span><strong id="Push">Push</strong>: If it sees an if, it pushes the expectation of an endif onto the stack.
+
+<li>
+<span id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Validation"></span><strong id="Validation">Validation</strong>: If it encounters a }, it looks at the top of the stack. If the stack says it was expecting an endif, it knows you have a nesting error (e.g., you tried to close an if block with a }).
+
+<li>
+<span id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Pop"></span><strong id="Pop">Pop</strong>: If the closer matches the expectation, it clears that level and moves on.
+
+</ul>
+<div id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Key Improvements:"><h4 id="Key Improvements:" class="header"><a href="#Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Key Improvements:">Key Improvements:</a></h4></div>
+
+<ul>
+<li>
+<span id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Key Improvements:-Context Awareness"></span><strong id="Context Awareness">Context Awareness</strong>: It can tell the difference between a missing endif and a missing end_group.
+
+<li>
+<span id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Key Improvements:-Scalability"></span><strong id="Scalability">Scalability</strong>: You can add any pairs you want to the l:pairs dictionary at the top of the function.
+
+<li>
+<span id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Key Improvements:-Regex Power"></span><strong id="Regex Power">Regex Power</strong>: The \&gt; in ^if\&gt; ensures it matches the word "if" but not a word like "ifconfig".
+
+</ul>
+<div id="Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Next Step"><h4 id="Next Step" class="header"><a href="#Other Types of Brackets-The Universal Checker-How the &quot;Dictionary Stack&quot; Works-Next Step">Next Step</a></h4></div>
+
+<table>
+<tr>
+<td>
+Would you like me to show you how to ignore lines that are commented out, so the script doesn't get confused by tags inside comments?
+</td>
+</tr>
+</table>
+
+<div id="Ignore Comments"><h1 id="Ignore Comments" class="header"><a href="#Ignore Comments">Ignore Comments</a></h1></div>
+
+<p>
+To ignore comments, we need to check the Syntax Highlighting of the text. In Vim, even if a line looks like a Group {, if the syntax engine has labeled it as a "Comment," we should skip it.
+</p>
+
+<p>
+Here is the finalized, production-ready version of your script.
+</p>
+
+<div id="Ignore Comments-The Robust Universal Checker"><h2 id="The Robust Universal Checker" class="header"><a href="#Ignore Comments-The Robust Universal Checker">The Robust Universal Checker</a></h2></div>
+
+<pre>
+function! CheckBalance()
+    let l:pairs = {
+    \ '^Group {': '^end_group$',
+    \ '^if\&gt;': '^endif$',
+    \ '^\s*{': '^\s*}'
+    \ }
+
+    let l:stack = []
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        " 1. Skip the line if it's entirely a comment
+        " synIDattr checks the syntax ID at line, column
+        if synIDattr(synID(lnum, 1, 1), "name") =~? 'comment'
+            continue
+        endif
+
+        for [opener, closer] in items(l:pairs)
+            " 2. Handle Openers
+            if line =~ opener
+                call add(l:stack, {'line': lnum, 'expected': closer, 'text': opener})
+                break
+            endif
+
+            " 3. Handle Closers
+            if line =~ closer
+                if empty(l:stack) || l:stack[-1].expected != closer
+                    call cursor(lnum, 1)
+                    norm! zz
+                    echohl ErrorMsg
+                    let msg = empty(l:stack) ? "Unexpected '" . closer . "'" : "Expected '" . l:stack[-1].expected . "' but found '" . closer . "'"
+                    echom "Error at line " . lnum . ": " . msg
+                    echohl None
+                    return
+                endif
+                call remove(l:stack, -1)
+                break
+            endif
+        endfor
+    endfor
+
+    " 4. Final Stack Check
+    if !empty(l:stack)
+        let last_err = l:stack[-1]
+        call cursor(last_err.line, 1)
+        norm! zz
+        echohl ErrorMsg
+        echom "Error: Unclosed '" . last_err.text . "' from line " . last_err.line
+        echohl None
+    else
+        echom "All structures are balanced!"
+    endif
+endfunction
+
+command! CheckBalance call CheckBalance()
+</pre>
+
+
+<div id="Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;"><h3 id="Why this is &quot;Production-Grade&quot;" class="header"><a href="#Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;">Why this is "Production-Grade"</a></h3></div>
+
+<div id="Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;-1. Syntax Awareness"><h4 id="1. Syntax Awareness" class="header"><a href="#Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;-1. Syntax Awareness">1. Syntax Awareness</a></h4></div>
+
+<p>
+By using synIDattr(synID(lnum, 1, 1), "name"), the script asks Vim: "What is the actual category of this text?" If Vim says "Comment" or "String," the script ignores it. This prevents errors when you have notes like: # Remember: don't use Group { here
+</p>
+
+<div id="Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;-2. Cross-Pollination Errors"><h4 id="2. Cross-Pollination Errors" class="header"><a href="#Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;-2. Cross-Pollination Errors">2. Cross-Pollination Errors</a></h4></div>
+
+<p>
+Because the stack now stores the expected closer, it catches interleaved errors. If you open a Group { and then an if, but try to close the Group before the if, the stack will detect that the "Top" item doesn't match.
+</p>
+
+<div id="Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;-3. Smarter Error Messages"><h4 id="3. Smarter Error Messages" class="header"><a href="#Ignore Comments-The Robust Universal Checker-Why this is &quot;Production-Grade&quot;-3. Smarter Error Messages">3. Smarter Error Messages</a></h4></div>
+
+<p>
+The error message now adapts. If the stack is empty, it tells you it's an "Unexpected" closer. If the stack has items but the wrong one is closed, it tells you exactly what it was expecting to see instead.
+</p>
+
+<div id="Ignore Comments-The Robust Universal Checker-One final tip"><h3 id="One final tip" class="header"><a href="#Ignore Comments-The Robust Universal Checker-One final tip">One final tip</a></h3></div>
+
+<p>
+If you want this to run every time you save a file, you can add this "autocmd" to your config:
+</p>
+
+<pre vim>
+" Automatically check balance when saving .txt or .myext files
+autocmd BufWritePost *.txt,*.conf CheckBalance
+</pre>
+
+<table>
+<tr>
+<td>
+Would you like me to explain how to modify the regex patterns if your "Group" names have spaces or specific characters in them?
+</td>
+</tr>
+</table>
+
+
+<div id="Modify REGEX Patterns"><h1 id="Modify REGEX Patterns" class="header"><a href="#Modify REGEX Patterns">Modify REGEX Patterns</a></h1></div>
+
+<p>
+In Vimscript, regex (Regular Expressions) can be a bit tricky because the symbols behave differently depending on the "magic" level set in your editor.
+</p>
+
+<p>
+To make your group matching more flexible—for example, if your groups have names like Group {Header} or Group { Main_Section }—you need to adjust the patterns in the l:pairs dictionary.
+</p>
+
+<div id="Modify REGEX Patterns-Flexible Regex Patterns"><h2 id="Flexible Regex Patterns" class="header"><a href="#Modify REGEX Patterns-Flexible Regex Patterns">Flexible Regex Patterns</a></h2></div>
+
+<p>
+Here are a few ways to update the l:pairs dictionary to handle variations:
+</p>
+
+<pre vim>
+let l:pairs = {
+\ '^Group\s*{.*}': '^end_group$',          " Matches 'Group {Anything}'
+\ '^\s*if\&gt;': '^endif$',                   " Allows leading spaces/tabs before 'if'
+\ '^\s*{\s*$': '^\s*}\s*$'                 " Matches a { or } on its own line with optional spaces
+\ }
+</pre>
+
+<p>
+Breakdown of the Symbols
+</p>
+
+<ul>
+<li>
+If you want to customize your own, here is a quick reference for the symbols used above:
+
+<li>
+<code>^</code>: Matches the very beginning of the line.
+
+<li>
+<code>\s*</code>: Matches zero or more whitespace characters (spaces or tabs).
+
+<li>
+<code>\&gt;</code>: This is a "word boundary." It ensures if matches, but ifconfig does not.
+
+<li>
+<code>.*</code>: Matches any character, any number of times. Use this if your group name is inside the brackets.
+
+<li>
+<code>$</code>: Matches the very end of the line.
+
+</ul>
+<div id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually"><h3 id="Understanding the &quot;Stack&quot; Logic Visually" class="header"><a href="#Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually">Understanding the "Stack" Logic Visually</a></h3></div>
+
+<p>
+Since we are now tracking multiple types of openers and closers, the "Stack" is doing more work. It’s no longer just a counter; it’s a memory bank.
+</p>
+
+<ul>
+<li>
+<span id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Push"></span><strong id="Push">Push</strong>: When an opener is found, the line number and the expected closer are added to the top of the stack.
+
+<li>
+<span id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Verify"></span><strong id="Verify">Verify</strong>: When a closer is found, the script looks at the top item. If the closer doesn't match the expected value of the top item, it knows your code is "interleaved" (e.g., you closed a Group while an if was still open).
+
+<li>
+<span id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Pop"></span><strong id="Pop">Pop</strong>: If they match, the top item is removed, and the script moves to the next level down.
+
+</ul>
+<div id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Troubleshooting Regex in Vim"><h4 id="Troubleshooting Regex in Vim" class="header"><a href="#Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Troubleshooting Regex in Vim">Troubleshooting Regex in Vim</a></h4></div>
+
+<p>
+Vim handles regex slightly differently than languages like Python or JavaScript.
+</p>
+
+<ul>
+<li>
+<span id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Troubleshooting Regex in Vim-Case Sensitivity"></span><strong id="Case Sensitivity">Case Sensitivity</strong>: By default, =~ follows your global ignorecase setting. To force it to be case-sensitive regardless of your settings, use =~#. To force case-insensitive, use =~?.
+
+<li>
+<span id="Modify REGEX Patterns-Flexible Regex Patterns-Understanding the &quot;Stack&quot; Logic Visually-Troubleshooting Regex in Vim-Escaping"></span><strong id="Escaping">Escaping</strong>: If your group name uses literal parentheses like Group (Main), you must escape them: Group\s*(.*).
 
 </ul>
 <p>
