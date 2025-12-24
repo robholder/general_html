@@ -437,6 +437,756 @@ Without that set and the subsequent push, the Grade node would have automaticall
 </p>
 
 
+<div id="Stack and Pop Logic"><h1 id="Stack and Pop Logic" class="header"><a href="#Stack and Pop Logic">Stack and Pop Logic</a></h1></div>
+
+<p>
+In the "Node-Node-Pop" logic, a 1-input node doesn't just sit on top of the stack—it consumes what is currently at the top, connects to it, and then replaces it as the new "top."
+</p>
+
+<p>
+Let’s look at how the stack actually evolves when a 1-input node like a Grade is involved. It acts as a transaction.
+</p>
+
+<table>
+<tr>
+<td>
+Line in .nk File
+</td>
+<td>
+Action
+</td>
+<td>
+The "Stack" (Bottom to Top)
+</td>
+<td>
+Logic
+</td>
+<td>
+&nbsp;
+</td>
+</tr>
+<tr>
+<td>
+Read { name Read1 }
+</td>
+<td>
+Push
+</td>
+<td>
+[Read1]
+</td>
+<td>
+The starting point.
+</td>
+<td>
+&nbsp;
+</td>
+</tr>
+<tr>
+<td>
+Grade { name Grade1 }
+</td>
+<td>
+Pop 1, Push 1
+</td>
+<td>
+[Grade1]
+</td>
+<td>
+Grade1 "pops" Read1, connects its input to it, then "pushes" itself onto the stack.
+</td>
+<td>
+&nbsp;
+</td>
+</tr>
+</table>
+<p>
+|Read { name Read2 }	|Push|	[Grade1, Read2]|	A new branch/node is added.
+|Merge2 { inputs 2 }|	Pop 2, Push 1|	[Merge1]|	Merge pops Read2 (Input A) and Grade1 (Input B), then pushes itself.
+</p>
+
+<div id="Stack and Pop Logic-Why this happens: Input Requirements"><h3 id="Why this happens: Input Requirements" class="header"><a href="#Stack and Pop Logic-Why this happens: Input Requirements">Why this happens: Input Requirements</a></h3></div>
+
+<p>
+The behavior of the stack is dictated by the node's input count.
+</p>
+
+<ul>
+<li>
+0-Input Nodes (Read, CheckerBoard, Constant): These nodes just Push. They don't need anything from the stack to exist.
+
+<li>
+1-Input Nodes (Grade, Blur, ColorCorrect): These Pop 1 and then Push 1. This creates a linear chain.
+
+<li>
+Multi-Input Nodes (Merge, JoinViews): These Pop N (where N is the number of inputs) and then Push 1. This is what actually "merges" the branches of your script.
+
+</ul>
+<div id="Stack and Pop Logic-The &quot;Hidden&quot; DAG"><h3 id="The &quot;Hidden&quot; DAG" class="header"><a href="#Stack and Pop Logic-The &quot;Hidden&quot; DAG">The "Hidden" DAG</a></h3></div>
+
+<p>
+If you visualize this as the stack "consuming" its predecessors, you can see how the 1D text file builds the 2D graph.
+</p>
+
+<p>
+In the example:
+</p>
+
+<ul>
+<li>
+Read1 enters the stack.
+
+<li>
+Grade1 sees Read1, grabs it, and now Grade1 represents the end of that specific "pipe."
+
+<li>
+Read2 is placed on the stack as a totally separate pipe.
+
+<li>
+Merge sees two pipes available, grabs both, and combines them into one final pipe.
+
+</ul>
+<div id="Stack and Pop Logic-The &quot;Hidden&quot; DAG-A Quick Way to See This in Nuke"><h4 id="A Quick Way to See This in Nuke" class="header"><a href="#Stack and Pop Logic-The &quot;Hidden&quot; DAG-A Quick Way to See This in Nuke">A Quick Way to See This in Nuke</a></h4></div>
+
+<p>
+If you ever want to see this "stack" logic in the actual Nuke UI, try this:
+</p>
+<ul>
+<li>
+Select two Read nodes.
+
+<li>
+Press M to Merge.
+
+</ul>
+<p>
+Nuke will automatically connect them based on the order they were selected—which is Nuke's way of creating a temporary "selection stack."
+</p>
+
+<div id="Mask Inputs"><h1 id="Mask Inputs" class="header"><a href="#Mask Inputs">Mask Inputs</a></h1></div>
+
+<p>
+When a node has a Mask input (or any optional 3rd input), the stack logic gets slightly more sophisticated. In a Nuke script, these are often referred to as "side-pipe" inputs.
+</p>
+
+<p>
+In the .nk file, Nuke handles this by looking at the Input Count defined in the node's class. For a Merge node, the inputs are usually numbered: input0 (B), input1 (A), and input2 (Mask).
+</p>
+
+<div id="Mask Inputs-The &quot;Side-Pipe&quot; Stack Logic"><h3 id="The &quot;Side-Pipe&quot; Stack Logic" class="header"><a href="#Mask Inputs-The &quot;Side-Pipe&quot; Stack Logic">The "Side-Pipe" Stack Logic</a></h3></div>
+
+<p>
+Here is how the robot handles a Merge with a Mask. Note how it "reaches deeper" into the stack:
+</p>
+
+<table>
+<tr>
+<td>
+Line in .nk File
+</td>
+<td>
+Action
+</td>
+<td>
+The "Stack" (Bottom to Top)
+</td>
+<td>
+Logic
+</td>
+</tr>
+<tr>
+<td>
+Read { name BG }
+</td>
+<td>
+Push
+</td>
+<td>
+[BG]
+</td>
+<td>
+The background layer.
+</td>
+</tr>
+<tr>
+<td>
+Read { name FG }
+</td>
+<td>
+Push
+</td>
+<td>
+[BG, FG]
+</td>
+<td>
+The foreground layer.
+</td>
+</tr>
+<tr>
+<td>
+Radial { name Mask1 }
+</td>
+<td>
+Push
+</td>
+<td>
+[BG, FG, Mask1]
+</td>
+<td>
+The mask shape.
+</td>
+</tr>
+<tr>
+<td>
+Merge2 { inputs 3 }
+</td>
+<td>
+Pop 3, Push 1
+</td>
+<td>
+[Merge1]
+</td>
+<td>
+Pop Mask1 (Input 2), Pop FG (Input 1), Pop BG (Input 0).
+</td>
+</tr>
+</table>
+
+<div id="Mask Inputs-The &quot;Nuke Rule of Three&quot;"><h3 id="The &quot;Nuke Rule of Three&quot;" class="header"><a href="#Mask Inputs-The &quot;Nuke Rule of Three&quot;">The "Nuke Rule of Three"</a></h3></div>
+
+<p>
+When the Merge2 node is created with 3 inputs, it executes a specific "ordering" from the stack:
+</p>
+<ul>
+<li>
+The Top Item on the stack becomes the Mask (Input 2).
+
+<li>
+The Second Item down becomes the A pipe (Input 1).
+
+<li>
+The Third Item down becomes the B pipe (Input 0).
+
+</ul>
+<p>
+This is why, if you were to accidentally create your nodes in the wrong order—for example, creating your Background after your Mask—the Merge node would plug your background image into the Mask input!
+</p>
+
+<div id="Mask Inputs-Visualizing the Connections (The DAG)"><h3 id="Visualizing the Connections (The DAG)" class="header"><a href="#Mask Inputs-Visualizing the Connections (The DAG)">Visualizing the Connections (The DAG)</a></h3></div>
+
+<p>
+In the Node Graph, this "Pop 3" action creates the familiar three-way junction. The stack is essentially "collapsing" three separate branches into a single output pipe.
+</p>
+
+<div id="Mask Inputs-What happens if the Stack is too &quot;Short&quot;?"><h3 id="What happens if the Stack is too &quot;Short&quot;?" class="header"><a href="#Mask Inputs-What happens if the Stack is too &quot;Short&quot;?">What happens if the Stack is too "Short"?</a></h3></div>
+
+<p>
+If you write a Nuke script that calls for a Merge2 { inputs 3 } but there is only one node on the stack, Nuke won't crash. Instead:
+</p>
+<ul>
+<li>
+It connects Input 0 to the available node.
+
+<li>
+It leaves Input 1 and Input 2 disconnected.
+
+<li>
+The stack then contains only the Merge node, waiting for the next command.
+
+</ul>
+<div id="Mask Inputs-Identifying &quot;Stack Errors&quot; in your Script"><h3 id="Identifying &quot;Stack Errors&quot; in your Script" class="header"><a href="#Mask Inputs-Identifying &quot;Stack Errors&quot; in your Script">Identifying "Stack Errors" in your Script</a></h3></div>
+
+<p>
+If you are looking at a raw Nuke script and you see a node that looks like it's floating or connected to the wrong thing, check the lines directly above it.
+</p>
+
+<p>
+Pro-Tip: In Nuke, the push command can be used explicitly in the text file to duplicate an item already on the stack. If you see push $cut_paste_input, Nuke is "copying" a lower item in the stack and putting it back on top so a node can grab it again!
+</p>
+
+
+<div id="More on Copy and Push"><h1 id="More on Copy and Push" class="header"><a href="#More on Copy and Push">More on Copy and Push</a></h1></div>
+
+<p>
+In a raw Nuke script (.nk), $cut_paste_input is a placeholder variable. It is a temporary "memory link" used by Nuke when you copy a node that was connected to something you didn't select.
+</p>
+
+<p>
+When you paste that node, Nuke uses $cut_paste_input to try and reconnect it to the "current" top of the stack in your new location.
+</p>
+
+<div id="More on Copy and Push-1. The push Command: Reusing the Stack"><h3 id="1. The push Command: Reusing the Stack" class="header"><a href="#More on Copy and Push-1. The push Command: Reusing the Stack">1. The push Command: Reusing the Stack</a></h3></div>
+
+<p>
+In the Nuke text format, the push command is how the script re-uses a node that is already existing in the script. It literally tells the robot: "Go back to that specific node we made earlier and put a 'virtual copy' of it on top of the stack so I can use it again."
+</p>
+
+<p>
+The push logic in action: Imagine you have a Read1 node. You use it for your main pipe, but you also want to use it as a mask for a Merge later down the script.
+</p>
+
+<table>
+<tr>
+<td>
+Line in .nk File
+</td>
+<td>
+Action
+</td>
+<td>
+The Stack
+</td>
+<td>
+Result
+</td>
+</tr>
+<tr>
+<td>
+Read { name Read1 }
+</td>
+<td>
+Push
+</td>
+<td>
+[Read1]
+</td>
+<td>
+Creates the node.
+</td>
+</tr>
+<tr>
+<td>
+Blur { name Blur1 }
+</td>
+<td>
+Pop 1, Push 1
+</td>
+<td>
+[Blur1]
+</td>
+<td>
+Read1 flows into Blur1.
+</td>
+</tr>
+<tr>
+<td>
+push $Read1
+</td>
+<td>
+Push (Ref)
+</td>
+<td>
+[Blur1, Read1]
+</td>
+<td>
+The Magic: Read1 is now at the top again!
+</td>
+</tr>
+<tr>
+<td>
+Merge2 { inputs 2 }
+</td>
+<td>
+Pop 2, Push 1
+</td>
+<td>
+[Merge1]
+</td>
+<td>
+Merge connects Input B to Blur1 and Input A back to Read1.
+</td>
+</tr>
+</table>
+
+<div id="More on Copy and Push-2. How $cut_paste_input Works"><h3 id="2. How $cut_paste_input Works" class="header"><a href="#More on Copy and Push-2. How $cut_paste_input Works">2. How $cut_paste_input Works</a></h3></div>
+
+<p>
+When you select a node (let's say a Grade) and copy it, but you don't select the Read node it’s attached to, Nuke generates this text:
+</p>
+
+<pre tcl>
+set cut_paste_input [stack 0]  # Store the current top of the stack
+version 15.0
+push $cut_paste_input          # Push that stored "ghost" onto the stack
+Grade {
+ name Grade_Copied
+ ...
+}
+</pre>
+
+<ul>
+<li>
+<code>[stack 0]</code>: This tells Nuke to look at whatever node is currently at the very top of the stack where you are about to paste.
+
+<li>
+<span id="More on Copy and Push-2. How $cut_paste_input Works-The Result"></span><strong id="The Result">The Result</strong>: When you paste, Nuke "pushes" whatever you were just clicking on (the current stack top) into the input of your pasted node. This is why pasted nodes "jump" onto your active selection.
+
+</ul>
+<div id="More on Copy and Push-3. The copy Logic (Node Level)"><h3 id="3. The copy Logic (Node Level)" class="header"><a href="#More on Copy and Push-3. The copy Logic (Node Level)">3. The copy Logic (Node Level)</a></h3></div>
+
+<p>
+The Copy node in Nuke (which copies channels like Alpha from one pipe to another) works exactly like the 3-input Merge we discussed, but it relies heavily on the push command to bring the two pipes together.
+</p>
+
+<div id="More on Copy and Push-3. The copy Logic (Node Level)-The Stack Flow for a Copy Node:"><h4 id="The Stack Flow for a Copy Node:" class="header"><a href="#More on Copy and Push-3. The copy Logic (Node Level)-The Stack Flow for a Copy Node:">The Stack Flow for a Copy Node:</a></h4></div>
+
+<ul>
+<li>
+<span id="More on Copy and Push-3. The copy Logic (Node Level)-The Stack Flow for a Copy Node:-Pipe B"></span><strong id="Pipe B">Pipe B</strong>: You define your main image (pushed to stack).
+
+<li>
+<span id="More on Copy and Push-3. The copy Logic (Node Level)-The Stack Flow for a Copy Node:-Pipe A"></span><strong id="Pipe A">Pipe A</strong>: You define your Alpha source (pushed to stack).
+
+<li>
+<span id="More on Copy and Push-3. The copy Logic (Node Level)-The Stack Flow for a Copy Node:-The Copy Node"></span><strong id="The Copy Node">The Copy Node</strong>: It pops the Alpha source, then pops the main image, combines the channels, and pushes the result back to the top.
+
+</ul>
+<div id="More on Copy and Push-3. The copy Logic (Node Level)-Why this matters for the &quot;Ghost&quot; Connection"><h4 id="Why this matters for the &quot;Ghost&quot; Connection" class="header"><a href="#More on Copy and Push-3. The copy Logic (Node Level)-Why this matters for the &quot;Ghost&quot; Connection">Why this matters for the "Ghost" Connection</a></h4></div>
+
+<p>
+If you see $cut_paste_input and push commands in a script, it means Nuke is doing non-linear branching. It is taking a single node and "splitting" its output to go to multiple places.
+</p>
+
+<p>
+Without the push command, the stack would only ever be a single straight line. The push command is what allows Nuke to have branches.
+</p>
+
+<div id="More on Copy and Push-Pro-Tip: Cleaning up the Stack"><h3 id="Pro-Tip: Cleaning up the Stack" class="header"><a href="#More on Copy and Push-Pro-Tip: Cleaning up the Stack">Pro-Tip: Cleaning up the Stack</a></h3></div>
+
+<p>
+If you ever open a Nuke script in a text editor and see hundreds of push \(cut_paste_input lines, it’s usually a sign of a "messy" copy-paste history. You can actually manually change \)cut_paste_input to a specific node name (like Read1) to force a connection to stay put regardless of where it is pasted!
+</p>
+
+<div id="PostageStamp Illustration"><h1 id="PostageStamp Illustration" class="header"><a href="#PostageStamp Illustration">PostageStamp Illustration</a></h1></div>
+
+<p>
+In Nuke, a PostageStamp node is essentially a "portal" or a "visual reference" node. While it looks like a regular node in the DAG, its behavior in the underlying .nk script is a clever use of the push and hidden logic we’ve been discussing.
+</p>
+
+<div id="PostageStamp Illustration-How PostageStamp relates to the Stack"><h3 id="How PostageStamp relates to the Stack" class="header"><a href="#PostageStamp Illustration-How PostageStamp relates to the Stack">How PostageStamp relates to the Stack</a></h3></div>
+
+<p>
+When you use a PostageStamp to "clean up" a script, you are essentially telling Nuke: "I want to use the output of a node from way over there, without dragging a long pipe across my whole workspace."
+</p>
+
+<p>
+In the stack system, the PostageStamp acts as a named push.
+</p>
+
+<table>
+<tr>
+<td>
+Action in Node Graph
+</td>
+<td>
+Stack Action in .nk File
+</td>
+</tr>
+<tr>
+<td>
+Create Read1
+</td>
+<td>
+Push Read1
+</td>
+</tr>
+<tr>
+<td>
+Create PostageStamp
+</td>
+<td>
+Push a reference to the top of the stack
+</td>
+</tr>
+<tr>
+<td>
+Change PostageStamp
+</td>
+<td>
+Input	Nuke uses a push $NodeName command to grab a specific point in the script's history
+</td>
+</tr>
+</table>
+
+<div id="PostageStamp Illustration-How PostageStamp relates to the Stack-Using &quot;Hidden Inputs&quot; for a Cleaner Stack"><h4 id="Using &quot;Hidden Inputs&quot; for a Cleaner Stack" class="header"><a href="#PostageStamp Illustration-How PostageStamp relates to the Stack-Using &quot;Hidden Inputs&quot; for a Cleaner Stack">Using "Hidden Inputs" for a Cleaner Stack</a></h4></div>
+
+<p>
+The most common way to use this logic for script organization is through Hidden Inputs. If you select a PostageStamp (or any node), go to the Node tab, and check "hide input", the visual pipe disappears, but the Stack Connection remains.
+</p>
+
+<ul>
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Using &quot;Hidden Inputs&quot; for a Cleaner Stack-The Hidden push"></span><strong id="The Hidden push">The Hidden push</strong>: Even though you don't see the line in the DAG, the script still contains a push command.
+
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Using &quot;Hidden Inputs&quot; for a Cleaner Stack-The Benefit"></span><strong id="The Benefit">The Benefit</strong>: Your "Stack" stays organized. You can have a "Global Mask" node at the top of your script and "push" it into multiple Merge nodes at the bottom without creating a "spaghetti" graph.
+
+</ul>
+<div id="PostageStamp Illustration-How PostageStamp relates to the Stack-The &quot;Clone&quot; vs. &quot;PostageStamp&quot; Stack Logic"><h4 id="The &quot;Clone&quot; vs. &quot;PostageStamp&quot; Stack Logic" class="header"><a href="#PostageStamp Illustration-How PostageStamp relates to the Stack-The &quot;Clone&quot; vs. &quot;PostageStamp&quot; Stack Logic">The "Clone" vs. "PostageStamp" Stack Logic</a></h4></div>
+
+<p>
+It is important to distinguish these two, as they handle the stack differently:
+</p>
+<ul>
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-The &quot;Clone&quot; vs. &quot;PostageStamp&quot; Stack Logic-PostageStamp"></span><strong id="PostageStamp">PostageStamp</strong>: Creates a new node entry in the stack that simply references the output of another node. It has its own controls.
+
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-The &quot;Clone&quot; vs. &quot;PostageStamp&quot; Stack Logic-Clone (Alt+K)"></span><strong id="Clone (Alt+K)">Clone (Alt+K)</strong>: Creates a linked entry. In the .nk file, these nodes share the same parameters. If the stack updates the "Master" node, the "Clone" updates simultaneously because they are essentially the same ID in the stack.
+
+</ul>
+<div id="PostageStamp Illustration-How PostageStamp relates to the Stack-Visualizing a Complex Stack"><h4 id="Visualizing a Complex Stack" class="header"><a href="#PostageStamp Illustration-How PostageStamp relates to the Stack-Visualizing a Complex Stack">Visualizing a Complex Stack</a></h4></div>
+
+<p>
+If you were to see a "PostageStamp" system animated, it would look like a "Teleporter."
+</p>
+<ul>
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Visualizing a Complex Stack-Input"></span><strong id="Input">Input</strong>: A node enters a "PostageStamp" portal.
+
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Visualizing a Complex Stack-The Stack"></span><strong id="The Stack">The Stack</strong>: The node doesn't disappear; it stays at its original location in the script.
+
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Visualizing a Complex Stack-Output"></span><strong id="Output">Output</strong>: At the bottom of the script, a "Ghost" version of that node is pushed onto the stack exactly when it's needed for a Merge or a ColorCorrect.
+
+</ul>
+<div id="PostageStamp Illustration-How PostageStamp relates to the Stack-Summary of the Nuke &quot;Stack&quot; Journey"><h4 id="Summary of the Nuke &quot;Stack&quot; Journey" class="header"><a href="#PostageStamp Illustration-How PostageStamp relates to the Stack-Summary of the Nuke &quot;Stack&quot; Journey">Summary of the Nuke "Stack" Journey</a></h4></div>
+
+<p>
+We've traveled from a simple Vimscript stack = 0 counter to the complex, non-linear push/pop logic of a Nuke production script.
+</p>
+<ul>
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Summary of the Nuke &quot;Stack&quot; Journey-Vimscript"></span><strong id="Vimscript">Vimscript</strong>: Used the stack to track nesting (opening/closing).
+
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Summary of the Nuke &quot;Stack&quot; Journey-Nuke"></span><strong id="Nuke">Nuke</strong>: Uses the stack to track data flow (inputs/outputs).
+
+<li>
+<span id="PostageStamp Illustration-How PostageStamp relates to the Stack-Summary of the Nuke &quot;Stack&quot; Journey-Both"></span><strong id="Both">Both</strong>: Rely on the LIFO (Last-In, First-Out) principle to know exactly which "opener" or "node" is currently active.
+
+</ul>
+<div id="Python Script to Find Orphan Nodes (and illustrate the stack)"><h1 id="Python Script to Find Orphan Nodes (and illustrate the stack)" class="header"><a href="#Python Script to Find Orphan Nodes (and illustrate the stack)">Python Script to Find Orphan Nodes (and illustrate the stack)</a></h1></div>
+
+<p>
+In Nuke, "orphaned" nodes are nodes that exist in your script but aren't connected to the "Main Pipe" leading to your Viewer or Write nodes. These nodes take up memory and can make the .nk file difficult to read.
+</p>
+
+<p>
+Because Nuke's Python API (nuke) works by looking at the DAG as a collection of objects, we can write a script that mimics the Stack logic to see which nodes are "dead ends."
+</p>
+
+<div id="Python Script to Find Orphan Nodes (and illustrate the stack)-The &quot;Orphan Hunter&quot; Script"><h3 id="The &quot;Orphan Hunter&quot; Script" class="header"><a href="#Python Script to Find Orphan Nodes (and illustrate the stack)-The &quot;Orphan Hunter&quot; Script">The "Orphan Hunter" Script</a></h3></div>
+
+<p>
+This script starts at your selected node (usually your final Write node) and "walks" backwards up the stack. Any node it doesn't touch is considered an orphan.
+</p>
+
+<pre python>
+import nuke
+
+def find_orphans():
+    # 1. Start with the nodes currently leading to your output
+    all_nodes = nuke.allNodes()
+    connected_nodes = set()
+    
+    # We "walk" the tree from the selected node backwards
+    nodes_to_check = nuke.selectedNodes()
+    
+    if not nodes_to_check:
+        nuke.message("Please select the 'Tail' node (e.g., your Write node) to check connections.")
+        return
+
+    while nodes_to_check:
+        current = nodes_to_check.pop()
+        if current not in connected_nodes:
+            connected_nodes.add(current)
+            # Add all inputs of this node to the 'to-check' list (the reverse stack)
+            for i in range(current.inputs()):
+                input_node = current.input(i)
+                if input_node:
+                    nodes_to_check.append(input_node)
+
+    # 2. Identify who didn't make the list
+    orphans = [n for n in all_nodes if n not in connected_nodes]
+
+    # 3. Highlight the orphans in the DAG
+    if orphans:
+        for n in all_nodes:
+            n.setSelected(False)
+        for o in orphans:
+            o.setSelected(True)
+        nuke.message(f"Found {len(orphans)} orphaned nodes. They are now selected.")
+    else:
+        nuke.message("No orphans found! Your stack is fully connected.")
+
+# Run the function
+find_orphans()
+</pre>
+
+<div id="Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack"><h3 id="How this Python relates to the Stack" class="header"><a href="#Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack">How this Python relates to the Stack</a></h3></div>
+
+<p>
+In this script, the nodes_to_check variable is literally a stack.
+</p>
+<ul>
+<li>
+<span id="Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack-Push"></span><strong id="Push">Push</strong>: We take the node you selected and put it in the list.
+
+<li>
+<span id="Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack-Pop"></span><strong id="Pop">Pop</strong>: The while loop "pops" the node out to look at its inputs.
+
+<li>
+<span id="Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack-Recursive Push"></span><strong id="Recursive Push">Recursive Push</strong>: It then "pushes" all the nodes connected to those inputs back into the list.
+
+</ul>
+<div id="Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack-Why this is useful for Nuke Scripts"><h4 id="Why this is useful for Nuke Scripts" class="header"><a href="#Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack-Why this is useful for Nuke Scripts">Why this is useful for Nuke Scripts</a></h4></div>
+
+<ul>
+<li>
+<span id="Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack-Why this is useful for Nuke Scripts-Performance"></span><strong id="Performance">Performance</strong>: Orphaned nodes with "heavy" calculations (like a MotionBlur or Defocus) can sometimes still render in the background if they are part of a side-pipe.
+
+<li>
+<span id="Python Script to Find Orphan Nodes (and illustrate the stack)-How this Python relates to the Stack-Why this is useful for Nuke Scripts-Debugging"></span><strong id="Debugging">Debugging</strong>: If your PostageStamp logic broke (the $cut_paste_input failed), this script will highlight that the Stamp is no longer "connected" to the main stack.
+
+</ul>
+<div id="Python Script to Find Orphan Nodes (and illustrate the stack)-Comparison: Vim vs. Nuke Stack Logic"><h3 id="Comparison: Vim vs. Nuke Stack Logic" class="header"><a href="#Python Script to Find Orphan Nodes (and illustrate the stack)-Comparison: Vim vs. Nuke Stack Logic">Comparison: Vim vs. Nuke Stack Logic</a></h3></div>
+
+<p>
+To wrap up our deep dive, let's look at the two systems we've explored:
+</p>
+
+<table>
+<tr>
+<td>
+Feature
+</td>
+<td>
+Vimscript Stack
+</td>
+<td>
+Nuke Script Stack
+</td>
+</tr>
+<tr>
+<td>
+Purpose
+</td>
+<td>
+Balancing Syntax (if/endif)
+</td>
+<td>
+Routing Data (Read/Merge)
+</td>
+</tr>
+<tr>
+<td>
+Items Stored
+</td>
+<td>
+Line Numbers / Tags
+</td>
+<td>
+Node Objects / Pointers
+</td>
+</tr>
+<tr>
+<td>
+Logic Type
+</td>
+<td>
+LIFO (Last-In, First-Out)
+</td>
+<td>
+LIFO (for input assignment)
+</td>
+</tr>
+<tr>
+<td>
+Goal
+</td>
+<td>
+Preventing Syntax Errors
+</td>
+<td>
+Creating an Image
+</td>
+</tr>
+</table>
+
+<div id="Python Script to Find Orphan Nodes (and illustrate the stack)-Adding as a Command (Menu)"><h3 id="Adding as a Command (Menu)" class="header"><a href="#Python Script to Find Orphan Nodes (and illustrate the stack)-Adding as a Command (Menu)">Adding as a Command (Menu)</a></h3></div>
+
+<p>
+To add this to your menu.py, you just need to wrap the function and use the nuke.menu method to assign it a place in the UI and a keyboard shortcut.
+</p>
+
+<p>
+I've assigned it to Alt+Shift+O (for "Orphans") in the example below.
+</p>
+
+<pre python>
+import nuke
+
+def selectOrphanedNodes():
+    # Start from selected nodes (the outputs) and find all upstream parents
+    start_nodes = nuke.selectedNodes()
+    if not start_nodes:
+        nuke.message("Please select your 'target' nodes (e.g. Write or Viewer) first.")
+        return
+
+    connected = set()
+    stack = list(start_nodes)
+
+    while stack:
+        node = stack.pop()
+        if node not in connected:
+            connected.add(node)
+            # Add all inputs of current node to the stack to keep searching upstream
+            for i in range(node.inputs()):
+                upstream = node.input(i)
+                if upstream:
+                    stack.append(upstream)
+
+    # Find nodes that exist in script but weren't reached in the walk
+    orphans = [n for n in nuke.allNodes() if n not in connected]
+
+    if orphans:
+        # Clear current selection and select only the orphans
+        for n in nuke.allNodes():
+            n.setSelected(False)
+        for o in orphans:
+            o.setSelected(True)
+        nuke.message(f"Selected {len(orphans)} orphaned nodes.")
+    else:
+        nuke.message("No orphans found! Everything is connected to your selection.")
+
+# --- ADD TO MENU.PY ---
+# This adds a 'Tools' menu (or uses existing one) and puts the command inside
+m = nuke.menu('Nuke')
+menu_tools = m.addMenu('Tools')
+menu_tools.addCommand('Select Orphaned Nodes', 'selectOrphanedNodes()', 'alt+shift+o')
+</pre>
+
+<div id="Python Script to Find Orphan Nodes (and illustrate the stack)-Adding as a Command (Menu)-Quick Usage Tip:"><h4 id="Quick Usage Tip:" class="header"><a href="#Python Script to Find Orphan Nodes (and illustrate the stack)-Adding as a Command (Menu)-Quick Usage Tip:">Quick Usage Tip:</a></h4></div>
+
+<ul>
+<li>
+Save this in your .nuke/menu.py file.
+
+<li>
+Restart Nuke.
+
+<li>
+Select your Write node or Viewer.
+
+<li>
+Press Alt+Shift+O.
+
+<li>
+Any node that Nuke doesn't need to calculate that specific output will be highlighted, allowing you to delete them and keep your "stack" clean.
+
+</ul>
 <p>
 <a href="nuke_index.html">Nuke Index</a>
 </p>
