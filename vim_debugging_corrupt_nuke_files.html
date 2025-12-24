@@ -82,6 +82,174 @@ This gives you:
 or <code>All groups balanced</code>
 
 </ul>
+<div id="Show Line Number"><h1 id="Show Line Number" class="header"><a href="#Show Line Number">Show Line Number</a></h1></div>
+
+<p>
+To track the exact line number where an unclosed group started, we need to transform stack from a simple counter into a true List.
+</p>
+
+<p>
+In this version, instead of just adding 1, we will push the current line number onto a list. When we find a closing tag, we pop the last line number off.
+</p>
+
+<div id="Show Line Number-The Modified Function"><h2 id="The Modified Function" class="header"><a href="#Show Line Number-The Modified Function">The Modified Function</a></h2></div>
+
+
+<pre vim>
+function! CheckGroups()
+    " Now 'stack' is a List to store line numbers
+    let stack = []
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        if line =~ '^Group {'
+            " Push the current line number onto the stack
+            call add(stack, lnum)
+
+        elseif line =~ '^end_group$'
+            if empty(stack)
+                echohl ErrorMsg 
+                echom "Error: Extra 'end_group' at line " . lnum 
+                echohl None
+                return
+            endif
+            " Pop the last opening line number off the stack
+            call remove(stack, -1)
+        endif
+    endfor
+
+    if !empty(stack)
+        " The last item in the list is the most recent unclosed group
+        echohl ErrorMsg 
+        echom "Error: Unclosed 'Group {' starting at line " . stack[-1] 
+        echohl None
+    else
+        echom "All groups balanced"
+    endif
+endfunction
+</pre>
+
+<div id="Show Line Number-The Modified Function-What changed?"><h4 id="What changed?" class="header"><a href="#Show Line Number-The Modified Function-What changed?">What changed?</a></h4></div>
+
+<ul>
+<li>
+<code>let stack = []</code>: We initialized stack as an empty List.
+
+<li>
+<code>call add(stack, lnum)</code>: Instead of incrementing a number, we record the line number where the group started.
+
+<li>
+<code>stack[-1]</code>: This is Vimscript syntax for "the last element in the list." If the loop finishes and the list isn't empty, stack[-1] points directly to the line that caused the trouble.
+
+</ul>
+<div id="Show Line Number-The Modified Function-Visualizing the Logic"><h4 id="Visualizing the Logic" class="header"><a href="#Show Line Number-The Modified Function-Visualizing the Logic">Visualizing the Logic</a></h4></div>
+
+<ul>
+<li>
+At Line 10 (Group {): The stack becomes [10].
+
+<li>
+At Line 25 (Group {): The stack becomes [10, 25].
+
+<li>
+At Line 30 (end_group): We remove 25. The stack is back to [10].
+
+<li>
+End of file: If the stack still contains 10, we can tell the user exactly where the mistake began.
+<table>
+<tr>
+<td>
+Would you like me to add a feature that automatically jumps your cursor to the line with the error?
+</td>
+</tr>
+</table>
+
+</ul>
+<div id="Jump Cursor to Line"><h1 id="Jump Cursor to Line" class="header"><a href="#Jump Cursor to Line">Jump Cursor to Line</a></h1></div>
+
+<p>
+To make this even more useful, we can use the cursor() function. This will not only tell you where the error is but physically move your cursor to that exact line and column so you can fix it immediately.
+</p>
+
+<p>
+I have also added norm! zz to center the screen on the error line.
+</p>
+
+<div id="Jump Cursor to Line-The Upgraded Function"><h2 id="The Upgraded Function" class="header"><a href="#Jump Cursor to Line-The Upgraded Function">The Upgraded Function</a></h2></div>
+
+<pre vim>
+function! CheckGroups()
+    let stack = []
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        if line =~ '^Group {'
+            call add(stack, lnum)
+        elseif line =~ '^end_group$'
+            if empty(stack)
+                " Error: Orphaned closing tag
+                call cursor(lnum, 1)
+                norm! zz
+                echohl ErrorMsg 
+                echom "Error: Extra 'end_group' (no matching opener) at line " . lnum 
+                echohl None
+                return
+            endif
+            call remove(stack, -1)
+        endif
+    endfor
+
+    if !empty(stack)
+        " Error: Unclosed opening tag
+        " Move cursor to the LAST line added to the stack
+        let error_line = stack[-1]
+        call cursor(error_line, 1)
+        norm! zz
+        echohl ErrorMsg 
+        echom "Error: Unclosed 'Group {' found at line " . error_line 
+        echohl None
+    else
+        echom "All groups balanced"
+    endif
+endfunction
+</pre>
+
+<div id="Jump Cursor to Line-The Upgraded Function-New Features Added:"><h4 id="New Features Added:" class="header"><a href="#Jump Cursor to Line-The Upgraded Function-New Features Added:">New Features Added:</a></h4></div>
+
+<ul>
+<li>
+<code>call cursor(lnum, 1)</code>: This command takes the line number and the column number (1) and moves the cursor there instantly.
+
+<li>
+norm! zz`: This executes the "Normal mode" command zz, which scrolls the window so that the current line is right in the middle of your screen.
+
+<li>
+Instant Feedback: Instead of just reading a message and searching for the line number manually, you are now placed exactly where the fix needs to happen.
+
+</ul>
+<div id="Jump Cursor to Line-The Upgraded Function-How it handles multiple errors:"><h4 id="How it handles multiple errors:" class="header"><a href="#Jump Cursor to Line-The Upgraded Function-How it handles multiple errors:">How it handles multiple errors:</a></h4></div>
+
+<p>
+This script follows a "fail-fast" approach.
+</p>
+
+<ul>
+<li>
+If there is an extra end_group, it stops immediately at that line.
+
+<li>
+If there are several unclosed Group { tags, it will jump to the most recent one (the one at the "top" of the stack), as that is usually the source of the syntax break.
+<table>
+<tr>
+<td>
+Would you like to turn this into a command (like :CheckGroups) so you don't have to type the full function name every time?
+</td>
+</tr>
+</table>
+
+</ul>
 <p>
 <a href="vim_learning.html">Vim Learning</a>
 </p>
