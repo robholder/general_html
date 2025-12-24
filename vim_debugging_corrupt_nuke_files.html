@@ -913,6 +913,441 @@ endif
 This gives you a mini‑report in the message area.
 </p>
 
+<div id="Updated Script"><h1 id="Updated Script" class="header"><a href="#Updated Script">Updated Script</a></h1></div>
+
+<p>
+Here’s a polished version of your function with the improvements you asked for:
+</p>
+
+<ul>
+<li>
+Detects nested Group { blocks
+
+<li>
+Detects orphaned end_group
+
+<li>
+Detects unclosed Group {
+
+<li>
+Highlights the offending line
+
+<li>
+Moves the cursor to the problem
+
+<li>
+Provides clear feedback messages
+
+</ul>
+<p>
+I kept your structure and behavior, just enhanced it.
+</p>
+
+<div id="Updated Script-✅ Updated Vimscript Function (with highlighting + better feedback)"><h4 id="✅ Updated Vimscript Function (with highlighting + better feedback)" class="header"><a href="#Updated Script-✅ Updated Vimscript Function (with highlighting + better feedback)">✅ Updated Vimscript Function (with highlighting + better feedback)</a></h4></div>
+
+<pre vim>
+function! CheckGroups()
+    let stack = []
+
+    " Clear previous highlights (optional)
+    silent! call matchdelete(9999)
+    silent! call matchdelete(9998)
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        " Opening block
+        if line =~ '^\s*Group\s*{'
+            " No nesting allowed
+            if !empty(stack)
+                call cursor(lnum, 1)
+                norm! zz
+                " Highlight offending line
+                call matchadd('ErrorMsg', '\%' . lnum . 'l', 10, 9999)
+                echohl ErrorMsg
+                echom "Error: Nested 'Group {' found at line " . lnum
+                echohl None
+                return
+            endif
+
+            call add(stack, lnum)
+        endif
+
+        " Closing block
+        if line =~ '^\s*end_group\s*$'
+            if empty(stack)
+                " Orphaned closing tag
+                call cursor(lnum, 1)
+                norm! zz
+                call matchadd('ErrorMsg', '\%' . lnum . 'l', 10, 9999)
+                echohl ErrorMsg
+                echom "Error: Extra 'end_group' (no matching opener) at line " . lnum
+                echohl None
+                return
+            endif
+
+            call remove(stack, -1)
+        endif
+    endfor
+
+    " If stack not empty, we have unclosed Group {
+    if !empty(stack)
+        let error_line = stack[-1]
+        call cursor(error_line, 1)
+        norm! zz
+        call matchadd('ErrorMsg', '\%' . error_line . 'l', 10, 9999)
+        echohl ErrorMsg
+        echom "Error: Unclosed 'Group {' found at line " . error_line
+        echohl None
+        return
+    endif
+
+    echom "All groups valid"
+endfunction
+</pre>
+
+<div id="Updated Script-⭐ What’s new and improved"><h3 id="⭐ What’s new and improved" class="header"><a href="#Updated Script-⭐ What’s new and improved">⭐ What’s new and improved</a></h3></div>
+
+<div id="Updated Script-⭐ What’s new and improved-1. Highlights the offending line"><h4 id="1. Highlights the offending line" class="header"><a href="#Updated Script-⭐ What’s new and improved-1. Highlights the offending line">1. Highlights the offending line</a></h4></div>
+
+<p>
+This makes the error visually obvious:
+</p>
+
+<pre vim>
+call matchadd('ErrorMsg', '\%' . lnum . 'l', 10, 9999)
+</pre>
+
+<div id="Updated Script-⭐ What’s new and improved-2. Moves the cursor to the problem"><h4 id="2. Moves the cursor to the problem" class="header"><a href="#Updated Script-⭐ What’s new and improved-2. Moves the cursor to the problem">2. Moves the cursor to the problem</a></h4></div>
+
+<p>
+You already had this — I kept it:
+</p>
+
+<pre vim>
+call cursor(lnum, 1)
+norm! zz
+</pre>
+
+<div id="Updated Script-⭐ What’s new and improved-3. Clear, descriptive error messages"><h4 id="3. Clear, descriptive error messages" class="header"><a href="#Updated Script-⭐ What’s new and improved-3. Clear, descriptive error messages">3. Clear, descriptive error messages</a></h4></div>
+
+<p>
+You now get:
+</p>
+<ul>
+<li>
+Nested group detected
+
+<li>
+Orphaned end_group
+
+<li>
+Unclosed Group {
+
+</ul>
+<div id="Updated Script-⭐ What’s new and improved-4. Cleans up old highlights"><h4 id="4. Cleans up old highlights" class="header"><a href="#Updated Script-⭐ What’s new and improved-4. Cleans up old highlights">4. Cleans up old highlights</a></h4></div>
+
+<p>
+Optional but helpful:
+</p>
+
+<pre vim>
+silent! call matchdelete(9999)
+silent! call matchdelete(9998)
+</pre>
+
+<div id="Updated Script-⭐ What’s new and improved-⭐ Example output"><h4 id="⭐ Example output" class="header"><a href="#Updated Script-⭐ What’s new and improved-⭐ Example output">⭐ Example output</a></h4></div>
+
+<p>
+If a block is missing its end_group, you’ll see:
+</p>
+
+<ul>
+<li>
+Cursor jumps to the Group { line
+
+<li>
+That line turns red
+
+<li>
+Message:
+
+</ul>
+  
+<pre>
+Error: Unclosed 'Group {' found at line 42
+</pre>
+
+<p>
+If a nested block is found:
+</p>
+
+<pre>
+Error: Nested 'Group {' found at line 57
+</pre>
+
+<p>
+If an orphaned end_group appears:
+</p>
+
+<pre>
+Error: Extra 'end_group' (no matching opener) at line 88
+</pre>
+
+<div id="Call The Function"><h1 id="Call The Function" class="header"><a href="#Call The Function">Call The Function</a></h1></div>
+
+<p>
+You’ve got a couple of easy ways to call your CheckGroups() function while you’re editing a file. Pick whichever feels most natural in your workflow.
+</p>
+
+<div id="Call The Function-1. Call it directly from command mode"><h3 id="1. Call it directly from command mode" class="header"><a href="#Call The Function-1. Call it directly from command mode">1. Call it directly from command mode</a></h3></div>
+
+<p>
+This is the simplest:
+</p>
+
+<pre>
+:call CheckGroups()
+</pre>
+
+<p>
+Just type that while you’re in the buffer you want to check.
+</p>
+
+<div id="Call The Function-2. Create a custom command (recommended)"><h3 id="2. Create a custom command (recommended)" class="header"><a href="#Call The Function-2. Create a custom command (recommended)">2. Create a custom command (recommended)</a></h3></div>
+
+<p>
+Add this to your vimrc:
+</p>
+
+<pre vim>
+command! CheckGroups call CheckGroups()
+</pre>
+
+<p>
+Then you can run it with:
+</p>
+
+<pre>
+:CheckGroups
+</pre>
+
+<p>
+Much easier to remember.
+</p>
+
+<div id="Call The Function-3. Map it to a keybinding"><h3 id="3. Map it to a keybinding" class="header"><a href="#Call The Function-3. Map it to a keybinding">3. Map it to a keybinding</a></h3></div>
+
+<p>
+If you want a quick shortcut, for example &lt;leader&gt;g:
+</p>
+
+<pre vim>
+nnoremap &lt;leader&gt;g :call CheckGroups()&lt;CR&gt;
+</pre>
+
+<p>
+Now you can press:
+</p>
+
+<pre>
+&lt;leader&gt;g
+</pre>
+
+<p>
+…and your script will run instantly.
+</p>
+
+<div id="Call The Function-4. Run it automatically on save (optional)"><h3 id="4. Run it automatically on save (optional)" class="header"><a href="#Call The Function-4. Run it automatically on save (optional)">4. Run it automatically on save (optional)</a></h3></div>
+
+<p>
+If you want the check to run every time you write a file:
+</p>
+
+<pre vim>
+autocmd BufWritePost *.nk,*.tcl call CheckGroups()
+</pre>
+
+<p>
+(Adjust extensions as needed.)
+</p>
+
+
+<div id="Plugin Version"><h1 id="Plugin Version" class="header"><a href="#Plugin Version">Plugin Version</a></h1></div>
+
+<p>
+Great — let’s turn your CheckGroups() function into a tiny, self‑contained Vim “plugin” you can load, reuse, and even share with coworkers. I’ll keep things simple and friendly so it feels like a natural extension of your workflow.
+</p>
+
+<p>
+You’ll end up with:
+</p>
+
+<ul>
+<li>
+a dedicated file for the function
+
+<li>
+a :CheckGroups command
+
+<li>
+an optional keybinding
+
+<li>
+automatic highlight cleanup
+
+<li>
+everything neatly packaged
+
+</ul>
+<p>
+Here’s how to set it up.
+</p>
+
+<div id="Plugin Version-1. Create a plugin file"><h4 id="1. Create a plugin file" class="header"><a href="#Plugin Version-1. Create a plugin file">1. Create a plugin file</a></h4></div>
+
+<p>
+In your Vim config directory, create:
+</p>
+
+<pre>
+~/.vim/plugin/checkgroups.vim
+</pre>
+
+<p>
+(or for Neovim)
+</p>
+
+<pre>
+~/.config/nvim/plugin/checkgroups.vim
+</pre>
+
+<p>
+Anything inside plugin/ loads automatically on startup.
+</p>
+
+<div id="Plugin Version-2. Put the full function inside that file"><h4 id="2. Put the full function inside that file" class="header"><a href="#Plugin Version-2. Put the full function inside that file">2. Put the full function inside that file</a></h4></div>
+
+<pre vim>
+" checkgroups.vim — validate Nuke TCL Group blocks
+
+function! CheckGroups()
+    let stack = []
+
+    " Clear previous highlights (IDs 9999 and 9998)
+    silent! call matchdelete(9999)
+    silent! call matchdelete(9998)
+
+    for lnum in range(1, line('$'))
+        let line = getline(lnum)
+
+        " Opening block
+        if line =~ '^\s*Group\s*{'
+            " No nesting allowed
+            if !empty(stack)
+                call cursor(lnum, 1)
+                norm! zz
+                call matchadd('ErrorMsg', '\%' . lnum . 'l', 10, 9999)
+                echohl ErrorMsg
+                echom "Error: Nested 'Group {' found at line " . lnum
+                echohl None
+                return
+            endif
+
+            call add(stack, lnum)
+        endif
+
+        " Closing block
+        if line =~ '^\s*end_group\s*$'
+            if empty(stack)
+                call cursor(lnum, 1)
+                norm! zz
+                call matchadd('ErrorMsg', '\%' . lnum . 'l', 10, 9999)
+                echohl ErrorMsg
+                echom "Error: Extra 'end_group' (no matching opener) at line " . lnum
+                echohl None
+                return
+            endif
+
+            call remove(stack, -1)
+        endif
+    endfor
+
+    " Unclosed Group {
+    if !empty(stack)
+        let error_line = stack[-1]
+        call cursor(error_line, 1)
+        norm! zz
+        call matchadd('ErrorMsg', '\%' . error_line . 'l', 10, 9999)
+        echohl ErrorMsg
+        echom "Error: Unclosed 'Group {' found at line " . error_line
+        echohl None
+        return
+    endif
+
+    echom "All groups valid"
+endfunction
+
+" Create a user command
+command! CheckGroups call CheckGroups()
+</pre>
+
+<p>
+That’s the whole plugin.
+</p>
+
+<div id="Plugin Version-3. Restart Vim"><h3 id="3. Restart Vim" class="header"><a href="#Plugin Version-3. Restart Vim">3. Restart Vim</a></h3></div>
+
+<p>
+Once you restart, you’ll have a new command:
+</p>
+
+<pre vim>
+:CheckGroups
+</pre>
+
+<p>
+Run it in any buffer containing Nuke TCL.
+</p>
+
+<div id="Plugin Version-4. (Optional) Add a keybinding"><h3 id="4. (Optional) Add a keybinding" class="header"><a href="#Plugin Version-4. (Optional) Add a keybinding">4. (Optional) Add a keybinding</a></h3></div>
+
+<p>
+If you want a quick shortcut, add this to the same file or your vimrc:
+</p>
+
+<pre vim>
+nnoremap &lt;leader&gt;g :CheckGroups&lt;CR&gt;
+</pre>
+
+<p>
+Now you can press:
+</p>
+
+<pre vim>
+&lt;leader&gt;g
+</pre>
+
+<p>
+…and your checker runs instantly.
+</p>
+
+<div id="Plugin Version-5. (Optional) Run automatically on save"><h3 id="5. (Optional) Run automatically on save" class="header"><a href="#Plugin Version-5. (Optional) Run automatically on save">5. (Optional) Run automatically on save</a></h3></div>
+
+<p>
+If you want to validate every time you write a .nk or .tcl file:
+</p>
+
+<pre vim>
+autocmd BufWritePost *.nk,*.tcl CheckGroups
+</pre>
+
+<p>
+This is great for catching corrupt scripts before they get committed or passed along.
+</p>
+
+
+
 
 <p>
 <a href="vim_learning.html">Vim Learning</a>
