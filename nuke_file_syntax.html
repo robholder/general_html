@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>nuke_file_syntax</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+
+<div id="Nuke File Syntax"><h1 id="Nuke File Syntax" class="header"><a href="#Nuke File Syntax">Nuke File Syntax</a></h1></div>
+
+<p>
+A Nuke scene file (.nk) is fundamentally a text file written using Tcl (Tool Command Language) syntax. It captures all node relationships and their parameter values in a hierarchical structure. 
+</p>
+
+<div id="Nuke File Syntax-Core Syntax Elements"><h2 id="Core Syntax Elements" class="header"><a href="#Nuke File Syntax-Core Syntax Elements">Core Syntax Elements</a></h2></div>
+
+<ul>
+<li>
+<span id="Nuke File Syntax-Core Syntax Elements-Node Definition"></span><strong id="Node Definition">Node Definition</strong>: Each node begins with its class name, followed by curly braces {} containing its parameters and connections. The Root node is at the top level of every script.
+
+</ul>
+  
+<pre tcl>
+Root {
+ # Root node parameters go here
+}
+</pre>
+
+<ul>
+<li>
+<span id="Nuke File Syntax-Core Syntax Elements-Parameters (Knobs)"></span><strong id="Parameters (Knobs)">Parameters (Knobs)</strong>: Node parameters, referred to as "knobs" in Nuke, are defined within the node's braces using the format parameter_name value. String values may require quotes if they contain spaces.
+<pre tcl>
+ColorBars {
+ inputs 0
+ name ColorBars1
+}
+</pre>
+
+<li>
+<span id="Nuke File Syntax-Core Syntax Elements-Connections"></span><strong id="Connections">Connections</strong>: Node connections are managed via a stack system using set and push commands, though these are often abstracted in a saved .nk file by the inputs keyword.
+
+</ul>
+  
+<pre tcl>
+Read {
+ file "/path/to/my/footage.####.exr"
+ # other parameters
+}
+# This push command puts the Read node onto the stack for the next node to use as input
+push 0 
+Merge2 {
+ inputs 2
+ # Input A is empty/nothing pushed, Input B is the Read node that was just pushed
+}
+</pre>
+
+<ul>
+<li>
+<span id="Nuke File Syntax-Core Syntax Elements-Groups"></span><strong id="Groups">Groups</strong>: Group nodes (Group {}) contain their own nested structure and form new group stacks. The end_group keyword marks the end of a group definition.
+<pre tcl>
+Group {
+ name Group1
+ Input { inputs 0 }
+ Output { name Output1 }
+}
+end_group 
+</pre>
+
+<li>
+<span id="Nuke File Syntax-Core Syntax Elements-Tcl Expressions"></span><strong id="Tcl Expressions">Tcl Expressions</strong>: Nuke allows Tcl expressions to be used in nearly any knob field to create dynamic links and automation. Square brackets [] trigger Tcl evaluation within a knob's value.
+
+<li>
+<code>[value knob_name]</code> retrieves the value of a knob. For example, [value root.name] returns the current script's full path and name.
+
+<li>
+<code>[file dirname [value root.name]]</code> uses Tcl's file command to extract the directory name from the current script's path.
+
+<li>
+<code>####</code> or <code>%04d</code> is used in file paths as a variable for the frame number, padded to four digits. 
+
+</ul>
+<div id="Nuke File Syntax-Key Characteristics"><h2 id="Key Characteristics" class="header"><a href="#Nuke File Syntax-Key Characteristics">Key Characteristics</a></h2></div>
+
+<ul>
+<li>
+<span id="Nuke File Syntax-Key Characteristics-Human-Readable"></span><strong id="Human-Readable">Human-Readable</strong>: Nuke scripts are designed to be read, edited, and even generated with a simple text editor.
+
+<li>
+<span id="Nuke File Syntax-Key Characteristics-Context-Aware"></span><strong id="Context-Aware">Context-Aware</strong>: Tcl commands in Nuke are context-aware, allowing them to reference other nodes or script properties using commands like [topnode], [thisNode], or [metadata]. 
+
+</ul>
+<div id="The Stack System"><h1 id="The Stack System" class="header"><a href="#The Stack System">The Stack System</a></h1></div>
+
+<p>
+In Nuke’s .nk (Tcl-based) files, the "stack" is a Last-In, First-Out (LIFO) mechanism used to manage node connections as the file is read sequentially from top to bottom. 
+</p>
+
+<div id="How the Stack Works"><h1 id="How the Stack Works" class="header"><a href="#How the Stack Works">How the Stack Works</a></h1></div>
+
+<p>
+When Nuke processes a script, it maintains a temporary list (the stack) of nodes that are "active" and available to be connected. 
+</p>
+<ul>
+<li>
+<span id="How the Stack Works-Node Creation"></span><strong id="Node Creation">Node Creation</strong>: When Nuke encounters a node definition (e.g., Blur { ... }), it creates that node and immediately pushes it onto the top of the stack.
+
+<li>
+<span id="How the Stack Works-Input Consumption"></span><strong id="Input Consumption">Input Consumption</strong>: If the next node in the file requires inputs (e.g., inputs 1), Nuke pops (removes) the required number of nodes from the top of the stack and connects them to the new node's inputs.
+
+<li>
+<span id="How the Stack Works-Result Replacement"></span><strong id="Result Replacement">Result Replacement</strong>: After connecting, the new node is pushed onto the stack, becoming the new "top" item for the next node to use. 
+
+</ul>
+<div id="How the Stack Works-The Role of set and push"><h3 id="The Role of set and push" class="header"><a href="#How the Stack Works-The Role of set and push">The Role of set and push</a></h3></div>
+
+<p>
+These commands allow Nuke to handle complex branching or non-linear connections that a simple sequential stack cannot manage alone. 
+</p>
+<ul>
+<li>
+<code>set [Variable] [stack 0]</code>: This command "remembers" a node. It takes the node currently at the top of the stack (stack 0) and assigns it to a Tcl variable (usually a unique ID like N1a2b3c4). This does not remove the node from the stack.
+
+<li>
+<code>push $[Variable]</code>: This command retrieves a previously "set" node and places a reference to it back on the top of the stack. This is how Nuke handles branches, such as a single Read node feeding into two different Grade nodes.
+
+<li>
+<code>push 0</code>: This clears the stack (or pushes a "null" entry), ensuring the next node created does not automatically connect to whatever was previously on top. 
+
+</ul>
+<div id="How the Stack Works-Group Hierarchy and the Stack"><h3 id="Group Hierarchy and the Stack" class="header"><a href="#How the Stack Works-Group Hierarchy and the Stack">Group Hierarchy and the Stack</a></h3></div>
+
+<p>
+Nuke uses a separate stack for every Group or LiveGroup. 
+</p>
+
+<ul>
+<li>
+<span id="How the Stack Works-Group Hierarchy and the Stack-Starting a Group"></span><strong id="Starting a Group">Starting a Group</strong>: Encountering Group { ... } creates a new, empty stack for that group's internal nodes.
+
+<li>
+<span id="How the Stack Works-Group Hierarchy and the Stack-end_group"></span><strong id="end_group">end_group</strong>: This keyword signals the end of the group's internal node list. It collapses the group's internal stack and pushes the Group node itself onto the parent's stack. 
+
+</ul>
+<div id="How the Stack Works-More on Push"><h2 id="More on Push" class="header"><a href="#How the Stack Works-More on Push">More on Push</a></h2></div>
+
+<p>
+In a Nuke .nk file, the command push 0 is used to push a "null" or "empty" slot onto the connection stack. 
+</p>
+
+<p>
+This is a critical flow-control tool that serves two primary purposes:
+</p>
+
+<div id="How the Stack Works-More on Push-1. Breaking the Chain (Isolation)"><h3 id="1. Breaking the Chain (Isolation)" class="header"><a href="#How the Stack Works-More on Push-1. Breaking the Chain (Isolation)">1. Breaking the Chain (Isolation)</a></h3></div>
+
+<p>
+By default, Nuke nodes are "greedy"—they automatically try to connect to whatever node is currently at the top of the stack. If you want to create a new node (like a second Read node) that should not connect to the previous node, you use push 0 to clear the "active" connection slot. 
+</p>
+<ul>
+<li>
+<span id="How the Stack Works-More on Push-1. Breaking the Chain (Isolation)-Without push 0"></span><strong id="Without push 0">Without push 0</strong>: The next node with inputs will automatically latch onto the previous node.
+
+<li>
+<span id="How the Stack Works-More on Push-1. Breaking the Chain (Isolation)-With push 0"></span><strong id="With push 0">With push 0</strong>: The stack now has an "empty" entry at index 0. The next node created will see this empty slot and start its own independent branch. 
+
+</ul>
+<div id="How the Stack Works-More on Push-2. Managing Specific Input Ports"><h3 id="2. Managing Specific Input Ports" class="header"><a href="#How the Stack Works-More on Push-2. Managing Specific Input Ports">2. Managing Specific Input Ports</a></h3></div>
+
+<p>
+For nodes with multiple inputs (like a Merge node with A and B pipes), push 0 is used to skip a specific input. 
+</p>
+
+<ul>
+<li>
+<span id="How the Stack Works-More on Push-2. Managing Specific Input Ports-Example"></span><strong id="Example">Example</strong>: If you want to connect a node to a Merge’s Input B but leave Input A disconnected, the script will:
+
+<ul>
+<li>
+<code>push $NodeForB</code> (puts the node on the stack).
+
+<li>
+<code>push 0</code> (puts an "empty" slot at the very top of the stack).
+
+<li>
+<code>Merge { inputs 2 }</code> (Nuke pops the top item—the empty slot—for Input 0/A, and then pops the next item—the actual node—for Input 1/B). 
+
+</ul>
+</ul>
+<div id="How the Stack Works-More on Push-Why it Matters for Fixing Corrupt Files"><h3 id="Why it Matters for Fixing Corrupt Files" class="header"><a href="#How the Stack Works-More on Push-Why it Matters for Fixing Corrupt Files">Why it Matters for Fixing Corrupt Files</a></h3></div>
+
+<p>
+If you are manually repairing a broken .nk file:
+</p>
+<ul>
+<li>
+<span id="How the Stack Works-More on Push-Why it Matters for Fixing Corrupt Files-Too many push 0 commands"></span><strong id="Too many push 0 commands">Too many push 0 commands</strong>: Can cause subsequent nodes to lose their intended connections, resulting in "disconnected" nodes in the DAG.
+
+<li>
+<span id="How the Stack Works-More on Push-Why it Matters for Fixing Corrupt Files-Missing push 0 commands"></span><strong id="Missing push 0 commands">Missing push 0 commands</strong>: Will cause nodes to connect to the wrong things, often creating massive "snakes" of nodes that should be separate branches.
+
+<li>
+<span id="How the Stack Works-More on Push-Why it Matters for Fixing Corrupt Files-Variable Missing"></span><strong id="Variable Missing">Variable Missing</strong>: If you see an error like can't read "N...": no such variable, you can sometimes temporarily replace that push $Variable with a push 0 just to get the script to open so you can manually reconnect the pipe in the GUI. 
+
+</ul>
+<div id="How the Stack Works-Debugging and Fixing Corrupt Files"><h2 id="Debugging and Fixing Corrupt Files" class="header"><a href="#How the Stack Works-Debugging and Fixing Corrupt Files">Debugging and Fixing Corrupt Files</a></h2></div>
+
+<p>
+Understanding this logic is essential for manual repairs:
+</p>
+
+<ul>
+<li>
+<span id="How the Stack Works-Debugging and Fixing Corrupt Files-Missing end_group"></span><strong id="Missing end_group">Missing end_group</strong>: If this keyword is missing, Nuke will continue to treat every subsequent node in the file as if it belongs inside that Group. To fix, locate the node that should be the last one in the group and insert end_group immediately after it.
+
+<li>
+<span id="How the Stack Works-Debugging and Fixing Corrupt Files-can't read [Variable]"></span><strong id="can't read [Variable]">can't read [Variable]</strong>: no such variable: This happens when a push $Variable command appears before its corresponding set Variable command, or if the set command was deleted. You can often fix this by finding the intended source node, adding set [MissingVariableName] [stack 0] after it, or by changing the push command to reference a known node name.
+
+<li>
+<span id="How the Stack Works-Debugging and Fixing Corrupt Files-Divide and Conquer"></span><strong id="Divide and Conquer">Divide and Conquer</strong>: If a script fails to open, you can copy-paste chunks of the text file into a fresh Nuke session. When a chunk fails, you have isolated the specific nodes or stack commands causing the corruption.
+
+</ul>
+<div id="Example Nuke Node Script"><h1 id="Example Nuke Node Script" class="header"><a href="#Example Nuke Node Script">Example Nuke Node Script</a></h1></div>
+
+<pre tcl>
+CheckerBoard2 {
+	inputs 0
+	name CheckerBoard1
+	xpos -48
+	ypos -290
+}
+set N2099800 [stack 0]
+Blur {
+	size 15
+	name Blur1
+	xpos -171
+	ypos -145
+}
+push $N2099800
+Grade {
+	name Grade1
+	xpos -48
+	ypos -160
+}
+ColorCorrect {
+	name ColorCorrect1
+	xpos -48
+	ypos -115
+}
+</pre>
+
+<p>
+In the provided snippet, <code>[stack 0]</code> is a Tcl command that retrieves the identity of the node currently at the very top of Nuke's internal stack. 
+</p>
+
+<p>
+When used in the command set N2099800 [stack 0], it "bookmarks" the most recently created node so it can be referenced later. 
+</p>
+
+<div id="Example Nuke Node Script-Step-by-Step Logic of Your Snippet"><h2 id="Step-by-Step Logic of Your Snippet" class="header"><a href="#Example Nuke Node Script-Step-by-Step Logic of Your Snippet">Step-by-Step Logic of Your Snippet</a></h2></div>
+
+<ul>
+<li>
+<span id="Example Nuke Node Script-Step-by-Step Logic of Your Snippet-CheckerBoard2"></span><strong id="CheckerBoard2">CheckerBoard2</strong>: Nuke creates this node. Because it has inputs 0, it doesn't take anything from the stack. Once created, the CheckerBoard1 node is pushed to the top of the stack (it is now at index 0).
+
+<li>
+<code>set N2099800 [stack 0]</code>:
+
+<ul>
+<li>
+<code>[stack 0]</code> looks at the top of the stack and sees CheckerBoard1.
+
+<li>
+The set command assigns that node's unique internal ID to the variable N2099800.
+
+<li>
+Crucially, this does not remove the node from the stack; it just creates a "pointer" to it for later use.
+
+</ul>
+<li>
+<span id="Example Nuke Node Script-Step-by-Step Logic of Your Snippet-Blur"></span><strong id="Blur">Blur</strong>: Nuke creates the Blur node. It defaults to having 1 input.
+
+<ul>
+<li>
+Nuke pops (removes) the top item from the stack (CheckerBoard1) and connects it to the Blur node's input.
+
+<li>
+The Blur1 node is then pushed to the top of the stack.
+
+</ul>
+<li>
+<code>push $N2099800</code>:
+
+<ul>
+<li>
+This manually retrieves the node we bookmarked earlier (CheckerBoard1) and pushes it onto the top of the stack.
+
+<li>
+The stack now has two items: CheckerBoard1 (at index 0) and Blur1 (at index 1).
+
+</ul>
+<li>
+<span id="Example Nuke Node Script-Step-by-Step Logic of Your Snippet-Grade"></span><strong id="Grade">Grade</strong>: Nuke creates the Grade node.
+
+</ul>
+<p>
+It pops the top item from the stack (CheckerBoard1) and connects it to Grade1's input.
+</p>
+<ul>
+<li>
+Grade1 is pushed to the top of the stack.
+
+</ul>
+<li>
+ColorCorrect: Nuke creates this node.
+
+<ul>
+<li>
+It pops the top item (Grade1) and connects it to ColorCorrect1. 
+
+</ul>
+<div id="Example Nuke Node Script-Step-by-Step Logic of Your Snippet-Why [stack 0] is Used"><h3 id="Why [stack 0] is Used" class="header"><a href="#Example Nuke Node Script-Step-by-Step Logic of Your Snippet-Why [stack 0] is Used">Why [stack 0] is Used</a></h3></div>
+
+<p>
+In this specific script, [stack 0] is used to create a branch in the DAG. By "setting" the CheckerBoard to a variable, the script can connect it to the Blur node (linear flow) and then jump back to connect it to the Grade node as well (branching flow). 
+</p>
+
+<p>
+Without that set and the subsequent push, the Grade node would have automatically connected to the Blur node because the Blur would have been at the top of the stack. 
+</p>
+
+</body>
+</html>
