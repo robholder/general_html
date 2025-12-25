@@ -348,6 +348,261 @@ Understanding this logic is essential for manual repairs:
 <span id="How the Stack Works-Debugging and Fixing Corrupt Files-Divide and Conquer"></span><strong id="Divide and Conquer">Divide and Conquer</strong>: If a script fails to open, you can copy-paste chunks of the text file into a fresh Nuke session. When a chunk fails, you have isolated the specific nodes or stack commands causing the corruption.
 
 </ul>
+<div id="Another Run Through the Stack (and Set &amp; Push)"><h1 id="Another Run Through the Stack (and Set &amp; Push)" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)">Another Run Through the Stack (and Set &amp; Push)</a></h1></div>
+
+<p>
+In the .nk file syntax, the nodes are listed sequentially. Because the Merge node uses the LIFO (Last-In, First-Out) stack to assign inputs, the order in which they appear in the text dictates which node becomes "A" and which becomes "B."
+</p>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure"><h2 id="The .nk Syntax Structure" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure">The .nk Syntax Structure</a></h2></div>
+
+<p>
+Here is how that specific setup would be written in the script:
+</p>
+
+<pre tcl>
+CheckerBoard2 {
+ inputs 0
+ name CheckerBoard1
+ xpos -200
+ ypos -150
+}
+ColorWheel {
+ inputs 0
+ name ColorWheel1
+ xpos 0
+ ypos -150
+}
+Merge2 {
+ inputs 2
+ name Merge1
+ xpos -100
+ ypos -50
+}
+</pre>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-How the Stack Decides the Inputs"><h3 id="How the Stack Decides the Inputs" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-How the Stack Decides the Inputs">How the Stack Decides the Inputs</a></h3></div>
+
+<p>
+When Nuke reads this text, it follows the "Node-Node-Pop" logic we discussed:
+</p>
+
+<ul>
+<li>
+<span id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-How the Stack Decides the Inputs-Line 1 (CheckerBoard)"></span><strong id="Line 1 (CheckerBoard)">Line 1 (CheckerBoard)</strong>: Nuke creates the CheckerBoard and pushes it onto the stack.
+
+<li>
+<span id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-How the Stack Decides the Inputs-Line 7 (ColorWheel)"></span><strong id="Line 7 (ColorWheel)">Line 7 (ColorWheel)</strong>: Nuke creates the ColorWheel and pushes it onto the stack. The stack now looks like: [CheckerBoard1, ColorWheel1].
+
+<li>
+<span id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-How the Stack Decides the Inputs-Line 13 (Merge2)"></span><strong id="Line 13 (Merge2)">Line 13 (Merge2)</strong>: The Merge node sees inputs 2.
+
+<ul>
+<li>
+It pops the top item (ColorWheel1) and assigns it to Input B (the primary input).
+
+<li>
+It pops the next item (CheckerBoard1) and assigns it to Input A.
+
+</ul>
+</ul>
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Why B is &quot;Top&quot; and A is &quot;Bottom&quot;"><h3 id="Why B is &quot;Top&quot; and A is &quot;Bottom&quot;" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Why B is &quot;Top&quot; and A is &quot;Bottom&quot;">Why B is "Top" and A is "Bottom"</a></h3></div>
+
+<p>
+In Nuke's internal logic, the B input is considered the main flow of the stack, while the A input is the "add-on." Therefore, the very last node created before the Merge is always grabbed first and assigned to B.
+</p>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-What if you wanted to flip them?"><h3 id="What if you wanted to flip them?" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-What if you wanted to flip them?">What if you wanted to flip them?</a></h3></div>
+
+<p>
+If you wanted the CheckerBoard to be the B input and the ColorWheel to be the A input, you would simply swap their positions in the text file:
+</p>
+<ul>
+<li>
+List the ColorWheel first (pushes to stack).
+
+<li>
+List the CheckerBoard second (pushes to top of stack).
+
+<li>
+The Merge then pops the CheckerBoard as B and the ColorWheel as A.
+
+</ul>
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Summary of the &quot;A/B&quot; Stack Rule"><h3 id="Summary of the &quot;A/B&quot; Stack Rule" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Summary of the &quot;A/B&quot; Stack Rule">Summary of the "A/B" Stack Rule</a></h3></div>
+
+<ul>
+<li>
+The last node before the Merge = Input B.
+
+<li>
+The second-to-last node before the Merge = Input A.
+
+<li>
+The third-to-last node before the Merge = Input Mask (if inputs 3 is specified).
+<table>
+<tr>
+<td>
+Would you like to see what happens to the syntax if you manually "offset" the pipes using a push command?
+</td>
+</tr>
+</table>
+
+</ul>
+<p>
+In a Nuke script, set and push are the commands that transform a simple "stack" into a complex, branching tree. Without these, your script would be a single straight line; with them, you can reuse nodes and create the complex DAG (Directed Acyclic Graph) structures Nuke is famous for.
+</p>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-1. The set command: Naming the Branch"><h3 id="1. The set command: Naming the Branch" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-1. The set command: Naming the Branch">1. The set command: Naming the Branch</a></h3></div>
+
+<p>
+The set command assigns a variable name to the node that was just created. Think of it like a bookmark. It tells Nuke: "Remember this specific point in the stack so I can jump back to it later."
+</p>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-2. The push command: The &quot;Teleporter&quot;"><h3 id="2. The push command: The &quot;Teleporter&quot;" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-2. The push command: The &quot;Teleporter&quot;">2. The push command: The "Teleporter"</a></h3></div>
+
+<p>
+The push command tells Nuke to go find a previously set bookmark and place a reference to it back onto the top of the stack.
+</p>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Example: Branching a CheckerBoard into two paths"><h3 id="Example: Branching a CheckerBoard into two paths" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Example: Branching a CheckerBoard into two paths">Example: Branching a CheckerBoard into two paths</a></h3></div>
+
+<p>
+Let’s look at a script where one CheckerBoard is used as the background (B) for a Merge, but also goes through a Blur to become the foreground (A) of that same Merge.
+</p>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Example: Branching a CheckerBoard into two paths-The .nk Syntax Logic:"><h4 id="The .nk Syntax Logic:" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Example: Branching a CheckerBoard into two paths-The .nk Syntax Logic:">The .nk Syntax Logic:</a></h4></div>
+
+<pre tcl>
+CheckerBoard2 {
+ name CheckerBoard1
+}
+set N72a5c00 [stack 0]  # BOOKMARK: 'set' remembers the CheckerBoard
+
+Blur {
+ size 20
+ name Blur1
+ # Note: Blur automatically pops/connects to the CheckerBoard above it
+}
+
+push $N72a5c00          # TELEPORT: Bring the original CheckerBoard back to the top
+
+Merge2 {
+ inputs 2
+ name Merge1
+}
+</pre>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Example: Branching a CheckerBoard into two paths-The Stack Table for this Branch"><h4 id="The Stack Table for this Branch" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Example: Branching a CheckerBoard into two paths-The Stack Table for this Branch">The Stack Table for this Branch</a></h4></div>
+
+<table>
+<tr>
+<td>
+Line
+</td>
+<td>
+Action
+</td>
+<td>
+The Stack (Bottom to Top)
+</td>
+<td>
+Logic
+</td>
+</tr>
+<tr>
+<td>
+CheckerBoard
+</td>
+<td>
+Push
+</td>
+<td>
+[CheckerBoard1]
+</td>
+<td>
+The node is created.
+</td>
+</tr>
+<tr>
+<td>
+set N72a...
+</td>
+<td>
+Assign
+</td>
+<td>
+[CheckerBoard1]
+</td>
+<td>
+We bookmark the top of the stack as "N72a...".
+</td>
+</tr>
+<tr>
+<td>
+Blur
+</td>
+<td>
+Pop/Push
+</td>
+<td>
+[Blur1]
+</td>
+<td>
+Blur grabs CheckerBoard, connects, and replaces it.
+</td>
+</tr>
+<tr>
+<td>
+push $N72a...
+</td>
+<td>
+Push Ref
+</td>
+<td>
+[Blur1, CheckerBoard1]
+</td>
+<td>
+We "teleport" the original node back onto the top.
+</td>
+</tr>
+<tr>
+<td>
+Merge
+</td>
+<td>
+Pop 2
+</td>
+<td>
+[Merge1]
+</td>
+<td>
+Merge pops CheckerBoard1 (A) and Blur1 (B).
+</td>
+</tr>
+</table>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-How this dictates the DAG (Visual Graph)"><h3 id="How this dictates the DAG (Visual Graph)" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-How this dictates the DAG (Visual Graph)">How this dictates the DAG (Visual Graph)</a></h3></div>
+
+<p>
+By using set and push, Nuke creates a "Y" split in your script. In the visual Node Graph, this looks like one node having two output arrows pointing to different places.
+</p>
+
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Why does Nuke use weird names like N72a5c00?"><h3 id="Why does Nuke use weird names like N72a5c00?" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Why does Nuke use weird names like N72a5c00?">Why does Nuke use weird names like N72a5c00?</a></h3></div>
+
+<p>
+When you copy-paste nodes, Nuke generates these hex codes automatically. They are unique IDs for that specific instance of the node in memory.
+</p>
+<ul>
+<li>
+<span id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-Why does Nuke use weird names like N72a5c00?-Manual Control"></span><strong id="Manual Control">Manual Control</strong>: You can actually edit the .nk file and rename set N72a5c00 to set MY_BRANCH. As long as you change the corresponding push \(N72a5c00 to push \)MY_BRANCH, the script will still work perfectly.
+
+</ul>
+<div id="Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-The &quot;Hidden&quot; Branching Rule"><h3 id="The &quot;Hidden&quot; Branching Rule" class="header"><a href="#Another Run Through the Stack (and Set &amp; Push)-The .nk Syntax Structure-The &quot;Hidden&quot; Branching Rule">The "Hidden" Branching Rule</a></h3></div>
+
+<p>
+If you see a push command in a Nuke script that doesn't have a name (just push), it tells Nuke to look for the "next available" item lower down in the stack. However, for branching (using the same node twice), the named set/push method is mandatory.
+</p>
+
 <div id="Example Nuke Node Script"><h1 id="Example Nuke Node Script" class="header"><a href="#Example Nuke Node Script">Example Nuke Node Script</a></h1></div>
 
 <pre tcl>
