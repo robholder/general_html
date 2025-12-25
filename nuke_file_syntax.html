@@ -854,6 +854,98 @@ When a node has a Mask input (or any optional 3rd input), the stack logic gets s
 In the .nk file, Nuke handles this by looking at the Input Count defined in the node's class. For a Merge node, the inputs are usually numbered: input0 (B), input1 (A), and input2 (Mask).
 </p>
 
+<p>
+To show the "side-pipe" or mask input in Nuke's descriptive syntax, we need to look at how Nuke manages the stack when it encounters a node that requires three inputs.
+</p>
+
+<p>
+In the .nk file, the Merge2 node will declare inputs 3. Because the stack is LIFO (Last-In, First-Out), the last thing you put on the stack becomes the Mask, and the thing at the very bottom of that "set" becomes the B-pipe.
+</p>
+
+<div id="Mask Inputs-The 3-Input Mask Syntax"><h3 id="The 3-Input Mask Syntax" class="header"><a href="#Mask Inputs-The 3-Input Mask Syntax">The 3-Input Mask Syntax</a></h3></div>
+
+<p>
+Here is how Nuke describes a Background, a Foreground, and a Radial mask connecting into one Merge node:
+</p>
+
+<pre tcl>
+Read {
+ inputs 0
+ name Background_B
+ xpos 0
+ ypos 0
+}
+Read {
+ inputs 0
+ name Foreground_A
+ xpos 100
+ ypos 0
+}
+Radial {
+ area {512 288 1536 864}
+ name Mask_Input
+ xpos 200
+ ypos 0
+}
+Merge2 {
+ inputs 3
+ name Merge_With_Mask
+ xpos 100
+ ypos 100
+}
+</pre>
+
+<div id="Mask Inputs-How the Robot &quot;Pops&quot; the Inputs"><h3 id="How the Robot &quot;Pops&quot; the Inputs" class="header"><a href="#Mask Inputs-How the Robot &quot;Pops&quot; the Inputs">How the Robot "Pops" the Inputs</a></h3></div>
+
+<p>
+When Nuke reads the Merge2 { inputs 3 } line, it looks at the stack which, at that exact moment, contains: [Background_B, Foreground_A, Mask_Input].
+</p>
+
+<p>
+It performs the following logic in order:
+</p>
+<ul>
+<li>
+<span id="Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-Pop 1"></span><strong id="Pop 1">Pop 1</strong>: It takes Mask_Input (the top) and plugs it into input2 (Mask).
+
+<li>
+<span id="Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-Pop 2"></span><strong id="Pop 2">Pop 2</strong>: It takes Foreground_A (the middle) and plugs it into input1 (A).
+
+<li>
+<span id="Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-Pop 3"></span><strong id="Pop 3">Pop 3</strong>: It takes Background_B (the bottom) and plugs it into input0 (B).
+
+</ul>
+<div id="Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-The &quot;Side-Pipe&quot; Visual"><h4 id="The &quot;Side-Pipe&quot; Visual" class="header"><a href="#Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-The &quot;Side-Pipe&quot; Visual">The "Side-Pipe" Visual</a></h4></div>
+
+<p>
+In the Node Graph (DAG), this creates the three distinct arrows. The B-pipe usually comes from the top, the A-pipe from the side, and the Mask-pipe from the right side.
+</p>
+
+<div id="Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-What if the Mask is &quot;Hidden&quot; or Branching?"><h4 id="What if the Mask is &quot;Hidden&quot; or Branching?" class="header"><a href="#Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-What if the Mask is &quot;Hidden&quot; or Branching?">What if the Mask is "Hidden" or Branching?</a></h4></div>
+
+<p>
+If the Mask is a node used elsewhere in the script, Nuke will use the set and push commands we discussed earlier. The syntax would look like this:
+</p>
+
+<pre tcl>
+# ... higher up in the script ...
+set N83b2f00 [stack 0]    # This is our Mask node
+
+# ... some other nodes happen here ...
+
+push $N83b2f00            # We push the Mask back to the top of the stack
+Merge2 {
+ inputs 3                 # It now grabs the Mask as the 3rd input
+ name Merge1
+}
+</pre>
+
+<div id="Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-Why &quot;input0&quot; is B"><h4 id="Why &quot;input0&quot; is B" class="header"><a href="#Mask Inputs-How the Robot &quot;Pops&quot; the Inputs-Why &quot;input0&quot; is B">Why "input0" is B</a></h4></div>
+
+<p>
+In Nuke's internal C++ architecture, the B input is always the "primary" stream. If you were to change inputs 3 to inputs 1 in the text file and reload, Nuke would only pop one node and it would always default to connecting to the B pipe. The stack logic is built to prioritize the main trunk of the tree (B) and treat A and Mask as "attachments" to that trunk.
+</p>
+
 <div id="Mask Inputs-The &quot;Side-Pipe&quot; Stack Logic"><h3 id="The &quot;Side-Pipe&quot; Stack Logic" class="header"><a href="#Mask Inputs-The &quot;Side-Pipe&quot; Stack Logic">The "Side-Pipe" Stack Logic</a></h3></div>
 
 <p>
@@ -985,7 +1077,273 @@ If you are looking at a raw Nuke script and you see a node that looks like it's 
 Pro-Tip: In Nuke, the push command can be used explicitly in the text file to duplicate an item already on the stack. If you see push $cut_paste_input, Nuke is "copying" a lower item in the stack and putting it back on top so a node can grab it again!
 </p>
 
+<div id="Mask Inputs-The Switch Node"><h2 id="The Switch Node" class="header"><a href="#Mask Inputs-The Switch Node">The Switch Node</a></h2></div>
 
+<p>
+The Switch node is a fascinating "stack-eater" because, unlike the Merge (which usually caps at 3 inputs), a Switch can have an infinite number of inputs.
+</p>
+
+<p>
+In the .nk file, the Switch node simply states how many nodes it is "popping" from the stack. The index starts at 0 and goes up, where the node at the very bottom of the stack section becomes input 0, and the node at the very top becomes the highest-numbered input.
+</p>
+
+<div id="Mask Inputs-The Switch Node-The Switch Stack Syntax"><h4 id="The Switch Stack Syntax" class="header"><a href="#Mask Inputs-The Switch Node-The Switch Stack Syntax">The Switch Stack Syntax</a></h4></div>
+
+<p>
+Imagine you have three different colored Constants, and you want to toggle between them.
+</p>
+
+<pre>
+Constant {
+ color {1 0 0 1}
+ name Red
+}
+Constant {
+ color {0 1 0 1}
+ name Green
+}
+Constant {
+ color {0 0 1 1}
+ name Blue
+}
+Switch {
+ inputs 3
+ which 1
+ name ColorSelector
+}
+</pre>
+
+<div id="Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping"><h3 id="The &quot;Stack to Index&quot; Mapping" class="header"><a href="#Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping">The "Stack to Index" Mapping</a></h3></div>
+
+<p>
+When the Switch node sees inputs 3, it reaches into the stack and maps them to its internal "which" knob.
+</p>
+
+<table>
+<tr>
+<td>
+Stack Position
+</td>
+<td>
+Node Name
+</td>
+<td>
+Switch Index
+</td>
+</tr>
+<tr>
+<td>
+Bottom
+</td>
+<td>
+Red
+</td>
+<td>
+0
+</td>
+</tr>
+<tr>
+<td>
+Middle
+</td>
+<td>
+Green
+</td>
+<td>
+1
+</td>
+</tr>
+<tr>
+<td>
+Top
+</td>
+<td>
+Blue
+</td>
+<td>
+2
+</td>
+</tr>
+</table>
+
+<p>
+In the example above, because the which knob is set to 1, the Switch will output the Green constant.
+</p>
+
+<div id="Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping-Dynamic Branching with Switch"><h4 id="Dynamic Branching with Switch" class="header"><a href="#Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping-Dynamic Branching with Switch">Dynamic Branching with Switch</a></h4></div>
+
+<p>
+The Switch is often used in descriptive Nuke scripts to manage different versions of a shot. To do this, Nuke uses the push command to grab different "branches" and line them up for the Switch to consume.
+</p>
+
+<pre tcl>
+push $BRANCH_VERSION_C
+push $BRANCH_VERSION_B
+push $BRANCH_VERSION_A
+Switch {
+ inputs 3
+ which 0
+ name VersionToggle
+}
+</pre>
+
+<div id="Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping-The Visual Result (The DAG)"><h4 id="The Visual Result (The DAG)" class="header"><a href="#Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping-The Visual Result (The DAG)">The Visual Result (The DAG)</a></h4></div>
+
+<p>
+In the Node Graph, this looks like a "fan" of pipes entering the bottom of the Switch node. Because Nuke's stack logic is LIFO, the order of the push commands or node definitions in the text file strictly dictates which pipe is which number.
+</p>
+
+<div id="Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping-Why this is &quot;Descriptive&quot;"><h4 id="Why this is &quot;Descriptive&quot;" class="header"><a href="#Mask Inputs-The Switch Node-The &quot;Stack to Index&quot; Mapping-Why this is &quot;Descriptive&quot;">Why this is "Descriptive"</a></h4></div>
+
+<p>
+If you were to open this .nk file and manually swap the lines for Red and Blue, the which knob on the Switch wouldn't change (it would still stay at 1), but the result would change. You would now see Blue instead of Green.
+</p>
+
+<p>
+This confirms the earlier insight: the file describes the state of the stack at the moment the node is created. The node itself doesn't "know" it's connected to Red; it only knows it is connected to "whatever was at index 0."
+</p>
+
+<div id="Mask Inputs-The Switch Node-Final &quot;Stack&quot; Thought"><h3 id="Final &quot;Stack&quot; Thought" class="header"><a href="#Mask Inputs-The Switch Node-Final &quot;Stack&quot; Thought">Final "Stack" Thought</a></h3></div>
+
+<p>
+We’ve seen how the stack handles:
+</p>
+<ul>
+<li>
+Linear flow (Grade/Blur)
+
+<li>
+Merging (A/B/Mask)
+
+<li>
+Branching (Set/Push)
+
+<li>
+Indexing (Switch/ContactSheet)
+
+</ul>
+<div id="Group Node's Internal Stack"><h1 id="Group Node's Internal Stack" class="header"><a href="#Group Node's Internal Stack">Group Node's Internal Stack</a></h1></div>
+
+<p>
+In Nuke, a Group node is essentially a "script within a script." It acts as a black box that contains its own internal stack, keeping the main DAG clean while performing complex operations inside.
+</p>
+
+<p>
+When Nuke’s descriptive parser enters a Group, it effectively "pauses" the main script stack and starts a brand-new, isolated stack for the nodes inside the Group.
+</p>
+
+<div id="Group Node's Internal Stack-1. The Group Syntax: The Nested Stack"><h3 id="1. The Group Syntax: The Nested Stack" class="header"><a href="#Group Node's Internal Stack-1. The Group Syntax: The Nested Stack">1. The Group Syntax: The Nested Stack</a></h3></div>
+
+<p>
+In the .nk file, a Group is defined by a block that starts with Group { and ends with end_group. Everything inside those braces exists in its own local "universe."
+</p>
+
+<pre>
+Group {
+ name MyCustomFilter
+ inputs 1              # The Group tells the MAIN stack it needs 1 input
+}
+ Input {               # This node represents the "Pipe" from the main stack
+  inputs 0
+  name Input1
+ }
+ Blur {
+  size 10
+  name InternalBlur
+ }
+ Output {              # This node sends the internal stack result back out
+  name Output1
+ }
+end_group
+</pre>
+
+<div id="Group Node's Internal Stack-2. How the Main Stack and Group Stack Interact"><h3 id="2. How the Main Stack and Group Stack Interact" class="header"><a href="#Group Node's Internal Stack-2. How the Main Stack and Group Stack Interact">2. How the Main Stack and Group Stack Interact</a></h3></div>
+
+<p>
+Think of the Group node as a bridge.
+</p>
+<ul>
+<li>
+<span id="Group Node's Internal Stack-2. How the Main Stack and Group Stack Interact-Entering the Group"></span><strong id="Entering the Group">Entering the Group</strong>: When the main stack hits the Group node, it "hands off" the top node of the main stack to the internal Input node.
+
+<li>
+<span id="Group Node's Internal Stack-2. How the Main Stack and Group Stack Interact-Inside the Group"></span><strong id="Inside the Group">Inside the Group</strong>: The Input node pushes that image onto the Internal Stack. All the blurs, grades, and merges inside the group only "see" this internal stack.
+
+<li>
+<span id="Group Node's Internal Stack-2. How the Main Stack and Group Stack Interact-Exiting the Group"></span><strong id="Exiting the Group">Exiting the Group</strong>: The Output node takes the final result of the internal stack and "pushes" it back onto the Main Stack.
+
+</ul>
+<div id="Group Node's Internal Stack-3. Multiple Inputs: The &quot;Map&quot;"><h3 id="3. Multiple Inputs: The &quot;Map&quot;" class="header"><a href="#Group Node's Internal Stack-3. Multiple Inputs: The &quot;Map&quot;">3. Multiple Inputs: The "Map"</a></h3></div>
+
+<p>
+If a Group has multiple inputs (like a custom Merge), the internal Input nodes are numbered. These numbers correspond to the order they pop from the main stack.
+</p>
+
+<table>
+<tr>
+<td>
+Internal Node
+</td>
+<td>
+Main Stack Assignment
+</td>
+</tr>
+<tr>
+<td>
+Input { number 0 }
+</td>
+<td>
+Becomes the B pipe (The bottom of the popped set)
+</td>
+</tr>
+<tr>
+<td>
+Input { number 1 }
+</td>
+<td>
+Becomes the A pipe
+</td>
+</tr>
+<tr>
+<td>
+Input { number 2 }
+</td>
+<td>
+Becomes the Mask pipe
+</td>
+</tr>
+</table>
+
+<p>
+Inside the group, these inputs can be moved around, branched with set and push, or merged. The main script doesn't care what's happening inside; it just sees a single node that "eats" X nodes and "spits out" 1.
+</p>
+
+<div id="Group Node's Internal Stack-4. Why this is powerful for &quot;Descriptive&quot; files"><h3 id="4. Why this is powerful for &quot;Descriptive&quot; files" class="header"><a href="#Group Node's Internal Stack-4. Why this is powerful for &quot;Descriptive&quot; files">4. Why this is powerful for "Descriptive" files</a></h3></div>
+
+<p>
+By using Groups, you can create massive, 10,000-node scripts that are still readable.
+</p>
+<ul>
+<li>
+<span id="Group Node's Internal Stack-4. Why this is powerful for &quot;Descriptive&quot; files-Encapsulation"></span><strong id="Encapsulation">Encapsulation</strong>: You can copy-paste a Group node, and all its internal set and push variables are local. They won't conflict with variables in the main script.
+
+<li>
+<span id="Group Node's Internal Stack-4. Why this is powerful for &quot;Descriptive&quot; files-The &quot;Gizmo&quot; transition"></span><strong id="The &quot;Gizmo&quot; transition">The "Gizmo" transition</strong>: If you save this Group as a separate .gizmo file, you are essentially saving a standalone descriptive stack that Nuke can load as a single "tool."
+
+</ul>
+<div id="Group Node's Internal Stack-Summary of the Nuke Stack Hierarchy"><h3 id="Summary of the Nuke Stack Hierarchy" class="header"><a href="#Group Node's Internal Stack-Summary of the Nuke Stack Hierarchy">Summary of the Nuke Stack Hierarchy</a></h3></div>
+
+<ul>
+<li>
+<span id="Group Node's Internal Stack-Summary of the Nuke Stack Hierarchy-Main Script Stack"></span><strong id="Main Script Stack">Main Script Stack</strong>: The high-level flow of your shot.
+
+<li>
+<span id="Group Node's Internal Stack-Summary of the Nuke Stack Hierarchy-Group/Gizmo Stack"></span><strong id="Group/Gizmo Stack">Group/Gizmo Stack</strong>: Localized, isolated logic.
+
+<li>
+<span id="Group Node's Internal Stack-Summary of the Nuke Stack Hierarchy-Expression/Engine"></span><strong id="Expression/Engine">Expression/Engine</strong>: The dynamic values living inside the descriptive nodes.
+
+</ul>
 <div id="More on Copy and Push"><h1 id="More on Copy and Push" class="header"><a href="#More on Copy and Push">More on Copy and Push</a></h1></div>
 
 <p>
