@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>vim_git_grep_setting</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="vim_learning.html">Vim Learning</a>
+</p>
+
+<div id="Git Grep"><h2 id="Git Grep" class="header"><a href="#Git Grep">Git Grep</a></h2></div>
+
+<div id="Git Grep-🔍 What “using git grep in Vim” actually means"><h3 id="🔍 What “using git grep in Vim” actually means" class="header"><a href="#Git Grep-🔍 What “using git grep in Vim” actually means">🔍 What “using git grep in Vim” actually means</a></h3></div>
+
+<p>
+Vim’s :grep command normally runs your system’s grep program.
+</p>
+
+<p>
+If you tell Vim to use git grep instead, then:
+</p>
+
+<ul>
+<li>
+Vim searches only files tracked by Git
+
+<li>
+It respects .gitignore
+
+<li>
+It’s much faster because Git uses its index
+
+<li>
+Results go into Vim’s quickfix list (just like normal grep)
+
+</ul>
+<p>
+So you get a project‑aware, lightning‑fast search inside Vim.
+</p>
+
+<div id="Git Grep-⚙️ The correct vimrc setting"><h3 id="⚙️ The correct vimrc setting" class="header"><a href="#Git Grep-⚙️ The correct vimrc setting">⚙️ The correct vimrc setting</a></h3></div>
+
+<p>
+Add this to your ~/.vimrc:
+</p>
+
+<pre vim>
+set grepprg=git\ grep\ -n\ $*
+set grepformat=%f:%l:%m
+</pre>
+
+<div id="Git Grep-⚙️ The correct vimrc setting-What these do"><h4 id="What these do" class="header"><a href="#Git Grep-⚙️ The correct vimrc setting-What these do">What these do</a></h4></div>
+
+<ul>
+<li>
+<code>grepprg</code> tells Vim which program to run when you type :grep
+
+<li>
+<code>git grep -n</code> prints results as file:line:match, which Vim understands
+
+<li>
+<code>grepformat</code> tells Vim how to parse that output into the quickfix list
+
+</ul>
+<p>
+This is the canonical, correct setup.
+</p>
+
+<div id="Git Grep-▶️ How to use it inside Vim"><h3 id="▶️ How to use it inside Vim" class="header"><a href="#Git Grep-▶️ How to use it inside Vim">▶️ How to use it inside Vim</a></h3></div>
+
+<p>
+Once configured, searching your Git repo is as simple as:
+</p>
+
+<pre vim>
+:grep pattern
+</pre>
+
+<p>
+Examples:
+</p>
+
+<pre vim>
+:grep myFunction
+:grep -i error
+:grep -w init
+</pre>
+
+<p>
+Then open the quickfix window:
+</p>
+
+<pre vim>
+:copen
+</pre>
+
+<p>
+Navigate results:
+</p>
+
+<pre vim>
+:cnext
+:cprev
+</pre>
+
+<div id="Git Grep-🧩 Optional: Fugitive’s :Ggrep"><h3 id="🧩 Optional: Fugitive’s :Ggrep" class="header"><a href="#Git Grep-🧩 Optional: Fugitive’s :Ggrep">🧩 Optional: Fugitive’s :Ggrep</a></h3></div>
+
+<p>
+If you use vim‑fugitive, you also get:
+</p>
+
+<pre vim>
+:Ggrep pattern
+</pre>
+
+<p>
+This automatically uses git grep and fills the quickfix list.
+</p>
+
+<div id="Git Grep-📝 Summary"><h3 id="📝 Summary" class="header"><a href="#Git Grep-📝 Summary">📝 Summary</a></h3></div>
+
+<ul>
+<li>
+<code>git grep</code> in Vim = using Git’s search engine for :grep
+
+<li>
+Faster, respects .gitignore, searches only tracked files
+
+<li>
+Set it with:
+
+</ul>
+  
+<pre vim>
+set grepprg=git\ grep\ -n\ $*
+set grepformat=%f:%l:%m
+</pre>
+
+<ul>
+<li>
+Use it with :grep pattern and navigate via the quickfix list
+
+</ul>
+<div id="Switch Between Vim Grep and Git Grep"><h2 id="Switch Between Vim Grep and Git Grep" class="header"><a href="#Switch Between Vim Grep and Git Grep">Switch Between Vim Grep and Git Grep</a></h2></div>
+
+<p>
+ Vim can automatically switch between git grep when you’re inside a Git repo and normal grep everywhere else. Once set up, you just type :grep foo and Vim chooses the right backend without you thinking about it.
+</p>
+
+<p>
+Here’s a clean, reliable setup that works in both Vim and Neovim.
+</p>
+
+<div id="Switch Between Vim Grep and Git Grep-🔧 The Smart “git‑grep‑when‑possible” Setup"><h3 id="🔧 The Smart “git‑grep‑when‑possible” Setup" class="header"><a href="#Switch Between Vim Grep and Git Grep-🔧 The Smart “git‑grep‑when‑possible” Setup">🔧 The Smart “git‑grep‑when‑possible” Setup</a></h3></div>
+
+<p>
+Add this to your ~/.vimrc (or init.vim):
+</p>
+
+<pre vim>
+" Use git grep when inside a Git repo, otherwise fall back to normal grep
+function! SmartGrep()
+  if system('git rev-parse --is-inside-work-tree') =~# 'true'
+    set grepprg=git\ grep\ -n\ $*
+    set grepformat=%f:%l:%m
+  else
+    set grepprg=grep\ -nH\ $*
+    set grepformat=%f:%l:%m
+  endif
+endfunction
+
+" Automatically choose the right grep program when Vim starts
+autocmd VimEnter * call SmartGrep()
+
+" Also re-evaluate when changing directories
+autocmd DirChanged * call SmartGrep()
+</pre>
+
+<div id="Switch Between Vim Grep and Git Grep-🧠 What this does"><h3 id="🧠 What this does" class="header"><a href="#Switch Between Vim Grep and Git Grep-🧠 What this does">🧠 What this does</a></h3></div>
+
+<p>
+✔ Detects whether you’re inside a Git repository
+</p>
+
+<p>
+It runs:
+</p>
+
+<pre vim>
+git rev-parse --is-inside-work-tree
+</pre>
+
+<p>
+If the answer is “true”, Vim switches to:
+</p>
+
+<pre vim>
+git grep -n
+</pre>
+
+<p>
+Otherwise it uses normal grep.
+</p>
+
+<div id="Switch Between Vim Grep and Git Grep-✔ Keeps the quickfix list working"><h3 id="✔ Keeps the quickfix list working" class="header"><a href="#Switch Between Vim Grep and Git Grep-✔ Keeps the quickfix list working">✔ Keeps the quickfix list working</a></h3></div>
+
+<p>
+Both branches set:
+</p>
+
+<pre vim>
+grepformat=%f:%l:%m
+</pre>
+
+<p>
+So results always populate the quickfix window correctly.
+</p>
+
+<div id="Switch Between Vim Grep and Git Grep-✔ Updates automatically"><h3 id="✔ Updates automatically" class="header"><a href="#Switch Between Vim Grep and Git Grep-✔ Updates automatically">✔ Updates automatically</a></h3></div>
+
+<ul>
+<li>
+When Vim starts
+
+<li>
+When you :cd into another directory
+
+<li>
+When plugins change your working directory
+
+</ul>
+<p>
+You never have to think about it again.
+</p>
+
+<div id="Switch Between Vim Grep and Git Grep-▶️ How you use it"><h3 id="▶️ How you use it" class="header"><a href="#Switch Between Vim Grep and Git Grep-▶️ How you use it">▶️ How you use it</a></h3></div>
+
+<p>
+Exactly the same as before:
+</p>
+
+<pre vim>
+:grep pattern
+</pre>
+
+<p>
+Then:
+</p>
+
+<pre vim>
+:copen
+:cnext
+:cprev
+</pre>
+
+<p>
+Vim silently chooses the right engine.
+</p>
+
+<div id="Switch Between Vim Grep and Git Grep-▶️ How you use it-🎉 Result"><h4 id="🎉 Result" class="header"><a href="#Switch Between Vim Grep and Git Grep-▶️ How you use it-🎉 Result">🎉 Result</a></h4></div>
+
+<p>
+You get:
+</p>
+
+<ul>
+<li>
+blazing‑fast Git‑aware searching when you’re in a repo
+
+<li>
+normal grep everywhere else
+
+<li>
+zero mental overhead
+
+</ul>
+<div id="Live Preview"><h2 id="Live Preview" class="header"><a href="#Live Preview">Live Preview</a></h2></div>
+
+<p>
+Let’s turn your :grep workflow into something that feels almost like a fuzzy‑finder: instant previews and one‑keystroke searches for the word under your cursor. These two additions pair beautifully with your smart git grep fallback setup.
+</p>
+
+<div id="Live Preview-🔎 1. Live preview of grep results"><h3 id="🔎 1. Live preview of grep results" class="header"><a href="#Live Preview-🔎 1. Live preview of grep results">🔎 1. Live preview of grep results</a></h3></div>
+
+<p>
+This trick opens the quickfix window automatically after every :grep so you see matches immediately.
+</p>
+
+<p>
+Add this to your vimrc:
+</p>
+
+<pre vim>
+" Automatically open quickfix window after :grep
+autocmd QuickFixCmdPost grep cwindow
+</pre>
+
+<p>
+What this does
+</p>
+
+<ul>
+<li>
+<code>QuickFixCmdPost grep</code> fires after any :grep command finishes
+
+<li>
+<code>cwindow</code> opens the quickfix window only if there are results
+
+<li>
+If there are no matches, it stays closed (so it doesn’t annoy you)
+
+</ul>
+<p>
+This makes :grep feel instant and interactive.
+</p>
+
+<div id="Live Preview-🎯 2. Search for the word under the cursor"><h3 id="🎯 2. Search for the word under the cursor" class="header"><a href="#Live Preview-🎯 2. Search for the word under the cursor">🎯 2. Search for the word under the cursor</a></h3></div>
+
+<p>
+This is the killer quality‑of‑life improvement. One keypress, and Vim runs :grep on the symbol you’re on.
+</p>
+
+<p>
+Add this mapping:
+</p>
+
+<pre vim>
+" Grep for the word under cursor
+nnoremap &lt;leader&gt;g :grep &lt;cword&gt;&lt;CR&gt;
+</pre>
+
+<div id="Live Preview-🎯 2. Search for the word under the cursor-How it works"><h4 id="How it works" class="header"><a href="#Live Preview-🎯 2. Search for the word under the cursor-How it works">How it works</a></h4></div>
+
+<ul>
+<li>
+<code>&lt;cword&gt;</code> expands to the word under your cursor
+
+<li>
+<code>&lt;leader&gt;g</code> becomes your “search this symbol” shortcut
+
+<li>
+Results drop into the quickfix window automatically (thanks to the autocmd above)
+
+</ul>
+<p>
+If your leader is the default '\', then typing:
+</p>
+
+<pre vim>
+\g
+</pre>
+
+<p>
+...will search for the identifier under your cursor across your entire Git repo (or the filesystem if you’re outside a repo).
+</p>
+
+<div id="Live Preview-🧩 Optional: case‑insensitive or whole‑word search"><h3 id="🧩 Optional: case‑insensitive or whole‑word search" class="header"><a href="#Live Preview-🧩 Optional: case‑insensitive or whole‑word search">🧩 Optional: case‑insensitive or whole‑word search</a></h3></div>
+
+<p>
+If you want the mapping to always do a whole‑word match:
+</p>
+
+<pre vim>
+nnoremap &lt;leader&gt;g :grep -w &lt;cword&gt;&lt;CR&gt;
+</pre>
+
+<p>
+Case‑insensitive:
+</p>
+
+<pre vim>
+nnoremap &lt;leader&gt;g :grep -i &lt;cword&gt;&lt;CR&gt;
+</pre>
+
+<div id="Live Preview-🚀 How it all works together"><h3 id="🚀 How it all works together" class="header"><a href="#Live Preview-🚀 How it all works together">🚀 How it all works together</a></h3></div>
+
+<p>
+With your smart fallback + these two additions, your workflow becomes:
+</p>
+
+<ul>
+<li>
+<code>:grep foo</code> → instant results
+
+<li>
+<code>&lt;leader&gt;g</code> → search symbol under cursor
+
+<li>
+<code>:copen</code> is no longer needed
+
+<li>
+<code>:cnext</code> / <code>:cprev</code> jump through matches
+
+<li>
+Works with <code>git grep</code> inside repos and normal <code>grep</code> elsewhere
+
+</ul>
+<p>
+It’s a really smooth, modern search experience inside classic Vim.
+</p>
+
+
+<p>
+<a href="vim_learning.html">Vim Learning</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
