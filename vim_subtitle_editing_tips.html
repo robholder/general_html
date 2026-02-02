@@ -2,7 +2,6 @@
 <html>
 <head>
 <link rel="Stylesheet" type="text/css" href="style.css">
-<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
 <title>vim_subtitle_editing_tips</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,6 +33,7 @@ vim -O file1.txt file2.txt
 <code>-O</code> opens the files in vertical splits (use <code>-o</code> for horizontal splits).
 
 </ul>
+
 <div id="Opening the Files Side by Side-Locking Scrolling Between the Files"><h4 id="Locking Scrolling Between the Files" class="header"><a href="#Opening the Files Side by Side-Locking Scrolling Between the Files">Locking Scrolling Between the Files</a></h4></div>
 
 <p>
@@ -142,19 +142,64 @@ NOTE: &lt;ctrl&gt;] and &lt;ctrl&gt;] should work too, but are commandeered by u
 <code>g</code> → Apply to all matches in each line.
 
 </ul>
+
 <p>
 ✅ Effect: Strips tags but keeps the text between them.
 </p>
 
-<div id="Removing Styling Tags-Remove tags and their content (for specific tags)"><h4 id="Remove tags and their content (for specific tags)" class="header"><a href="#Removing Styling Tags-Remove tags and their content (for specific tags)">Remove tags and their content (for specific tags)</a></h4></div>
+<div id="Removing Styling Tags-Putting This Into A Function"><h2 id="Putting This Into A Function" class="header"><a href="#Removing Styling Tags-Putting This Into A Function">Putting This Into A Function</a></h2></div>
+
+<p>
+You can drop that substitution straight into a Vim function just like any other Ex command. Vimscript doesn’t require execute unless you need to build the command dynamically.
+</p>
+
+<p>
+A simple version looks like this:
+</p>
+
+<pre vim>
+" ~/.vimrc
+
+function! StripTags()
+    %s/&lt;[^&gt;]\+&gt;//g
+endfunction
+
+nnoremap &lt;leader&gt;st :call StripTags()&lt;CR&gt;
+</pre>
+
+<p>
+That gives you a quick shortcut (&lt;Leader&gt;st) to remove all tags in the file.
+</p>
+
+<div id="Removing Styling Tags-Putting This Into A Function-If you want it to work on a visual range"><h4 id="If you want it to work on a visual range" class="header"><a href="#Removing Styling Tags-Putting This Into A Function-If you want it to work on a visual range">If you want it to work on a visual range</a></h4></div>
+
+<p>
+This version respects a selected range, but still works on the whole file if no range is given:
+</p>
+
+<pre vim>
+function! StripTagsRange() range
+    execute a:firstline . "," . a:lastline . "s/&lt;[^&gt;]\\+&gt;//g"
+endfunction
+
+xnoremap &lt;leader&gt;st :call StripTagsRange()&lt;CR&gt;
+nnoremap &lt;leader&gt;st :call StripTagsRange()&lt;CR&gt;
+</pre>
+
+
+<div id="Removing Styling Tags-Putting This Into A Function-Remove tags and their content (for specific tags)"><h4 id="Remove tags and their content (for specific tags)" class="header"><a href="#Removing Styling Tags-Putting This Into A Function-Remove tags and their content (for specific tags)">Remove tags and their content (for specific tags)</a></h4></div>
 
 <ul>
 <li>
 Example for <code>&lt;div&gt;</code> and its content:
+
+</ul>
+
 <pre vim>
 :%s#&lt;div[^&gt;]*&gt;.\{-}&lt;/div&gt;##g
 </pre>
 
+<ul>
 <li>
 <code>#</code> → Used instead of / as the delimiter (handy when working with / inside HTML).
 
@@ -176,6 +221,7 @@ Example for <code>&lt;div&gt;</code> and its content:
 <code>g</code> → Apply to all matches in each line.
 
 </ul>
+
 <p>
 ✅ Effect: Deletes the <div> tag and everything inside it.
 </p>
@@ -184,7 +230,7 @@ Example for <code>&lt;div&gt;</code> and its content:
 The .\{-} makes it non-greedy, so it only removes the matching pair.
 </p>
 
-<div id="Removing Styling Tags-Remove everything including text inside any tags"><h4 id="Remove everything including text inside any tags" class="header"><a href="#Removing Styling Tags-Remove everything including text inside any tags">Remove everything including text inside any tags</a></h4></div>
+<div id="Removing Styling Tags-Putting This Into A Function-Remove everything including text inside any tags"><h4 id="Remove everything including text inside any tags" class="header"><a href="#Removing Styling Tags-Putting This Into A Function-Remove everything including text inside any tags">Remove everything including text inside any tags</a></h4></div>
 
 <pre>
 :%g/&lt;[^&gt;]\+&gt;/d
@@ -209,7 +255,7 @@ This deletes any line containing tags entirely.
 ✅ Effect: If a line contains any tag, the whole line is removed.
 </p>
 
-<div id="Removing Styling Tags-Extra tip for nested or multiline tags:"><h4 id="Extra tip for nested or multiline tags:" class="header"><a href="#Removing Styling Tags-Extra tip for nested or multiline tags:">Extra tip for nested or multiline tags:</a></h4></div>
+<div id="Removing Styling Tags-Putting This Into A Function-Extra tip for nested or multiline tags:"><h4 id="Extra tip for nested or multiline tags:" class="header"><a href="#Removing Styling Tags-Putting This Into A Function-Extra tip for nested or multiline tags:">Extra tip for nested or multiline tags:</a></h4></div>
 
 <p>
 If your HTML has tags that span multiple lines (e.g., &lt;div\nclass="..."&gt;), you can enable “very magic” mode and allow matches across lines:
@@ -227,6 +273,7 @@ If your HTML has tags that span multiple lines (e.g., &lt;div\nclass="..."&gt;),
 <code>[^&gt;]+</code> → Matches everything until the first &gt;, even across attributes.
 
 </ul>
+
 <div id="Removing 'Hard of Hearing' Square Bracket Content"><h1 id="Removing 'Hard of Hearing' Square Bracket Content" class="header"><a href="#Removing 'Hard of Hearing' Square Bracket Content">Removing 'Hard of Hearing' Square Bracket Content</a></h1></div>
 
 <pre vim>
@@ -313,6 +360,7 @@ This whole line concatenates a bunch of strings and expressions. Imagine that th
 <code>w</code> - Saves the updated buffer to the new file name.
 
 </ul>
+
 <p>
 The full string (command) before execution might look something like this:
 </p>
@@ -336,6 +384,7 @@ file /path/to/myfile_clean.srt | w
 <code>\r\r</code>: Replaces them with two newlines, ensuring single empty lines remain.
 
 </ul>
+
 <p>
 If some empty lines contain spaces, you can remove them first:
 </p>
@@ -364,10 +413,14 @@ Matching the First Line (Timestamp):
 <li>
 <code>^</code> Asserts the beginning of the line.
 
+</ul>
+
+<ul>
 <li>
 <code>\(\d\{2}:\d\{2}:\d\{2},\d\{3} --&gt; \d\{2}:\d\{2}:\d\{2},\d\{3}\)</code> This group (group 1) matches a timestamp line in the exact format with two digits for hours, minutes, seconds and three digits for milliseconds on both sides of <code> --&gt; </code>.
 
 </ul>
+
 <div id="Delete Empty Lines Between Timecode and Text-Matching the Second (Empty) Line:"><h3 id="Matching the Second (Empty) Line:" class="header"><a href="#Delete Empty Lines Between Timecode and Text-Matching the Second (Empty) Line:">Matching the Second (Empty) Line:</a></h3></div>
 
 <ul>
@@ -381,6 +434,7 @@ Matching the First Line (Timestamp):
 <code>\n</code> The following <code>\n</code> marks the end of that blank line.
 
 </ul>
+
 <div id="Delete Empty Lines Between Timecode and Text-Matching the Third Line (Conditional Check):"><h3 id="Matching the Third Line (Conditional Check):" class="header"><a href="#Delete Empty Lines Between Timecode and Text-Matching the Third Line (Conditional Check):">Matching the Third Line (Conditional Check):</a></h3></div>
 
 <ul>
@@ -388,6 +442,7 @@ Matching the First Line (Timestamp):
 <code>\([^0-9].*\)</code> This group (group 2) matches the third line only if its first character is not a digit (i.e. <code>[0-9]</code> is negated via <code>[^0-9]</code>). The rest of the line is matched by <code>.*</code>.
 
 </ul>
+
 <div id="Delete Empty Lines Between Timecode and Text-The Replacement:"><h3 id="The Replacement:" class="header"><a href="#Delete Empty Lines Between Timecode and Text-The Replacement:">The Replacement:</a></h3></div>
 
 <ul>
@@ -395,6 +450,7 @@ Matching the First Line (Timestamp):
 <code>\1\r\2</code> This puts back the captured timestamp (group 1), then a newline (the <code>\r</code> acts as a newline in Vim’s replacement), and then the third line (group 2). This effectively removes the empty/whitespace-only line that was between the first and third lines.
 
 </ul>
+
 <p>
 In summary, this command only deletes the empty (or whitespace) line if it follows a timestamp line and the next line starts with a non-digit character. If the third line begins with a digit, the pattern won’t match, and nothing is changed.
 </p>
