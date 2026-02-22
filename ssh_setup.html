@@ -356,6 +356,144 @@ ie. macbook for key created on a MacBook
 </ul>
 </ul>
 
+
+<div id="Naming SSH Keys (Directly Or Renaming)"><h1 id="Naming SSH Keys (Directly Or Renaming)" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)">Naming SSH Keys (Directly Or Renaming)</a></h1></div>
+
+<p>
+You can rename SSH keys at any time, and you can also specify a custom name the moment you create them. 
+</p>
+
+<div id="Naming SSH Keys (Directly Or Renaming)-1. Naming keys during creation"><h4 id="1. Naming keys during creation" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)-1. Naming keys during creation">1. Naming keys during creation</a></h4></div>
+
+<p>
+When you run ssh-keygen, it will prompt you: <code>Enter a file in which to save the key</code>. You can type a custom path and name there. 
+</p>
+
+<p>
+Alternatively, you can skip the prompt entirely by using the <code>-f</code> (file) flag to name it directly in the command: 
+</p>
+
+<pre sh>
+ssh-keygen -t ed25519 -f ~/.ssh/my_custom_key_name
+</pre>
+
+<p>
+This will automatically create two files: <code>my_custom_key_name</code> (private) and <code>my_custom_key_name.pub</code> (public). 
+</p>
+
+<div id="Naming SSH Keys (Directly Or Renaming)-2. Renaming existing keys"><h4 id="2. Renaming existing keys" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)-2. Renaming existing keys">2. Renaming existing keys</a></h4></div>
+
+<p>
+SSH keys are just standard files. You can rename them using the <code>mv</code> (move) command in your terminal. 
+</p>
+
+<p>
+Important: You must rename both the private and public key files to the same base name for them to continue working together easily. 
+</p>
+
+<pre sh>
+# Rename the private key
+mv ~/.ssh/id_rsa ~/.ssh/new_key_name
+
+# Rename the public key
+mv ~/.ssh/id_rsa.pub ~/.ssh/new_key_name.pub
+</pre>
+
+<div id="Naming SSH Keys (Directly Or Renaming)-3. Critical follow-up steps"><h4 id="3. Critical follow-up steps" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)-3. Critical follow-up steps">3. Critical follow-up steps</a></h4></div>
+
+<p>
+Renaming or using custom names "breaks" the default behavior where SSH automatically looks for id_rsa. To make your custom-named keys work:
+</p>
+
+<ul>
+<li>
+Update your Config:
+
+<ul>
+<li>
+You must update the IdentityFile path in your ~/.ssh/config to point to the new filename.
+
+</ul>
+<li>
+Update the Agent:
+
+<ul>
+<li>
+If you use ssh-agent, you may need to re-add the key using its new name: <code>ssh-add ~/.ssh/new_key_name</code>.
+
+</ul>
+</ul>
+
+<ul>
+<li>
+Permissions: Ensure the private key still has restricted permissions (usually 600) after moving or renaming it.
+
+</ul>
+
+<div id="Naming SSH Keys (Directly Or Renaming)-Permissions"><h3 id="Permissions" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)-Permissions">Permissions</a></h3></div>
+
+<p>
+To ensure SSH doesn't reject your renamed keys for being "too open," you need to set strict permissions. SSH will refuse to use a private key if it's readable by other users on your system.
+</p>
+
+<div id="Naming SSH Keys (Directly Or Renaming)-Permissions-1. Fix Permissions for All Keys"><h4 id="1. Fix Permissions for All Keys" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)-Permissions-1. Fix Permissions for All Keys">1. Fix Permissions for All Keys</a></h4></div>
+
+<p>
+Run these commands in your terminal to secure the entire folder and its contents:
+</p>
+
+<pre sh>
+# Set the .ssh folder so only YOU can read/write/enter it
+chmod 700 ~/.ssh
+
+# Set all PRIVATE keys so only YOU can read/write them
+# (This handles all files in the folder; SSH will ignore the .pub files)
+chmod 600 ~/.ssh/*
+</pre>
+
+<div id="Naming SSH Keys (Directly Or Renaming)-Permissions-2. Verify the Permissions"><h4 id="2. Verify the Permissions" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)-Permissions-2. Verify the Permissions">2. Verify the Permissions</a></h4></div>
+
+<p>
+You can check if it worked by listing the files with ls -l ~/.ssh. You want to see -rw------- for your private keys:
+</p>
+
+<pre sh>
+ls -l ~/.ssh
+# Output should look like this:
+# -rw-------  1 yourname  staff  2602 Feb 21 19:00 my_custom_key_name
+# -rw-r--r--  1 yourname  staff   571 Feb 21 19:00 my_custom_key_name.pub
+</pre>
+
+<div id="Naming SSH Keys (Directly Or Renaming)-Permissions-3. Clear and Re-add to Agent (The &quot;Fresh Start&quot;)"><h4 id="3. Clear and Re-add to Agent (The &quot;Fresh Start&quot;)" class="header"><a href="#Naming SSH Keys (Directly Or Renaming)-Permissions-3. Clear and Re-add to Agent (The &quot;Fresh Start&quot;)">3. Clear and Re-add to Agent (The "Fresh Start")</a></h4></div>
+
+<p>
+If you renamed your keys, the ssh-agent might still be looking for the old names. Clear it and add your new ones:
+</p>
+
+<pre sh>
+# Remove all identities currently in the agent
+ssh-add -D
+
+# Add your specific new key (and save to macOS Keychain)
+ssh-add --apple-use-keychain ~/.ssh/my_custom_key_name
+</pre>
+
+<p>
+Pro Tip: The "Why"
+</p>
+<ul>
+<li>
+<code>600 (-rw-------)</code>: Means Read &amp; Write for you, and Nothing for everyone else.
+
+<li>
+<code>700 (-drwx------)</code>: Means Read, Write, &amp; Execute (access) for you, and Nothing for everyone else.
+
+</ul>
+
+<p>
+If you ever see the error "Permissions 0644 for '~/.ssh/id_rsa' are too open", these commands are your immediate fix.
+</p>
+
 <p>
 <a href="index.html">index</a>
 </p>
