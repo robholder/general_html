@@ -756,6 +756,420 @@ No Twine — uv publishes packages
 It’s the first tool that truly unifies the Python ecosystem.
 </p>
 
+<div id="Migrating Projects"><h1 id="Migrating Projects" class="header"><a href="#Migrating Projects">Migrating Projects</a></h1></div>
+
+<p>
+Migrating an existing Python project to uv is surprisingly smooth once you understand the moving parts. The goal is to replace your old stack (pyenv, venv, pip, pip-tools, pipx, Poetry, etc.) with uv’s unified workflow — without breaking your project or surprising your teammates.
+</p>
+
+<p>
+Below is a clear, practical, end‑to‑end migration guide that works whether your project uses:
+</p>
+<ul>
+<li>
+requirements.txt
+
+<li>
+requirements.in + pip-tools
+
+<li>
+pyproject.toml (Poetry, PDM, Hatch, etc.)
+
+<li>
+venv or virtualenv
+
+<li>
+pyenv‑managed Python versions
+
+</ul>
+
+<p>
+Let’s walk through it in a way that feels natural and keeps your project stable.
+</p>
+
+<div id="Migrating Projects-🧭 Step 1 — Install uv’s Python Version (pyenv replacement)"><h2 id="🧭 Step 1 — Install uv’s Python Version (pyenv replacement)" class="header"><a href="#Migrating Projects-🧭 Step 1 — Install uv’s Python Version (pyenv replacement)">🧭 Step 1 — Install uv’s Python Version (pyenv replacement)</a></h2></div>
+
+<p>
+If your project expects Python 3.11, for example:
+</p>
+
+<pre sh>
+uv python install 3.11
+</pre>
+
+<p>
+Check what’s installed:
+</p>
+
+<pre sh>
+uv python list
+</pre>
+
+<p>
+You don’t need pyenv shims anymore — uv keeps interpreters isolated and fast.
+</p>
+
+<div id="Migrating Projects-🧱 Step 2 — Create a New uv Virtual Environment"><h2 id="🧱 Step 2 — Create a New uv Virtual Environment" class="header"><a href="#Migrating Projects-🧱 Step 2 — Create a New uv Virtual Environment">🧱 Step 2 — Create a New uv Virtual Environment</a></h2></div>
+
+<p>
+Inside your project folder:
+</p>
+
+<pre sh>
+uv venv --python 3.11
+</pre>
+
+<p>
+Activate it:
+</p>
+
+<pre sh>
+source .venv/bin/activate
+</pre>
+
+<p>
+This replaces:
+</p>
+<ul>
+<li>
+pyenv local
+
+<li>
+python -m venv .venv
+
+<li>
+poetry env use
+
+</ul>
+
+<div id="Migrating Projects-📦 Step 3 — Convert Your Dependencies"><h2 id="📦 Step 3 — Convert Your Dependencies" class="header"><a href="#Migrating Projects-📦 Step 3 — Convert Your Dependencies">📦 Step 3 — Convert Your Dependencies</a></h2></div>
+
+<p>
+This is the part people worry about, but uv makes it painless.
+</p>
+
+<p>
+If you have requirements.txt:
+</p>
+
+<pre sh>
+uv add --from-requirements requirements.txt
+</pre>
+
+<p>
+uv will:
+</p>
+<ul>
+<li>
+Install everything
+
+<li>
+Create a pyproject.toml
+
+<li>
+Generate a uv.lock
+
+</ul>
+
+<div id="Migrating Projects-📦 Step 3 — Convert Your Dependencies-If you have requirements.in (pip-tools):"><h3 id="If you have requirements.in (pip-tools):" class="header"><a href="#Migrating Projects-📦 Step 3 — Convert Your Dependencies-If you have requirements.in (pip-tools):">If you have requirements.in (pip-tools):</a></h3></div>
+
+<pre sh>
+uv add --from-requirements requirements.in
+</pre>
+
+<p>
+uv handles dependency resolution itself — no more pip-compile.
+</p>
+
+<div id="Migrating Projects-📦 Step 3 — Convert Your Dependencies-If you already have a pyproject.toml (Poetry/PDM/Hatch):"><h3 id="If you already have a pyproject.toml (Poetry/PDM/Hatch):" class="header"><a href="#Migrating Projects-📦 Step 3 — Convert Your Dependencies-If you already have a pyproject.toml (Poetry/PDM/Hatch):">If you already have a pyproject.toml (Poetry/PDM/Hatch):</a></h3></div>
+
+<p>
+Just run:
+</p>
+
+<pre sh>
+uv sync
+</pre>
+
+<p>
+uv will:
+</p>
+<ul>
+<li>
+Read your existing pyproject.toml
+
+<li>
+Resolve dependencies
+
+<li>
+Create a uv.lock
+
+<li>
+Install everything into your venv
+
+</ul>
+
+<p>
+You can delete old lockfiles like:
+</p>
+<ul>
+<li>
+poetry.lock
+
+<li>
+pdm.lock
+
+<li>
+hatch.lock
+
+<li>
+requirements.txt (optional)
+
+</ul>
+
+<div id="Migrating Projects-🧪 Step 4 — Add Dev Dependencies (if needed)"><h2 id="🧪 Step 4 — Add Dev Dependencies (if needed)" class="header"><a href="#Migrating Projects-🧪 Step 4 — Add Dev Dependencies (if needed)">🧪 Step 4 — Add Dev Dependencies (if needed)</a></h2></div>
+
+<p>
+If your project has dev tools like pytest, ruff, black:
+</p>
+
+<pre sh>
+uv add --dev pytest ruff black
+</pre>
+
+<p>
+This replaces:
+</p>
+<ul>
+<li>
+pip install -r dev-requirements.txt
+
+<li>
+poetry add --group dev
+
+</ul>
+
+<div id="Migrating Projects-▶️ Step 5 — Run Your Project with uv"><h2 id="▶️ Step 5 — Run Your Project with uv" class="header"><a href="#Migrating Projects-▶️ Step 5 — Run Your Project with uv">▶️ Step 5 — Run Your Project with uv</a></h2></div>
+
+<p>
+Instead of:
+</p>
+<ul>
+<li>
+python script.py
+
+<li>
+poetry run python script.py
+
+</ul>
+
+<p>
+Use:
+</p>
+
+<pre sh>
+uv run src/myproject/main.py
+</pre>
+
+<p>
+Or run a module:
+</p>
+
+<pre sh>
+uv run myproject
+</pre>
+
+<p>
+uv automatically uses your venv’s interpreter.
+</p>
+
+<div id="Migrating Projects-🧰 Step 6 — Run Tools Without Installing Them Globally"><h2 id="🧰 Step 6 — Run Tools Without Installing Them Globally" class="header"><a href="#Migrating Projects-🧰 Step 6 — Run Tools Without Installing Them Globally">🧰 Step 6 — Run Tools Without Installing Them Globally</a></h2></div>
+
+<p>
+This is where uv feels magical.
+</p>
+
+<p>
+Instead of:
+</p>
+<ul>
+<li>
+pipx run black
+
+<li>
+poetry run ruff
+
+</ul>
+
+<p>
+You can do:
+</p>
+
+<pre sh>
+uv tool run ruff check .
+uv tool run black .
+</pre>
+
+<p>
+Tools run in isolated environments — no global installs.
+</p>
+
+<div id="Migrating Projects-🔒 Step 7 — Lock Dependencies"><h2 id="🔒 Step 7 — Lock Dependencies" class="header"><a href="#Migrating Projects-🔒 Step 7 — Lock Dependencies">🔒 Step 7 — Lock Dependencies</a></h2></div>
+
+<p>
+uv maintains a lockfile automatically, but you can regenerate it:
+</p>
+
+<pre sh>
+uv lock
+</pre>
+
+<p>
+This replaces:
+</p>
+<ul>
+<li>
+pip-compile
+
+<li>
+poetry lock
+
+</ul>
+
+<div id="Migrating Projects-📦 Step 8 — Build Your Package (if applicable)"><h2 id="📦 Step 8 — Build Your Package (if applicable)" class="header"><a href="#Migrating Projects-📦 Step 8 — Build Your Package (if applicable)">📦 Step 8 — Build Your Package (if applicable)</a></h2></div>
+
+<p>
+If your project is a library:
+</p>
+
+<pre sh>
+uv build
+</pre>
+
+<p>
+Outputs go to dist/.
+</p>
+
+<p>
+This replaces:
+</p>
+<ul>
+<li>
+python -m build
+
+<li>
+poetry build
+
+</ul>
+
+<div id="Migrating Projects-🚀 Step 9 — Publish to PyPI (optional)"><h2 id="🚀 Step 9 — Publish to PyPI (optional)" class="header"><a href="#Migrating Projects-🚀 Step 9 — Publish to PyPI (optional)">🚀 Step 9 — Publish to PyPI (optional)</a></h2></div>
+
+<pre sh>
+uv publish
+</pre>
+
+<p>
+This replaces:
+</p>
+<ul>
+<li>
+twine upload
+
+</ul>
+
+
+<div id="Migrating Projects-🧹 Step 10 — Remove Old Tooling (optional but satisfying)"><h2 id="🧹 Step 10 — Remove Old Tooling (optional but satisfying)" class="header"><a href="#Migrating Projects-🧹 Step 10 — Remove Old Tooling (optional but satisfying)">🧹 Step 10 — Remove Old Tooling (optional but satisfying)</a></h2></div>
+
+<p>
+Depending on your project, you can now delete:
+</p>
+<ul>
+<li>
+.python-version (pyenv)
+
+<li>
+requirements.txt (if you want)
+
+<li>
+requirements.in
+
+<li>
+poetry.lock
+
+<li>
+Pipfile / Pipfile.lock
+
+<li>
+.venv/ (if you want uv to recreate it)
+
+<li>
+Any pip-tools scripts
+
+</ul>
+
+<p>
+Your project now runs on:
+</p>
+<ul>
+<li>
+pyproject.toml
+
+<li>
+uv.lock
+
+<li>
+.venv/
+
+</ul>
+
+<p>
+Clean, modern, and fast.
+</p>
+
+<div id="Migrating Projects-🎁 Bonus: A Minimal pyproject.toml After Migration"><h2 id="🎁 Bonus: A Minimal pyproject.toml After Migration" class="header"><a href="#Migrating Projects-🎁 Bonus: A Minimal pyproject.toml After Migration">🎁 Bonus: A Minimal pyproject.toml After Migration</a></h2></div>
+
+<p>
+uv keeps things simple:
+</p>
+<pre toml>
+[project]
+name = "myproject"
+version = "0.1.0"
+requires-python = "&gt;=3.11"
+dependencies = [
+    "requests",
+    "rich",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "ruff",
+    "black",
+]
+</pre>
+
+<p>
+uv doesn’t force a complex structure — it stays out of your way.
+</p>
+
+<div id="Migrating Projects-🏁 Final Summary: Migration in 10 Seconds"><h2 id="🏁 Final Summary: Migration in 10 Seconds" class="header"><a href="#Migrating Projects-🏁 Final Summary: Migration in 10 Seconds">🏁 Final Summary: Migration in 10 Seconds</a></h2></div>
+
+<pre sh>
+uv python install 3.11
+uv venv --python 3.11
+source .venv/bin/activate
+uv add --from-requirements requirements.txt   # or uv sync for pyproject
+uv add --dev pytest ruff black
+uv run src/myproject/main.py
+uv lock
+uv build
+uv publish
+</pre>
+
+<p>
+Your project is now fully uv‑powered.
+</p>
 
 <p>
 <a href="Python.html">Python</a>
