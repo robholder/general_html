@@ -211,6 +211,172 @@ stow -R &lt;folder_name&gt;
 This performs a Delete and an Install in one quick motion.
 </p>
 
+<div id="Adding Vim Configs"><h1 id="Adding Vim Configs" class="header"><a href="#Adding Vim Configs">Adding Vim Configs</a></h1></div>
+
+<p>
+To back up your Vim setup to a repo using Stow, the "gold standard" is to keep your configuration (the "brains") in Git, but let a plugin manager handle the heavy lifting of downloading the "paraphernalia" (the "brawn").
+</p>
+
+<div id="Adding Vim Configs-1. Structure your Dotfiles for Stow"><h3 id="1. Structure your Dotfiles for Stow" class="header"><a href="#Adding Vim Configs-1. Structure your Dotfiles for Stow">1. Structure your Dotfiles for Stow</a></h3></div>
+
+<p>
+Move your .vim directory into your ~/.dotfiles folder. To work with Stow, the internal structure must mimic your home directory:
+</p>
+
+<pre sh>
+~/.dotfiles/
+└── vim/
+    └── .vim/
+        ├── vimrc
+        ├── colors/
+        ├── snippets/
+        └── (Don't move 'plugged' or 'bundle' here yet!)
+</pre>
+
+<div id="Adding Vim Configs-2. The .gitignore Strategy (Omit the Bloat)"><h3 id="2. The .gitignore Strategy (Omit the Bloat)" class="header"><a href="#Adding Vim Configs-2. The .gitignore Strategy (Omit the Bloat)">2. The .gitignore Strategy (Omit the Bloat)</a></h3></div>
+
+<p>
+You are right—omitting plugins is essential. They take up space and are easily re-downloaded. Create a ~/.dotfiles/.gitignore file and add these:
+</p>
+
+<pre sh>
+# Ignore the actual plugin files
+.vim/plugged/
+.vim/bundle/
+.vim/pack/
+
+# Ignore swap and backup files
+*.swp
+*.swo
+.netrwhist
+
+# Ignore the undo and view history
+.vim/undo/
+.view/
+</pre>
+
+<div id="Adding Vim Configs-3. Use a Plugin Manager for &quot;One-Command&quot; Restore"><h3 id="3. Use a Plugin Manager for &quot;One-Command&quot; Restore" class="header"><a href="#Adding Vim Configs-3. Use a Plugin Manager for &quot;One-Command&quot; Restore">3. Use a Plugin Manager for "One-Command" Restore</a></h3></div>
+
+<p>
+In your vimrc, ensure you use something like vim-plug. This allows you to restore your entire setup on a new machine with just your vimrc and one command.
+</p>
+
+<p>
+Example vimrc block:
+</p>
+
+<pre vim>
+call plug#begin('~/.vim/plugged')
+Plug 'nordtheme/vim'
+" ... other plugins
+call plug#end()
+</pre>
+
+<div id="Adding Vim Configs-4. The Workflow to Backup"><h3 id="4. The Workflow to Backup" class="header"><a href="#Adding Vim Configs-4. The Workflow to Backup">4. The Workflow to Backup</a></h3></div>
+
+<p>
+Once your folder is structured:
+</p>
+<ul>
+<li>
+<span id="Adding Vim Configs-4. The Workflow to Backup-Initialize Git"></span><strong id="Initialize Git">Initialize Git</strong>: cd ~/.dotfiles &amp;&amp; git init
+
+<li>
+<span id="Adding Vim Configs-4. The Workflow to Backup-Stow it"></span><strong id="Stow it">Stow it</strong>: stow vim (This creates the link ~/.vim -&gt; ~/.dotfiles/vim/.vim)
+
+<li>
+<span id="Adding Vim Configs-4. The Workflow to Backup-Commit"></span><strong id="Commit">Commit</strong>: git add . &amp;&amp; git commit -m "Add Vim config"
+
+<li>
+<span id="Adding Vim Configs-4. The Workflow to Backup-Push"></span><strong id="Push">Push</strong>: Link to a private GitHub/GitLab repo.
+
+</ul>
+
+<div id="Adding Vim Configs-Why this is the best way:"><h3 id="Why this is the best way:" class="header"><a href="#Adding Vim Configs-Why this is the best way:">Why this is the best way:</a></h3></div>
+
+<ul>
+<li>
+<span id="Adding Vim Configs-Why this is the best way:-Portability"></span><strong id="Portability">Portability</strong>: On a new Mac, you just git clone, stow vim, and run :PlugInstall inside Vim.
+
+<li>
+<span id="Adding Vim Configs-Why this is the best way:-Cleanliness"></span><strong id="Cleanliness">Cleanliness</strong>: Your repo stays tiny (likely under 1MB) because it only contains your custom logic, not thousands of lines of third-party plugin code.
+
+<li>
+<span id="Adding Vim Configs-Why this is the best way:-Safety"></span><strong id="Safety">Safety</strong>: If a plugin update breaks your setup, you can just delete the plugged/ folder and run :PlugInstall to redownload them fresh.
+
+</ul>
+
+<table>
+<tr>
+<td>
+Do you want to see a minimal vimrc that handles the automatic installation of the plugin manager itself if it’s missing?
+</td>
+</tr>
+</table>
+
+<div id="Adding Vim Configs-Adding to the Vimrc"><h2 id="Adding to the Vimrc" class="header"><a href="#Adding Vim Configs-Adding to the Vimrc">Adding to the Vimrc</a></h2></div>
+
+<p>
+This snippet is a lifesaver for a portable setup. It checks if vim-plug exists; if not, it uses curl to download it and then tells Vim to run :PlugInstall automatically.
+Add this to the very top of your vimrc:
+</p>
+
+<pre vim>
+" 1. AUTO-INSTALL vim-plug if missing
+let data_dir = expand('~/.vim/autoload/plug.vim')
+if empty(glob(data_dir))
+  silent execute '!curl -fLo '.data_dir.' --create-dirs https://raw.githubusercontent.com'
+  autocmd VimEnter * PlugInstall --sync | source $MYVIMRC
+endif
+
+" 2. PLUGIN SECTION
+call plug#begin('~/.vim/plugged')
+
+" Appearance (Matches your WezTerm!)
+Plug 'nordtheme/vim'
+
+" Navigation &amp; Editing
+Plug 'tpope/vim-sensible'
+Plug 'preservim/nerdtree'
+Plug 'junegunn/fzf', { 'do': { -&gt; fzf#install() } }
+
+call plug#end()
+
+" 3. BASIC CONFIG
+syntax on
+colorscheme nord
+set number
+set relativenumber
+</pre>
+
+<div id="Adding Vim Configs-Adding to the Vimrc-Why this is the &quot;Gold Standard&quot; for your Dotfiles:"><h3 id="Why this is the &quot;Gold Standard&quot; for your Dotfiles:" class="header"><a href="#Adding Vim Configs-Adding to the Vimrc-Why this is the &quot;Gold Standard&quot; for your Dotfiles:">Why this is the "Gold Standard" for your Dotfiles:</a></h3></div>
+
+<ul>
+<li>
+<span id="Adding Vim Configs-Adding to the Vimrc-Why this is the &quot;Gold Standard&quot; for your Dotfiles:-Zero Manual Setup"></span><strong id="Zero Manual Setup">Zero Manual Setup</strong>: When you move to a new machine, you just stow vim and open Vim. It handles the rest.
+
+<li>
+<span id="Adding Vim Configs-Adding to the Vimrc-Why this is the &quot;Gold Standard&quot; for your Dotfiles:-Isolation"></span><strong id="Isolation">Isolation</strong>: By keeping plugins in ~/.vim/plugged, and ignoring that folder in Git, your repo stays tiny and clean [1].
+
+<li>
+<span id="Adding Vim Configs-Adding to the Vimrc-Why this is the &quot;Gold Standard&quot; for your Dotfiles:-Stow Friendly"></span><strong id="Stow Friendly">Stow Friendly</strong>: Since this script installs autoload/plug.vim directly into your ~/.vim folder (which is now a symlink to your dotfiles), the plugin manager itself becomes part of your tracked setup [1][2].
+
+</ul>
+
+<div id="Adding Vim Configs-Adding to the Vimrc-Why this is the &quot;Gold Standard&quot; for your Dotfiles:-A Pro-Tip for your .gitignore:"><h4 id="A Pro-Tip for your .gitignore:" class="header"><a href="#Adding Vim Configs-Adding to the Vimrc-Why this is the &quot;Gold Standard&quot; for your Dotfiles:-A Pro-Tip for your .gitignore:">A Pro-Tip for your .gitignore:</a></h4></div>
+
+<p>
+Since you're using GNU Stow, make sure your .gitignore in your ~/.dotfiles folder specifically ignores the undo and swap directories inside .vim so you don't accidentally commit your editing history [1][2].
+</p>
+
+<p>
+Does your Nord theme look consistent between WezTerm and Vim now, or do we need to tweak the Vim termguicolors?
+</p>
+
+<p>
+Next Step: Should we set up a Git alias to quickly "push" all your config changes with one command?
+</p>
+
 <p>
 <a href="unix_tools_index.html">Unix Tools</a>
 </p>
