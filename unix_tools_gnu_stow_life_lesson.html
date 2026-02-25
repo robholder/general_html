@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_gnu_stow_life_lesson</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="GNU Stow - A Life Lesson"><h1 id="GNU Stow - A Life Lesson" class="header"><a href="#GNU Stow - A Life Lesson">GNU Stow - A Life Lesson</a></h1></div>
+
+<table>
+<tr>
+<td>
+I want to use the --dotfiles flag with stow, so i've named some files and directories with the dot- prefix. I though perhaps, I could use this structure so that I could back this all to a git repo, and when cloned, run stow on each app's subdirectory as needed (wezterm, zshrc, etc.).
+</td>
+</tr>
+</table>
+
+<p>
+NOTE: The <code>--dotfiles</code> flat in <code>stow</code> interprets <code>dot-zshrc</code> as <code>.zshrc</code> when naming the symlink.
+</p>
+
+<div id="GNU Stow - A Life Lesson-QUESTION"><h2 id="QUESTION" class="header"><a href="#GNU Stow - A Life Lesson-QUESTION">QUESTION</a></h2></div>
+
+<p>
+...would this work?
+</p>
+
+<pre sh>
+dotfiles
+├── README.md
+├── robsaliases
+│   └── dot-robsaliases
+├── starship
+│   ├── gruvbox_rainbow.starship.toml
+│   ├── pastel_powerline.starship.toml
+│   ├── starship.toml
+│   └── tokyo_night.starship.toml
+├── vim
+│   └── dot-vim
+├── wezterm
+│   └── wezterm.lua
+└── zshrc
+    ├── dot-zprofile
+    └── dot-zshrc
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER"><h2 id="ANSWER" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Your structure can work with Stow’s --dotfiles mode — but a couple of tweaks will make it behave exactly the way you want.
+</p>
+
+<p>
+Let’s walk through what Stow expects, what your layout implies, and how to make it smooth and predictable.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-✅ How --dotfiles actually works"><h3 id="✅ How --dotfiles actually works" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-✅ How --dotfiles actually works">✅ How --dotfiles actually works</a></h3></div>
+
+<p>
+When you run:
+</p>
+
+<pre sh>
+stow --dotfiles &lt;package&gt;
+</pre>
+
+<p>
+Stow interprets any file or directory beginning with:
+</p>
+
+<pre sh>
+dot-&lt;name&gt;
+</pre>
+
+<p>
+...as something that should become:
+</p>
+
+<pre sh>
+.&lt;name&gt;
+</pre>
+
+<p>
+...in the target directory.
+</p>
+
+<p>
+So:
+</p>
+
+<pre sh>
+dot-zshrc     →   ~/.zshrc
+dot-vim       →   ~/.vim
+dot-robsaliases → ~/.robsaliases
+</pre>
+
+<p>
+This part of your plan is correct.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-📁 Your proposed structure (annotated)"><h3 id="📁 Your proposed structure (annotated)" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-📁 Your proposed structure (annotated)">📁 Your proposed structure (annotated)</a></h3></div>
+
+<pre sh>
+dotfiles
+├── README.md
+├── robsaliases
+│   └── dot-robsaliases        ✔ becomes ~/.robsaliases
+├── starship
+│   ├── gruvbox_rainbow.starship.toml
+│   ├── pastel_powerline.starship.toml
+│   ├── starship.toml          ✘ this will NOT become ~/.config/starship.toml
+│   └── tokyo_night.starship.toml
+├── vim
+│   └── dot-vim                ✔ becomes ~/.vim
+├── wezterm
+│   └── wezterm.lua            ✘ becomes ~/wezterm.lua (not ~/.config/wezterm/wezterm.lua)
+└── zshrc
+    ├── dot-zprofile           ✔ becomes ~/.zprofile
+    └── dot-zshrc              ✔ becomes ~/.zshrc
+</pre>
+
+<p>
+So far, the dot- prefixed items will work perfectly.
+</p>
+
+<p>
+But the Starship and WezTerm directories need a different layout if you want them to land in the correct XDG config paths.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-❗ The issue: Stow only mirrors your directory structure"><h3 id="❗ The issue: Stow only mirrors your directory structure" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-❗ The issue: Stow only mirrors your directory structure">❗ The issue: Stow only mirrors your directory structure</a></h3></div>
+
+<p>
+Stow does not magically know that:
+</p>
+<ul>
+<li>
+Starship config belongs in <code>~/.config/starship/starship.toml</code>
+
+<li>
+WezTerm config belongs in <code>~/.config/wezterm/wezterm.lua</code>
+
+</ul>
+<p>
+If you want Stow to place files there, your repo must mirror that structure.
+</p>
+
+
+<div id="GNU Stow - A Life Lesson-ANSWER-✅ Recommended layout for your repo"><h3 id="✅ Recommended layout for your repo" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-✅ Recommended layout for your repo">✅ Recommended layout for your repo</a></h3></div>
+
+<p>
+Here’s the version that will work exactly as intended:
+</p>
+
+<pre sh>
+dotfiles
+├── robsaliases
+│   └── dot-robsaliases
+├── starship
+│   └── .config
+│       └── starship
+│           ├── starship.toml
+│           ├── gruvbox_rainbow.starship.toml
+│           ├── pastel_powerline.starship.toml
+│           └── tokyo_night.starship.toml
+├── vim
+│   └── dot-vim
+├── wezterm
+│   └── .config
+│       └── wezterm
+│           └── wezterm.lua
+└── zshrc
+    ├── dot-zprofile
+    └── dot-zshrc
+</pre>
+
+<p>
+Then you run:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ starship
+stow --dotfiles -t ~ wezterm
+stow --dotfiles -t ~ zshrc
+stow --dotfiles -t ~ vim
+stow --dotfiles -t ~ robsaliases
+</pre>
+
+<p>
+This produces:
+</p>
+
+<pre sh>
+~/.config/starship/starship.toml
+~/.config/wezterm/wezterm.lua
+~/.zshrc
+~/.zprofile
+~/.vim
+~/.robsaliases
+</pre>
+
+<p>
+Exactly what you want.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🧠 Why this works"><h3 id="🧠 Why this works" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🧠 Why this works">🧠 Why this works</a></h3></div>
+
+<p>
+Stow simply:
+</p>
+<ul>
+<li>
+Takes the directory you give it (e.g., starship/)
+
+<li>
+Mirrors its internal structure into the target directory
+
+<li>
+Applies the dot- → . transformation if --dotfiles is used
+
+</ul>
+<p>
+So the key is: your repo must reflect the final desired directory layout.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-👍 Final verdict"><h3 id="👍 Final verdict" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-👍 Final verdict">👍 Final verdict</a></h3></div>
+
+<ul>
+<li>
+✔ Yes, your idea works
+
+<li>
+✘ But Starship and WezTerm need directory restructuring
+
+<li>
+✔ Everything with dot- will behave correctly
+
+<li>
+✔ This setup is perfect for a Git-backed dotfiles repo
+
+<li>
+✔ Running Stow per‑app is exactly how many people manage modular dotfiles
+
+</ul>
+<p>
+If you want, I can help you reorganize your repo cleanly or generate a script that automatically stows everything on a new machine.
+</p>
+
+<div id="GNU Stow - A Life Lesson-QUESTION"><h2 id="QUESTION" class="header"><a href="#GNU Stow - A Life Lesson-QUESTION">QUESTION</a></h2></div>
+
+<p>
+From where in the structure would you run Stow from?
+</p>
+
+<p>
+Like this:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ starship
+stow --dotfiles -t ~ wezterm
+stow --dotfiles -t ~ zshrc
+stow --dotfiles -t ~ vim
+stow --dotfiles -t ~ robsaliases
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER"><h2 id="ANSWER" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You always run stow from the top‑level directory that contains all your packages — in your case, the dotfiles/ directory.
+</p>
+
+<p>
+That’s the whole design of Stow: the directory you run it from becomes the “stow directory,” and each subdirectory becomes a package.
+</p>
+
+<p>
+So with your structure:
+</p>
+
+<pre sh>
+dotfiles/
+├── robsaliases/
+├── starship/
+├── vim/
+├── wezterm/
+└── zshrc/
+</pre>
+
+<p>
+...you should run:
+</p>
+  
+<pre sh>
+cd ~/dotfiles
+stow --dotfiles -t ~ starship
+stow --dotfiles -t ~ wezterm
+stow --dotfiles -t ~ zshrc
+stow --dotfiles -t ~ vim
+stow --dotfiles -t ~ robsaliases
+</pre>
+
+<p>
+Running Stow inside a package directory (e.g., inside starship/) will cause the exact problem you saw earlier — symlinks ending up one directory above where you want them.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-Why this works"><h4 id="Why this works" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-Why this works">Why this works</a></h4></div>
+
+<p>
+When you run:
+</p>
+
+<pre sh>
+cd ~/dotfiles
+stow --dotfiles -t ~ starship
+</pre>
+
+<p>
+Stow interprets:
+</p>
+<ul>
+<li>
+stow directory → ~/dotfiles
+
+<li>
+package → starship/
+
+<li>
+target → ~
+
+</ul>
+<p>
+So it mirrors the structure of:
+</p>
+
+<pre sh>
+dotfiles/starship/
+</pre>
+
+<p>
+...into:
+</p>
+
+<pre sh>
+$HOME/
+</pre>
+
+<p>
+...with <code>dot-</code> prefixes converted to leading dots.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-Quick mental model"><h3 id="Quick mental model" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-Quick mental model">Quick mental model</a></h3></div>
+
+<ul>
+<li>
+Run Stow from the parent directory of your packages.
+
+<li>
+Each subdirectory is a package.
+
+<li>
+Use -t ~ to force installation into your home directory.
+
+<li>
+Use --dotfiles to convert dot-foo → .foo.
+
+</ul>
+<p>
+This keeps everything predictable and clean.
+</p>
+
+<div id="GNU Stow - A Life Lesson-QUESTION"><h2 id="QUESTION" class="header"><a href="#GNU Stow - A Life Lesson-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Would this structure work when running 'stow' with the '--dotfiles' flag? (I've changed the .config dirs to dot-config):
+</p>
+
+<pre sh>
+dotfiles
+├── robsaliases
+│   └── dot-robsaliases
+├── starship
+│   └── dot-config
+│       └── starship
+│           ├── starship.toml
+│           ├── gruvbox_rainbow.starship.toml
+│           ├── pastel_powerline.starship.toml
+│           └── tokyo_night.starship.toml
+├── vim
+│   └── dot-vim
+├── wezterm
+│   └── dot-config
+│       └── wezterm
+│           └── wezterm.lua
+└── zshrc
+    ├── dot-zprofile
+    └── dot-zshrc
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER"><h2 id="ANSWER" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes — that structure will work correctly with stow --dotfiles, and it will produce exactly the paths you want, as long as you run Stow from the top‑level dotfiles/ directory.
+</p>
+
+<p>
+Let’s walk through it clearly so you know exactly what Stow will do.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-✅ Your proposed structure (with dot-config)"><h3 id="✅ Your proposed structure (with dot-config)" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-✅ Your proposed structure (with dot-config)">✅ Your proposed structure (with dot-config)</a></h3></div>
+
+<pre sh>
+dotfiles
+├── robsaliases
+│   └── dot-robsaliases
+├── starship
+│   └── dot-config
+│       └── starship
+│           ├── starship.toml
+│           ├── gruvbox_rainbow.starship.toml
+│           ├── pastel_powerline.starship.toml
+│           └── tokyo_night.starship.toml
+├── vim
+│   └── dot-vim
+├── wezterm
+│   └── dot-config
+│       └── wezterm
+│           └── wezterm.lua
+└── zshrc
+    ├── dot-zprofile
+    └── dot-zshrc
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🎯 What Stow will produce with --dotfiles -t ~"><h3 id="🎯 What Stow will produce with --dotfiles -t ~" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🎯 What Stow will produce with --dotfiles -t ~">🎯 What Stow will produce with --dotfiles -t ~</a></h3></div>
+
+<p>
+Running:
+</p>
+
+<pre sh>
+cd ~/dotfiles
+stow --dotfiles -t ~ starship
+</pre>
+
+<p>
+...will create:
+</p>
+
+<pre sh>
+~/.config/starship/starship.toml
+~/.config/starship/gruvbox_rainbow.starship.toml
+~/.config/starship/pastel_powerline.starship.toml
+~/.config/starship/tokyo_night.starship.toml
+</pre>
+
+<p>
+Because:
+</p>
+
+<ul>
+<li>
+dot-config → .config
+
+<li>
+Everything inside mirrors into ~/.config/...
+
+</ul>
+<p>
+Likewise:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ wezterm
+</pre>
+
+<p>
+creates:
+</p>
+
+<pre sh>
+~/.config/wezterm/wezterm.lua
+</pre>
+
+<p>
+And:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ zshrc
+</pre>
+
+
+<p>
+creates:
+</p>
+
+<pre sh>
+~/.zshrc
+~/.zprofile
+</pre>
+
+<p>
+And:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ vim
+</pre>
+
+<p>
+creates:
+</p>
+
+<pre sh>
+~/.vim
+</pre>
+
+<p>
+And:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ robsaliases
+</pre>
+
+<p>
+creates:
+</p>
+
+<pre sh>
+~/.robsaliases
+</pre>
+
+<p>
+Everything lines up perfectly.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🧠 Why this works"><h3 id="🧠 Why this works" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🧠 Why this works">🧠 Why this works</a></h3></div>
+
+<p>
+<code>--dotfiles</code> tells Stow:
+</p>
+
+<ul>
+<li>
+Any file or directory beginning with dot- should become a hidden file/directory (leading .) in the target.
+
+</ul>
+<p>
+So:
+</p>
+
+<pre sh>
+dot-config → ~/.config
+dot-vim → ~/.vim
+dot-zshrc → ~/.zshrc
+</pre>
+
+<p>
+And because Stow mirrors directory structure exactly, your nested layout under dot-config becomes the correct XDG paths.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🏁 Final verdict"><h3 id="🏁 Final verdict" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🏁 Final verdict">🏁 Final verdict</a></h3></div>
+
+<ul>
+<li>
+✔ Yes — your structure is valid
+
+<li>
+✔ Yes — it will install into the correct XDG config paths
+
+<li>
+✔ Yes — it works cleanly with --dotfiles
+
+<li>
+✔ Yes — it’s ideal for a Git‑backed dotfiles repo
+
+</ul>
+<p>
+You’ve built a clean, modular, future‑proof Stow setup.
+</p>
+
+<div id="GNU Stow - A Life Lesson-QUESTION"><h2 id="QUESTION" class="header"><a href="#GNU Stow - A Life Lesson-QUESTION">QUESTION</a></h2></div>
+
+<p>
+When I tried a wezterm setup as follows (inside a directory in the home directory called dotfiles):
+</p>
+
+<pre sh>
+&gt;cd ~/dotfiles
+
+&gt;eza -Ta 
+
+wezterm
+└── dot-config
+    └── wezterm
+        └── wezterm.lua
+</pre>
+
+<p>
+...and ran
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ wezterm
+</pre>
+
+
+<p>
+I got this:
+</p>
+ 
+<pre sh>
+ .config -&gt; dotfiles/wezterm/dot-config/
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER"><h2 id="ANSWER" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You actually uncovered a very normal Stow behavior — and the good news is nothing is “wrong” with your setup. What you’re seeing happens because of how Stow treats directories when using --dotfiles.
+</p>
+
+<p>
+Let me walk you through exactly why you got:
+</p>
+
+<pre sh>
+.config -&gt; dotfiles/wezterm/dot-config/
+</pre>
+
+<p>
+...instead of the nested structure you expected.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-✅ Why Stow created a symlink to .config instead of .config/wezterm/wezterm.lua"><h3 id="✅ Why Stow created a symlink to .config instead of .config/wezterm/wezterm.lua" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-✅ Why Stow created a symlink to .config instead of .config/wezterm/wezterm.lua">✅ Why Stow created a symlink to .config instead of .config/wezterm/wezterm.lua</a></h3></div>
+
+<p>
+Your structure:
+</p>
+
+<pre sh>
+dotfiles/
+└── wezterm/
+    └── dot-config/
+        └── wezterm/
+            └── wezterm.lua
+</pre>
+
+<p>
+When you run:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ wezterm
+</pre>
+
+<p>
+Stow sees:
+</p>
+<ul>
+<li>
+A package named wezterm
+
+<li>
+Inside it, a top‑level directory named dot-config
+
+</ul>
+<p>
+Because of --dotfiles, Stow rewrites:
+</p>
+
+<pre sh>
+dot-config → .config
+</pre>
+
+<p>
+And since <code>.config</code> is the top-level item inside the package, Stow creates a single symlink:
+</p>
+
+<pre sh>
+~/.config → dotfiles/wezterm/dot-config
+</pre>
+
+<p>
+This is expected behavior.
+</p>
+
+<p>
+Stow only creates nested symlinks when the top-level directory already exists in the target.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🧠 Why this happens"><h3 id="🧠 Why this happens" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🧠 Why this happens">🧠 Why this happens</a></h3></div>
+
+<p>
+Stow has two modes of operation:
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🧠 Why this happens-1. If the target directory does NOT exist"><h4 id="1. If the target directory does NOT exist" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🧠 Why this happens-1. If the target directory does NOT exist">1. If the target directory does NOT exist</a></h4></div>
+
+<p>
+Stow creates a single symlink to the entire directory.
+</p>
+
+<p>
+Example:
+</p>
+
+<pre sh>
+~/.config does NOT exist
+</pre>
+
+<p>
+Then Stow does:
+</p>
+
+<pre sh>
+ln -s dotfiles/wezterm/dot-config ~/.config
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🧠 Why this happens-2. If the target directory DOES exist"><h4 id="2. If the target directory DOES exist" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🧠 Why this happens-2. If the target directory DOES exist">2. If the target directory DOES exist</a></h4></div>
+
+<p>
+Stow creates individual symlinks inside it.
+</p>
+
+<p>
+Example:
+</p>
+
+<pre sh>
+mkdir -p ~/.config
+</pre>
+
+<p>
+Then run:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ wezterm
+</pre>
+
+<p>
+Now Stow will create:
+</p>
+
+<pre sh>
+~/.config/wezterm → dotfiles/wezterm/dot-config/wezterm
+</pre>
+
+<p>
+And inside that:
+</p>
+
+<pre sh>
+~/.config/wezterm/wezterm.lua → dotfiles/.../wezterm.lua
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🎯 The fix: ensure ~/.config exists before running Stow"><h3 id="🎯 The fix: ensure ~/.config exists before running Stow" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🎯 The fix: ensure ~/.config exists before running Stow">🎯 The fix: ensure ~/.config exists before running Stow</a></h3></div>
+
+<p>
+Just create the directory:
+</p>
+
+<pre sh>
+mkdir -p ~/.config
+</pre>
+
+<p>
+Then re-run:
+</p>
+
+<pre sh>
+stow --dotfiles -t ~ wezterm
+</pre>
+
+<p>
+Now you’ll get the structure you intended:
+</p>
+
+<pre sh>
+~/.config/wezterm/wezterm.lua
+</pre>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-🧩 Why this is the correct approach"><h3 id="🧩 Why this is the correct approach" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-🧩 Why this is the correct approach">🧩 Why this is the correct approach</a></h3></div>
+
+<p>
+Stow is designed to:
+</p>
+<ul>
+<li>
+Symlink whole directories when the target doesn’t exist
+
+<li>
+Populate existing directories when they do
+
+</ul>
+<p>
+This prevents Stow from accidentally overwriting or replacing important directories.
+</p>
+
+<div id="GNU Stow - A Life Lesson-ANSWER-👍 Final answer"><h3 id="👍 Final answer" class="header"><a href="#GNU Stow - A Life Lesson-ANSWER-👍 Final answer">👍 Final answer</a></h3></div>
+
+<p>
+Yes — your structure is correct.
+</p>
+
+<p>
+You just need to ensure the target directory exists:
+</p>
+
+<pre sh>
+mkdir -p ~/.config
+stow --dotfiles -t ~ wezterm
+</pre>
+
+<p>
+Then Stow will place:
+</p>
+
+<pre sh>
+~/.config/wezterm/wezterm.lua
+</pre>
+
+<p>
+...instead of symlinking <code>.config</code> itself.
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
