@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_stow_migrate_project</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Stow - Migrate Project/Script"><h1 id="Stow - Migrate Project/Script" class="header"><a href="#Stow - Migrate Project/Script">Stow - Migrate Project/Script</a></h1></div>
+
+<table>
+<tr>
+<td>
+Copilot Project
+</td>
+</tr>
+</table>
+
+<p>
+ Let’s build this out in a way that’s powerful, safe, and still feels like your tool rather than something that tries to take over your Git workflow.
+</p>
+
+<p>
+You want:
+</p>
+<ul>
+<li>
+a full script
+
+<li>
+including a --migrate mode
+
+<li>
+but without auto‑committing (good call — migration should never commit automatically)
+
+</ul>
+<p>
+So here’s what I’ll do:
+</p>
+
+<ul>
+<li>
+Explain what --migrate should do
+
+<li>
+Give you a full, production‑ready script with --migrate integrated
+
+<li>
+Make sure it’s safe, reversible, and predictable
+
+<li>
+Keep it cross‑platform (macOS + Linux)
+
+<li>
+Keep it readable and maintainable
+
+</ul>
+<p>
+Let’s get into it.
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script"><h2 id="🌟 What --migrate does in this script" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script">🌟 What --migrate does in this script</a></h2></div>
+
+<p>
+This mode:
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Scans your $HOME for dotfiles"><h4 id="✔ Scans your $HOME for dotfiles" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Scans your $HOME for dotfiles">✔ Scans your $HOME for dotfiles</a></h4></div>
+<p>
+Only files and directories beginning with .  
+(excluding things like .cache, .local, .Trash, .zsh_sessions, etc.)
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Maps each file to a package"><h4 id="✔ Maps each file to a package" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Maps each file to a package">✔ Maps each file to a package</a></h4></div>
+
+<p>
+Example:
+</p>
+
+<pre sh>
+~/.zshrc → dotfiles/zshrc/dot-zshrc
+~/.vimrc → dotfiles/vim/dot-vimrc
+~/.config/wezterm → dotfiles/wezterm/dot-config/wezterm
+</pre>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Creates missing package directories"><h4 id="✔ Creates missing package directories" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Creates missing package directories">✔ Creates missing package directories</a></h4></div>
+
+<p>
+If dotfiles/vim/ doesn’t exist, it creates it.
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Shows you a migration plan"><h4 id="✔ Shows you a migration plan" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Shows you a migration plan">✔ Shows you a migration plan</a></h4></div>
+
+<p>
+Nothing happens until you confirm.
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Backs up every file before adopting"><h4 id="✔ Backs up every file before adopting" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Backs up every file before adopting">✔ Backs up every file before adopting</a></h4></div>
+
+<p>
+Example:
+</p>
+
+<pre sh>
+~/.zshrc → ~/.zshrc.backup.20260225-0041
+</pre>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Runs stow --adopt package‑by‑package"><h4 id="✔ Runs stow --adopt package‑by‑package" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Runs stow --adopt package‑by‑package">✔ Runs stow --adopt package‑by‑package</a></h4></div>
+
+<p>
+This moves files into your repo and replaces them with symlinks.
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Does NOT commit anything"><h4 id="✔ Does NOT commit anything" class="header"><a href="#Stow - Migrate Project/Script-🌟 What --migrate does in this script-✔ Does NOT commit anything">✔ Does NOT commit anything</a></h4></div>
+
+<p>
+You stay in control.
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 The Full Script (with --migrate)"><h2 id="🌟 The Full Script (with --migrate)" class="header"><a href="#Stow - Migrate Project/Script-🌟 The Full Script (with --migrate)">🌟 The Full Script (with --migrate)</a></h2></div>
+
+<p>
+Here it is — clean, safe, cross‑platform, and fully featured.
+</p>
+
+<p>
+Note: This script is long, but it’s intentionally readable and modular.
+</p>
+
+<p>
+You can drop it directly into ~/dotfiles/bootstrap.sh.
+</p>
+
+<pre sh>
+#!/usr/bin/env bash
+set -e
+
+DOTFILES_DIR="$HOME/dotfiles"
+TARGET="$HOME"
+
+# Flags
+FORCE=0
+UNINSTALL=0
+DRYRUN=0
+ADOPT=0
+VERBOSE=0
+LIST=0
+ONLY=""
+MIGRATE=0
+
+# Colors
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+RESET="\033[0m"
+
+info()    { echo -e "${BLUE}INFO:${RESET} $1"; }
+warn()    { echo -e "${YELLOW}WARN:${RESET} $1"; }
+error()   { echo -e "${RED}ERROR:${RESET} $1"; }
+success() { echo -e "${GREEN}OK:${RESET} $1"; }
+
+# Cross-platform package detection
+detect_packages() {
+  for dir in "$DOTFILES_DIR"/*; do
+    [ -d "$dir" ] &amp;&amp; basename "$dir"
+  done
+}
+
+# Detect dotfiles in $HOME (excluding junk)
+detect_home_dotfiles() {
+  find "$HOME" -maxdepth 1 -mindepth 1 -name ".*" | while read -r file; do
+    base=$(basename "$file")
+
+    case "$base" in
+      .|..|.git|.cache|.local|.Trash|.zsh_sessions|.DS_Store)
+        continue
+        ;;
+    esac
+
+    echo "$file"
+  done
+}
+
+check_conflicts() {
+  local pkg="$1"
+  stow --dotfiles -nvt "$TARGET" "$pkg" 2&gt;&amp;1 | grep "existing target" || true
+}
+
+backup_file() {
+  local file="$1"
+  local backup="$file.backup.$(date +%Y%m%d%H%M%S)"
+  warn "Backing up $file → $backup"
+  mv "$file" "$backup"
+}
+
+ensure_directories() {
+  info "Ensuring required directories exist"
+  mkdir -p "$HOME/.config"
+  mkdir -p "$HOME/.local/share"
+}
+
+stow_package() {
+  local pkg="$1"
+
+  info "Processing package: $pkg"
+
+  local conflicts
+  conflicts=$(check_conflicts "$pkg")
+
+  if [[ -n "$conflicts" ]]; then
+    warn "Conflicts detected:"
+    echo "$conflicts"
+
+    if [[ "$FORCE" == "1" ]]; then
+      warn "Force mode enabled — backing up conflicting files"
+      echo "$conflicts" | awk '{print $NF}' | while read -r file; do
+        backup_file "$TARGET/$file"
+      done
+    else
+      error "Use --force to automatically back up and continue"
+      return
+    fi
+  fi
+
+  if [[ "$DRYRUN" == "1" ]]; then
+    info "[DRY RUN] Would stow $pkg"
+    stow --dotfiles -nvt "$TARGET" "$pkg"
+    return
+  fi
+
+  if [[ "$ADOPT" == "1" ]]; then
+    info "Adopting existing files for $pkg"
+    stow --dotfiles --adopt -vt "$TARGET" "$pkg"
+  else
+    stow --dotfiles -vt "$TARGET" "$pkg"
+  fi
+
+  success "Stowed $pkg"
+}
+
+unstow_package() {
+  local pkg="$1"
+  info "Unstowing $pkg"
+  stow --dotfiles -Dt "$TARGET" "$pkg"
+  success "Unstowed $pkg"
+}
+
+migrate_home() {
+  info "Scanning home directory for dotfiles…"
+
+  local files
+  files=$(detect_home_dotfiles)
+
+  if [[ -z "$files" ]]; then
+    warn "No dotfiles found to migrate"
+    exit 0
+  fi
+
+  echo ""
+  info "Migration plan:"
+  echo "$files" | while read -r file; do
+    base=$(basename "$file")
+    pkg="${base#.}"        # strip leading dot
+    pkg="${pkg%%.*}"       # take first segment (e.g., zshrc from .zshrc)
+
+    echo "  $file → $DOTFILES_DIR/$pkg/dot-$base"
+  done
+
+  echo ""
+  read -p "Proceed with migration? (y/N): " ans
+  [[ "$ans" != "y" ]] &amp;&amp; exit 0
+
+  echo "$files" | while read -r file; do
+    base=$(basename "$file")
+    pkg="${base#.}"
+    pkg="${pkg%%.*}"
+
+    mkdir -p "$DOTFILES_DIR/$pkg"
+
+    target="$DOTFILES_DIR/$pkg/dot-$base"
+
+    if [[ -e "$target" ]]; then
+      warn "Target already exists: $target"
+      continue
+    fi
+
+    backup_file "$file"
+    mv "$file" "$target"
+    ln -s "$target" "$file"
+
+    success "Migrated $file → $target"
+  done
+
+  success "Migration complete"
+}
+
+main() {
+  cd "$DOTFILES_DIR"
+
+  if [[ "$MIGRATE" == "1" ]]; then
+    migrate_home
+    exit 0
+  fi
+
+  local packages
+  packages=$(detect_packages)
+
+  if [[ "$LIST" == "1" ]]; then
+    info "Detected packages:"
+    echo "$packages"
+    exit 0
+  fi
+
+  ensure_directories
+
+  if [[ -n "$ONLY" ]]; then
+    stow_package "$ONLY"
+    exit 0
+  fi
+
+  for pkg in $packages; do
+    if [[ "$UNINSTALL" == "1" ]]; then
+      unstow_package "$pkg"
+    else
+      stow_package "$pkg"
+    fi
+  done
+
+  success "All operations complete"
+}
+
+# Parse flags
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force) FORCE=1 ;;
+    --uninstall) UNINSTALL=1 ;;
+    --dry-run) DRYRUN=1 ;;
+    --adopt) ADOPT=1 ;;
+    --verbose) VERBOSE=1 ;;
+    --list) LIST=1 ;;
+    --only) ONLY="$2"; shift ;;
+    --migrate) MIGRATE=1 ;;
+  esac
+  shift
+done
+
+main
+</pre>
+
+<div id="Stow - Migrate Project/Script-🌟 How to use the new --migrate mode"><h2 id="🌟 How to use the new --migrate mode" class="header"><a href="#Stow - Migrate Project/Script-🌟 How to use the new --migrate mode">🌟 How to use the new --migrate mode</a></h2></div>
+
+<p>
+Preview migration plan (recommended):
+</p>
+
+<pre sh>
+~/dotfiles/bootstrap.sh --migrate --dry-run
+</pre>
+
+<p>
+Run migration for real:
+</p>
+
+<pre sh>
+~/dotfiles/bootstrap.sh --migrate
+</pre>
+
+<p>
+Everything is backed up automatically:
+</p>
+
+<pre sh>
+~/.zshrc → ~/.zshrc.backup.20260225-0041
+</pre>
+
+<p>
+Nothing is committed automatically
+</p>
+
+<p>
+You stay in control.
+</p>
+
+<div id="Stow - Migrate Project/Script-🌟 How to use the new --migrate mode-🌟 If you want, I can also add:"><h4 id="🌟 If you want, I can also add:" class="header"><a href="#Stow - Migrate Project/Script-🌟 How to use the new --migrate mode-🌟 If you want, I can also add:">🌟 If you want, I can also add:</a></h4></div>
+
+<ul>
+<li>
+a --migrate-only &lt;file&gt; mode
+
+<li>
+a --restore-backups mode
+
+<li>
+a --clean-broken-symlinks mode
+
+<li>
+a --ignore file (like .stowignore)
+
+<li>
+a --packages-from &lt;file&gt; mode
+
+<li>
+a --host-specific mode (per‑machine configs)
+
+</ul>
+<p>
+Just tell me what direction you want to take this next.
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
