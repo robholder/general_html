@@ -1917,9 +1917,12 @@ migrate_home() {
 
   info "Scanning home directory for dotfiles…"
 
-  mapfile -t files &lt; &lt;(detect_home_dotfiles)
+  files=()
+  while IFS= read -r file; do
+    files+=("$file")
+  done &lt; &lt;(detect_home_dotfiles)
 
-  if [[ ${#files[@]} -eq 0 ]]; then
+  if [ ${#files[@]} -eq 0 ]; then
     warn "No dotfiles found to migrate"
     exit 0
   fi
@@ -1992,12 +1995,22 @@ main() {
     exit 0
   fi
 
-  local packages
-  packages=$(detect_packages)
+  # Load packages into an array (portable version)
+  packages=()
+  while IFS= read -r pkg; do
+    packages+=("$pkg")
+  done &lt; &lt;(detect_packages)
+
+  # Feedback when no packages exist
+  if [ ${#packages[@]} -eq 0 ]; then
+    warn "No packages found in $DOTFILES_DIR"
+    info "Create a package directory (e.g., mkdir zshrc) and try again."
+    exit 0
+  fi
 
   if [[ "$LIST" == "1" ]]; then
     info "Detected packages:"
-    echo "$packages"
+    printf '%s\n' "${packages[@]}"
     exit 0
   fi
 
@@ -2008,7 +2021,7 @@ main() {
     exit 0
   fi
 
-  for pkg in $packages; do
+  for pkg in "${packages[@]}"; do
     if [[ "$UNINSTALL" == "1" ]]; then
       unstow_package "$pkg"
     else
@@ -2196,6 +2209,11 @@ dot-vimrc     → ~/.vimrc
 dot-config/... → ~/.config/...
 </pre>
 
+<p>
+The script treats the directory it is run from as the dotfiles root.
+Do not place bootstrap.sh in \(HOME or run it from \)HOME.
+</p>
+
 <div id="Next Step-README.md-🚀 Getting Started"><h3 id="🚀 Getting Started" class="header"><a href="#Next Step-README.md-🚀 Getting Started">🚀 Getting Started</a></h3></div>
 
 <p>
@@ -2207,6 +2225,11 @@ mkdir ~/mydotfiles
 cd ~/mydotfiles
 cp /path/to/bootstrap.sh .
 </pre>
+
+<p>
+Note: The script will refuse to run if executed directly from $HOME.
+Always run it inside a dedicated dotfiles directory.
+</p>
 
 <p>
 Run the script:
@@ -2675,6 +2698,9 @@ DESCRIPTION
     built around GNU Stow. It treats the current working directory
     as the dotfiles root and provides interactive migration,
     automatic backups, and dry‑run behavior by default.
+    
+    bootstrap refuses to run if invoked from $HOME to prevent accidental
+    migration or stowing of the entire home directory.
 
     No changes are made unless --apply is specified.
 
@@ -2758,7 +2784,7 @@ If you want, I can also generate:
 a CHANGELOG.md
 
 <li>
-a CONTRIBUTING.md
+a <a href="CONTRIBUTING.md.html">CONTRIBUTING.md</a>
 
 <li>
 a sample .migrateignore
