@@ -23,20 +23,19 @@
 #!/usr/bin/env bash
 set -e
 
-DOTFILES_DIR="$(pwd)"
+DOTFILES_DIR="$HOME/dotfiles"
 TARGET="$HOME"
 
-if [[ "$DOTFILES_DIR" == "$HOME" ]]; then
-  echo "ERROR: Refusing to run from \$HOME. Create a dotfiles directory first."
-  exit 1
-fi
-
-APPLY=0
+# Flags
+FORCE=0
 UNINSTALL=0
+DRYRUN=1
 ADOPT=0
+VERBOSE=0
 LIST=0
 ONLY=""
 
+# Colors
 RED="\033[0;31m"
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
@@ -48,6 +47,21 @@ warn()    { echo -e "${YELLOW}WARN:${RESET} $1"; }
 error()   { echo -e "${RED}ERROR:${RESET} $1"; }
 success() { echo -e "${GREEN}OK:${RESET} $1"; }
 
+# Cross-platform package detection (no GNU find)
+detect_packages() {
+  for dir in "$DOTFILES_DIR"/*; do
+    # Only treat as a package if it's a directory AND not the .git folder
+    if [[ -d "$dir" &amp;&amp; "$(basename "$dir")" != ".git" ]]; then
+      basename "$dir"
+    fi
+  done
+}
+
+check_conflicts() {
+  local pkg="$1"
+  stow --dotfiles -nvt "$TARGET" "$pkg" 2&gt;&amp;1 | grep "existing target" || true
+}
+
 backup_file() {
   local file="$1"
   local backup="$file.backup.$(date +%Y%m%d%H%M%S)"
@@ -55,232 +69,65 @@ backup_file() {
   mv "$file" "$backup"
 }
 
-detect_packages() {
-  for dir in "$DOTFILES_DIR"/*; do
-    [ -d "$dir" ] &amp;&amp; basename "$dir"
-  done
-}
-
 ensure_directories() {
+  info "Ensuring required directories exist"
   mkdir -p "$HOME/.config"
   mkdir -p "$HOME/.local/share"
 }
 
-infer_home_files_for_package() {
-  local pkg="$1"
-  find "$HOME" -maxdepth 1 -mindepth 1 -name ".*" | while read -r file; do
-    local base clean
-    base="$(basename "$file")"
-    clean="${base#.}"
-    if [[ "$clean" == "$pkg"* ]]; then
-      echo "$file"
-    fi
-  done
-}
-
-list_existing_dotfiles_in_package() {
-  local pkg="$1"
-  local pkgdir="$DOTFILES_DIR/$pkg"
-  if [[ -d "$pkgdir" ]]; then
-    find "$pkgdir" -type f -name "dot-*"
-  fi
-}
-
-prompt_selection() {
-  local files_var="$1"
-  eval "local files=(\"\${${files_var}[@]}\")"
-
-  local selection
-
-  if [ ${#files[@]} -eq 0 ]; then
-    info "No matching home files found."
-    read -r -p "Press Enter to continue (default: none): " selection
-    echo ""
-    SELECTED_INDEXES=()
-    return
-  fi
-
-  info "Home files matching this package:"
-  local i=1
-  for f in "${files[@]}"; do
-    echo "  [$i] $f"
-    i=$((i+1))
-  done
-  echo ""
-
-  read -r -p "Select items to include (e.g. \"1 3\", \"all\", or \"none\"; default: none): " selection
-  echo ""
-
-  if [[ -z "$selection" || "$selection" == "none" ]]; then
-    SELECTED_INDEXES=()
-    return
-  fi
-
-  if [[ "$selection" == "all" ]]; then
-    SELECTED_INDEXES=()
-    for ((j=1; j&lt;=${#files[@]}; j++)); do
-      SELECTED_INDEXES+=("$j")
-    done
-    return
-  fi
-
-  SELECTED_INDEXES=()
-  for token in $selection; do
-    if [[ "$token" =~ ^[0-9]+$ ]] &amp;&amp; (( token &gt;= 1 &amp;&amp; token &lt;= ${#files[@]} )); then
-      SELECTED_INDEXES+=("$token")
-    else
-      warn "Ignoring invalid selection: $token"
-    fi
-  done
-}
-
-build_selected_files() {
-  local files_var="$1"
-  local out_var="$2"
-
-  eval "local files=(\"\${${files_var}[@]}\")"
-  local out=()
-
-  for idx in "${SELECTED_INDEXES[@]}"; do
-    out+=("${files[$((idx-1))]}")
-  done
-
-  eval "$out_var=(\"\${out[@]}\")"
-}
-
-preview_grouped() {
-  local pkg="$1"
-  local existing_var="$2"
-  local selected_var="$3"
-
-  eval "local existing=(\"\${${existing_var}[@]}\")"
-  eval "local selected=(\"\${${selected_var}[@]}\")"
-
-  local pkgdir="$DOTFILES_DIR/$pkg"
-
-  info "[DRY RUN] Would stow $pkg"
-  echo ""
-
-  echo "Existing dotfiles in package (auto-included):"
-  if [ ${#existing[@]} -eq 0 ]; then
-    echo "  (none)"
-  else
-    for f in "${existing[@]}"; do
-      echo "  ${f#$pkgdir/}"
-    done
-  fi
-  echo ""
-
-  echo "New symlinks to create:"
-  if [ ${#selected[@]} -eq 0 ]; then
-    echo "  (none)"
-  else
-    local file base clean target
-    for file in "${selected[@]}"; do
-      base="$(basename "$file")"
-      clean="${base#.}"
-      target="$pkgdir/dot-$clean"
-      echo "  $file → $target"
-    done
-  fi
-  echo ""
-}
-
-apply_selected_files() {
-  local pkg="$1"
-  local selected_var="$2"
-
-  eval "local selected=(\"\${${selected_var}[@]}\")"
-
-  local pkgdir="$DOTFILES_DIR/$pkg"
-  mkdir -p "$pkgdir"
-
-  local file base clean target
-  for file in "${selected[@]}"; do
-    base="$(basename "$file")"
-    clean="${base#.}"
-    target="$pkgdir/dot-$clean"
-    mkdir -p "$(dirname "$target")"
-    backup_file "$file"
-    mv "$file" "$target"
-    ln -s "$target" "$file"
-    success "Migrated $file → $target"
-  done
-}
-
 stow_package() {
   local pkg="$1"
-  local pkgdir="$DOTFILES_DIR/$pkg"
-
   info "Processing package: $pkg"
-  echo ""
 
-  local existing_files=()
-  while IFS= read -r f; do
-    existing_files+=("$f")
-  done &lt; &lt;(list_existing_dotfiles_in_package "$pkg")
+  # 1. Check for Conflicts
+  local conflicts
+  conflicts=$(check_conflicts "$pkg")
 
-  info "Existing dotfiles in package (auto-included):"
-  if [ ${#existing_files[@]} -eq 0 ]; then
-    echo "  (none)"
-  else
-    for ef in "${existing_files[@]}"; do
-      echo "  ${ef#$pkgdir/}"
-    done
-  fi
-  echo ""
-
-  local inferred_files=()
-  while IFS= read -r f; do
-    inferred_files+=("$f")
-  done &lt; &lt;(infer_home_files_for_package "$pkg")
-
-  prompt_selection inferred_files
-
-  local selected_files=()
-  build_selected_files inferred_files selected_files
-
-  if [[ "$APPLY" != "1" ]]; then
-    preview_grouped "$pkg" existing_files selected_files
-    return
-  fi
-
-  if [ ${#selected_files[@]} -gt 0 ]; then
-    apply_selected_files "$pkg" selected_files
-  fi
-
-  if [[ "$UNINSTALL" == "1" ]]; then
-    stow --dotfiles -Dt "$TARGET" "$pkg"
-    success "Unstowed $pkg"
-  else
-    if [[ "$ADOPT" == "1" ]]; then
-      stow --dotfiles --adopt -vt "$TARGET" "$pkg"
+  if [[ -n "$conflicts" ]]; then
+    if [[ "$FORCE" == "1" ]]; then
+      echo "$conflicts" | sed 's/.*existing target: //' | while read -r file; do
+        # Use our safe dry-run backup function
+        backup_file "$TARGET/$file"
+      done
     else
-      stow --dotfiles -vt "$TARGET" "$pkg"
+      warn "Conflicts detected for $pkg. Run with --force to see preview."
+      return
     fi
-    success "Stowed $pkg"
   fi
 
-  echo ""
+  # 2. THE FIX: Run Stow with --restow (-R) in dry-run mode to "see through" old links
+  # -R tells Stow: "Ignore existing links and show me what the NEW ones would be."
+  local STOW_OPTS="-vvt $TARGET --dotfiles"
+  [[ "$DRYRUN" == "1" ]] &amp;&amp; STOW_OPTS="-n $STOW_OPTS"
+  
+  # Use -R (Restow) here so it calculates the arrows even if old links exist
+  local cmd="stow $STOW_OPTS -R $pkg"
+  
+  $cmd 2&gt;&amp;1 | sed -n 's/^LINK: \(.*\) =&gt; \(.*\)/\1 --&gt; \2/p'
+}
+
+unstow_package() {
+  local pkg="$1"
+  info "Unstowing $pkg"
+  stow --dotfiles -Dt "$TARGET" "$pkg"
+  success "Unstowed $pkg"
 }
 
 main() {
+  if [[ "$DRYRUN" == "1" ]]; then
+    echo -e "${YELLOW}------------------------------------------------------------${RESET}"
+    echo -e "${YELLOW}  RUNNING IN SIMULATION ONLY - Run with --apply to execute${RESET}"
+    echo -e "${YELLOW}------------------------------------------------------------${RESET}"
+    echo ""
+  fi
   cd "$DOTFILES_DIR"
 
-  local packages=()
-  while IFS= read -r pkg; do
-    packages+=("$pkg")
-  done &lt; &lt;(detect_packages)
-
-  if [ ${#packages[@]} -eq 0 ]; then
-    warn "No packages found in $DOTFILES_DIR"
-    info "Create a package directory (e.g., zshrc, vim) and run again."
-    exit 0
-  fi
+  local packages
+  packages=$(detect_packages)
 
   if [[ "$LIST" == "1" ]]; then
     info "Detected packages:"
-    printf '  %s\n' "${packages[@]}"
+    echo "$packages"
     exit 0
   fi
 
@@ -291,22 +138,28 @@ main() {
     exit 0
   fi
 
-  local pkg
-  for pkg in "${packages[@]}"; do
-    stow_package "$pkg"
+  for pkg in $packages; do
+    if [[ "$UNINSTALL" == "1" ]]; then
+      unstow_package "$pkg"
+    else
+      stow_package "$pkg"
+    fi
   done
 
   success "All operations complete"
 }
 
+# Parse flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --apply) APPLY=1 ;;
+    --force) FORCE=1 ;;
     --uninstall) UNINSTALL=1 ;;
+    --apply) DRYRUN=0 ;;
+    --dry-run) DRYRUN=1 ;;
     --adopt) ADOPT=1 ;;
+    --verbose) VERBOSE=1 ;;
     --list) LIST=1 ;;
     --only) ONLY="$2"; shift ;;
-    *) error "Unknown option: $1"; exit 1 ;;
   esac
   shift
 done
@@ -659,59 +512,65 @@ Here is a proper <span id="Stow - Updated Project-MAN PAGE Text-roff"></span><st
 </p>
 
 <pre roff>
-.TH BOOTSTRAP 1 "February 2026" "Dotty" "User Commands"
+.TH BOOTSTRAP 1 "February 2024" "1.0" "Dotfiles Management Manual"
 .SH NAME
-bootstrap.sh \- interactive dotfiles bootstrapper using GNU Stow
+bootstrap \- automated dotfiles symlinking and management using GNU Stow
 .SH SYNOPSIS
-.B bootstrap.sh
-[\fB--apply\fR]
-[\fB--uninstall\fR]
-[\fB--adopt\fR]
-[\fB--list\fR]
-[\fB--only\fR \fIPACKAGE\fR]
+.B ./bootstrap.sh
+[\fIOPTIONS\fR]
 .SH DESCRIPTION
-The
 .B bootstrap.sh
-tool provides an interactive workflow for managing dotfiles using GNU Stow.
-It infers matching files in the user's home directory based on package name
-prefixes, presents a selection interface, migrates selected files into the
-package directory, and creates symbolic links managed by Stow.
-
-There is no separate migration mode; migration is integrated into the normal
-workflow. By default, the script performs a dry run and makes no changes.
+is a wrapper script for GNU Stow designed to organize and deploy configuration files (dotfiles). 
+It automates the process of creating symlinks from a central repository (default: ~/dotfiles) 
+to the home directory, while providing safety features like dry-runs and automatic backups.
+.PP
+By default, the script runs in \fBSIMULATION ONLY\fR mode. No changes are made to the 
+filesystem unless the \fB\-\-apply\fR flag is provided.
 .SH OPTIONS
 .TP
-.B --apply
-Apply changes. Without this flag, the script performs a dry run.
+.B \-\-apply
+Execute the operations. This is required to make actual changes to the filesystem.
 .TP
-.B --uninstall
-Unstow all packages.
+.B \-\-force
+Enable force mode. If a conflict is detected with an existing file that is not a symlink 
+or points elsewhere, the script will automatically back up the original file and replace it.
 .TP
-.B --adopt
-Adopt unmanaged files into Stow.
+.B \-\-dry\-run
+Explicitly run in simulation mode. This is the default behavior.
 .TP
-.B --list
-List detected packages.
+.B \-\-adopt
+Import existing files into the dotfiles repository. WARNING: This will overwrite 
+files in your repository with the versions currently in your home directory.
 .TP
-.B --only \fIPACKAGE\fR
-Process only the specified package.
-.SH WORKFLOW
-For each package directory, the script:
-.IP 1. 4
-Identifies existing dotfiles in the package (auto-included).
-.IP 2. 4
-Infers matching home directory files based on prefix rules.
-.IP 3. 4
-Presents a numbered selection interface.
-.IP 4. 4
-Shows a grouped preview of actions.
-.IP 5. 4
-Migrates selected files and invokes GNU Stow (when using --apply).
+.B \-\-uninstall
+Remove symlinks created by Stow for all detected packages.
+.TP
+.B \-\-list
+List all detected packages in the dotfiles directory and exit.
+.TP
+.B \-\-only \fIPACKAGE\fR
+Process only the specified package instead of all detected packages.
 .SH FILES
-Package directories must reside in the same directory as the script.
-Dotfiles inside packages must follow the "dot-" naming convention.
+.TP
+.I ~/dotfiles
+The default directory where configuration packages are stored.
+.TP
+.I ~/.config
+The script ensures this directory exists before processing.
+.SH EXAMPLES
+.TP
+.B ./bootstrap.sh
+Run a safe simulation to see what links would be created.
+.TP
+.B ./bootstrap.sh \-\-force
+Preview which files would be backed up and replaced.
+.TP
+.B ./bootstrap.sh \-\-apply \-\-only zsh
+Apply only the 'zsh' configuration package.
 .SH AUTHOR
-Written by you, with assistance from Microsoft Copilot.
+Created for custom dotfiles management.
+.SH SEE ALSO
+.BR stow (1)
 </pre>
 
 
