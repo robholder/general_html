@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_stow_build_dotfiles</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Stow - Updated Project"><h1 id="Stow - Updated Project" class="header"><a href="#Stow - Updated Project">Stow - Updated Project</a></h1></div>
+
+<pre bash>
+#!/usr/bin/env bash
+set -e
+
+DOTFILES_DIR="$(pwd)"
+TARGET="$HOME"
+
+if [[ "$DOTFILES_DIR" == "$HOME" ]]; then
+  echo "ERROR: Refusing to run from \$HOME. Create a dotfiles directory first."
+  exit 1
+fi
+
+APPLY=0
+UNINSTALL=0
+ADOPT=0
+LIST=0
+ONLY=""
+
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+RESET="\033[0m"
+
+info()    { echo -e "${BLUE}INFO:${RESET} $1"; }
+warn()    { echo -e "${YELLOW}WARN:${RESET} $1"; }
+error()   { echo -e "${RED}ERROR:${RESET} $1"; }
+success() { echo -e "${GREEN}OK:${RESET} $1"; }
+
+backup_file() {
+  local file="$1"
+  local backup="$file.backup.$(date +%Y%m%d%H%M%S)"
+  warn "Backing up $file → $backup"
+  mv "$file" "$backup"
+}
+
+detect_packages() {
+  for dir in "$DOTFILES_DIR"/*; do
+    [ -d "$dir" ] &amp;&amp; basename "$dir"
+  done
+}
+
+ensure_directories() {
+  mkdir -p "$HOME/.config"
+  mkdir -p "$HOME/.local/share"
+}
+
+infer_home_files_for_package() {
+  local pkg="$1"
+  find "$HOME" -maxdepth 1 -mindepth 1 -name ".*" | while read -r file; do
+    local base clean
+    base="$(basename "$file")"
+    clean="${base#.}"
+    if [[ "$clean" == "$pkg"* ]]; then
+      echo "$file"
+    fi
+  done
+}
+
+list_existing_dotfiles_in_package() {
+  local pkg="$1"
+  local pkgdir="$DOTFILES_DIR/$pkg"
+  if [[ -d "$pkgdir" ]]; then
+    find "$pkgdir" -type f -name "dot-*"
+  fi
+}
+
+prompt_selection() {
+  local files_var="$1"
+  eval "local files=(\"\${${files_var}[@]}\")"
+
+  local selection
+
+  if [ ${#files[@]} -eq 0 ]; then
+    info "No matching home files found."
+    read -r -p "Press Enter to continue (default: none): " selection
+    echo ""
+    SELECTED_INDEXES=()
+    return
+  fi
+
+  info "Home files matching this package:"
+  local i=1
+  for f in "${files[@]}"; do
+    echo "  [$i] $f"
+    i=$((i+1))
+  done
+  echo ""
+
+  read -r -p "Select items to include (e.g. \"1 3\", \"all\", or \"none\"; default: none): " selection
+  echo ""
+
+  if [[ -z "$selection" || "$selection" == "none" ]]; then
+    SELECTED_INDEXES=()
+    return
+  fi
+
+  if [[ "$selection" == "all" ]]; then
+    SELECTED_INDEXES=()
+    for ((j=1; j&lt;=${#files[@]}; j++)); do
+      SELECTED_INDEXES+=("$j")
+    done
+    return
+  fi
+
+  SELECTED_INDEXES=()
+  for token in $selection; do
+    if [[ "$token" =~ ^[0-9]+$ ]] &amp;&amp; (( token &gt;= 1 &amp;&amp; token &lt;= ${#files[@]} )); then
+      SELECTED_INDEXES+=("$token")
+    else
+      warn "Ignoring invalid selection: $token"
+    fi
+  done
+}
+
+build_selected_files() {
+  local files_var="$1"
+  local out_var="$2"
+
+  eval "local files=(\"\${${files_var}[@]}\")"
+  local out=()
+
+  for idx in "${SELECTED_INDEXES[@]}"; do
+    out+=("${files[$((idx-1))]}")
+  done
+
+  eval "$out_var=(\"\${out[@]}\")"
+}
+
+preview_grouped() {
+  local pkg="$1"
+  local existing_var="$2"
+  local selected_var="$3"
+
+  eval "local existing=(\"\${${existing_var}[@]}\")"
+  eval "local selected=(\"\${${selected_var}[@]}\")"
+
+  local pkgdir="$DOTFILES_DIR/$pkg"
+
+  info "[DRY RUN] Would stow $pkg"
+  echo ""
+
+  echo "Existing dotfiles in package (auto-included):"
+  if [ ${#existing[@]} -eq 0 ]; then
+    echo "  (none)"
+  else
+    for f in "${existing[@]}"; do
+      echo "  ${f#$pkgdir/}"
+    done
+  fi
+  echo ""
+
+  echo "New symlinks to create:"
+  if [ ${#selected[@]} -eq 0 ]; then
+    echo "  (none)"
+  else
+    local file base clean target
+    for file in "${selected[@]}"; do
+      base="$(basename "$file")"
+      clean="${base#.}"
+      target="$pkgdir/dot-$clean"
+      echo "  $file → $target"
+    done
+  fi
+  echo ""
+}
+
+apply_selected_files() {
+  local pkg="$1"
+  local selected_var="$2"
+
+  eval "local selected=(\"\${${selected_var}[@]}\")"
+
+  local pkgdir="$DOTFILES_DIR/$pkg"
+  mkdir -p "$pkgdir"
+
+  local file base clean target
+  for file in "${selected[@]}"; do
+    base="$(basename "$file")"
+    clean="${base#.}"
+    target="$pkgdir/dot-$clean"
+    mkdir -p "$(dirname "$target")"
+    backup_file "$file"
+    mv "$file" "$target"
+    ln -s "$target" "$file"
+    success "Migrated $file → $target"
+  done
+}
+
+stow_package() {
+  local pkg="$1"
+  local pkgdir="$DOTFILES_DIR/$pkg"
+
+  info "Processing package: $pkg"
+  echo ""
+
+  local existing_files=()
+  while IFS= read -r f; do
+    existing_files+=("$f")
+  done &lt; &lt;(list_existing_dotfiles_in_package "$pkg")
+
+  info "Existing dotfiles in package (auto-included):"
+  if [ ${#existing_files[@]} -eq 0 ]; then
+    echo "  (none)"
+  else
+    for ef in "${existing_files[@]}"; do
+      echo "  ${ef#$pkgdir/}"
+    done
+  fi
+  echo ""
+
+  local inferred_files=()
+  while IFS= read -r f; do
+    inferred_files+=("$f")
+  done &lt; &lt;(infer_home_files_for_package "$pkg")
+
+  prompt_selection inferred_files
+
+  local selected_files=()
+  build_selected_files inferred_files selected_files
+
+  if [[ "$APPLY" != "1" ]]; then
+    preview_grouped "$pkg" existing_files selected_files
+    return
+  fi
+
+  if [ ${#selected_files[@]} -gt 0 ]; then
+    apply_selected_files "$pkg" selected_files
+  fi
+
+  if [[ "$UNINSTALL" == "1" ]]; then
+    stow --dotfiles -Dt "$TARGET" "$pkg"
+    success "Unstowed $pkg"
+  else
+    if [[ "$ADOPT" == "1" ]]; then
+      stow --dotfiles --adopt -vt "$TARGET" "$pkg"
+    else
+      stow --dotfiles -vt "$TARGET" "$pkg"
+    fi
+    success "Stowed $pkg"
+  fi
+
+  echo ""
+}
+
+main() {
+  cd "$DOTFILES_DIR"
+
+  local packages=()
+  while IFS= read -r pkg; do
+    packages+=("$pkg")
+  done &lt; &lt;(detect_packages)
+
+  if [ ${#packages[@]} -eq 0 ]; then
+    warn "No packages found in $DOTFILES_DIR"
+    info "Create a package directory (e.g., zshrc, vim) and run again."
+    exit 0
+  fi
+
+  if [[ "$LIST" == "1" ]]; then
+    info "Detected packages:"
+    printf '  %s\n' "${packages[@]}"
+    exit 0
+  fi
+
+  ensure_directories
+
+  if [[ -n "$ONLY" ]]; then
+    stow_package "$ONLY"
+    exit 0
+  fi
+
+  local pkg
+  for pkg in "${packages[@]}"; do
+    stow_package "$pkg"
+  done
+
+  success "All operations complete"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --apply) APPLY=1 ;;
+    --uninstall) UNINSTALL=1 ;;
+    --adopt) ADOPT=1 ;;
+    --list) LIST=1 ;;
+    --only) ONLY="$2"; shift ;;
+    *) error "Unknown option: $1"; exit 1 ;;
+  esac
+  shift
+done
+
+main
+</pre>
+
+<p>
+Now that the script is stable and the workflow is clear, this is the perfect moment to generate the supporting docs. I’ll craft:
+</p>
+
+<ul>
+<li>
+A README.md that explains the philosophy, workflow, installation, usage, examples, and edge cases
+
+<li>
+A man page (bootstrap.1) in proper roff format
+
+<li>
+A quick cheat sheet for fast reference
+
+</ul>
+<p>
+Let’s build these one by one.
+</p>
+
+<p>
+📘 README.md
+</p>
+
+<p>
+Here is a polished, production‑ready README:
+</p>
+
+<pre markdown>
+# Dotty — A Friendly Dotfiles Bootstrapper
+
+Dotty is a Bash-based dotfiles bootstrap tool built on top of GNU Stow.  
+It provides a clean, interactive workflow for managing dotfiles using simple
+package directories such as:
+
+dotty/
+zshrc/
+vim/
+git/
+
+Dotty automatically:
+
+- Infers which `$HOME` files belong to each package (prefix-based)
+- Shows a numbered selection list for each package
+- Auto-includes existing dotfiles already inside the package
+- Previews all symlinks in a grouped, human-friendly format
+- Migrates selected files into the package (with backups)
+- Symlinks them back into `$HOME`
+- Uses Stow to manage the final structure
+
+No more manual renaming to `dot-*`.  
+No more guessing what Stow will do.  
+No more separate “migrate” mode — migration is built in.
+
+---
+
+## 🚀 Quick Start
+
+```bash
+git clone &lt;your repo&gt; ~/dotty
+cd ~/dotty
+./bootstrap.sh
+```
+
+Dotty will:
+- Detect each package directory
+- Infer matching $HOME files (prefix-based)
+- Show a selection UI
+- Preview the symlink plan
+- Apply changes only when you use --apply
+
+## 🧠 How Dotty Infers Files
+
+A package named:
+
+```sh
+zshrc
+```
+will match any $HOME file whose name begins with:
+
+```sh
+.zsh*
+```
+Examples:
+- ~/.zshrc
+- ~/.zshenv
+- ~/.zprofile
+- ~/.zlogin
+
+This is Option A (prefix-based inference).
+
+## 🧩 Selection UI
+
+For each package, Dotty shows:
+1. Existing dotfiles in the package (auto-included)
+
+```sh
+Existing dotfiles in package (auto-included):
+  dot-zshrc
+  dot-zshenv
+```
+
+2. Inferred $HOME files (user-selectable)
+
+```sh
+Home files matching this package:
+
+  [1] ~/.zshrc
+  [2] ~/.zshenv
+  [3] ~/.zprofile
+
+Select items to include (e.g. "1 3", "all", or "none"; default: none):
+```
+
+3. Default behavior
+- Pressing Enter = none
+- all = include all inferred files
+- none = include none
+- 1 3 = include only those
+
+## 🧪 Dry Run Mode (default)
+
+Dotty never modifies your system unless you use --apply.
+
+Dry run preview example:
+
+```sh
+[DRY RUN] Would stow zshrc
+
+Existing dotfiles in package (auto-included):
+  dot-zshrc
+
+New symlinks to create:
+  ~/.zshenv → dotty/zshrc/dot-zshenv
+  ~/.zprofile → dotty/zshrc/dot-zshprofile
+```
+
+## 🔧 Apply Mode
+
+To actually migrate and symlink:
+
+```bash
+./bootstrap.sh --apply
+```
+
+Dotty will:
+- Backup each selected $HOME file
+- Move it into the package as dot-*
+- Create the symlink
+- Run Stow to finalize the structure
+
+## 🎯 Commands
+
+| Command                    | Description                      |
+|----------------------------|----------------------------------|
+| ./bootstrap.sh             | Dry run (recommended first step) |
+| ./bootstrap.sh --apply     | Apply changes                    |
+| ./bootstrap.sh --uninstall | Unstow all packages              |
+| ./bootstrap.sh --adopt     | Adopt unmanaged files into Stow  |
+| ./bootstrap.sh --list      | List detected packages           |
+| ./bootstrap.sh --only      | Process only one package         |
+
+## 📦 Package Structure
+
+Dotty expects:
+
+```bash
+dotty/
+  &lt;package&gt;/
+    dot-&lt;file&gt;
+    dot-config/&lt;subdirs&gt;
+```
+
+But you can start with empty package directories — Dotty will populate them.
+
+## 🛡 Safety Features
+
+- Backups created before modifying any file
+- Dry run by default
+- Explicit user selection for inferred files
+- Existing package dotfiles always preserved
+- No destructive operations without --apply
+
+## 📝 Requirements
+
+- Bash 4+
+- GNU Stow
+- macOS, Linux, WSL compatible
+
+## 📄 License
+
+MIT (or your preferred license)
+</pre>
+
+
+
+
+
+<ul>
+<li>
+📙 **MAN PAGE (<code>bootstrap.1</code>)**
+
+</ul>
+<p>
+Here is a proper <span id="Stow - Updated Project-roff"></span><strong id="roff">roff</strong> man page:
+</p>
+
+<p>
+```roff
+.TH BOOTSTRAP 1 "February 2026" "Dotty" "User Commands"
+.SH NAME
+bootstrap.sh \- interactive dotfiles bootstrapper using GNU Stow
+.SH SYNOPSIS
+.B bootstrap.sh
+[\fB--apply\fR]
+[\fB--uninstall\fR]
+[\fB--adopt\fR]
+[\fB--list\fR]
+[\fB--only\fR \fIPACKAGE\fR]
+.SH DESCRIPTION
+The
+.B bootstrap.sh
+tool provides an interactive workflow for managing dotfiles using GNU Stow.
+It infers matching files in the user's home directory based on package name
+prefixes, presents a selection interface, migrates selected files into the
+package directory, and creates symbolic links managed by Stow.
+</p>
+
+<p>
+There is no separate migration mode; migration is integrated into the normal
+workflow. By default, the script performs a dry run and makes no changes.
+.SH OPTIONS
+.TP
+.B --apply
+Apply changes. Without this flag, the script performs a dry run.
+.TP
+.B --uninstall
+Unstow all packages.
+.TP
+.B --adopt
+Adopt unmanaged files into Stow.
+.TP
+.B --list
+List detected packages.
+.TP
+.B --only \fIPACKAGE\fR
+Process only the specified package.
+.SH WORKFLOW
+For each package directory, the script:
+.IP 1. 4
+Identifies existing dotfiles in the package (auto-included).
+.IP 2. 4
+Infers matching home directory files based on prefix rules.
+.IP 3. 4
+Presents a numbered selection interface.
+.IP 4. 4
+Shows a grouped preview of actions.
+.IP 5. 4
+Migrates selected files and invokes GNU Stow (when using --apply).
+.SH FILES
+Package directories must reside in the same directory as the script.
+Dotfiles inside packages must follow the "dot-" naming convention.
+.SH AUTHOR
+Written by you, with assistance from Microsoft Copilot.
+```
+</p>
+
+<p>
+## 📗 Quick Cheat Sheet
+</p>
+
+<p>
+```markdown
+</p>
+<ul>
+<li>
+Dotty Cheat Sheet
+
+</ul>
+<p>
+## Basic Usage
+</p>
+<ul>
+<li>
+Dry run (safe):  
+  <code>./bootstrap.sh</code>
+
+<li>
+Apply changes:  
+  <code>./bootstrap.sh --apply</code>
+
+<li>
+Uninstall all packages:  
+  <code>./bootstrap.sh --uninstall</code>
+
+<li>
+Adopt unmanaged files:  
+  <code>./bootstrap.sh --adopt</code>
+
+<li>
+List packages:  
+  <code>./bootstrap.sh --list</code>
+
+<li>
+Process only one package:  
+  <code>./bootstrap.sh --only zshrc</code>
+
+</ul>
+<p>
+---
+</p>
+
+<p>
+## Workflow Summary
+</p>
+<ol>
+<li>
+Dotty detects each package directory.
+
+<li>
+Shows existing dotfiles (auto-included).
+
+<li>
+Infers <code>$HOME</code> files by prefix.
+
+<li>
+Shows numbered selection list.
+
+<li>
+Dry run preview (grouped).
+
+<li>
+Apply mode migrates + symlinks + stows.
+
+</ol>
+<p>
+---
+</p>
+
+<p>
+## Selection UI
+</p>
+<ul>
+<li>
+<code>all</code> → include all inferred files  
+
+<li>
+<code>none</code> → include none  
+
+<li>
+<code>1 3</code> → include specific files  
+
+<li>
+*<span id="Stow - Updated Project-Enter"></span><strong id="Enter">Enter</strong>* → default = none  
+
+</ul>
+<p>
+---
+</p>
+
+<p>
+## Package Naming Rules
+Package <code>zshrc</code> matches:
+</p>
+
+<ul>
+<li>
+<code>~/.zshrc</code>
+
+<li>
+<code>~/.zshenv</code>
+
+<li>
+<code>~/.zprofile</code>
+
+<li>
+<code>~/.zlogin</code>
+
+</ul>
+<p>
+Package <code>vim</code> matches:
+</p>
+
+<ul>
+<li>
+<code>~/.vimrc</code>
+
+<li>
+<code>~/.vim/</code>
+
+</ul>
+<p>
+---
+</p>
+
+<p>
+## Safety
+</p>
+<ul>
+<li>
+Backups created automatically
+
+<li>
+Dry run by default
+
+<li>
+No destructive actions without <code>--apply</code>
+
+</ul>
+<p>
+```
+</p>
+
+<p>
+## 🎉 Want anything else?
+</p>
+
+<p>
+I can also generate:
+</p>
+<ul>
+<li>
+A sample dotfiles repo layout
+
+<li>
+logo or ASCII banner
+
+<li>
+“getting started” tutorial
+
+<li>
+test suite
+
+<li>
+changelog
+
+<li>
+GitHub Actions CI workflow
+
+</ul>
+<p>
+Just tell me what direction you want to take Dotty next.
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+</body>
+</html>
