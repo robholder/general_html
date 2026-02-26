@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_stow_tests</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Stow - Updated Project - Tests"><h1 id="Stow - Updated Project - Tests" class="header"><a href="#Stow - Updated Project - Tests">Stow - Updated Project - Tests</a></h1></div>
+
+<table>
+<tr>
+<td>
+Copilot Guide
+</td>
+</tr>
+</table>
+
+<p>
+You don’t have to do everything at once—we can make this very incremental.
+</p>
+
+<p>
+Let’s walk it step by step, starting from where you are now: you have bootstrap.sh in your dotfiles repo.
+</p>
+
+<div id="Stow - Updated Project - Tests-Step 1: Install Bats"><h2 id="Step 1: Install Bats" class="header"><a href="#Stow - Updated Project - Tests-Step 1: Install Bats">Step 1: Install Bats</a></h2></div>
+
+<p>
+On macOS (with Homebrew):
+</p>
+
+<pre sh>
+brew install bats-core
+</pre>
+
+<p>
+On Ubuntu/Debian:
+</p>
+<pre sh>
+sudo apt-get update
+sudo apt-get install -y bats
+</pre>
+
+<p>
+To confirm:
+</p>
+<pre sh>
+bats --version
+</pre>
+
+<div id="Stow - Updated Project - Tests-Step 2: Create the tests/ directory"><h2 id="Step 2: Create the tests/ directory" class="header"><a href="#Stow - Updated Project - Tests-Step 2: Create the tests/ directory">Step 2: Create the tests/ directory</a></h2></div>
+
+<p>
+From your repo root (where bootstrap.sh lives):
+</p>
+
+<pre sh>
+mkdir tests
+cd tests
+</pre>
+
+<div id="Stow - Updated Project - Tests-Step 3: Add test_helper.bash"><h2 id="Step 3: Add test_helper.bash" class="header"><a href="#Stow - Updated Project - Tests-Step 3: Add test_helper.bash">Step 3: Add test_helper.bash</a></h2></div>
+
+<p>
+Create tests/test_helper.bash:
+</p>
+
+<pre sh>
+cat &gt; test_helper.bash &lt;&lt; 'EOF'
+setup_fake_home() {
+  export TEST_HOME
+  TEST_HOME="$(mktemp -d)"
+  export HOME="$TEST_HOME"
+}
+
+setup_fake_dotty() {
+  export DOTTY_DIR
+  DOTTY_DIR="$(mktemp -d)"
+  cp "$BATS_TEST_DIRNAME/../bootstrap.sh" "$DOTTY_DIR/bootstrap.sh"
+  chmod +x "$DOTTY_DIR/bootstrap.sh"
+}
+
+create_home_file() {
+  local name="$1"
+  echo "# test file" &gt; "$HOME/$name"
+}
+
+run_dotty() {
+  cd "$DOTTY_DIR"
+  ./bootstrap.sh "$@" 2&gt;&amp;1
+}
+EOF
+</pre>
+
+<p>
+This gives all tests a clean $HOME and a fresh copy of bootstrap.sh.
+</p>
+
+<div id="Stow - Updated Project - Tests-Step 4: Add your first test file"><h2 id="Step 4: Add your first test file" class="header"><a href="#Stow - Updated Project - Tests-Step 4: Add your first test file">Step 4: Add your first test file</a></h2></div>
+
+<p>
+Let’s start with a single, simple test: “does the script run at all?”
+</p>
+
+<p>
+Create tests/00_smoke.bats:
+</p>
+
+<pre sh>
+cat &gt; 00_smoke.bats &lt;&lt; 'EOF'
+#!/usr/bin/env bats
+
+load test_helper
+
+@test "bootstrap.sh runs in dry mode" {
+  setup_fake_home
+  setup_fake_dotty
+
+  mkdir "$DOTTY_DIR/zshrc"
+
+  run run_dotty
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Processing package: zshrc" ]]
+}
+EOF
+</pre>
+
+<p>
+Make it executable (not strictly required, but nice):
+</p>
+<pre sh>
+chmod +x 00_smoke.bats
+</pre>
+
+<div id="Stow - Updated Project - Tests-Step 5: Run the tests"><h2 id="Step 5: Run the tests" class="header"><a href="#Stow - Updated Project - Tests-Step 5: Run the tests">Step 5: Run the tests</a></h2></div>
+
+<p>
+From your repo root:
+</p>
+
+<pre sh>
+bats tests
+</pre>
+
+<p>
+You should see something like:
+</p>
+
+<pre text>
+ ✓ bootstrap.sh runs in dry mode
+
+1 test, 0 failures
+</pre>
+
+<p>
+If you see that, you’ve got a working test harness.
+</p>
+
+<div id="Stow - Updated Project - Tests-Step 6: Add a second, slightly richer test"><h2 id="Step 6: Add a second, slightly richer test" class="header"><a href="#Stow - Updated Project - Tests-Step 6: Add a second, slightly richer test">Step 6: Add a second, slightly richer test</a></h2></div>
+
+<p>
+Now let’s test the prefix inference.
+</p>
+
+<p>
+Create tests/01_inference.bats:
+</p>
+
+<pre sh>
+cat &gt; 01_inference.bats &lt;&lt; 'EOF'
+#!/usr/bin/env bats
+
+load test_helper
+
+@test "prefix inference detects matching home files" {
+  setup_fake_home
+  setup_fake_dotty
+
+  mkdir "$DOTTY_DIR/zshrc"
+  create_home_file ".zshrc"
+  create_home_file ".zshenv"
+
+  run run_dotty
+
+  [[ "$output" =~ "$HOME/.zshrc" ]]
+  [[ "$output" =~ "$HOME/.zshenv" ]]
+}
+EOF
+</pre>
+
+<p>
+Run again:
+</p>
+
+<pre sh>
+bats tests
+</pre>
+
+<p>
+Now you should see 2 tests passing.
+</p>
+
+<div id="Stow - Updated Project - Tests-Step 7: Grow from there (one test at a time)"><h2 id="Step 7: Grow from there (one test at a time)" class="header"><a href="#Stow - Updated Project - Tests-Step 7: Grow from there (one test at a time)">Step 7: Grow from there (one test at a time)</a></h2></div>
+
+<p>
+Once that’s working, you can add more tests gradually:
+</p>
+<ul>
+<li>
+02_selection_ui.bats — check that default is “none” when pressing Enter
+
+<li>
+03_apply_migration.bats — pipe 1\n into --apply and assert file moved + symlink created
+
+<li>
+04_existing_dotfiles.bats — create dot-zshrc in package and assert it’s listed as auto-included
+
+</ul>
+<p>
+You don’t have to build the whole suite in one sitting—just add tests as you touch behavior.
+</p>
+
+<p>
+If you’d like, next we can:
+</p>
+<ul>
+<li>
+write 03_apply_migration.bats together and debug it live
+
+<li>
+or wire up GitHub Actions once you’re happy running bats tests locally.
+
+</ul>
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
