@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>git_branches_maintain_branches</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Git.html">Git</a>
+</p>
+
+<div id="Git Main, MacMini &amp; MacBook Branches"><h1 id="Git Main, MacMini &amp; MacBook Branches" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches">Git Main, MacMini &amp; MacBook Branches</a></h1></div>
+
+<div id="Git Main, MacMini &amp; MacBook Branches-QUESTION"><h2 id="QUESTION" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I want to have a main branch in a repo, then two branches (one for each macOS machine). These are config files.
+</p>
+
+<p>
+I want to be able to adjust configs on each machine (on their respective branches) but when it seems like a good Idea, I'd like to pull the changes from one or other of the 'machine' branches into main. Is this possible while maintaining two distinct branches that are always in parallel to main?
+</p>
+
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER"><h2 id="ANSWER" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a classic "Dotfiles" workflow. It is absolutely possible and is actually the recommended way to manage machine-specific configurations (like WezTerm or Starship settings) while sharing a common core.
+</p>
+
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER-1. The Strategy: &quot;The Core and the Flavors&quot;"><h3 id="1. The Strategy: &quot;The Core and the Flavors&quot;" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER-1. The Strategy: &quot;The Core and the Flavors&quot;">1. The Strategy: "The Core and the Flavors"</a></h3></div>
+
+<ul>
+<li>
+<span id="Git Main, MacMini &amp; MacBook Branches-ANSWER-1. The Strategy: &quot;The Core and the Flavors&quot;-main branch"></span><strong id="main branch">main branch</strong>: Contains the "Generic" config that works on both Macs (e.g., your Vim mappings, Git aliases).
+
+<li>
+<span id="Git Main, MacMini &amp; MacBook Branches-ANSWER-1. The Strategy: &quot;The Core and the Flavors&quot;-mac-work &amp; mac-home branches"></span><strong id="mac-work &amp; mac-home branches">mac-work &amp; mac-home branches</strong>: These stay "downstream" from main. They contain the hostname-specific colors/icons we discussed.
+
+</ul>
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER-2. The Workflow"><h3 id="2. The Workflow" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER-2. The Workflow">2. The Workflow</a></h3></div>
+
+<p>
+To keep everything in sync without creating a mess, you follow a one-way flow for shared features and a specific pull for "promoting" features.
+</p>
+
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER-2. The Workflow-A. When you improve a &quot;shared&quot; config (on main):"><h4 id="A. When you improve a &quot;shared&quot; config (on main):" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER-2. The Workflow-A. When you improve a &quot;shared&quot; config (on main):">A. When you improve a "shared" config (on main):</a></h4></div>
+
+<p>
+You want both machines to get this update.
+</p>
+
+<ul>
+<li>
+Commit to main.
+
+<li>
+Switch to your machine branch: git switch mac-work.
+
+<li>
+Rebase on main: git rebase main.
+
+<ul>
+<li>
+This "lifts" your machine-specific colors and places them on top of the new shared core.
+
+</ul>
+</ul>
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER-2. The Workflow-B. When you have a &quot;great idea&quot; on a machine branch:"><h4 id="B. When you have a &quot;great idea&quot; on a machine branch:" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER-2. The Workflow-B. When you have a &quot;great idea&quot; on a machine branch:">B. When you have a "great idea" on a machine branch:</a></h4></div>
+
+<p>
+If you wrote a cool new function on mac-home and want it on both machines:
+Cherry-pick that specific commit into main:
+</p>
+
+<pre bash>
+git checkout main
+git cherry-pick &lt;commit-hash-from-home-branch&gt;
+</pre>
+
+<p>
+Now that it's in main, follow Step A above to pull it into the mac-work branch.
+</p>
+
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER-3. Maintaining &quot;Parallel&quot; Distinctness"><h3 id="3. Maintaining &quot;Parallel&quot; Distinctness" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER-3. Maintaining &quot;Parallel&quot; Distinctness">3. Maintaining "Parallel" Distinctness</a></h3></div>
+
+<p>
+To ensure your host-specific variables don't get overwritten when you merge, you have two options:
+</p>
+
+<ul>
+<li>
+<span id="Git Main, MacMini &amp; MacBook Branches-ANSWER-3. Maintaining &quot;Parallel&quot; Distinctness-Option 1 (Git Attributes)"></span><strong id="Option 1 (Git Attributes)">Option 1 (Git Attributes)</strong>: You can tell Git to "always keep my local version" of a specific file (like hostname_config.lua) during merges using a merge=ours strategy in a .gitattributes file.
+
+<li>
+<span id="Git Main, MacMini &amp; MacBook Branches-ANSWER-3. Maintaining &quot;Parallel&quot; Distinctness-Option 2 (Modularization - Recommended)"></span><strong id="Option 2 (Modularization - Recommended)">Option 2 (Modularization - Recommended)</strong>:
+
+<li>
+Keep wezterm.lua identical on main.
+
+<li>
+Have it require('host_config').
+
+<li>
+On mac-work, host_config.lua defines Blue.
+
+<li>
+On mac-home, host_config.lua defines Green.
+
+<li>
+Never merge host_config.lua into main.
+
+</ul>
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER-4. How to prevent accidental merges"><h3 id="4. How to prevent accidental merges" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER-4. How to prevent accidental merges">4. How to prevent accidental merges</a></h3></div>
+
+<p>
+To make sure you don't accidentally merge your "Work" colors into "Main," you can use a .gitignore on the main branch that includes the host_config.lua file, but force add it only on the specific machine branches.
+</p>
+
+<div id="Git Main, MacMini &amp; MacBook Branches-ANSWER-4. How to prevent accidental merges-The Pro-Tip for Vim/Mac Users:"><h4 id="The Pro-Tip for Vim/Mac Users:" class="header"><a href="#Git Main, MacMini &amp; MacBook Branches-ANSWER-4. How to prevent accidental merges-The Pro-Tip for Vim/Mac Users:">The Pro-Tip for Vim/Mac Users:</a></h4></div>
+
+<p>
+Since you use WezTerm, you can actually skip the "two branches" headache entirely by using the Lua logic we wrote earlier. If your wezterm.lua detects the hostname and sets the color automatically, you only need one branch (main) for both machines.
+</p>
+
+<p>
+Do you prefer the logic-based approach (one branch, code detects the machine) or the branch-based approach (two separate versions of the file)?
+</p>
+
+<p>
+<a href="Git.html">Git</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
