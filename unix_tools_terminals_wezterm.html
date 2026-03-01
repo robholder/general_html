@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_terminals_wezterm</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+ 
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<div id="WezTerm"><h1 id="WezTerm" class="header"><a href="#WezTerm">WezTerm</a></h1></div>
+
+<div id="WezTerm-Setting Colors Based On Hostname"><h2 id="Setting Colors Based On Hostname" class="header"><a href="#WezTerm-Setting Colors Based On Hostname">Setting Colors Based On Hostname</a></h2></div>
+
+<table>
+<tr>
+<td>
+In WezTerm's lua settings, is there a way to specify a color assignment based on the host name?
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td>
+UNTESTED
+</td>
+</tr>
+</table>
+
+<p>
+Yes, you can use the built-in wezterm.hostname() function to dynamically assign a color scheme or specific colors based on the machine running the terminal. 
+</p>
+
+<div id="WezTerm-Setting Colors Based On Hostname-Implementation in wezterm.lua"><h3 id="Implementation in wezterm.lua" class="header"><a href="#WezTerm-Setting Colors Based On Hostname-Implementation in wezterm.lua">Implementation in wezterm.lua</a></h3></div>
+
+<p>
+You can use a simple if/else block or a Lua table to map hostnames to your preferred themes.
+</p>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+local hostname = wezterm.hostname()
+
+if hostname == 'work-laptop' then
+    config.color_scheme = 'Tokyo Night'
+elseif hostname == 'home-desktop' then
+    config.color_scheme = 'Catppuccin Macchiato'
+else
+    config.color_scheme = 'AdventureTime'
+end
+
+return config
+</pre>
+
+<div id="WezTerm-Setting Colors Based On Hostname-Important Considerations"><h3 id="Important Considerations" class="header"><a href="#WezTerm-Setting Colors Based On Hostname-Important Considerations">Important Considerations</a></h3></div>
+
+<ul>
+<li>
+<span id="WezTerm-Setting Colors Based On Hostname-Important Considerations-Local vs. Remote"></span><strong id="Local vs. Remote">Local vs. Remote</strong>: The wezterm.hostname() function returns the name of the system running the WezTerm process. If you are using wezterm ssh or a multiplexer domain, the color scheme is typically controlled by the configuration file on the remote server.
+
+<li>
+<span id="WezTerm-Setting Colors Based On Hostname-Important Considerations-Dynamic SSH Coloring"></span><strong id="Dynamic SSH Coloring">Dynamic SSH Coloring</strong>: If you want your local WezTerm window to change colors automatically when you SSH into a different server, you can use the window-config-reloaded event to check for a running SSH process and apply a config override.
+
+<li>
+<span id="WezTerm-Setting Colors Based On Hostname-Important Considerations-DHCP Warning"></span><strong id="DHCP Warning">DHCP Warning</strong>: If your environment uses DHCP with short leases, hostnames can occasionally change, which might cause your logic to fail if it relies on a specific string. 
+<table>
+<tr>
+<td>
+Would you like a more advanced example that uses a Lua table to manage a large list of different server-to-color mappings?
+</td>
+</tr>
+</table>
+
+</ul>
+<p>
+Using a Lua table is much cleaner than multiple if/else statements, especially as your list of servers grows. It also allows you to define a "fallback" or default theme if a host isn't recognized.
+</p>
+
+<p>
+Here is an advanced implementation for your wezterm.lua:
+</p>
+
+<div id="WezTerm-Setting Colors Based On Hostname-The Table-Based Configuration"><h3 id="The Table-Based Configuration" class="header"><a href="#WezTerm-Setting Colors Based On Hostname-The Table-Based Configuration">The Table-Based Configuration</a></h3></div>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- 1. Define your host-to-theme mapping
+local host_themes = {
+    ["work-macbook"]     = "Tokyo Night",
+    ["linux-server-01"]  = "Catppuccin Mocha",
+    ["raspberry-pi"]     = "Gruvbox Dark",
+    ["gaming-desktop"]   = "Cyberpunk",
+}
+
+-- 2. Get the current hostname
+local current_host = wezterm.hostname()
+
+-- 3. Assign the theme (with a default fallback)
+local default_theme = "Nord"
+config.color_scheme = host_themes[current_host] or default_theme
+
+-- 4. Optional: Visual indicator (Border or Tab Bar color)
+-- This makes it obvious which host you are on at a glance
+if current_host == "linux-server-01" then
+    config.colors = {
+        tab_bar = {
+            background = '#4b0000', -- Dark red background for production servers
+        }
+    }
+end
+
+return config
+</pre>
+
+<div id="WezTerm-Setting Colors Based On Hostname-Why this approach is better:"><h3 id="Why this approach is better:" class="header"><a href="#WezTerm-Setting Colors Based On Hostname-Why this approach is better:">Why this approach is better:</a></h3></div>
+
+<ul>
+<li>
+<span id="WezTerm-Setting Colors Based On Hostname-Why this approach is better:-Lookup Speed"></span><strong id="Lookup Speed">Lookup Speed</strong>: Lua tables are hashed, making lookups extremely fast.
+
+<li>
+<span id="WezTerm-Setting Colors Based On Hostname-Why this approach is better:-Readability"></span><strong id="Readability">Readability</strong>: You can see all your environments at a glance in one block of code.
+
+<li>
+<span id="WezTerm-Setting Colors Based On Hostname-Why this approach is better:-Scalability"></span><strong id="Scalability">Scalability</strong>: If you add a new machine, you only need to add one line to the host_themes list.
+
+</ul>
+<div id="WezTerm-Setting Colors Based On Hostname-Why this approach is better:-Pro-Tip: Handling &quot;Partial&quot; Hostnames"><h4 id="Pro-Tip: Handling &quot;Partial&quot; Hostnames" class="header"><a href="#WezTerm-Setting Colors Based On Hostname-Why this approach is better:-Pro-Tip: Handling &quot;Partial&quot; Hostnames">Pro-Tip: Handling "Partial" Hostnames</a></h4></div>
+
+<p>
+Sometimes wezterm.hostname() returns a Fully Qualified Domain Name (e.g., macbook.local instead of just macbook). You can "sanitize" the hostname to make your table lookups more reliable:
+</p>
+
+<pre lua>
+-- Strips everything after the first dot
+local clean_hostname = current_host:split('.')[1] 
+config.color_scheme = host_themes[clean_hostname] or default_theme
+</pre>
+
+<div id="WezTerm-Conditional Based Icons"><h2 id="Conditional Based Icons" class="header"><a href="#WezTerm-Conditional Based Icons">Conditional Based Icons</a></h2></div>
+
+<div id="WezTerm-Conditional Based Icons-Bonus: Unique Backgrounds per Host"><h4 id="Bonus: Unique Backgrounds per Host" class="header"><a href="#WezTerm-Conditional Based Icons-Bonus: Unique Backgrounds per Host">Bonus: Unique Backgrounds per Host</a></h4></div>
+
+<table>
+<tr>
+<td>
+Since you are using Nerd Fonts, you could even add a specific icon to your status bar based on the host. Would you like to see how to inject a hostname-specific icon (like a  for Mac or  for Linux) into your WezTerm status bar?
+</td>
+</tr>
+</table>
+
+<p>
+To inject a hostname-specific icon into your WezTerm status bar, you use the update-right-status event. This event allows you to run Lua code periodically and update the status area with text, colors, and Nerd Font symbols. 
+</p>
+
+<div id="WezTerm-Conditional Based Icons-Implementation in wezterm.lua"><h3 id="Implementation in wezterm.lua" class="header"><a href="#WezTerm-Conditional Based Icons-Implementation in wezterm.lua">Implementation in wezterm.lua</a></h3></div>
+
+<p>
+You can define a table that maps hostnames to specific icons and then use window:set_right_status to display them.
+</p>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- 1. Define host-to-icon mapping using Nerd Font symbols
+local host_icons = {
+  ["work-macbook"] = wezterm.nerdfonts.fa_apple,      -- 
+  ["linux-server"] = wezterm.nerdfonts.cod_terminal_linux, -- 
+  ["home-pc"]      = wezterm.nerdfonts.fa_windows,    -- 
+}
+
+-- 2. Create the status bar update function
+wezterm.on('update-right-status', function(window, pane)
+  local hostname = wezterm.hostname()
+  -- Get the icon or use a generic "host" icon as fallback
+  local icon = host_icons[hostname] or wezterm.nerdfonts.fa_server
+  
+  window:set_right_status(wezterm.format {
+    { Foreground = { Color = '#7aa2f7' } }, -- Pick a color
+    { Text = icon .. '  ' .. hostname .. ' ' },
+  })
+end)
+
+return config
+</pre>
+
+<div id="WezTerm-Conditional Based Icons-Implementation in wezterm.lua-Why This Works"><h4 id="Why This Works" class="header"><a href="#WezTerm-Conditional Based Icons-Implementation in wezterm.lua-Why This Works">Why This Works</a></h4></div>
+
+<ul>
+<li>
+<span id="WezTerm-Conditional Based Icons-Implementation in wezterm.lua-Why This Works-wezterm.hostname()"></span><strong id="wezterm.hostname()">wezterm.hostname()</strong>: Returns the name of the system running the terminal process.
+
+<li>
+<span id="WezTerm-Conditional Based Icons-Implementation in wezterm.lua-Why This Works-wezterm.nerdfonts"></span><strong id="wezterm.nerdfonts">wezterm.nerdfonts</strong>: A built-in library that lets you look up icons by name (e.g., fa_apple) without needing to remember hex codes.
+
+<li>
+<span id="WezTerm-Conditional Based Icons-Implementation in wezterm.lua-Why This Works-wezterm.format"></span><strong id="wezterm.format">wezterm.format</strong>: Allows you to apply colors and styles to specific parts of your status string. 
+
+</ul>
+<div id="WezTerm-Conditional Based Icons-Implementation in wezterm.lua-Pro-Tip: OS Detection Fallback"><h4 id="Pro-Tip: OS Detection Fallback" class="header"><a href="#WezTerm-Conditional Based Icons-Implementation in wezterm.lua-Pro-Tip: OS Detection Fallback">Pro-Tip: OS Detection Fallback</a></h4></div>
+
+<p>
+If you have many machines and don't want to list every hostname, you can use wezterm.target_triple to detect the Operating System generally (e.g., searching for "apple" or "linux" in the string) and assign an icon based on the OS instead of the specific host.
+</p>
+
+<div id="WezTerm-Assigning Colors to Variables"><h2 id="Assigning Colors to Variables" class="header"><a href="#WezTerm-Assigning Colors to Variables">Assigning Colors to Variables</a></h2></div>
+
+<table>
+<tr>
+<td>
+Can I assign a color to a variable (so that I may apply that color to various items) based on host names? (And will these settings default to a color if the host name is not in the list?)
+</td>
+</tr>
+</table>
+
+<p>
+Yes, this is a very efficient way to handle theming in Lua. By assigning a "base color" to a variable based on the hostname, you can reuse that single color for your cursor, borders, tab bars, and selection highlights, ensuring a consistent "vibe" for each machine.
+</p>
+
+<p>
+Here is how you can structure your wezterm.lua to define a primary theme color with a built-in fallback:
+</p>
+
+<div id="WezTerm-Assigning Colors to Variables-The Variable-Based Configuration"><h3 id="The Variable-Based Configuration" class="header"><a href="#WezTerm-Assigning Colors to Variables-The Variable-Based Configuration">The Variable-Based Configuration</a></h3></div>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- 1. Define your host-to-color mapping
+-- You can use Hex codes or CSS color names
+local host_colors = {
+    ["work-macbook"]    = "#7aa2f7", -- Soft Blue
+    ["prod-server"]     = "#f7768e", -- Warning Red
+    ["raspberry-pi"]    = "#9ece6a", -- Forest Green
+}
+
+-- 2. Get hostname and determine the "Accent Color"
+local current_host = wezterm.hostname()
+local default_color = "#bb9af7" -- Purple fallback
+
+-- This variable now holds the color for the current machine
+local accent_color = host_colors[current_host] or default_color
+
+-- 3. Apply that variable to various UI elements
+config.colors = {
+    -- Change the cursor color
+    cursor_bg = accent_color,
+    
+    -- Change the active tab indicator
+    tab_bar = {
+        active_tab = {
+            bg_color = accent_color,
+            fg_color = '#1a1b26', -- Dark text for contrast
+        },
+    },
+
+    -- Change the visual selection color (with some transparency)
+    selection_bg = accent_color,
+}
+
+-- 4. Apply it to the window frame/border
+config.window_frame = {
+    active_titlebar_bg = accent_color,
+}
+
+return config
+</pre>
+
+<div id="WezTerm-Assigning Colors to Variables-The Variable-Based Configuration-Why this works well:"><h4 id="Why this works well:" class="header"><a href="#WezTerm-Assigning Colors to Variables-The Variable-Based Configuration-Why this works well:">Why this works well:</a></h4></div>
+
+<p>
+The "Or" Fallback: The line host_colors[current_host] or default_color is a Lua idiom. If the hostname isn't found in your table, it evaluates to nil, and Lua automatically moves to the second option (default_color).
+</p>
+<ul>
+<li>
+<span id="WezTerm-Assigning Colors to Variables-The Variable-Based Configuration-Why this works well:-Centralized Control"></span><strong id="Centralized Control">Centralized Control</strong>: If you decide you want your "Work" machine to be Orange instead of Blue, you only change the Hex code in one place (the table), and every UI element you've linked to accent_color updates automatically.
+
+<li>
+<span id="WezTerm-Assigning Colors to Variables-The Variable-Based Configuration-Why this works well:-Readability"></span><strong id="Readability">Readability</strong>: It keeps your config.colors block clean because you aren't nesting logic inside it.
+
+</ul>
+<div id="WezTerm-Assigning Colors to Variables-The Variable-Based Configuration-A Quick Tip on Visibility"><h4 id="A Quick Tip on Visibility" class="header"><a href="#WezTerm-Assigning Colors to Variables-The Variable-Based Configuration-A Quick Tip on Visibility">A Quick Tip on Visibility</a></h4></div>
+
+<p>
+When using an accent_color for things like selection_bg, the text underneath can sometimes become hard to read. You can use WezTerm's color functions to slightly dim or brighten your variable on the fly:
+</p>
+
+<pre lua>
+-- This would make the selection background 50% transparent
+selection_bg = wezterm.color.parse(accent_color):srgba(0,0,0,0.5)
+</pre>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+ 
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
