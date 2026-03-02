@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_starship_example_toml</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="unix_tools_terminals_starship.html">Starship</a>
+</p>
+
+<div id="Used with a zshrc setup block"><h3 id="Used with a zshrc setup block" class="header"><a href="#Used with a zshrc setup block">Used with a zshrc setup block</a></h3></div>
+
+<pre sh>
+#------------------------------------------------------------------------------#
+# 3. STARSHIP CONFIGURATION (Hostname &amp; Palette Logic)
+#------------------------------------------------------------------------------#
+#-------------------------------- Add Starship --------------------------------#
+## 1. ORIGINAL Set config from default of ~/.config to ~/.config/starship/
+#export STARSHIP_CONFIG=~/.config/starship/starship.toml
+## 2. ORIGINAL Start Starship
+#eval "$(starship init zsh)"
+#
+# 1. Path to your master config file, and other paths and defaults
+SOURCE_TOML="$HOME/.config/starship/starship.toml"
+TEMP_CONFIG="/tmp/starship_rendered.toml"
+TARGET_PALETTE="default" 
+
+# 1. Maintain your fleet here (Comments are ignored by Zsh)
+KNOWN_HOSTS=(
+    "macbook-m3"      # MacBook Pro - 2023 - M3 (Blue Accent)
+    "macbook-intel"   # MacBook Pro - 2012 - Intel (Purple Accent)
+    "macmini"         # MacMini - 2020 (Green Accent)
+)
+
+# 2. Setup paths and defaults
+#  Get host (Detects OS automatically - Linux/MacOS )
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    ## Simple (slower?) way
+    #CURRENT_HOST=$(hostname -s) # macOS
+    # macOS: The %m expansion is the internal Zsh short hostname - faster
+    CURRENT_HOST=${(%):-%m}
+else
+    # Simple (less reliable with long host 'dot' hostnames
+    #CURRENT_HOST=$(hostname)    # Linux
+    # Linux: Fallback to standard hostname
+    CURRENT_HOST=$(hostname | cut -d. -f1)
+fi
+
+# 3. Check if CURRENT_HOST exists in the array
+# This specific Zsh syntax (i) returns the index if found
+if [[ ${KNOWN_HOSTS[(i)$CURRENT_HOST]} -le ${#KNOWN_HOSTS} ]]; then
+    TARGET_PALETTE="$CURRENT_HOST"
+fi
+
+# 4. Inject the palette and fire up Starship
+# We check if the source file exists first to avoid sed errors
+if [[ -f "$SOURCE_TOML" ]]; then
+    sed "s/SUBSTITUTE_MACHINE_NAME/$TARGET_PALETTE/" "$SOURCE_TOML" &gt; "$TEMP_CONFIG"
+    export STARSHIP_CONFIG="$TEMP_CONFIG"
+fi
+
+# 4. Start Starship 
+export STARSHIP_CONFIG="$TEMP_CONFIG"
+eval "$(starship init zsh)"
+#------------------------------------ END -------------------------------------#
+</pre>
+
+<pre toml>
+# tokyo night starship configuration requires a nerd font for symbols
+# Increase from default 500ms to 2000ms (2 seconds)
+command_timeout = 1000
+
+format = """
+[░▒▓](machine_accent)\
+$username\
+[](bg:#3b4261 fg:machine_accent)\
+$hostname\
+[](fg:#394260)\
+$python\
+$line_break\
+[░▒▓](#a3aed2)\
+[  ](bg:#a3aed2 fg:#090c0c)\
+[](bg:theme_light fg:#a3aed2)\
+$directory\
+[](fg:theme_light bg:#394260)\
+${custom.production_zone}\
+$git_branch\
+$git_status\
+[](fg:#394260 bg:#212736)\
+[](fg:#212736 bg:#1d2230)\
+$time\
+[ ](fg:#1d2230)\
+\n$character"""
+
+#$fill\
+
+palette = 'SUBSTITUTE_MACHINE_NAME'
+
+[username]
+show_always = true
+style_user = "bg:machine_accent fg:#15161e italic bold"
+format = '[ $user ]($style)'
+
+[hostname]
+ssh_only = false
+style = "bg:#3b4261 fg:#bb9af7"
+format = '[ @ $hostname ]($style)'
+
+[directory]
+style = "fg:#e3e5e5 bg:theme_light"
+format = "[ $path ]($style)"
+truncation_length = 6
+truncation_symbol = "…/"
+
+[directory.substitutions]
+"documents" = "󰈙 "
+"downloads" = " "
+"music" = " "
+"pictures" = " "
+
+[git_branch]
+symbol = ""
+style = "bg:#394260 bold"
+format = '[[ $symbol $branch ](fg:theme_light bg:#394260)]($style)'
+
+# [git_status]
+# style = "bg:#394260 bold"
+# format = '[[($all_status$ahead_behind )](fg:theme_light bg:#394260)]($style)'
+
+[git_status]
+#style = "fg:machine_accent bg:theme_dark bold"
+style = "fg:white bg:theme_dark bold"
+format = '[($all_status$ahead_behind )]($style)'
+conflicted = "🏳 "
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕⇡${ahead_count}⇣${behind_count}"
+untracked = " "
+stashed = " "
+modified = " "
+staged = " "
+renamed = " "
+deleted = "󱂥 "
+
+[fill]
+symbol = '.  '
+
+[python]
+disabled = false
+format = '[ ${symbol}](theme_light)[${pyenv_prefix}(${version} )](machine_accent italic)'
+#style_version = "machine_accent"
+#style = "bold theme_light"
+symbol = ' '
+
+[time]
+disabled = false
+time_format = "󱁳  %y%m%d   %R" # Hour:Minute Format
+style = "bg:#1d2230"
+format = '[[ $time ](fg:#a0a9cb bg:#1d2230)]($style)'
+
+[custom.production_zone]
+# Shows the folder name + a warning icon
+command = "echo '⚠️  PRODUCTION'" 
+# Triggers if the path starts with your production folder
+when = 'pwd | grep -q "^/Users/noddy/Documents/handbrake"'
+# Using Powerline styling with your palette colors
+format = "[$output](bg:red fg:white)[](red) "
+shell = ["bash", "--noprofile", "--norc"]
+
+#---------------------------------- Palettes ----------------------------------#
+## The corresponding .zshrc block (in .robsaliases currently) checks the
+## hostname -s (removes suffixes like .local) and passes it to this config
+## via a temporary file (after a Sed substitution).
+
+[palettes.default]
+machine_accent = '#7aa2f7' # sky_blue
+theme_light = '#769ff0' # bg_sky_blue
+theme_dark = '#394260' # dark cool gray
+
+[palettes.macbook-m3]
+#machine_accent = '#7aa2f7' # sky_blue
+machine_accent = '#a4c77f' # green
+theme_light = '#769ff0' # bg_sky_blue
+theme_dark = '#394260' # dark cool gray
+
+[palettes.macbook-intel]
+machine_accent = '#8c7fc7' # purple
+theme_light = '#769ff0' # bg_sky_blue
+theme_dark = '#394260' # dark cool gray
+
+[palettes.macmini]
+machine_accent = '#7fbdc7' # teal
+theme_light = '#769ff0' # bg_sky_blue
+theme_dark = '#394260' # dark cool gray
+</pre>
+
+<p>
+<a href="unix_tools_terminals_starship.html">Starship</a>
+</p>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
