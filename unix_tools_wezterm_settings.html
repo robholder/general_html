@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_wezterm_settings</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="unix_tools_terminals_wezterm.html">WezTerm</a>
+</p>
+
+<div id="WezTerm Lua Settings"><h2 id="WezTerm Lua Settings" class="header"><a href="#WezTerm Lua Settings">WezTerm Lua Settings</a></h2></div>
+
+<pre lua>
+local wezterm = require 'wezterm'
+
+--Add this line ONLY ONCE
+local config = wezterm.config_builder()
+
+------------------------------ Set Mux Variable ------------------------------
+
+local mux = wezterm.mux
+
+---------------------------- Initial Window Size -----------------------------
+
+-- Since a pixel size of 700x700 is being ignored at startup, we need to tell
+-- WezTerm to open with the correct number of character cells first. For example
+-- for FiraMono, 12pt, 700x700 pixels is approximately 88 columns and 42 rows
+config.initial_cols = 88
+config.initial_rows = 42
+
+----------------------------- Color Scheme Setup -----------------------------
+
+config.color_scheme = 'Nord (Gogh)' -- Example scheme
+
+---------------------------- Set Font Attributes -----------------------------
+
+-- Define your favorite fonts here
+local my_fonts = {
+  { family = "Agave Nerd Font", weight = 700, size = 12},
+  { family = "CaskaydiaCove Nerd Font", weight = 700, size = 12},
+  { family = "ComicShannsMono Nerd Font", weight = 700, size = 12},
+  { family = "FiraMono Nerd Font", weight = 700, size = 12 },
+  { family = "JetBrainsMono Nerd Font", weight = 700, size = 11.5 },
+  { family = "Hack Nerd Font", weight = 700, size = 12 },
+}
+
+-- Set your primary default font
+config.font = wezterm.font("FiraMono Nerd Font", { weight = 700 })
+config.font_size = 12
+
+-- config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = Medium } )
+-- Alternative to Word based definitions like 'Medium'; i.e., value (700 here)
+config.font = wezterm.font("FiraMono Nerd Font", { weight = 700 } )
+config.font_size = 12
+
+-- The "Thickening" Combo
+-- 'Normal' provides the most 'body' to the letters.
+config.freetype_load_target = 'Normal'
+config.freetype_render_target = 'HorizontalLcd'
+
+-- Subpixel Antialiasing (The 'Smoothness' factor)
+-- This mimics the 'Font Smoothing' in macOS Terminal.
+config.freetype_load_flags = 'DEFAULT'
+
+-- Horizontal and Vertical Spacing
+config.cell_width = 1
+config.line_height = 1.1
+
+------------------------------ Window Position -------------------------------
+
+-- Prevent re-sizing to NOT jump to nearest character width
+config.use_resize_increments = false
+
+local is_buffer_mode = false
+local STANDARD_WIDTH = 700
+local STANDARD_HEIGHT = 700
+local BUFFER_WIDTH = 700
+local BUFFER_HEIGHT = 1000 -- Increased height for Vim
+
+-- 1. GLOBAL CHECKLIST (Survives config reloads/Vim saves)
+if wezterm.GLOBAL.sized_windows == nil then
+  wezterm.GLOBAL.sized_windows = {}
+end
+
+-- 2. INITIAL WINDOW SETUP
+wezterm.on('window-config-reloaded', function(window, pane)
+  -- Convert the ID to a string immediately
+  local window_id = tostring(window:window_id()) 
+  
+  -- Check our persistent global list using the string version of the ID
+  if wezterm.GLOBAL.sized_windows[window_id] == nil then
+    window:set_inner_size(700, 700)
+    window:set_position(100, 100)
+    
+    -- Mark this window as "Done" using the string version of the ID
+    wezterm.GLOBAL.sized_windows[window_id] = true
+  end
+end)
+
+-- 3. APP STARTUP
+wezterm.on('gui-startup', function(cmd)
+  wezterm.mux.spawn_window(cmd or {})
+end)
+
+-------------------------------- Window size ---------------------------------
+
+--Switched Off (using SCREEN SIZE instead)
+--config.initial_cols = 120 -- Number of character columns
+--config.initial_rows = 40  -- Number of character rows
+
+------------------------------- ALL KEYS HERE --------------------------------
+
+config.keys = {
+  -- Remap Debug Overlay (as I'm using default for window expansion)
+  { key = 'd', mods = 'CTRL|SHIFT', action = wezterm.action.ShowDebugOverlay
+  },
+
+  {
+    key = 'f', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      -- Ensure our global font tracker exists
+      if wezterm.GLOBAL.font_indices == nil then
+        wezterm.GLOBAL.font_indices = {}
+      end
+      
+      local id = tostring(window:window_id())
+      local current_index = wezterm.GLOBAL.font_indices[id] or 1
+      
+      -- Increment and wrap around
+      local next_index = current_index + 1
+      if next_index &gt; #my_fonts then
+        next_index = 1
+      end
+      
+      local next_font = my_fonts[next_index]
+      
+      -- ONLY send official fields to overrides (No custom fields!)
+      window:set_config_overrides({
+        font = wezterm.font(next_font.family, { weight = next_font.weight }),
+        font_size = next_font.size,
+      })
+      
+      -- Store the index in our safe GLOBAL table
+      wezterm.GLOBAL.font_indices[id] = next_index
+    end),
+  },
+
+  -- Pane Resizing (Option + Arrows)
+
+  { key = 'LeftArrow', mods = 'OPT', action = wezterm.action.AdjustPaneSize { 'Left', 5 } },
+  { key = 'RightArrow', mods = 'OPT', action = wezterm.action.AdjustPaneSize { 'Right', 5 } },
+  { key = 'UpArrow', mods = 'OPT', action = wezterm.action.AdjustPaneSize { 'Up', 5 } },
+  { key = 'DownArrow', mods = 'OPT', action = wezterm.action.AdjustPaneSize { 'Down', 5 } },
+  
+  -- Zoom Pane
+  { key = 'z', mods = 'CTRL|SHIFT', action = wezterm.action.TogglePaneZoomState },
+
+  -- The STANDARD to BUFFER Toggle
+  {
+    key = 't', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      -- Ensure our global state table exists
+      if wezterm.GLOBAL.buffer_modes == nil then
+        wezterm.GLOBAL.buffer_modes = {}
+      end
+      
+      local id = tostring(window:window_id())
+      local is_buffer = wezterm.GLOBAL.buffer_modes[id] == true
+      
+      if is_buffer then
+        window:set_inner_size(700, 700)
+        wezterm.GLOBAL.buffer_modes[id] = false
+      else
+        window:set_inner_size(700, 950)
+        wezterm.GLOBAL.buffer_modes[id] = true
+      end
+    end),
+  },
+  -- App Window Stretching (Ctrl+Shift + hjkl)
+  {
+    key = 'l', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      local dims = window:get_dimensions()
+      window:set_inner_size(dims.pixel_width + 50, dims.pixel_height)
+    end),
+  },
+  {
+    key = 'j', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      local dims = window:get_dimensions()
+      window:set_inner_size(dims.pixel_width, dims.pixel_height + 50)
+    end),
+  },
+  {
+    key = 'h', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      local dims = window:get_dimensions()
+      window:set_inner_size(dims.pixel_width - 50, dims.pixel_height)
+    end),
+  },
+  {
+    key = 'k', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      local dims = window:get_dimensions()
+      window:set_inner_size(dims.pixel_width, dims.pixel_height - 50)
+    end),
+  },
+
+}
+
+--------------------------------- Status Bar ---------------------------------
+
+-- This forces the entire bar (tabs + right status) to the bottom
+config.tab_bar_at_bottom = true
+config.use_fancy_tab_bar = false 
+
+-- This ensures the status bar updates its text 
+-- whenever you interact with the window
+wezterm.on('update-status', function(window, pane)
+  local hostname = wezterm.hostname()
+  --local workspace = window:active_workspace()
+  local dims = window:get_dimensions()
+  
+  -- Check our global table for this window's ID
+  local id = tostring(window:window_id())
+  local font_idx = 1
+  if wezterm.GLOBAL.font_indices and wezterm.GLOBAL.font_indices[id] then
+    font_idx = wezterm.GLOBAL.font_indices[id]
+  end
+  -- Check our global table for this window's BUFFER stat
+  local is_buffer = false
+  if wezterm.GLOBAL.buffer_modes and wezterm.GLOBAL.buffer_modes[id] then
+    is_buffer = true
+  end
+  
+  local mode_text = is_buffer and " BUFFER MODE " or " STANDARD MODE"
+  local mode_color = is_buffer and "#ffaf00" or "#808080"
+  
+  -- Format the final status string
+  window:set_right_status(wezterm.format({
+    -- Hostname (Replaces Workspace)
+    { Foreground = { Color = '#bb9af7' } },
+    { Text = '    ' .. hostname .. '  ' }, -- Includes a Nerd Font computer icon
+    
+    -- -- Workspace Icon and Name
+    -- { Foreground = { Color = '#bb9af7' } },
+    -- { Text = '     ' .. workspace .. '  ' },
+    
+    -- Live Pixel Dimensions (Green)
+    { Foreground = { Color = '#7edaf0' } }, -- Cyan/Light Blue
+    { Text = string.format(" %dx%d ", dims.pixel_width, dims.pixel_height) },
+    
+    -- Buffer/Standard Mode Toggle Status
+    { Foreground = { Color = mode_color } },
+    { Attribute = { Intensity = 'Bold' } },
+    { Text = mode_text },
+  }))
+end)
+
+return config
+</pre>
+
+<div id="What Does It All Mean"><h1 id="What Does It All Mean" class="header"><a href="#What Does It All Mean">What Does It All Mean</a></h1></div>
+
+<div id="What Does It All Mean-1. local wezterm = require 'wezterm'"><h3 id="1. local wezterm = require 'wezterm'" class="header"><a href="#What Does It All Mean-1. local wezterm = require 'wezterm'">1. local wezterm = require 'wezterm'</a></h3></div>
+
+<p>
+What it is: This is a standard Lua "import" statement.
+</p>
+<ul>
+<li>
+<span id="What Does It All Mean-1. local wezterm = require 'wezterm'-What it does"></span><strong id="What it does">What it does</strong>: It pulls in the entire WezTerm API. Without this line, the script wouldn't know what wezterm.on or wezterm.format means.
+
+<li>
+<span id="What Does It All Mean-1. local wezterm = require 'wezterm'-The local keyword"></span><strong id="The local keyword">The local keyword</strong>: In Lua, local means this variable is only visible within this specific file. This is a "best practice" to prevent your configuration from accidentally interfering with other scripts.
+
+</ul>
+<div id="What Does It All Mean-2. local config = wezterm.config_builder()"><h3 id="2. local config = wezterm.config_builder()" class="header"><a href="#What Does It All Mean-2. local config = wezterm.config_builder()">2. local config = wezterm.config_builder()</a></h3></div>
+
+<ul>
+<li>
+<span id="What Does It All Mean-2. local config = wezterm.config_builder()-What it is"></span><strong id="What it is">What it is</strong>: This initializes a "configuration object."
+
+<li>
+<span id="What Does It All Mean-2. local config = wezterm.config_builder()-What it does"></span><strong id="What it does">What it does</strong>: Think of this as creating an empty "shopping list" or a "bucket." You will spend the rest of your file filling this config object with settings (like fonts, colors, and keybindings).
+
+<li>
+*Why use config_builder()? Newer versions of WezTerm use this function because it provides type-checking and better error messages. If you make a typo later in the file, WezTerm can warn you exactly where you went wrong because you used the builder.
+
+</ul>
+<div id="What Does It All Mean-3. local mux = wezterm.mux"><h3 id="3. local mux = wezterm.mux" class="header"><a href="#What Does It All Mean-3. local mux = wezterm.mux">3. local mux = wezterm.mux</a></h3></div>
+
+<ul>
+<li>
+<span id="What Does It All Mean-3. local mux = wezterm.mux-What it is"></span><strong id="What it is">What it is</strong>: An alias for the "Multiplexer" (Mux) module.
+
+<li>
+<span id="What Does It All Mean-3. local mux = wezterm.mux-What it does"></span><strong id="What it does">What it does</strong>: The "Mux" is the part of WezTerm that manages Windows, Tabs, and Panes.
+
+<li>
+<span id="What Does It All Mean-3. local mux = wezterm.mux-Why it's there"></span><strong id="Why it's there">Why it's there</strong>: You usually see this defined at the top if you plan to do things like:
+
+<ul>
+<li>
+Automatically split the screen when a window opens.
+
+<li>
+Set the title of a window programmatically.
+
+<li>
+Rename a workspace.
+
+</ul>
+<li>
+<span id="What Does It All Mean-3. local mux = wezterm.mux-Note"></span><strong id="Note">Note</strong>: Your current status bar code uses window and pane (which are passed into the function), so you might not be using this mux variable yet, but it’s standard to have it ready for more advanced automation.
+
+</ul>
+<div id="What Does It All Mean-3. local mux = wezterm.mux-Summary of the Flow"><h4 id="Summary of the Flow" class="header"><a href="#What Does It All Mean-3. local mux = wezterm.mux-Summary of the Flow">Summary of the Flow</a></h4></div>
+
+<ul>
+<li>
+<span id="What Does It All Mean-3. local mux = wezterm.mux-Summary of the Flow-Import"></span><strong id="Import">Import</strong>: Load the WezTerm engine (require).
+
+<li>
+<span id="What Does It All Mean-3. local mux = wezterm.mux-Summary of the Flow-Initialize"></span><strong id="Initialize">Initialize</strong>: Create the container for your settings (config_builder).
+
+<li>
+<span id="What Does It All Mean-3. local mux = wezterm.mux-Summary of the Flow-Prepare"></span><strong id="Prepare">Prepare</strong>: Grab the tools needed to manage windows and tabs (mux).
+
+</ul>
+<div id="What Does It All Mean-Visual Preferences"><h2 id="Visual Preferences" class="header"><a href="#What Does It All Mean-Visual Preferences">Visual Preferences</a></h2></div>
+
+<p>
+The next section is where you transition from "setup" to actual visual preferences. It controls how the window feels when it first pops into existence and what it looks like.
+</p>
+
+<div id="What Does It All Mean-Visual Preferences-1. config.initial_cols and config.initial_rows"><h3 id="1. config.initial_cols and config.initial_rows" class="header"><a href="#What Does It All Mean-Visual Preferences-1. config.initial_cols and config.initial_rows">1. config.initial_cols and config.initial_rows</a></h3></div>
+
+<ul>
+<li>
+<span id="What Does It All Mean-Visual Preferences-1. config.initial_cols and config.initial_rows-What they are"></span><strong id="What they are">What they are</strong>: These define the starting width (columns) and height (rows) of your terminal window in terms of character cells, not pixels.
+
+<li>
+<span id="What Does It All Mean-Visual Preferences-1. config.initial_cols and config.initial_rows-The &quot;Why&quot;"></span><strong id="The &quot;Why&quot;">The "Why"</strong>: Terminals are historically "cell-based." Because fonts vary in size, a <code>700 × 700</code> pixel window might fit 100 characters of a thin font but only 50 of a thick one.
+
+<li>
+<span id="What Does It All Mean-Visual Preferences-1. config.initial_cols and config.initial_rows-The Logic in your comment"></span><strong id="The Logic in your comment">The Logic in your comment</strong>: You've noted that 700x700 pixels was being ignored. This happens because most window managers and terminals negotiate size based on the font grid. By setting columns to 88 and rows to 42, you are telling WezTerm: "Calculate how much space 88 characters across and 42 lines down takes up with my current font, and make the window exactly that big."
+
+</ul>
+<div id="What Does It All Mean-Visual Preferences-2. config.color_scheme = 'Nord (Gogh)'"><h3 id="2. config.color_scheme = 'Nord (Gogh)'" class="header"><a href="#What Does It All Mean-Visual Preferences-2. config.color_scheme = 'Nord (Gogh)'">2. config.color_scheme = 'Nord (Gogh)'</a></h3></div>
+
+<ul>
+<li>
+<span id="What Does It All Mean-Visual Preferences-2. config.color_scheme = 'Nord (Gogh)'-What it is"></span><strong id="What it is">What it is</strong>: This sets the overall "skin" of your terminal.
+
+<li>
+<span id="What Does It All Mean-Visual Preferences-2. config.color_scheme = 'Nord (Gogh)'-The Scheme"></span><strong id="The Scheme">The Scheme</strong>: Nord (Gogh) is a very popular, cool-toned, "arctic" color palette (lots of frosty blues, greys, and muted whites). It’s designed to be easy on the eyes for long coding sessions.
+
+<li>
+<span id="What Does It All Mean-Visual Preferences-2. config.color_scheme = 'Nord (Gogh)'-The Source"></span><strong id="The Source">The Source</strong>: WezTerm comes bundled with hundreds of color schemes. The (Gogh) suffix refers to a massive collection of color themes originally created for various terminal emulators; WezTerm includes these by default.
+
+</ul>
+<div id="What Does It All Mean-A Useful Tip for Color Schemes"><h2 id="A Useful Tip for Color Schemes" class="header"><a href="#What Does It All Mean-A Useful Tip for Color Schemes">A Useful Tip for Color Schemes</a></h2></div>
+
+<p>
+Since you are using a color scheme, you can actually browse them live without restarting WezTerm.
+</p>
+<ul>
+<li>
+If you press CMD + SHIFT + L (macOS) or CTRL + SHIFT + L (Linux/Windows), it will open a "Command Palette" specifically for color schemes.
+
+<li>
+As you arrow down through the list, WezTerm will live-preview the colors. Once you find one you like, you can update this line in your wezterm.lua.
+
+</ul>
+<div id="Setting Fonts"><h1 id="Setting Fonts" class="header"><a href="#Setting Fonts">Setting Fonts</a></h1></div>
+
+<p>
+This section is all about typography and readability. You’re not just choosing a font; you’re fine-tuning exactly how the pixels are rendered to get that "thick" and "crisp" look.
+</p>
+
+<div id="Setting Fonts-1. The my_fonts Table"><h3 id="1. The my_fonts Table" class="header"><a href="#Setting Fonts-1. The my_fonts Table">1. The my_fonts Table</a></h3></div>
+
+<ul>
+<li>
+<span id="Setting Fonts-1. The my_fonts Table-What it is"></span><strong id="What it is">What it is</strong>: A custom Lua Table.
+
+<li>
+<span id="Setting Fonts-1. The my_fonts Table-What it does"></span><strong id="What it does">What it does</strong>: It doesn't actually change the font yet—it's essentially a favorites list. You’ve pre-defined several Nerd Fonts (which include the icons you’re using in your status bar) so you can easily swap them later without looking up the exact names.
+
+</ul>
+<div id="Setting Fonts-2. config.font and config.font_size"><h3 id="2. config.font and config.font_size" class="header"><a href="#Setting Fonts-2. config.font and config.font_size">2. config.font and config.font_size</a></h3></div>
+
+<ul>
+<li>
+<span id="Setting Fonts-2. config.font and config.font_size-The Weight"></span><strong id="The Weight">The Weight</strong>: You’re using weight = 700, which corresponds to Bold.
+
+<li>
+<span id="Setting Fonts-2. config.font and config.font_size-The Redundancy"></span><strong id="The Redundancy">The Redundancy</strong>: You’ll notice the line config.font = ... appears twice. In Lua, the last one wins. Right now, your config sets it to FiraMono, then immediately overwrites it with FiraMono again.
+
+<li>
+<span id="Setting Fonts-2. config.font and config.font_size-WezTerm Font Function"></span><strong id="WezTerm Font Function">WezTerm Font Function</strong>: The wezterm.font() function is a helper that tells the engine exactly which face to pull from your system.
+
+</ul>
+<div id="Setting Fonts-3. The &quot;Thickening&quot; Combo (FreeType Settings)"><h3 id="3. The &quot;Thickening&quot; Combo (FreeType Settings)" class="header"><a href="#Setting Fonts-3. The &quot;Thickening&quot; Combo (FreeType Settings)">3. The "Thickening" Combo (FreeType Settings)</a></h3></div>
+
+<p>
+This is the "secret sauce" of your config. WezTerm uses the FreeType engine to draw letters, and these settings mimic the high-contrast look of the classic macOS Terminal:
+</p>
+<ul>
+<li>
+freetype_load_target = 'Normal': This tells the engine not to make the letters too thin or "hinted" to the grid. It keeps the "body" of the font.
+
+<li>
+freetype_render_target = 'HorizontalLcd': This enables Subpixel Rendering. It uses the red, green, and blue components of your monitor's pixels to make the edges of letters look smoother.
+
+<li>
+freetype_load_flags = 'DEFAULT': This avoids "force-autohinting," letting the font’s natural design shine through.
+
+</ul>
+<div id="Setting Fonts-4. Spacing"><h3 id="4. Spacing" class="header"><a href="#Setting Fonts-4. Spacing">4. Spacing</a></h3></div>
+
+<ul>
+<li>
+config.cell_width = 1: This is the standard width. If you ever find a font feels too "cramped," you can increase this to something like 1.05.
+
+<li>
+config.line_height = 1.1: This adds a tiny bit of "breathing room" (10% extra space) between lines of text, which significantly reduces eye strain.
+
+</ul>
+<div id="Setting Fonts-A Quick Optimization Tip"><h2 id="A Quick Optimization Tip" class="header"><a href="#Setting Fonts-A Quick Optimization Tip">A Quick Optimization Tip</a></h2></div>
+
+<p>
+Since you have that nice my_fonts list at the top, you can actually make your configuration "cleaner" by referencing the list directly:
+</p>
+
+<pre lua>
+-- Instead of typing the name again, use the 4th item in your list (FiraMono)
+config.font = wezterm.font(my_fonts[4].family, { weight = my_fonts[4].weight })
+config.font_size = my_fonts[4].size
+</pre>
+
+<div id="Window Position"><h1 id="Window Position" class="header"><a href="#Window Position">Window Position</a></h1></div>
+
+<p>
+This final chunk is where the "intelligence" of your setup lives. It uses state tracking to make the terminal behave more like a specialized app than a basic text box.
+Here is the breakdown of the logic:
+</p>
+
+<div id="Window Position-1. The Persistent State (wezterm.GLOBAL)"><h3 id="1. The Persistent State (wezterm.GLOBAL)" class="header"><a href="#Window Position-1. The Persistent State (wezterm.GLOBAL)">1. The Persistent State (wezterm.GLOBAL)</a></h3></div>
+
+<p>
+You are using a "Global Table." Normally, when you save your wezterm.lua file, the configuration reloads and all variables are wiped. However, wezterm.GLOBAL stays in memory.
+</p>
+
+<p>
+This allows the terminal to "remember" which font you chose or if a window is in "Buffer Mode" even after a config refresh.
+</p>
+
+<div id="Window Position-2. Window Positioning &amp; &quot;Sizing Once&quot;"><h3 id="2. Window Positioning &amp; &quot;Sizing Once&quot;" class="header"><a href="#Window Position-2. Window Positioning &amp; &quot;Sizing Once&quot;">2. Window Positioning &amp; "Sizing Once"</a></h3></div>
+
+<ul>
+<li>
+<span id="Window Position-2. Window Positioning &amp; &quot;Sizing Once&quot;-window-config-reloaded"></span><strong id="window-config-reloaded">window-config-reloaded</strong>: This event runs every time you save the file.
+
+<li>
+<span id="Window Position-2. Window Positioning &amp; &quot;Sizing Once&quot;-The Logic"></span><strong id="The Logic">The Logic</strong>: You don't want the window to jump back to 700 × 700 every single time you save a change. Your code checks wezterm.GLOBAL.sized_windows. If the window ID isn't there, it positions it; if it is there, it leaves your manual resizes alone.
+
+</ul>
+<div id="Window Position-3. Dynamic Font Cycling (CTRL+SHIFT+F)"><h3 id="3. Dynamic Font Cycling (CTRL+SHIFT+F)" class="header"><a href="#Window Position-3. Dynamic Font Cycling (CTRL+SHIFT+F)">3. Dynamic Font Cycling (CTRL+SHIFT+F)</a></h3></div>
+
+<p>
+This is the payoff for that my_fonts table from earlier!
+</p>
+<ul>
+<li>
+It grabs the window_id.
+
+<li>
+It increments the index (1 to 2, 2 to 3, etc.).
+
+<li>
+set_config_overrides: This is a powerful function that changes settings for only that specific window without altering your main wezterm.lua file.
+
+</ul>
+<div id="Window Position-4. &quot;Buffer Mode&quot; Toggle (CTRL+SHIFT+T)"><h3 id="4. &quot;Buffer Mode&quot; Toggle (CTRL+SHIFT+T)" class="header"><a href="#Window Position-4. &quot;Buffer Mode&quot; Toggle (CTRL+SHIFT+T)">4. "Buffer Mode" Toggle (CTRL+SHIFT+T)</a></h3></div>
+
+<p>
+This is a clever "IDE Mode" switch.
+</p>
+
+<ul>
+<li>
+<span id="Window Position-4. &quot;Buffer Mode&quot; Toggle (CTRL+SHIFT+T)-Standard Mode"></span><strong id="Standard Mode">Standard Mode</strong>: Sets the window to a square 700 × 700
+
+<li>
+<span id="Window Position-4. &quot;Buffer Mode&quot; Toggle (CTRL+SHIFT+T)-Buffer Mode"></span><strong id="Buffer Mode">Buffer Mode</strong>: Stretches the window vertically to 700 × 950 (or 950) as seen in your code). This is perfect for opening Vim or Neovim where you want more vertical lines of code visible without manually dragging the window corner.
+
+</ul>
+<div id="Window Position-5. Pixel-Perfect Stretching (CTRL+SHIFT + HJKL)"><h3 id="5. Pixel-Perfect Stretching (CTRL+SHIFT + HJKL)" class="header"><a href="#Window Position-5. Pixel-Perfect Stretching (CTRL+SHIFT + HJKL)">5. Pixel-Perfect Stretching (CTRL+SHIFT + HJKL)</a></h3></div>
+
+<ul>
+<li>
+Instead of resizing by "character cells" (which can be jerky), your code uses window:get_dimensions() to find the exact pixel width.
+
+<li>
+It then adds or subtracts 50 pixels instantly. This works because you set config.use_resize_increments = false at the top of the chunk, which allows WezTerm to resize smoothly rather than snapping to the font grid.
+
+</ul>
+<div id="Window Position-6. The Status Bar (The Finale)"><h3 id="6. The Status Bar (The Finale)" class="header"><a href="#Window Position-6. The Status Bar (The Finale)">6. The Status Bar (The Finale)</a></h3></div>
+
+<ul>
+<li>
+Everything comes together here. It looks at the is_buffer state and the hostname to draw that custom bar at the bottom.
+
+<li>
+return config: This is the most important line in the whole file. It hands the "shopping list" we built back to the WezTerm engine to apply the settings.
+
+</ul>
+<div id="Window Position-Summary of your custom Keybindings:"><h2 id="Summary of your custom Keybindings:" class="header"><a href="#Window Position-Summary of your custom Keybindings:">Summary of your custom Keybindings:</a></h2></div>
+
+<pre lua>
+CTRL + SHIFT + F: Cycles through your 6 favorite fonts.
+CTRL + SHIFT + T: Toggles "Vim/Buffer" height.
+CTRL + SHIFT + H/J/K/L: Stretches the window in 50px increments.
+OPT + Arrows: Resizes internal split panes.
+</pre>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
