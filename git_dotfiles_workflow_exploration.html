@@ -263,6 +263,11 @@ This is using the more modern 'switch' option (rather then checkout):
 <p>
 Since you are syncing your macbook-m3 and macmini changes, here is how your workflow looks with the new command:
 </p>
+
+<p>
+Imagine you've made changes on one of the 'machine' branches (macbook-m3 for example) and want to propagate:
+</p>
+
 <ul>
 <li>
 git switch main
@@ -271,16 +276,34 @@ git switch main
 git merge macbook-m3
 
 <li>
+git push
+
+<li>
+git switch macbook-m3 (Update the source branch too!)
+
+<li>
+git rebase main
+
+<li>
+git push --force-with-lease
+
+<li>
 git switch macmini
 
 <li>
 git rebase main
 
 <li>
+git push --force-with-lease
+
+<li>
 git switch macbook-intel
 
 <li>
 git rebase main
+
+<li>
+git push --force-with-lease
 
 </ul>
 <p>
@@ -382,6 +405,208 @@ In your specific dotfile cycle, you should run git push --force immediately afte
 
 <p>
 Because a rebase rewrites your commit history, your local machine branch will no longer match the version already stored on your remote server
+</p>
+
+<div id="Git - Dotfiles Workflow Exploration-Updated Workflow (actually shown above)"><h2 id="Updated Workflow (actually shown above)" class="header"><a href="#Git - Dotfiles Workflow Exploration-Updated Workflow (actually shown above)">Updated Workflow (actually shown above)</a></h2></div>
+
+<p>
+Your workflow effectively uses main as the "source of truth" and treats your machine branches as "layers" sitting on top of that truth.
+</p>
+
+<p>
+A few "Quality of Life" tweaks:
+</p>
+
+<ul>
+<li>
+Use --force-with-lease: Use git push --force-with-lease instead of --force. If you ever accidentally edit the macmini branch on two different machines, this will prevent you from overwriting work you forgot to pull.
+
+<li>
+Stash before switching: If you have uncommitted changes on a machine when you start this cycle, git switch might fail. Use git stash to tuck them away, then git stash pop when you're back on that machine's branch.
+
+<li>
+The "Upstream" Push: After you merge macbook-m3 into main and push, your local macbook-m3 branch is technically "behind" main (it doesn't have the merge commit). You should rebase macbook-m3 onto main as well, or simply reset it, so all branches start from the same point.
+
+</ul>
+<div id="Git - Dotfiles Workflow Exploration-Updated Workflow (actually shown above)-Your refined sequence:"><h4 id="Your refined sequence:" class="header"><a href="#Git - Dotfiles Workflow Exploration-Updated Workflow (actually shown above)-Your refined sequence:">Your refined sequence:</a></h4></div>
+
+<ul>
+<li>
+git switch main
+
+<li>
+git merge macbook-m3
+
+<li>
+git push
+
+<li>
+git switch macbook-m3 (Update the source branch too!)
+
+<li>
+git rebase main
+
+<li>
+git push --force-with-lease
+
+<li>
+git switch macbook-intel (Update the source branch too!)
+
+<li>
+git rebase main
+
+<li>
+git push --force-with-lease
+
+<li>
+git switch macmini (Update the source branch too!)
+
+<li>
+git rebase main
+
+<li>
+git push --force-with-lease
+
+</ul>
+<p>
+One quick tip: Since you use Stow, ensure your .stow-local-ignore (or equivalent) is set up so that machine-specific files don't accidentally get swept into main during that first merge.
+</p>
+
+<div id="Git - Dotfiles Workflow Exploration-Automate"><h2 id="Automate" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate">Automate</a></h2></div>
+
+<p>
+Automating this workflow is a great way to reduce the repetitive "plumbing" of switching and rebasing. Below is a simple Bash script designed to handle your specific cycle safely. 
+</p>
+
+<div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script"><h3 id="Dotfile Sync Script" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script">Dotfile Sync Script</a></h3></div>
+<p>
+Save this as sync-dotfiles.sh in your repository and give it execution permissions (chmod +x sync-dotfiles.sh).
+</p>
+
+<pre bash>
+#!/bin/bash
+
+# Configuration
+MAIN_BRANCH="main"
+MACHINE_BRANCHES=("macbook-m3" "macmini" "macbook-intel")
+# Use --force-with-lease for safer pushes
+PUSH_CMD="git push --force-with-lease"
+
+# Save starting point
+START_BRANCH=$(git branch --show-current)
+
+echo "--- Starting dotfile sync ---"
+
+# 1. Update main branch first
+echo "Updating $MAIN_BRANCH..."
+git checkout $MAIN_BRANCH
+git pull origin $MAIN_BRANCH
+
+# 2. Process each machine branch
+for branch in "${MACHINE_BRANCHES[@]}"; do
+    echo "Processing $branch..."
+    
+    # Check if branch exists locally
+    if git show-ref --verify --quiet "refs/heads/$branch"; then
+        git checkout "$branch"
+        
+        # Rebase machine branch onto latest main
+        if git rebase "$MAIN_BRANCH"; then
+            $PUSH_CMD origin "$branch"
+            echo "SUCCESS: $branch is up to date."
+        else
+            echo "ERROR: Rebase failed on $branch. Resolve manually and then run 'git rebase --continue'."
+            exit 1
+        fi
+    else
+        echo "SKIP: $branch not found locally."
+    fi
+done
+
+# 3. Return to where you started
+git checkout "$START_BRANCH"
+echo "--- Sync complete! Back on $START_BRANCH ---"
+</pre>
+
+<div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:"><h4 id="Why this script helps:" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:">Why this script helps:</a></h4></div>
+
+<ul>
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:-Safety First"></span><strong id="Safety First">Safety First</strong>: It uses --force-with-lease, which prevents you from accidentally overwriting remote work you haven't fetched yet.
+
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:-Branch Awareness"></span><strong id="Branch Awareness">Branch Awareness</strong>: It checks if a branch exists locally before trying to switch, preventing errors if a specific machine doesn't have all branches checked out.
+
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:-Conflict Handling"></span><strong id="Conflict Handling">Conflict Handling</strong>: If a rebase hits a conflict, the script stops immediately so you can fix it manually before continuing. 
+
+</ul>
+<div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Pro-Tip: Add a Git Alias"><h4 id="Pro-Tip: Add a Git Alias" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Pro-Tip: Add a Git Alias">Pro-Tip: Add a Git Alias</a></h4></div>
+
+<p>
+If you don't want to run a script file every time, you can add this logic as a Git alias in your ~/.gitconfig or simply run the script via a shorthand like alias dsync='./sync-dotfiles.sh'.
+</p>
+
+<div id="Git - Dotfiles Workflow Exploration-Git Alias Addition"><h2 id="Git Alias Addition" class="header"><a href="#Git - Dotfiles Workflow Exploration-Git Alias Addition">Git Alias Addition</a></h2></div>
+
+<p>
+To add a multi-line script as a Git alias, you wrap the entire script in a shell function inside your .gitconfig. By prefixing the command with an exclamation mark (!), Git passes the command directly to your system's shell instead of trying to run it as a standard Git subcommand. 
+</p>
+
+<div id="Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 1: The &quot;Function Wrap&quot; (Direct in .gitconfig)"><h3 id="Method 1: The &quot;Function Wrap&quot; (Direct in .gitconfig)" class="header"><a href="#Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 1: The &quot;Function Wrap&quot; (Direct in .gitconfig)">Method 1: The "Function Wrap" (Direct in .gitconfig)</a></h3></div>
+
+<p>
+Open your ~/.gitconfig file (e.g., git config --global --edit) and add the following under the [alias] section: 
+</p>
+
+<pre ini>
+[alias]
+    sync-dots = "!f() { \
+        MAIN_BRANCH='main'; \
+        MACHINE_BRANCHES=('macbook-m3' 'macmini' 'macbook-intel'); \
+        START_BRANCH=$(git branch --show-current); \
+        git checkout $MAIN_BRANCH &amp;&amp; git pull origin $MAIN_BRANCH; \
+        for br in \"${MACHINE_BRANCHES[@]}\"; do \
+            git checkout $br &amp;&amp; git rebase $MAIN_BRANCH &amp;&amp; git push --force-with-lease; \
+        done; \
+        git checkout $START_BRANCH; \
+    }; f"
+</pre>
+
+<ul>
+<li>
+The !: Tells Git to run this in the shell.
+
+<li>
+The f() { ... }; f: Defines a temporary shell function and immediately executes it.
+
+<li>
+Backslashes (\): Required at the end of each line in the config file to tell Git the command continues on the next line. 
+
+</ul>
+<div id="Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 2: The &quot;External Script&quot; (Cleaner &amp; Easier)"><h3 id="Method 2: The &quot;External Script&quot; (Cleaner &amp; Easier)" class="header"><a href="#Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 2: The &quot;External Script&quot; (Cleaner &amp; Easier)">Method 2: The "External Script" (Cleaner &amp; Easier)</a></h3></div>
+
+<p>
+If the script is too long, the standard practice is to save it as a standalone file and point the alias to it. 
+</p>
+
+<ul>
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 2: The &quot;External Script&quot; (Cleaner &amp; Easier)-Save the script"></span><strong id="Save the script">Save the script</strong>: Create a file named git-sync-dots (no extension needed) in a folder that is in your $PATH (like ~/bin/ or /usr/local/bin/).
+
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 2: The &quot;External Script&quot; (Cleaner &amp; Easier)-Make it executable"></span><strong id="Make it executable">Make it executable</strong>: Run chmod +x ~/bin/git-sync-dots.
+
+<li>
+Add the simple alias:
+
+</ul>
+  
+<pre bash>
+git config --global alias.sync-dots "!git-sync-dots"
+</pre>
+
+<p>
 <a href="Git.html">Git</a>
 </p>
 
