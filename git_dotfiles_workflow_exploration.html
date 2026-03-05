@@ -490,6 +490,9 @@ Save this as sync-dotfiles.sh in your repository and give it execution permissio
 #!/bin/bash
 
 # Configuration
+#!/bin/bash
+
+# Configuration
 MAIN_BRANCH="main"
 MACHINE_BRANCHES=("macbook-m3" "macmini" "macbook-intel")
 PUSH_CMD="git push --force-with-lease"
@@ -499,7 +502,14 @@ START_BRANCH=$(git branch --show-current)
 
 echo "--- Starting dotfile sync ---"
 
-# 1. Update main and merge the current machine's work
+# 1. Safety Check: Ensure no uncommitted changes
+if ! git diff-index --quiet HEAD --; then
+    echo "ERROR: You have uncommitted changes on $START_BRANCH."
+    echo "Please commit or stash them before running the sync."
+    exit 1
+fi
+
+# 2. Update main and merge the current machine's work
 echo "Switching to $MAIN_BRANCH and pulling..."
 git checkout $MAIN_BRANCH
 git pull origin $MAIN_BRANCH
@@ -514,7 +524,7 @@ if [ "$START_BRANCH" != "$MAIN_BRANCH" ]; then
     fi
 fi
 
-# 2. Process each machine branch (including the one we started on)
+# 3. Process each machine branch
 for branch in "${MACHINE_BRANCHES[@]}"; do
     echo "Rebasing $branch onto latest $MAIN_BRANCH..."
     
@@ -533,7 +543,7 @@ for branch in "${MACHINE_BRANCHES[@]}"; do
     fi
 done
 
-# 3. Return to where you started
+# 4. Return to where you started
 git checkout "$START_BRANCH"
 echo "--- Sync complete! Back on $START_BRANCH ---"
 </pre>
@@ -541,6 +551,15 @@ echo "--- Sync complete! Back on $START_BRANCH ---"
 <div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:"><h4 id="Why this script helps:" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:">Why this script helps:</a></h4></div>
 
 <ul>
+<li>
+The "Dirty Check": Added git diff-index --quiet HEAD --. If you have modified or staged files that aren't committed, the script will stop immediately to prevent messy rebases or accidental loss of work.
+
+<li>
+Propagate to Main: It now successfully merges your current machine's work into main before rebasing the other branches, ensuring everyone gets the newest updates.
+
+<li>
+Atomic Failure: If a merge or rebase fails, the script exits with an error code rather than continuing and potentially corrupting other branches.
+
 <li>
 <span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:-Safety First"></span><strong id="Safety First">Safety First</strong>: It uses --force-with-lease, which prevents you from accidentally overwriting remote work you haven't fetched yet.
 
@@ -572,23 +591,39 @@ Open your ~/.gitconfig file (e.g., git config --global --edit) and add the follo
 <pre ini>
 [alias]
     sync-dots = "!f() { \
-        MAIN_BRANCH='main'; \
-        MACHINE_BRANCHES=('macbook-m3' 'macmini' 'macbook-intel'); \
-        START_BRANCH=$(git branch --show-current); \
-        echo \"Merging changes from $START_BRANCH into $MAIN_BRANCH...\"; \
-        git checkout $MAIN_BRANCH &amp;&amp; git pull origin $MAIN_BRANCH; \
-        if [ \"$START_BRANCH\" != \"$MAIN_BRANCH\" ]; then \
-            git merge \"$START_BRANCH\" &amp;&amp; git push origin $MAIN_BRANCH; \
+        MAIN='main'; \
+        MACHINES=('macbook-m3' 'macmini' 'macbook-intel'); \
+        START=$(git branch --show-current); \
+        if ! git diff-index --quiet HEAD --; then \
+            echo 'ERROR: Uncommitted changes found. Commit or stash first.'; return 1; \
         fi; \
-        for br in \"${MACHINE_BRANCHES[@]}\"; do \
+        echo \"Propagating $START to $MAIN...\"; \
+        git checkout $MAIN &amp;&amp; git pull origin $MAIN; \
+        if [ \"$START\" != \"$MAIN\" ]; then \
+            git merge \"$START\" &amp;&amp; git push origin $MAIN || { echo 'Merge failed'; return 1; }; \
+        fi; \
+        for br in \"${MACHINES[@]}\"; do \
             echo \"Updating $br...\"; \
-            git checkout $br &amp;&amp; git rebase $MAIN_BRANCH &amp;&amp; git push --force-with-lease; \
+            git checkout $br &amp;&amp; git rebase $MAIN &amp;&amp; git push --force-with-lease || { echo \"Rebase failed on $br\"; return 1; }; \
         done; \
-        git checkout $START_BRANCH; \
+        git checkout $START; \
+        echo '--- Sync Complete ---'; \
     }; f"
 </pre>
 
 <ul>
+<li>
+The Dirty Check: git diff-index --quiet HEAD -- checks for any local modifications before starting.
+
+<li>
+The Propagation: It now correctly merges the START branch into MAIN and pushes it to the server.
+
+<li>
+Error Handling: Added || { ... return 1; } logic. If any step (merge, rebase, or push) fails, the alias stops immediately so you don't end up in a broken state across multiple branches.
+
+<li>
+Refined Scope: It uses return 1 instead of exit 1 because aliases run within the shell context of the git command; this ensures it exits the function cleanly.
+
 <li>
 The !: Tells Git to run this in the shell.
 
