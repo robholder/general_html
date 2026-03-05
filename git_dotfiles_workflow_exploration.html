@@ -486,11 +486,29 @@ Save this as sync-dotfiles.sh in your repository and give it execution permissio
 <pre bash>
 #!/bin/bash
 
-# Configuration
-#!/bin/bash
+# 1. Automatic Directory Discovery &amp; Validation
+DOTFILES_PATH="$HOME/dotfiles"
 
-# Configuration
-#!/bin/bash
+# If we aren't in a git repo named 'dotfiles', try to go there
+REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2&gt;/dev/null)" 2&gt;/dev/null)
+
+if [[ "$REPO_NAME" != "dotfiles" ]]; then
+    if [[ -d "$DOTFILES_PATH" ]]; then
+        echo "Not in dotfiles repo. Jumping to $DOTFILES_PATH..."
+        cd "$DOTFILES_PATH" || exit 1
+    else
+        echo "ERROR: Not in 'dotfiles' repo and could not find it at $DOTFILES_PATH."
+        exit 1
+    fi
+fi
+
+# 2. Safety Check: Uncommitted changes
+if ! git diff-index --quiet HEAD --; then
+    echo "ERROR: You have uncommitted changes. Commit or stash them first."
+    exit 1
+fi
+
+# ... [Remainder of your rebase/merge logic] ...
 
 # Configuration
 MAIN_BRANCH="main"
@@ -568,6 +586,48 @@ Atomic Failure: If a merge or rebase fails, the script exits with an error code 
 
 <li>
 <span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this script helps:-Conflict Handling"></span><strong id="Conflict Handling">Conflict Handling</strong>: If a rebase hits a conflict, the script stops immediately so you can fix it manually before continuing. 
+
+</ul>
+<div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-UPDATED VERSION"><h4 id="UPDATED VERSION" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-UPDATED VERSION">UPDATED VERSION</a></h4></div>
+
+<p>
+This updated version is 'better' as it checks the location (the dotfiles repo):
+</p>
+
+<pre ini>
+[alias]
+    sync-dots = "!f() { \
+        DIR=\"$HOME/dotfiles\"; \
+        MAIN='main'; \
+        MACHINES=('macbook-m3' 'macmini' 'macbook-intel'); \
+        if [ ! -d \"$DIR\" ]; then echo \"Folder $DIR not found\"; return 1; fi; \
+        REPO=$(basename \"$(git -C \"$DIR\" rev-parse --show-toplevel)\"); \
+        if [ \"$REPO\" != 'dotfiles' ]; then echo 'Not a dotfiles repo'; return 1; fi; \
+        START=$(git -C \"$DIR\" branch --show-current); \
+        if ! git -C \"$DIR\" diff-index --quiet HEAD --; then echo 'Uncommitted changes found'; return 1; fi; \
+        echo \"Syncing from $DIR...\"; \
+        git -C \"$DIR\" checkout $MAIN &amp;&amp; git -C \"$DIR\" pull origin $MAIN; \
+        if [ \"$START\" != \"$MAIN\" ]; then \
+            git -C \"$DIR\" merge \"$START\" &amp;&amp; git -C \"$DIR\" push origin $MAIN || return 1; \
+        fi; \
+        for br in \"${MACHINES[@]}\"; do \
+            git -C \"$DIR\" checkout $br &amp;&amp; git -C \"$DIR\" rebase $MAIN &amp;&amp; git -C \"$DIR\" push --force-with-lease || return 1; \
+        done; \
+        git -C \"$DIR\" checkout $START; \
+    }; f"
+</pre>
+
+<div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this is better:"><h4 id="Why this is better:" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this is better:">Why this is better:</a></h4></div>
+
+<ul>
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this is better:-Location Independent"></span><strong id="Location Independent">Location Independent</strong>: You can run git sync-dots from your ~/Downloads folder, and it will still perform the work inside ~/dotfiles.
+
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this is better:-Zero Accidents"></span><strong id="Zero Accidents">Zero Accidents</strong>: If you rename your dotfiles folder or delete it, the script identifies the mismatch and stops before running dangerous commands like git push --force.
+
+<li>
+<span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this is better:-Clean Exit"></span><strong id="Clean Exit">Clean Exit</strong>: If any single rebase or merge fails, the script uses return 1 to halt immediately, leaving you exactly where the error occurred so you can fix it. 
 
 </ul>
 <div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Pro-Tip: Add a Git Alias"><h4 id="Pro-Tip: Add a Git Alias" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Pro-Tip: Add a Git Alias">Pro-Tip: Add a Git Alias</a></h4></div>
