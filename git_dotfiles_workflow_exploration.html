@@ -487,9 +487,11 @@ Save this as sync-dotfiles.sh in your repository and give it execution permissio
 #!/bin/bash
 
 # Configuration
+#!/bin/bash
+
+# Configuration
 MAIN_BRANCH="main"
 MACHINE_BRANCHES=("macbook-m3" "macmini" "macbook-intel")
-# Use --force-with-lease for safer pushes
 PUSH_CMD="git push --force-with-lease"
 
 # Save starting point
@@ -497,25 +499,33 @@ START_BRANCH=$(git branch --show-current)
 
 echo "--- Starting dotfile sync ---"
 
-# 1. Update main branch first
-echo "Updating $MAIN_BRANCH..."
+# 1. Update main and merge the current machine's work
+echo "Switching to $MAIN_BRANCH and pulling..."
 git checkout $MAIN_BRANCH
 git pull origin $MAIN_BRANCH
 
-# 2. Process each machine branch
+if [ "$START_BRANCH" != "$MAIN_BRANCH" ]; then
+    echo "Propagating changes from $START_BRANCH to $MAIN_BRANCH..."
+    if git merge "$START_BRANCH"; then
+        git push origin $MAIN_BRANCH
+    else
+        echo "ERROR: Merge into $MAIN_BRANCH failed. Resolve conflicts and try again."
+        exit 1
+    fi
+fi
+
+# 2. Process each machine branch (including the one we started on)
 for branch in "${MACHINE_BRANCHES[@]}"; do
-    echo "Processing $branch..."
+    echo "Rebasing $branch onto latest $MAIN_BRANCH..."
     
-    # Check if branch exists locally
     if git show-ref --verify --quiet "refs/heads/$branch"; then
         git checkout "$branch"
         
-        # Rebase machine branch onto latest main
         if git rebase "$MAIN_BRANCH"; then
             $PUSH_CMD origin "$branch"
-            echo "SUCCESS: $branch is up to date."
+            echo "SUCCESS: $branch is rebased and pushed."
         else
-            echo "ERROR: Rebase failed on $branch. Resolve manually and then run 'git rebase --continue'."
+            echo "ERROR: Rebase failed on $branch. Resolve manually."
             exit 1
         fi
     else
@@ -565,8 +575,13 @@ Open your ~/.gitconfig file (e.g., git config --global --edit) and add the follo
         MAIN_BRANCH='main'; \
         MACHINE_BRANCHES=('macbook-m3' 'macmini' 'macbook-intel'); \
         START_BRANCH=$(git branch --show-current); \
+        echo \"Merging changes from $START_BRANCH into $MAIN_BRANCH...\"; \
         git checkout $MAIN_BRANCH &amp;&amp; git pull origin $MAIN_BRANCH; \
+        if [ \"$START_BRANCH\" != \"$MAIN_BRANCH\" ]; then \
+            git merge \"$START_BRANCH\" &amp;&amp; git push origin $MAIN_BRANCH; \
+        fi; \
         for br in \"${MACHINE_BRANCHES[@]}\"; do \
+            echo \"Updating $br...\"; \
             git checkout $br &amp;&amp; git rebase $MAIN_BRANCH &amp;&amp; git push --force-with-lease; \
         done; \
         git checkout $START_BRANCH; \
