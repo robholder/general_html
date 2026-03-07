@@ -427,12 +427,29 @@ You can configure Vim to automatically update the tmux window name to the curren
 
 </ul>
   
-<pre vim>
-" Automatically rename tmux window to the current filename
-autocmd BufReadPost,FileReadPost,BufNewFile,FocusGained * call system("tmux rename-window " . expand("%:t"))
 
-" Reset to 'bash' (or your shell) when leaving Vim
-autocmd VimLeave,FocusLost * call system("tmux rename-window bash")
+<ul>
+<li>
+<em>Uses set-window-option automatic-rename. This tells tmux to resume its default behavior of naming the window based on the currently active process (e.g., it will correctly show zsh or ssh as soon as you exit Vim).</em>
+
+<li>
+Wraps everything in an augroup with autocmd!. This is best practice; it ensures that if you source your .vimrc multiple times, the commands aren't duplicated and performance doesn't degrade. 
+
+<li>
+Adds BufEnter, which ensures the window name updates immediately when you switch between internal Vim buffers (files), even if you never leave the terminal.
+
+</ul>
+  
+<pre vim>
+augroup tmux
+  autocmd!
+  if exists('$TMUX')
+    " Set window name to current filename when opening or switching files
+    autocmd BufReadPost,FileReadPost,BufNewFile,BufEnter * call system("tmux rename-window " . expand("%:t"))
+    " Restore automatic renaming (e.g., to 'bash' or 'zsh') when leaving Vim
+    autocmd VimLeave,FocusLost * call system("tmux set-window-option automatic-rename")
+  endif
+augroup END
 </pre>
 
 <ul>
