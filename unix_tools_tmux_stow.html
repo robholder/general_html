@@ -34,11 +34,13 @@ To layout tmux configs with plugins using Stow, create a ~/.config/tmux structur
 
 <pre text>
 ~/dotfiles/
-└── tmux/
-    └── dot-config/
-        └── tmux/
-            ├── tmux.conf
-            └── tpm/ (or plugins installed here)
+└──  tmux
+    └──  dot-config
+        └──  tmux
+            ├──  plugins
+            │   ├── 󰊢 .gitignore
+            │   └──  tpm
+            └──  tmux.conf
 </pre>
 
 <div id="Config and Plugins-Stow Setup for Tmux-Steps to Implement:"><h3 id="Steps to Implement:" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Steps to Implement:">Steps to Implement:</a></h3></div>
@@ -49,7 +51,7 @@ Create the directory structure in your dotfiles repository:
 
 <ul>
 <li>
-<code>mkdir -p ~/dotfiles/tmux/.config/tmux</code>
+<code>mkdir -p ~/dotfiles/tmux/dot-config/tmux</code>
 
 </ul>
 <li>
@@ -57,23 +59,120 @@ Move your existing configuration to this new location:
 
 <ul>
 <li>
-<code>mv ~/.tmux.conf ~/dotfiles/tmux/.config/tmux/tmux.conf</code>
+<code>mv ~/.tmux.conf ~/dotfiles/tmux/dot.config/tmux/tmux.conf</code>
 
 </ul>
 <li>
-Create tmux.conf and include Plugin Manager (TPM) settings:
+Edit tmux.conf and include Plugin Manager (TPM) settings:
 
 </ul>
   
 <pre bash>
-# Set plugin path
+# 1. Path (keeps Stow/Symlinks happy)
 set-environment -g TMUX_PLUGIN_MANAGER_PATH '~/.config/tmux/plugins'
-# List plugins
+
+# 2. List of plugins
 set -g @plugin 'tmux-plugins/tpm'
-set -g @plugin 'tmux-plugins/tmux-sensible'
-# Initialize TPM
+set -g @plugin 'tmux-plugins/tmux-sensible' # Recommended starting plugin
+
+# 3. Initialize (MUST be the last line)
 run '~/.config/tmux/plugins/tpm/tpm'
 </pre>
+
+<p>
+A standard git pull will get you 90% of the way there to including all this Tmux plugin stuff, but because we have introduced a submodule (TPM) and changed the directory structure, we need to run two extra commands on those machines to "activate" the changes.
+</p>
+
+<p>
+Here is the exact sequence to run on other machines
+</p>
+
+<div id="Config and Plugins-Stow Setup for Tmux-Steps to Implement:-1. The Pull &amp; Submodule Sync"><h4 id="1. The Pull &amp; Submodule Sync" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Steps to Implement:-1. The Pull &amp; Submodule Sync">1. The Pull &amp; Submodule Sync</a></h4></div>
+
+<p>
+A regular pull won't automatically download the contents of the new tpm folder. Run this:
+</p>
+<pre>
+bash
+git pull
+git submodule update --init --recursive
+</pre>
+
+<p>
+This tells Git: "I see a new submodule pointer in the history; go fetch the actual code from GitHub." [1]
+</p>
+
+<div id="Config and Plugins-Stow Setup for Tmux-Steps to Implement:-2. The Stow Update"><h4 id="2. The Stow Update" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Steps to Implement:-2. The Stow Update">2. The Stow Update</a></h4></div>
+
+<p>
+Since we moved dot-tmux.conf into dot-config/tmux/tmux.conf, our old symlinks are now broken (pointing to a file that doesn't exist) or outdated.
+</p>
+
+<pre bash>
+stow --restow tmux
+</pre>
+
+<p>
+The --restow (or -R) flag is a lifactor: it prunes the old dead links and creates the new ones in ~/.config/tmux/. [2]
+</p>
+
+<div id="Config and Plugins-Stow Setup for Tmux-Steps to Implement:-3. The Plugin Install"><h4 id="3. The Plugin Install" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Steps to Implement:-3. The Plugin Install">3. The Plugin Install</a></h4></div>
+
+<p>
+Finally, since the plugins/ folder (except for TPM) was gitignored, those machines don't have tmux-sensible or resurrect yet.
+</p>
+
+<ul>
+<li>
+Open tmux.
+
+<li>
+Press Prefix + I (Capital I).
+
+</ul>
+<p>
+TPM will now read your updated tmux.conf and download the plugins locally on that machine. [3]
+</p>
+
+<div id="Config and Plugins-Stow Setup for Tmux-Steps to Implement:-Summary Checklist for Remote Machines:"><h4 id="Summary Checklist for Remote Machines:" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Steps to Implement:-Summary Checklist for Remote Machines:">Summary Checklist for Remote Machines:</a></h4></div>
+
+<ul>
+<li>
+git pull
+
+<li>
+git submodule update --init
+
+<li>
+stow -R tmux
+
+<li>
+tmux -&gt; Prefix + I
+
+</ul>
+<p>
+Pro-Tip: If you see an error about "conflicting files" during the stow step, it’s because you might have an old ~/.tmux.conf file still sitting there. Delete it manually (rm ~/.tmux.conf) and run the stow command again.
+</p>
+
+<p>
+Would you like to see a one-liner alias you can add to your shell config to keep submodules updated automatically during every pull?
+</p>
+
+<div id="Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules"><h3 id="Setting Globals for Submodule Recursive Modules" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules">Setting Globals for Submodule Recursive Modules</a></h3></div>
+
+<p>
+You can change Git's default behavior for the pull command. This ensures that submodules are updated across all your machines and repositories without needing extra commands. 
+</p>
+
+<div id="Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules-Run this once on each machine:"><h4 id="Run this once on each machine:" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules-Run this once on each machine:">Run this once on each machine:</a></h4></div>
+
+<pre bash>
+git config --global submodule.recurse true
+</pre>
+
+<p>
+What this does: It tells Git to always include the --recurse-submodules flag for every git pull. This automatically runs git submodule update --init --recursive immediately after the pull is complete.
+</p>
 
 <div id="Config and Plugins-Stow Setup for Tmux-Stow the config:"><h3 id="Stow the config:" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Stow the config:">Stow the config:</a></h3></div>
 
@@ -81,10 +180,24 @@ run '~/.config/tmux/plugins/tpm/tpm'
 Run stow tmux from inside your ~/dotfiles directory to symlink ~/.config/tmux/.
 </p>
 
+<p>
+If you don't have a .stowrc setup and you've used the 'dot' substitution:
+</p>
+
 <pre sh>
 # If you used the 'dot' substitution in your file structure names
 # use the --dotfiles flat to force '.' in the symlink name.
 stow --dotfiles tmux
+</pre>
+
+<div id="Config and Plugins-Stow Setup for Tmux-Stow the config:-Final Synchronization Tip"><h4 id="Final Synchronization Tip" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Stow the config:-Final Synchronization Tip">Final Synchronization Tip</a></h4></div>
+
+<p>
+Since you are using Stow, remember that while your Git files are now auto-updating, you still need to refresh the symlinks if you change your folder structure. I recommend occasionally running: 
+</p>
+
+<pre bash>
+stow -R tmux
 </pre>
 
 <div id="Config and Plugins-Stow Setup for Tmux-Stow the config:-Key Rules for --dotfiles"><h4 id="Key Rules for --dotfiles" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Stow the config:-Key Rules for --dotfiles">Key Rules for --dotfiles</a></h4></div>
