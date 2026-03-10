@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>unix_tools_wezterm_finding_fonts</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="unix_tools_terminals_wezterm.html">WezTerm</a>
+</p>
+
+<div id="WezTerm - Finding Fonts"><h1 id="WezTerm - Finding Fonts" class="header"><a href="#WezTerm - Finding Fonts">WezTerm - Finding Fonts</a></h1></div>
+
+<p>
+It is a classic "Developer's Dilemma"—you’ve installed the font, but now you have to guess if it's "Fira Code," "FiraCode," or "Fira Code Nerd Font."
+</p>
+
+<p>
+Luckily, WezTerm has a built-in "tell-all" command that reveals exactly what it sees on your system.
+</p>
+
+<div id="WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command"><h2 id="The &quot;Source of Truth&quot; Command" class="header"><a href="#WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command">The "Source of Truth" Command</a></h2></div>
+
+<p>
+Open your terminal and run the following command. It lists every font family name that WezTerm recognizes:
+</p>
+
+<pre bash>
+wezterm ls-fonts --list-system
+</pre>
+
+<p>
+If you have a lot of fonts, you can filter the list to find your new Fira Code installation specifically:
+</p>
+
+<pre bash>
+wezterm ls-fonts --list-system | grep -i "Fira"
+</pre>
+
+<div id="WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command-What to look for"><h3 id="What to look for" class="header"><a href="#WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command-What to look for">What to look for</a></h3></div>
+
+<p>
+In the output, look for the line that says family: "Font Name". That exact string inside the quotes is what you need to paste into your wezterm.lua.
+</p>
+
+<ul>
+<li>
+Standard Install: It is usually just "Fira Code".
+
+<li>
+Nerd Font Version: If you installed the patched version via Homebrew, it is likely "FiraCode Nerd Font".
+
+</ul>
+<div id="WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command-What to look for-Pro-Tip: Testing via CLI"><h4 id="Pro-Tip: Testing via CLI" class="header"><a href="#WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command-What to look for-Pro-Tip: Testing via CLI">Pro-Tip: Testing via CLI</a></h4></div>
+
+<p>
+If you want to be 100% sure the font works before messing with your config file, you can tell WezTerm to start a temporary instance using that font:
+</p>
+
+<pre bash>
+wezterm start --font-config 'font={family="Fira Code", weight="Bold"}'
+}}{
+
+If the window opens and looks right, you've found your string.
+
+=== Updated Config Example ===
+
+Once you've confirmed the name, your table would look like this:
+
+{{{lua
+local my_fonts = {
+  { family = "Fira Code", weight = 700, size = 12 }, -- Adjust based on your 'ls-fonts' result
+  { family = "Agave Nerd Font", weight = 700, size = 14},
+  -- ... the rest of your list
+}
+</pre>
+
+<div id="WezTerm - Finding Fonts-Fallbacks"><h2 id="Fallbacks" class="header"><a href="#WezTerm - Finding Fonts-Fallbacks">Fallbacks</a></h2></div>
+
+<p>
+In WezTerm, fallbacks work like a "search list." If your primary font doesn't have a specific character (like a GitHub icon or a specific emoji), WezTerm will look at the next font in your list.
+</p>
+
+<p>
+You use the wezterm.font_with_fallback function to achieve this.
+</p>
+
+<div id="WezTerm - Finding Fonts-Fallbacks-The Basic Implementation"><h3 id="The Basic Implementation" class="header"><a href="#WezTerm - Finding Fonts-Fallbacks-The Basic Implementation">The Basic Implementation</a></h3></div>
+
+<p>
+Instead of just giving WezTerm a single font name, you provide a list. Here is how you would modify your config to use Fira Code as your main font, but keep a Nerd Font as a backup for icons:
+</p>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.font = wezterm.font_with_fallback({
+  -- 1. Your preferred main text font
+  { family = "Fira Code", weight = "Bold" },
+
+  -- 2. Your "Icon" fallback (use the name you found via ls-fonts)
+  { family = "JetBrainsMono Nerd Font", weight = "Bold" },
+
+  -- 3. Emoji fallback (optional, WezTerm has built-ins, but you can be explicit)
+  { family = "Apple Color Emoji" }, 
+})
+
+return config
+</pre>
+
+<div id="WezTerm - Finding Fonts-Fallbacks-Advanced: Handling Different Sizes"><h3 id="Advanced: Handling Different Sizes" class="header"><a href="#WezTerm - Finding Fonts-Fallbacks-Advanced: Handling Different Sizes">Advanced: Handling Different Sizes</a></h3></div>
+
+<p>
+Sometimes a fallback font looks tiny or huge compared to your main font. You can use the scale property to balance them out:
+</p>
+
+<pre lua>
+config.font = wezterm.font_with_fallback({
+  { family = "Fira Code", size = 12 },
+  -- If the icons in Agave look too small next to Fira, boost them by 20%
+  { family = "Agave Nerd Font", scale = 1.2 },
+})
+</pre>
+
+<div id="WezTerm - Finding Fonts-Fallbacks-Advanced: Handling Different Sizes-Why this is better than &quot;Nerd Fonts&quot; alone"><h4 id="Why this is better than &quot;Nerd Fonts&quot; alone" class="header"><a href="#WezTerm - Finding Fonts-Fallbacks-Advanced: Handling Different Sizes-Why this is better than &quot;Nerd Fonts&quot; alone">Why this is better than "Nerd Fonts" alone</a></h4></div>
+
+<p>
+When you install a "Nerd Font" (like font-fira-code-nerd-font), the icons are "patched" into the font. This can sometimes lead to:
+</p>
+
+<ul>
+<li>
+Blurry icons if the patching wasn't perfect.
+
+<li>
+Old versions of icons if the patch is out of date.
+
+</ul>
+<p>
+By using fallback, you can use the official, clean Fira Code for your text and a dedicated symbols font (like Symbols Nerd Font) for your icons. WezTerm will stitch them together perfectly.
+</p>
+
+
+<div id="WezTerm - Finding Fonts-Cursive Fonts"><h2 id="Cursive Fonts" class="header"><a href="#WezTerm - Finding Fonts-Cursive Fonts">Cursive Fonts</a></h2></div>
+
+<p>
+This is a popular aesthetic—often called the "Operator Mono" look. It keeps your main code block clean and readable in a sturdy font like Fira Code, but renders keywords (like function, return, or import) in a stylish cursive or distinct font.
+</p>
+
+<p>
+In WezTerm, you achieve this using font_rules.
+</p>
+
+<div id="WezTerm - Finding Fonts-Cursive Fonts-The &quot;Cursive Italics&quot; Setup"><h3 id="The &quot;Cursive Italics&quot; Setup" class="header"><a href="#WezTerm - Finding Fonts-Cursive Fonts-The &quot;Cursive Italics&quot; Setup">The "Cursive Italics" Setup</a></h3></div>
+
+<p>
+You’ll need a font that actually has a "cursive" style (like Agave, Victor Mono, or Cartograph CF). Here is how you configure your wezterm.lua to swap fonts based on the text style:
+</p>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- 1. Define your standard font (Regular/Bold)
+config.font = wezterm.font_with_fallback({
+  { family = "Fira Code", weight = 700 }, -- Your main workhorse
+  { family = "Symbols Nerd Font" },       -- Icons fallback
+})
+
+-- 2. Define the "Rule" for Italics
+config.font_rules = {
+  {
+    -- This rule matches whenever the terminal asks for Italic text
+    italic = true,
+    font = wezterm.font_with_fallback({
+      -- Replace "Agave Nerd Font" with your favorite cursive font
+      { family = "Agave Nerd Font", italic = true, weight = 700 },
+    }),
+  },
+}
+
+return config
+</pre>
+
+<div id="WezTerm - Finding Fonts-Cursive Fonts-Pro-Tip: Visual Balance"><h3 id="Pro-Tip: Visual Balance" class="header"><a href="#WezTerm - Finding Fonts-Cursive Fonts-Pro-Tip: Visual Balance">Pro-Tip: Visual Balance</a></h3></div>
+
+<p>
+Cursive fonts are often naturally smaller or thinner than blocky fonts like Fira Code. If your italics look "shrunken," you can use the scale property we discussed earlier inside the rule:
+</p>
+
+<pre lua>
+font = wezterm.font_with_fallback({
+  { family = "Agave Nerd Font", italic = true, scale = 1.1 },
+}),
+</pre>
+
+<div id="WezTerm - Finding Fonts-Cursive Fonts-Pro-Tip: Visual Balance-How to verify it's working"><h4 id="How to verify it's working" class="header"><a href="#WezTerm - Finding Fonts-Cursive Fonts-Pro-Tip: Visual Balance-How to verify it's working">How to verify it's working</a></h4></div>
+
+<p>
+Most modern color schemes (like Catppuccin or Tokyo Night) automatically italicize keywords in Neovim or VS Code. If you want to test it manually in your terminal right now, run this command:
+</p>
+
+<pre bash>
+echo -e "\e[3mThis should be in your Cursive Font\e[0m"
+</pre>
+
+<div id="WezTerm - Finding Fonts-Cursive Fonts-Common Cursive Fonts to Try"><h3 id="Common Cursive Fonts to Try" class="header"><a href="#WezTerm - Finding Fonts-Cursive Fonts-Common Cursive Fonts to Try">Common Cursive Fonts to Try</a></h3></div>
+
+<p>
+If you haven't picked a cursive font yet, these are the community favorites for this specific setup:
+</p>
+
+<ul>
+<li>
+Victor Mono: Famous for its very distinct, "handwritten" italics.
+
+<li>
+JetBrains Mono: Has a very clean, professional italic style.
+
+<li>
+Recursive: A variable font that can go from "Linear" to "Casual" (very curvy).
+
+</ul>
+<div id="WezTerm - Finding Fonts-Homebrew Font Install"><h2 id="Homebrew Font Install" class="header"><a href="#WezTerm - Finding Fonts-Homebrew Font Install">Homebrew Font Install</a></h2></div>
+
+<p>
+If you're on a Mac using Homebrew, you don't need to add special "taps" anymore—most fonts have been moved into the main Homebrew repository.
+</p>
+
+<p>
+Here are the commands for the top cursive-italic fonts we discussed:
+</p>
+
+<div id="WezTerm - Finding Fonts-Homebrew Font Install-1. Victor Mono (The &quot;Cursive&quot; King)"><h3 id="1. Victor Mono (The &quot;Cursive&quot; King)" class="header"><a href="#WezTerm - Finding Fonts-Homebrew Font Install-1. Victor Mono (The &quot;Cursive&quot; King)">1. Victor Mono (The "Cursive" King)</a></h3></div>
+
+<p>
+This is the most popular choice for that distinct, handwritten look.
+</p>
+
+<pre bash>
+brew install font-victor-mono
+</pre>
+
+<p>
+Note: If you want the version with pre-patched icons, use font-victor-mono-nerd-font instead.
+</p>
+
+<div id="WezTerm - Finding Fonts-Homebrew Font Install-2. JetBrains Mono"><h3 id="2. JetBrains Mono" class="header"><a href="#WezTerm - Finding Fonts-Homebrew Font Install-2. JetBrains Mono">2. JetBrains Mono</a></h3></div>
+
+<p>
+A very clean, professional italic that is less "handwritten" and more "slanted script."
+</p>
+
+<pre bash>
+brew install font-jetbrains-mono
+</pre>
+
+<p>
+Nerd Font version: font-jetbrains-mono-nerd-font
+</p>
+
+<div id="WezTerm - Finding Fonts-Homebrew Font Install-3. Recursive"><h3 id="3. Recursive" class="header"><a href="#WezTerm - Finding Fonts-Homebrew Font Install-3. Recursive">3. Recursive</a></h3></div>
+
+<p>
+A highly versatile font that can look very "casual" and curvy.
+</p>
+
+<pre bash>
+brew install font-recursive
+</pre>
+
+<p>
+Nerd Font version: font-recursive-mono-nerd-font
+</p>
+
+<div id="WezTerm - Finding Fonts-Homebrew Font Install-One-Liner for Quick Setup"><h3 id="One-Liner for Quick Setup" class="header"><a href="#WezTerm - Finding Fonts-Homebrew Font Install-One-Liner for Quick Setup">One-Liner for Quick Setup</a></h3></div>
+
+<p>
+If you want to try them all and see which one feels best in your terminal, you can run this single command:
+</p>
+
+<pre bash>
+brew install font-victor-mono font-jetbrains-mono font-recursive
+</pre>
+
+<div id="WezTerm - Finding Fonts-Homebrew Font Install-Important Setup Step"><h3 id="Important Setup Step" class="header"><a href="#WezTerm - Finding Fonts-Homebrew Font Install-Important Setup Step">Important Setup Step</a></h3></div>
+
+<p>
+Once installed, remember to run the command from earlier to find the exact name WezTerm needs for your config:
+</p>
+
+<pre bash>
+wezterm ls-fonts --list-system | grep -i "Victor"
+</pre>
+
+<p>
+Would you like me to generate a complete wezterm.lua code block that combines Fira Code, your icons, and Victor Mono italics so you can just copy-paste it?
+</p>
+
+<div id="WezTerm - Finding Fonts-Setup"><h2 id="Setup" class="header"><a href="#WezTerm - Finding Fonts-Setup">Setup</a></h2></div>
+
+<p>
+This setup uses Fira Code for your everyday typing, Victor Mono for that stylish cursive touch on italics, and ensures your Nerd Font icons are always there as a backup.
+</p>
+
+<p>
+I’ve included the scale and weight tweaks to make sure the transition between the two fonts feels smooth and balanced.
+</p>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- 1. Main Font Configuration (Regular and Bold text)
+config.font = wezterm.font_with_fallback({
+  -- Your main workhorse
+  { family = "Fira Code", weight = 700 }, 
+  
+  -- The "Safety Net" for icons (adjust if your ls-fonts name differs)
+  { family = "Symbols Nerd Font Mono" },
+  { family = "JetBrainsMono Nerd Font", scale = 1.0 },
+})
+
+config.font_size = 13.0
+
+-- 2. Custom Rules for Italics (The "Operator Mono" Look)
+config.font_rules = {
+  {
+    -- When the terminal asks for Italic (usually keywords in code)
+    italic = true,
+    font = wezterm.font_with_fallback({
+      -- Victor Mono is famous for its cursive italics
+      -- We add 'italic = true' here to ensure we get the script version
+      { 
+        family = "Victor Mono", 
+        italic = true, 
+        weight = "Medium",
+        scale = 1.05 -- Victor Mono can feel slightly slim, this buffs it up
+      },
+      -- Fallback to your main font if Victor Mono is missing a character
+      { family = "Fira Code", italic = true },
+    }),
+  },
+  {
+    -- This handles Bold + Italic specifically
+    italic = true,
+    bold = true,
+    font = wezterm.font_with_fallback({
+      { family = "Victor Mono", italic = true, weight = "Bold", scale = 1.05 },
+    }),
+  },
+}
+
+-- 3. Optional: Ligatures
+-- Fira Code is famous for these (turning -&gt; into an actual arrow)
+config.harfbuzz_features = { 'calt', 'liga', 'ss01' }
+
+return config
+</pre>
+
+<div id="WezTerm - Finding Fonts-Setup-Quick Test"><h4 id="Quick Test" class="header"><a href="#WezTerm - Finding Fonts-Setup-Quick Test">Quick Test</a></h4></div>
+
+<p>
+To see your new setup in action immediately, paste this into your terminal:
+</p>
+
+<pre bash>
+echo -e "Regular Text  \e[3mItalic Cursive Text\e[0m  \e[1;3mBold Cursive\e[0m"
+</pre>
+
+<div id="WezTerm - Finding Fonts-Setup-A Note on &quot;Victor Mono&quot;"><h3 id="A Note on &quot;Victor Mono&quot;" class="header"><a href="#WezTerm - Finding Fonts-Setup-A Note on &quot;Victor Mono&quot;">A Note on "Victor Mono"</a></h3></div>
+
+<p>
+If you just ran brew install font-victor-mono, the family name in the config should be exactly "Victor Mono". If you installed the Nerd Font version, it might be "VictorMono Nerd Font".
+</p>
+
+<div id="WezTerm - Finding Fonts-Color"><h2 id="Color" class="header"><a href="#WezTerm - Finding Fonts-Color">Color</a></h2></div>
+
+<p>
+To really make those Victor Mono italics pop, you need a color scheme that actually uses italics for keywords (like local, function, if, etc.).
+</p>
+
+<p>
+WezTerm comes with hundreds of built-in schemes. You can browse them all by running:
+</p>
+
+<pre bash>
+wezterm show-keys --all | grep -i "color_scheme"
+</pre>
+
+<div id="WezTerm - Finding Fonts-Color-1. Adding the Color Scheme to your wezterm.lua"><h3 id="1. Adding the Color Scheme to your wezterm.lua" class="header"><a href="#WezTerm - Finding Fonts-Color-1. Adding the Color Scheme to your wezterm.lua">1. Adding the Color Scheme to your wezterm.lua</a></h3></div>
+
+<p>
+The most popular schemes for this "Cursive + Dark Mode" aesthetic are Catppuccin, Tokyo Night, and Kanagawa.
+</p>
+
+<p>
+Here is how to add them to your existing config:
+</p>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- [Previous Font Config goes here...]
+
+-- 4. Color Scheme Selection
+-- Options: "Catppuccin Macchiato", "Tokyo Night", "Kanagawa (Glow)", "Night Owl"
+config.color_scheme = 'Catppuccin Macchiato'
+
+-- Optional: Make the window slightly transparent for a modern look
+config.window_background_opacity = 0.95
+config.macos_window_background_blur = 20 -- macOS only
+
+return config
+</pre>
+
+<div id="WezTerm - Finding Fonts-Color-2. How to &quot;Hot-Swap&quot; and Preview Schemes"><h3 id="2. How to &quot;Hot-Swap&quot; and Preview Schemes" class="header"><a href="#WezTerm - Finding Fonts-Color-2. How to &quot;Hot-Swap&quot; and Preview Schemes">2. How to "Hot-Swap" and Preview Schemes</a></h3></div>
+
+<p>
+You don't have to keep editing your file to see what looks good. You can open the WezTerm Command Palette while the terminal is open:
+</p>
+
+<ul>
+<li>
+Press CMD + SHIFT + L (or CTRL + SHIFT + L on Linux/Windows).
+
+<li>
+Type "color scheme".
+
+<li>
+Use the arrow keys to scroll through the names.
+
+<li>
+The terminal will live-preview the colors as you highlight them!
+
+</ul>
+<div id="WezTerm - Finding Fonts-Color-3. A Note on Neovim / CLI Tools"><h3 id="3. A Note on Neovim / CLI Tools" class="header"><a href="#WezTerm - Finding Fonts-Color-3. A Note on Neovim / CLI Tools">3. A Note on Neovim / CLI Tools</a></h3></div>
+
+<p>
+If you set a color scheme in WezTerm but your code doesn't show italics, it’s usually because your code editor (like Neovim) needs to be told to allow them.
+</p>
+
+<p>
+For Neovim, you usually just need to ensure your theme's configuration has italics enabled:
+</p>
+
+<pre lua>
+-- Example for Catppuccin in Neovim
+require("catppuccin").setup({
+    integrations = {
+        native_lsp = {
+            enabled = true,
+            underlines = {
+                errors = { "undercurl" },
+                hints = { "undercurl" },
+            },
+        },
+    },
+    styles = {
+        comments = { "italic" },
+        conditionals = { "italic" },
+        keywords = { "italic" },
+        functions = { "italic" },
+    },
+})
+</pre>
+
+<p>
+The "Is it working?" Visual Check
+</p>
+
+<p>
+Run this to see if your color scheme is correctly applying colors to different styles:
+</p>
+
+<pre bash>
+echo -e "\e[32mGreen Text\e[0m | \e[1;34mBold Blue\e[0m | \e[3;35mItalic Magenta (Cursive)\e[0m"
+</pre>
+
+<p>
+Would you like me to find the specific "ls-fonts" name for a different font, or are you all set with Victor Mono?
+</p>
+
+<p>
+<a href="unix_tools_terminals_wezterm.html">WezTerm</a>
+</p>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
