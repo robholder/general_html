@@ -75,15 +75,19 @@ If you want to be 100% sure the font works before messing with your config file,
 
 <pre bash>
 wezterm start --font-config 'font={family="Fira Code", weight="Bold"}'
-}}{
+</pre>
 
+<p>
 If the window opens and looks right, you've found your string.
+</p>
 
-=== Updated Config Example ===
+<div id="WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command-Updated Config Example"><h3 id="Updated Config Example" class="header"><a href="#WezTerm - Finding Fonts-The &quot;Source of Truth&quot; Command-Updated Config Example">Updated Config Example</a></h3></div>
 
+<p>
 Once you've confirmed the name, your table would look like this:
+</p>
 
-{{{lua
+<pre lua>
 local my_fonts = {
   { family = "Fira Code", weight = 700, size = 12 }, -- Adjust based on your 'ls-fonts' result
   { family = "Agave Nerd Font", weight = 700, size = 14},
@@ -495,9 +499,358 @@ Run this to see if your color scheme is correctly applying colors to different s
 echo -e "\e[32mGreen Text\e[0m | \e[1;34mBold Blue\e[0m | \e[3;35mItalic Magenta (Cursive)\e[0m"
 </pre>
 
+<div id="Setting Cursive Fonts"><h1 id="Setting Cursive Fonts" class="header"><a href="#Setting Cursive Fonts">Setting Cursive Fonts</a></h1></div>
+
+<div id="Setting Cursive Fonts-QUESTION"><h2 id="QUESTION" class="header"><a href="#Setting Cursive Fonts-QUESTION">QUESTION</a></h2></div>
+
 <p>
-Would you like me to find the specific "ls-fonts" name for a different font, or are you all set with Victor Mono?
+I have this in my wezterm.lua, and it sets the font, and I can change the font with a &lt;Ctrl&gt;&lt;Shift&gt;F combination.
 </p>
+
+<p>
+How can I add the cursive functionality you described into this configuration block?
+</p>
+
+<pre lua>
+---------------------------- Set Font Attributes -----------------------------
+
+-- Define your favorite fonts here
+local my_fonts = {
+  { family = "Agave Nerd Font", weight = 700, size = 14},
+  { family = "CaskaydiaCove Nerd Font", weight = 700, size = 12.3},
+  { family = "ComicShannsMono Nerd Font", weight = 700, size = 12.2},
+  { family = "FiraMono Nerd Font", weight = 700, size = 12 },
+  { family = "Fira Code", weight = 700, size = 12 },
+  { family = "JetBrainsMono Nerd Font", weight = 700, size = 11.3 },
+  { family = "Hack Nerd Font", weight = 700, size = 11.5 },
+}
+
+-- Set your primary default font
+config.font = wezterm.font("FiraMono Nerd Font", { weight = 700 })
+config.font_size = 12
+
+-- config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = Medium } )
+-- Alternative to Word based definitions like 'Medium'; i.e., value (700 here)
+config.font = wezterm.font("FiraMono Nerd Font", { weight = 700 } )
+config.font_size = 12
+
+-- The "Thickening" Combo
+-- 'Normal' provides the most 'body' to the letters.
+config.freetype_load_target = 'Normal'
+config.freetype_render_target = 'HorizontalLcd'
+
+-- Subpixel Antialiasing (The 'Smoothness' factor)
+-- This mimics the 'Font Smoothing' in macOS Terminal.
+config.freetype_load_flags = 'DEFAULT'
+
+-- Horizontal and Vertical Spacing
+config.cell_width = 1
+config.line_height = 1
+</pre>
+
+<div id="Setting Cursive Fonts-Gemini said"><h2 id="Gemini said" class="header"><a href="#Setting Cursive Fonts-Gemini said">Gemini said</a></h2></div>
+
+<p>
+To add the cursive functionality while keeping your current setup, we need to add a font_rules block.
+</p>
+
+<p>
+Since you have a list of fonts and a manual toggle (Ctrl+Shift+F), we want to make sure that no matter which font you switch to, the italics always use your "Cursive" font (like Victor Mono or Agave).
+</p>
+
+<p>
+Here is how to integrate the cursive logic into your existing code:
+</p>
+
+<p>
+Updated wezterm.lua Snippet
+</p>
+
+<pre lua>
+-- -------------------------- Set Font Attributes -----------------------------
+
+-- Your existing list (keep this as is for your toggle)
+local my_fonts = {
+  { family = "Agave Nerd Font", weight = 700, size = 14},
+  { family = "CaskaydiaCove Nerd Font", weight = 700, size = 12.3},
+  { family = "ComicShannsMono Nerd Font", weight = 700, size = 12.2},
+  { family = "FiraMono Nerd Font", weight = 700, size = 12 },
+  { family = "Fira Code", weight = 700, size = 12 },
+  { family = "JetBrainsMono Nerd Font", weight = 700, size = 11.3 },
+  { family = "Hack Nerd Font", weight = 700, size = 11.5 },
+}
+
+-- 1. Set your primary default font (using your existing logic)
+config.font = wezterm.font("FiraMono Nerd Font", { weight = 700 })
+config.font_size = 12
+
+-- 2. ADD THIS: The Cursive Logic
+-- This intercepts any "italic" request and forces it to use Victor Mono
+config.font_rules = {
+  {
+    italic = true,
+    font = wezterm.font_with_fallback({
+      -- This is the font that will appear for italics/cursive
+      { family = "Victor Mono", italic = true, weight = "Medium", scale = 1.05 },
+      
+      -- Fallback to your main font if the cursive font is missing a character
+      { family = "FiraMono Nerd Font", italic = true },
+    }),
+  },
+}
+
+-- ------------------------- Rendering Tweaks ---------------------------------
+config.freetype_load_target = 'Normal'
+config.freetype_render_target = 'HorizontalLcd'
+config.freetype_load_flags = 'DEFAULT'
+config.cell_width = 1
+config.line_height = 1
+</pre>
+
+<div id="Setting Cursive Fonts-Gemini said-Why this works with your &lt;Ctrl&gt;&lt;Shift&gt;F toggle:"><h4 id="Why this works with your &lt;Ctrl&gt;&lt;Shift&gt;F toggle:" class="header"><a href="#Setting Cursive Fonts-Gemini said-Why this works with your &lt;Ctrl&gt;&lt;Shift&gt;F toggle:">Why this works with your &lt;Ctrl&gt;&lt;Shift&gt;F toggle:</a></h4></div>
+
+<ul>
+<li>
+The Global Override: config.font sets your "standard" typing font.
+
+<li>
+The Rule Override: config.font_rules is like a higher-priority law. It says: "I don't care what the global font is; if the text is supposed to be italic, use this specific cursive font instead."
+
+<li>
+The Result: Even if you use your shortcut to cycle through Agave, Fira, or Hack, your keywords and comments will remain in that beautiful Victor Mono cursive.
+
+</ul>
+<div id="Setting Cursive Fonts-Gemini said-One small tweak for your Toggle"><h4 id="One small tweak for your Toggle" class="header"><a href="#Setting Cursive Fonts-Gemini said-One small tweak for your Toggle">One small tweak for your Toggle</a></h4></div>
+
+<p>
+If your Ctrl+Shift+F script only updates config.font, you are all set! However, if you want the fallback (for icons) to work across all your fonts, you should change your toggle script to use wezterm.font_with_fallback instead of just wezterm.font.
+</p>
+
+<div id="Setting Cursive Fonts-Gemini said-How to test it immediately"><h4 id="How to test it immediately" class="header"><a href="#Setting Cursive Fonts-Gemini said-How to test it immediately">How to test it immediately</a></h4></div>
+
+<p>
+Save the file, let WezTerm reload, and run this command to see your main font and cursive font side-by-side:
+</p>
+
+<pre bash>
+echo -e "Normal Text | \e[3mItalic Cursive Text\e[0m"
+</pre>
+
+<p>
+Would you like me to look at your &lt;Ctrl&gt;&lt;Shift&gt;F toggle script to make sure it plays nicely with these new rules?
+</p>
+
+<p>
+You said
+</p>
+
+<div id="Setting Cursive Fonts-QUESTION"><h2 id="QUESTION" class="header"><a href="#Setting Cursive Fonts-QUESTION">QUESTION</a></h2></div>
+
+<p>
+My font toggle block (inside config.keys) is this:
+</p>
+
+<pre lua>
+  {
+    key = 'f', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      -- Ensure our global font tracker exists
+      if wezterm.GLOBAL.font_indices == nil then
+        wezterm.GLOBAL.font_indices = {}
+      end
+      
+      local id = tostring(window:window_id())
+      local current_index = wezterm.GLOBAL.font_indices[id] or 1
+      
+      -- Increment and wrap around
+      local next_index = current_index + 1
+      if next_index &gt; #my_fonts then
+        next_index = 1
+      end
+      
+      local next_font = my_fonts[next_index]
+      
+      -- ONLY send official fields to overrides (No custom fields!)
+      window:set_config_overrides({
+        font = wezterm.font(next_font.family, { weight = next_font.weight }),
+        font_size = next_font.size,
+      })
+      
+      -- Store the index in our safe GLOBAL table
+      wezterm.GLOBAL.font_indices[id] = next_index
+    end),
+  },
+</pre>
+
+<div id="Setting Cursive Fonts-Gemini said"><h2 id="Gemini said" class="header"><a href="#Setting Cursive Fonts-Gemini said">Gemini said</a></h2></div>
+
+<p>
+Your current toggle script works by using window:set_config_overrides, which effectively "papers over" your main config. To keep your cursive italics working while you cycle through fonts, you need to make sure the overrides also include the font_rules logic.
+</p>
+
+<p>
+If you don't update this block, pressing &lt;Ctrl&gt;&lt;Shift&gt;F will switch your main font but might "kill" the cursive rules because the override takes total priority.
+</p>
+
+<div id="Setting Cursive Fonts-Gemini said-The Updated Toggle Block"><h3 id="The Updated Toggle Block" class="header"><a href="#Setting Cursive Fonts-Gemini said-The Updated Toggle Block">The Updated Toggle Block</a></h3></div>
+
+<p>
+Replace your existing action_callback with this version. It ensures that every time you switch fonts, it reapplies the Victor Mono rule for italics:
+</p>
+
+<pre lua>
+  {
+    key = 'f', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      if wezterm.GLOBAL.font_indices == nil then
+        wezterm.GLOBAL.font_indices = {}
+      end
+      
+      local id = tostring(window:window_id())
+      local current_index = wezterm.GLOBAL.font_indices[id] or 1
+      
+      local next_index = current_index + 1
+      if next_index &gt; #my_fonts then
+        next_index = 1
+      end
+      
+      local next_font = my_fonts[next_index]
+      
+      -- Apply the overrides
+      window:set_config_overrides({
+        -- 1. Set the new main font from your list
+        font = wezterm.font(next_font.family, { weight = next_font.weight }),
+        font_size = next_font.size,
+        
+        -- 2. RE-APPLY the cursive rules here so they persist after the toggle
+        font_rules = {
+          {
+            italic = true,
+            font = wezterm.font_with_fallback({
+              { family = "Victor Mono", italic = true, weight = "Medium", scale = 1.05 },
+              { family = next_font.family, italic = true }, -- Fallback to the current toggled font
+            }),
+          },
+          {
+            italic = true,
+            bold = true,
+            font = wezterm.font_with_fallback({
+              { family = "Victor Mono", italic = true, weight = "Bold", scale = 1.05 },
+            }),
+          },
+        },
+      })
+      
+      wezterm.GLOBAL.font_indices[id] = next_index
+    end),
+  },
+</pre>
+
+<div id="Setting Cursive Fonts-Gemini said-What changed?"><h3 id="What changed?" class="header"><a href="#Setting Cursive Fonts-Gemini said-What changed?">What changed?</a></h3></div>
+
+<ul>
+<li>
+The Persistence: By adding font_rules inside the set_config_overrides, WezTerm knows that even though you changed the base font to "Hack" or "Agave," the rule for italics remains "Use Victor Mono."
+
+<li>
+Dynamic Fallback: In the italic rule, I set the second font in the fallback list to next_font.family. This means if Victor Mono is missing a specific italic character, it will fall back to the italic version of whichever font you just toggled to.
+
+</ul>
+<div id="Setting Cursive Fonts-Gemini said-Pro-Tip: Visual Feedback"><h3 id="Pro-Tip: Visual Feedback" class="header"><a href="#Setting Cursive Fonts-Gemini said-Pro-Tip: Visual Feedback">Pro-Tip: Visual Feedback</a></h3></div>
+
+<p>
+Since you are cycling through fonts, it can be hard to remember which one is which. You can add a small "Toast" notification to your script so it tells you the name of the font you just switched to.
+</p>
+
+<p>
+Would you like me to add a line to that script that shows a brief "Font: Fira Code" notification in the top right corner when you toggle?
+</p>
+
+<div id="Setting Cursive Fonts-Toast Notification"><h2 id="Toast Notification" class="header"><a href="#Setting Cursive Fonts-Toast Notification">Toast Notification</a></h2></div>
+
+<p>
+This is a great quality-of-life upgrade. We’ll use window:toast_notification to display the font name. It’s subtle, disappears on its own, and saves you from having to guess which "Mono" you're currently looking at.
+</p>
+
+<p>
+Here is the complete, polished block for your config.keys:
+</p>
+
+<pre lua>
+  {
+    key = 'f', mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      -- Ensure our global font tracker exists
+      if wezterm.GLOBAL.font_indices == nil then
+        wezterm.GLOBAL.font_indices = {}
+      end
+      
+      local id = tostring(window:window_id())
+      local current_index = wezterm.GLOBAL.font_indices[id] or 1
+      
+      -- Increment and wrap around
+      local next_index = current_index + 1
+      if next_index &gt; #my_fonts then
+        next_index = 1
+      end
+      
+      local next_font = my_fonts[next_index]
+      
+      -- 1. Show a notification in the top right
+      window:toast_notification("WezTerm", "Font: " .. next_font.family, nil, 2000)
+      
+      -- 2. Apply the overrides (Font + Cursive Rules)
+      window:set_config_overrides({
+        font = wezterm.font(next_font.family, { weight = next_font.weight }),
+        font_size = next_font.size,
+        
+        -- Re-apply cursive rules so they stay active during the toggle
+        font_rules = {
+          {
+            italic = true,
+            font = wezterm.font_with_fallback({
+              { family = "Victor Mono", italic = true, weight = "Medium", scale = 1.05 },
+              { family = next_font.family, italic = true }, 
+            }),
+          },
+          {
+            italic = true,
+            bold = true,
+            font = wezterm.font_with_fallback({
+              { family = "Victor Mono", italic = true, weight = "Bold", scale = 1.05 },
+            }),
+          },
+        },
+      })
+      
+      -- Store the index
+      wezterm.GLOBAL.font_indices[id] = next_index
+    end),
+  },
+</pre>
+
+<p>
+What this adds:
+</p>
+
+<ul>
+<li>
+The Toast: window:toast_notification pops up a small box. I've set the timeout to 2000ms (2 seconds), which is just enough time to read it without it becoming annoying.
+
+<li>
+The Logic: It uses the next_font.family string from your my_fonts table so the name is always 100% accurate to what you're seeing.
+
+</ul>
+<div id="Setting Cursive Fonts-Toast Notification-A quick sanity check"><h4 id="A quick sanity check" class="header"><a href="#Setting Cursive Fonts-Toast Notification-A quick sanity check">A quick sanity check</a></h4></div>
+
+<p>
+Since you are using font_rules inside the override, make sure you also have the base config.font_rules defined earlier in your file (the one we created in the previous step). This ensures that when you first open WezTerm—before you ever hit Ctrl+Shift+F—your italics are already cursive.
+</p>
+
+<p>
+Would you like me to help you set up a similar toggle for your Color Schemes (e.g., swapping between Dark and Light mode or different themes)?
+</p>
+
 
 <p>
 <a href="unix_tools_terminals_wezterm.html">WezTerm</a>
