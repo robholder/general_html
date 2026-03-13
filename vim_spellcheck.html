@@ -182,7 +182,213 @@ This will display the current settings for the SpellBad highlight group, which i
 You can also use the <code>:hi</code> command as a shorthand for <code>:highlight</code>.
 </p>
 
-<div id="Settings-Guide to Setting Options"><h2 id="Guide to Setting Options" class="header"><a href="#Settings-Guide to Setting Options">Guide to Setting Options</a></h2></div>
+<div id="Marking Words as Good/Bad Spellings"><h1 id="Marking Words as Good/Bad Spellings" class="header"><a href="#Marking Words as Good/Bad Spellings">Marking Words as Good/Bad Spellings</a></h1></div>
+
+<p>
+In Vim, spelling commands are typically grouped by whether they affect your permanent spell file or just the current session. 
+</p>
+
+<div id="Marking Words as Good/Bad Spellings-Essential Vim Spelling Commands"><h2 id="Essential Vim Spelling Commands" class="header"><a href="#Marking Words as Good/Bad Spellings-Essential Vim Spelling Commands">Essential Vim Spelling Commands</a></h2></div>
+
+<table>
+<tr>
+<td>
+Command
+</td>
+<td>
+Action
+</td>
+<td>
+Persistence
+</td>
+</tr>
+<tr>
+<td>
+zg
+</td>
+<td>
+Mark word as good (add to spellfile)
+</td>
+<td>
+Permanent
+</td>
+</tr>
+<tr>
+<td>
+zG
+</td>
+<td>
+Mark word as good (internal word list)
+</td>
+<td>
+Current Session only
+</td>
+</tr>
+<tr>
+<td>
+zw
+</td>
+<td>
+Mark word as wrong (add to spellfile)
+</td>
+<td>
+Permanent
+</td>
+</tr>
+<tr>
+<td>
+zW
+</td>
+<td>
+Mark word as wrong (internal word list)
+</td>
+<td>
+Current Session only
+</td>
+</tr>
+<tr>
+<td>
+zug
+</td>
+<td>
+Undo zg or zw (removes word from spellfile)
+</td>
+<td>
+Permanent
+</td>
+</tr>
+<tr>
+<td>
+zuw
+</td>
+<td>
+Same as zug (undoes zw or zg)
+</td>
+<td>
+Permanent
+</td>
+</tr>
+<tr>
+<td>
+zuG
+</td>
+<td>
+Undo zG or zW (removes from internal list)
+</td>
+<td>
+Current Session only
+</td>
+</tr>
+<tr>
+<td>
+zuW
+</td>
+<td>
+Same as zuG (undoes zW or zG)
+</td>
+<td>
+Current Session only
+</td>
+</tr>
+<tr>
+<td>
+z=
+</td>
+<td>
+Suggest correctly spelled words for the current word
+</td>
+<td>
+N/A
+</td>
+</tr>
+</table>
+
+<div id="Marking Words as Good/Bad Spellings-Navigation &amp; Utility"><h2 id="Navigation &amp; Utility" class="header"><a href="#Marking Words as Good/Bad Spellings-Navigation &amp; Utility">Navigation &amp; Utility</a></h2></div>
+
+<ul>
+<li>
+]s / [s: Move to the next or previous misspelled word.
+
+<li>
+]S / [S: Move to the next/previous only "bad" word (skips rare or regional words).
+
+<li>
+1z=: Automatically replace the word with the first suggestion (great for speed).
+
+<li>
+<span id="Marking Words as Good/Bad Spellings-Navigation &amp; Utility-spellrepall"></span><span class="tag" id="spellrepall">spellrepall</span> Repeat the last z= replacement for all matching words in the current window.
+
+<li>
+Ctrl-X s: (In Insert mode) Show spelling suggestions at the cursor. 
+
+</ul>
+<div id="Marking Words as Good/Bad Spellings-Navigation &amp; Utility-Pro-Tip: Visual Mode"><h4 id="Pro-Tip: Visual Mode" class="header"><a href="#Marking Words as Good/Bad Spellings-Navigation &amp; Utility-Pro-Tip: Visual Mode">Pro-Tip: Visual Mode</a></h4></div>
+
+<p>
+You can use these commands in Visual Mode as well. If you highlight a phrase and press zg, Vim will add that entire selection (including spaces) as a single "good" entry in your dictionary. 
+</p>
+
+<div id="Marking Words as Good/Bad Spellings-Cleaning The Vim Spell List"><h2 id="Cleaning The Vim Spell List" class="header"><a href="#Marking Words as Good/Bad Spellings-Cleaning The Vim Spell List">Cleaning The Vim Spell List</a></h2></div>
+
+<p>
+When you use the zw command to mark a word as "wrong" or "bad," Vim doesn't delete the word from your .add file if it was already there as a "good" word. Instead, it comments it out by prepending a #. 
+</p>
+ 
+<p>
+For example, #onfigs likely means:
+</p>
+
+<p>
+configs was previously added as a "good" word (using zg).
+</p>
+
+<p>
+ You later marked it as a "bad" word (using zw) or "undid" its addition (using zug), so Vim turned the existing entry into a comment to effectively "remove" it without deleting the line.
+</p>
+
+<pre sh>
+:runtime spell/cleanadd.vim
+</pre>
+
+<p>
+Vim replaces the first character of that entry with the # symbol. 
+</p>
+
+<div id="Marking Words as Good/Bad Spellings-Cleaning The Vim Spell List-Why the &quot;Obliteration&quot;?"><h3 id="Why the &quot;Obliteration&quot;?" class="header"><a href="#Marking Words as Good/Bad Spellings-Cleaning The Vim Spell List-Why the &quot;Obliteration&quot;?">Why the "Obliteration"?</a></h3></div>
+
+<p>
+The goal of the .add file is to be a simple, flat list of words that Vim can quickly compile into a binary .spl file. When you change a word's status: 
+</p>
+
+<ul>
+<li>
+Space Efficiency: By replacing the first character instead of inserting a new one, Vim avoids shifting every subsequent byte in the file. In large dictionary files, shifting thousands of lines of text just to add one character is a "heavy" operation for a quick command like zw.
+
+<li>
+Effective Invalidation: Because the entry is no longer a valid word (e.g., configs becomes #onfigs), Vim's spell engine automatically stops recognizing it as a "good" word.
+
+<li>
+Placeholder for Cleanup: The "broken" word remains in the file as a placeholder. This allows you to run :runtime spell/cleanadd.vim later to purge all those corrupted/commented entries in one go. 
+
+</ul>
+<div id="Marking Words as Good/Bad Spellings-Cleaning The Vim Spell List-How to Fix It"><h3 id="How to Fix It" class="header"><a href="#Marking Words as Good/Bad Spellings-Cleaning The Vim Spell List-How to Fix It">How to Fix It</a></h3></div>
+
+<p>
+If you accidentally marked a word as bad and want the original word back:
+</p>
+
+<ul>
+<li>
+Don't just delete the #: If you manually edit the file to remove the #, you'll be left with a misspelled version (like onfigs).
+
+<li>
+Use the correct command: Move your cursor over the "bad" word in your actual document and type zug (undo-good) or zuw (undo-wrong). This tells Vim to properly manage the entry in the .add file for you.
+
+<li>
+Manual Edit: If you are editing the .add file directly, you must manually restore the first letter (e.g., change #onfigs back to configs) and then run :mkspell! % to recompile the binary dictionary so Vim sees the change. 
+
+</ul>
+<div id="Marking Words as Good/Bad Spellings-Guide to Setting Options"><h2 id="Guide to Setting Options" class="header"><a href="#Marking Words as Good/Bad Spellings-Guide to Setting Options">Guide to Setting Options</a></h2></div>
 
 <p>
 Here’s an example of how you might use options in your .vimrc file:
@@ -430,7 +636,7 @@ guisp=#ff0000
 
 </ul>
 </ul>
-<div id="Settings-Functions"><h2 id="Functions" class="header"><a href="#Settings-Functions">Functions</a></h2></div>
+<div id="Marking Words as Good/Bad Spellings-Functions"><h2 id="Functions" class="header"><a href="#Marking Words as Good/Bad Spellings-Functions">Functions</a></h2></div>
 
 <div id="Setting All Colorschemes to a Common SpellBad 'Look'"><h1 id="Setting All Colorschemes to a Common SpellBad 'Look'" class="header"><a href="#Setting All Colorschemes to a Common SpellBad 'Look'">Setting All Colorschemes to a Common SpellBad 'Look'</a></h1></div>
 
