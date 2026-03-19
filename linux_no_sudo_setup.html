@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>linux_no_sudo_setup</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<div id="Linux - No Sudo Setup Ideas"><h1 id="Linux - No Sudo Setup Ideas" class="header"><a href="#Linux - No Sudo Setup Ideas">Linux - No Sudo Setup Ideas</a></h1></div>
+
+<p>
+Let’s walk through how you can still build a surprisingly powerful environment entirely inside your home directory.
+</p>
+
+<p>
+Below is a clear, practical roadmap — starting with zsh.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🧭 Your Constraints (and Opportunities)"><h2 id="🧭 Your Constraints (and Opportunities)" class="header"><a href="#Linux - No Sudo Setup Ideas-🧭 Your Constraints (and Opportunities)">🧭 Your Constraints (and Opportunities)</a></h2></div>
+
+<p>
+In a restricted corporate Linux environment, you typically can:
+</p>
+<ul>
+<li>
+Use your $HOME directory freely
+
+<li>
+Compile software from source into \(HOME/bin or \)HOME/.local/bin
+
+<li>
+Use static binaries when available
+
+<li>
+Modify your shell startup files (.bashrc, .profile, .zshrc, etc.)
+
+<li>
+Use SSH keys stored in $HOME/.ssh
+
+<li>
+Use Python, Node, or other runtimes if they’re already installed
+
+</ul>
+<div id="Linux - No Sudo Setup Ideas-🧭 Your Constraints (and Opportunities)-You typically cannot:"><h3 id="You typically cannot:" class="header"><a href="#Linux - No Sudo Setup Ideas-🧭 Your Constraints (and Opportunities)-You typically cannot:">You typically cannot:</a></h3></div>
+
+<ul>
+<li>
+Install system packages (apt install, yum install, etc.)
+
+<li>
+Use sudo
+
+<li>
+Modify /usr/bin, /usr/local/bin, /etc
+
+<li>
+Change your login shell via chsh
+
+</ul>
+<p>
+But that’s fine — you can still run your own shell without being the system’s default shell.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo"><h2 id="🥇 Step 1: Install zsh Without sudo" class="header"><a href="#Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo">🥇 Step 1: Install zsh Without sudo</a></h2></div>
+
+<p>
+You have two realistic approaches:
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option A — Download a prebuilt static zsh binary (easiest)"><h3 id="Option A — Download a prebuilt static zsh binary (easiest)" class="header"><a href="#Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option A — Download a prebuilt static zsh binary (easiest)">Option A — Download a prebuilt static zsh binary (easiest)</a></h3></div>
+
+<p>
+Some people publish static builds of zsh. If you find one that matches your architecture (likely x86_64 or aarch64), you can:
+</p>
+
+<pre bash>
+mkdir -p $HOME/bin
+tar -xf zsh-static.tar.gz -C $HOME/bin
+</pre>
+
+<p>
+Then run it:
+</p>
+
+<pre bash>
+$HOME/bin/zsh --version
+</pre>
+
+<p>
+And make it your default interactive shell by adding to .bashrc:
+</p>
+
+<pre bash>
+exec $HOME/bin/zsh -l
+</pre>
+
+<p>
+This does not require chsh or sudo.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory"><h3 id="Option B — Build zsh from source in your home directory" class="header"><a href="#Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory">Option B — Build zsh from source in your home directory</a></h3></div>
+
+<p>
+This works surprisingly often, even on locked-down systems.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory-1. Download the source:"><h4 id="1. Download the source:" class="header"><a href="#Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory-1. Download the source:">1. Download the source:</a></h4></div>
+
+<pre bash>
+wget https://sourceforge.net/projects/zsh/files/latest/download -O zsh.tar.xz
+tar -xf zsh.tar.xz
+cd zsh-*/
+</pre>
+
+<div id="Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory-2. Configure it to install into your home directory:"><h4 id="2. Configure it to install into your home directory:" class="header"><a href="#Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory-2. Configure it to install into your home directory:">2. Configure it to install into your home directory:</a></h4></div>
+
+<pre bash>
+./configure --prefix=$HOME/.local
+make
+make install
+</pre>
+
+<p>
+This gives you:
+</p>
+
+<pre Code>
+$HOME/.local/bin/zsh
+$HOME/.local/share/zsh
+</pre>
+
+<div id="Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory-3. Make bash auto‑launch zsh"><h4 id="3. Make bash auto‑launch zsh" class="header"><a href="#Linux - No Sudo Setup Ideas-🥇 Step 1: Install zsh Without sudo-Option B — Build zsh from source in your home directory-3. Make bash auto‑launch zsh">3. Make bash auto‑launch zsh</a></h4></div>
+
+<p>
+Add to ~/.bashrc:
+</p>
+
+<pre bash>
+if [ -x "$HOME/.local/bin/zsh" ]; then
+    exec $HOME/.local/bin/zsh -l
+fi
+</pre>
+
+<p>
+Now every time you log in, bash immediately hands control to zsh.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🧪 Step 2: Install Starship (no sudo needed)"><h2 id="🧪 Step 2: Install Starship (no sudo needed)" class="header"><a href="#Linux - No Sudo Setup Ideas-🧪 Step 2: Install Starship (no sudo needed)">🧪 Step 2: Install Starship (no sudo needed)</a></h2></div>
+
+<p>
+Starship is perfect for restricted environments because it’s a single static binary.
+</p>
+
+<pre bash>
+curl -fsSL https://starship.rs/install.sh | bash -s -- --bin-dir $HOME/bin --yes
+</pre>
+
+<p>
+Then in your .zshrc:
+</p>
+
+<pre bash>
+eval "$(starship init zsh)"
+</pre>
+
+<div id="Linux - No Sudo Setup Ideas-🖥️ Step 3: Install WezTerm (optional inside VM)"><h2 id="🖥️ Step 3: Install WezTerm (optional inside VM)" class="header"><a href="#Linux - No Sudo Setup Ideas-🖥️ Step 3: Install WezTerm (optional inside VM)">🖥️ Step 3: Install WezTerm (optional inside VM)</a></h2></div>
+
+<p>
+Inside a VM, you may not need WezTerm, but if you want it:
+</p>
+<ul>
+<li>
+WezTerm provides portable AppImage builds
+
+<li>
+AppImages require no installation or sudo
+
+</ul>
+<p>
+Download:
+</p>
+
+<pre bash>
+wget https://github.com/wez/wezterm/releases/download/.../WezTerm-*.AppImage
+chmod +x WezTerm-*.AppImage
+</pre>
+
+<p>
+Run:
+</p>
+
+<pre bash>
+./WezTerm-*.AppImage
+</pre>
+
+<p>
+You can store it in $HOME/bin if you want.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🔠 Step 4: Nerd Fonts (user‑local install)"><h2 id="🔠 Step 4: Nerd Fonts (user‑local install)" class="header"><a href="#Linux - No Sudo Setup Ideas-🔠 Step 4: Nerd Fonts (user‑local install)">🔠 Step 4: Nerd Fonts (user‑local install)</a></h2></div>
+
+<p>
+You can install fonts locally without sudo.
+</p>
+
+<pre bash>
+mkdir -p ~/.local/share/fonts
+cd ~/.local/share/fonts
+wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/FiraCode.zip
+unzip FiraCode.zip
+fc-cache -fv
+</pre>
+
+<p>
+WezTerm or your terminal emulator will now see them.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🔧 Step 5: Tmux (build from source)"><h2 id="🔧 Step 5: Tmux (build from source)" class="header"><a href="#Linux - No Sudo Setup Ideas-🔧 Step 5: Tmux (build from source)">🔧 Step 5: Tmux (build from source)</a></h2></div>
+
+<p>
+Tmux also builds cleanly in $HOME.
+</p>
+
+<p>
+Dependencies: libevent and ncurses — but you can build those locally too.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🔧 Step 5: Tmux (build from source)-Build libevent:"><h3 id="Build libevent:" class="header"><a href="#Linux - No Sudo Setup Ideas-🔧 Step 5: Tmux (build from source)-Build libevent:">Build libevent:</a></h3></div>
+
+<pre bash>
+wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
+
+tar -xf libevent*.tar.gz
+cd libevent*
+./configure --prefix=$HOME/.local
+make
+make install
+</pre>
+
+<div id="Linux - No Sudo Setup Ideas-🔧 Step 5: Tmux (build from source)-Build tmux:"><h3 id="Build tmux:" class="header"><a href="#Linux - No Sudo Setup Ideas-🔧 Step 5: Tmux (build from source)-Build tmux:">Build tmux:</a></h3></div>
+
+<pre bash>
+wget https://github.com/tmux/tmux/releases/download/3.4/tmux-3.4.tar.gz
+tar -xf tmux*.tar.gz
+cd tmux*
+./configure --prefix=$HOME/.local CFLAGS="-I$HOME/.local/include" LDFLAGS="-L$HOME/.local/lib"
+make
+make install
+</pre>
+
+<div id="Linux - No Sudo Setup Ideas-🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)"><h2 id="🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)" class="header"><a href="#Linux - No Sudo Setup Ideas-🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)">🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)</a></h2></div>
+
+<p>
+SSH keys live in $HOME/.ssh, so no privileges needed.
+</p>
+
+<pre bash>
+ssh-keygen -t ed25519 -C "your_email@example.com"
+</pre>
+
+<p>
+Then:
+</p>
+
+<pre bash>
+cat ~/.ssh/id_ed25519.pub
+</pre>
+
+<p>
+Copy to GitHub → Settings → SSH Keys.
+</p>
+
+<div id="Linux - No Sudo Setup Ideas-🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)-Test:"><h4 id="Test:" class="header"><a href="#Linux - No Sudo Setup Ideas-🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)-Test:">Test:</a></h4></div>
+
+<pre bash>
+ssh -T git@github.com
+</pre>
+
+<div id="Linux - No Sudo Setup Ideas-🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)-🧩 Putting It All Together"><h3 id="🧩 Putting It All Together" class="header"><a href="#Linux - No Sudo Setup Ideas-🔐 Step 6: SSH access to GitHub (fully allowed as a normal user)-🧩 Putting It All Together">🧩 Putting It All Together</a></h3></div>
+
+<p>
+Once you have:
+</p>
+<ul>
+<li>
+zsh in <code>$HOME/.local/bin</code>
+
+<li>
+starship in <code>$HOME/bin</code>
+
+<li>
+tmux in <code>$HOME/.local/bin</code>
+
+<li>
+Nerd Fonts in <code>~/.local/share/fonts</code>
+
+</ul>
+<p>
+You can create a .zshrc that feels like your real environment, even on a locked-down corporate system.
+</p>
+
+<p>
+If you want, I can help you:
+</p>
+<ul>
+<li>
+Write a clean .zshrc for this restricted environment
+
+<li>
+Create a bootstrap script that sets everything up automatically
+
+<li>
+Build a “portable home directory” you can drop onto any Linux machine
+
+<li>
+Troubleshoot your UTM Linux environment
+
+</ul>
+<p>
+Where would you like to go next — installing zsh, or planning the whole environment?
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
