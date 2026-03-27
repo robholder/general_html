@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="rss.xml">
+<title>swift_hws_42</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_41.html">Hacking With Swift - 41 - How to create and use protocols</a>
+
+</ul>
+<div id="Hacking With Swift - How to use opaque return types"><h1 id="Hacking With Swift - How to use opaque return types" class="header"><a href="#Hacking With Swift - How to use opaque return types">Hacking With Swift - How to use opaque return types</a></h1></div>
+
+<p>
+Important: You don’t need to understand in detail how opaque return types work, only that they exist and do a very specific job. They are important, and the feature is useful.
+</p>
+
+<p>
+Let’s implement two simple functions:
+</p>
+
+
+<pre swift>
+func getRandomNumber() -&gt; Int {
+    Int.random(in: 1...6)
+}
+</pre>
+
+<pre swift>
+func getRandomBool() -&gt; Bool {
+    Bool.random()
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - How to use opaque return types-Tip"></span><strong id="Tip">Tip</strong>: <code>Bool.random()</code> returns either true or false. Unlike random integers and decimals, we don’t need to specify any parameters because there are no customization options.
+</p>
+
+<p>
+So, <code>getRandomNumber()</code> returns a random integer, and <code>getRandomBool()</code> returns a random Boolean.
+</p>
+
+<p>
+Both <code>Int</code> and <code>Bool</code> conform to a common Swift protocol called Equatable, which means “can be compared for equality.” The Equatable protocol is what allows us to use <code>==</code>, like this:
+</p>
+
+<pre swift>
+print(getRandomNumber() == getRandomNumber())
+</pre>
+
+<p>
+Because both of these types conform to Equatable, we could try amending our function to return an Equatable value, like this:
+</p>
+
+<pre swift>
+func getRandomNumber() -&gt; Equatable {
+    Int.random(in: 1...6)
+}
+
+func getRandomBool() -&gt; Equatable {
+    Bool.random()
+}
+</pre>
+
+<p>
+However, that code won’t work, and Swift will throw up an error message that is unlikely to be helpful at this point in your Swift career: “protocol 'Equatable' can only be used as a generic constraint because it has Self or associated type requirements”. What Swift’s error means is that returning Equatable doesn’t make sense, and understanding why it doesn’t make sense is the key to understanding opaque return types.
+</p>
+
+<p>
+First up: yes, you can return protocols from functions, and often it’s a really helpful thing to do. For example, you might have a function that finds car rentals for users: it accepts the number of passengers that it needs to carry, along with how much luggage they want, but it might send back one of several structs: Compact, SUV, Minivan, and so on.
+</p>
+
+<p>
+We can handle this by returning a <code>Vehicle</code> protocol that is adopted by all those structs, and so whoever calls the function will get back some kind of car matching their request without us having to write 10 different functions to handle all car varieties. Each of those car types will implement all the methods and properties of <code>Vehicle</code>, which means they are interchangeable - from a coding perspective we don’t care which of the options we get back.
+</p>
+
+<p>
+Now think about sending back an Int or a Bool. Yes, both conform to Equatable, but they aren’t interchangeable - we can’t use <code>==</code> to compare an <code>Int</code> and a <code>Bool</code>, because Swift won’t let us regardless of what protocols they conform to.
+</p>
+
+<p>
+Returning a protocol from a function is useful because it lets us hide information: rather than stating the exact type that is being returned, we get to focus on the functionality that is returned. In the case of a <code>Vehicle</code> protocol, that might mean reporting back the number of seats, the approximate fuel usage, and a price. This means we can change our code later without breaking things: we could return a <code>RaceCar</code>, or a <code>PickUpTruck</code>, etc, as long as they implement the properties and methods required by <code>Vehicle</code>.
+</p>
+
+<p>
+Hiding information in this way is really useful, but it just isn’t possible with Equatable because it isn’t possible to compare two different Equatable things. Even if we call <code>getRandomNumber()</code> twice to get two integers, we can’t compare them because we’ve hidden their exact data type - we’ve hidden the fact that they are two integers that actually could be compared.
+</p>
+
+<p>
+This is where opaque return types come in: they let us hide information in our code, but not from the Swift compiler. This means we reserve the right to make our code flexible internally so that we can return different things in the future, but Swift always understands the actual data type being returned and will check it appropriately.
+</p>
+
+<p>
+To upgrade our two functions to opaque return types, add the keyword some before their return type, like this:
+</p>
+
+<pre swift>
+func getRandomNumber() -&gt; some Equatable {
+    Int.random(in: 1...6)
+}
+
+func getRandomBool() -&gt; some Equatable {
+    Bool.random()
+}
+</pre>
+
+<p>
+And now we can call <code>getRandomNumber()</code> twice and compare the results using <code>==</code>. From our perspective we still only have some Equatable data, but Swift knows that behind the scenes they are actually two integers.
+</p>
+
+<p>
+Returning an opaque return type means we still get to focus on the functionality we want to return rather than the specific type, which in turn allows us to change our mind in the future without breaking the rest of our code. For example, <code>getRandomNumber()</code> could switch to using <code>Double.random(in:)</code> and the code would still work great.
+</p>
+
+<p>
+But the advantage here is that Swift always knows the real underlying data type. It’s a subtle distinction, but returning <code>Vehicle</code> means "any sort of <code>Vehicle</code> type but we don't know what", whereas returning some <code>Vehicle</code> means "a specific sort of <code>Vehicle</code> type but we don't want to say which one.”
+</p>
+
+<p>
+At this point I expect your head is spinning, so let me give you a real example of why this matters in SwiftUI. SwiftUI needs to know exactly what kind of layout you want to show on the screen, and so we write code to describe it.
+</p>
+
+<p>
+In English, we might say something like this: “there’s a screen with a toolbar at the top, a tab bar at the bottom, and in the middle is a scrolling grid of color icons, each of which has a label below saying what the icon means written in a bold font, and when you tap an icon a message appears.”
+</p>
+
+<p>
+When SwiftUI asks for our layout, that description - the whole thing - becomes the return type for the layout. We need to be explicit about every single thing we want to show on the screen, including positions, colors, font sizes, and more. Can you imagine typing that as your return type? It would be a mile long! And every time you changed the code to generate your layout, you’d need to change the return type to match.
+</p>
+
+<p>
+This is where opaque return types come to the rescue: we can return the type <code>some View</code>, which means that some kind of view screen will be returned but we don’t want to have to write out its mile-long type. At the same time, Swift knows the real underlying type because that’s how opaque return types work: Swift always knows the exact type of data being sent back, and SwiftUI will use that to create its layouts.
+</p>
+
+<p>
+Like I said at the beginning, opaque return types are a really obscure, really complex, but really important feature, and I wouldn’t cover them in a beginners course if it weren’t for the fact that they are used extensively in SwiftUI.
+</p>
+
+<p>
+So, when you see <code>some View</code> in your SwiftUI code, it’s effectively us telling Swift “this is going to send back some kind of view to lay out, but I don’t want to write out the exact thing - you figure it out for yourself.”
+</p>
+
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+</body>
+</html>
