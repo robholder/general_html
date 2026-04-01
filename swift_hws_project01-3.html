@@ -101,6 +101,104 @@ Add another section showing the total amount for the check – i.e., the origina
 Change the tip percentage picker to show a new screen rather than using a segmented control, and give it a wider range of options – everything from 0% to 100%. Tip: use the range 0..&lt;101 for your range rather than a fixed array.
 
 </ul>
+<div id="My Solution"><h1 id="My Solution" class="header"><a href="#My Solution">My Solution</a></h1></div>
+
+<p>
+Since I had to add more variable/functions, I took the opportunity to streamline them so that calculations for items were only done once, and called by subsequent functions. I also made the <code>actualAmount</code> a var function too (so that I didn't have to repeat the <code>checkAmount ?? 0</code> line over and over).
+</p>
+
+<p>
+I changed the order of tip percentages, and made zero the default. I also changed the default text in the 'amount' field.
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @State private var checkAmount: Double? = nil
+    @State private var numberOfPeople = 0 // A value of zero maps to minimum (2)
+    @State private var tipPercentage = 0
+    @FocusState private var amountIsFocused: Bool
+    
+    let tipPercentages = [0, 10, 15, 20, 25]
+    
+    var actualAmount: Double {
+        checkAmount ?? 0
+    }
+    
+    var totalTip: Double {
+        let tipSelection = Double(tipPercentage)
+        return actualAmount / 100 * tipSelection
+    }
+
+    var totalWithTip: Double {
+        // Build on totalTip
+        return actualAmount + totalTip
+    }
+
+    var totalPerPerson: Double {
+        let peopleCount = Double(numberOfPeople + 2)
+        // Build on totalWithTip
+        return totalWithTip / peopleCount
+    }
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Total Bill Amount", value: $checkAmount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                        .keyboardType(.decimalPad)
+                        .focused($amountIsFocused)
+                    
+                    Picker("Number of people", selection: $numberOfPeople) {
+                        ForEach(2..&lt;100) {
+                            Text("\($0) people")
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                }
+                
+                Section("How much tip do you want to leave?") {
+                    Picker("Tip percentage", selection: $tipPercentage) {
+                        ForEach(tipPercentages, id: \.self) {
+                            Text($0, format: .percent)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                
+                Section("Total tip"){
+                    Text(totalTip, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                }
+
+                Section("Total including tip"){
+                    Text(totalWithTip, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                }
+
+                Section("Amount Per Person"){
+                    Text(totalPerPerson, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                }
+            }
+            .navigationTitle("WeSplit")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        amountIsFocused = false
+                    }
+                }
+            }
+            // This is the magic part:
+            .onChange(of: amountIsFocused) { oldValue, newValue in
+                if newValue {
+                    checkAmount = nil
+                }
+            }
+        }
+    }
+}
+</pre>
+
 <p>
 <br>
 <hr>
