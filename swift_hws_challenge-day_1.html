@@ -1427,6 +1427,108 @@ struct ContentView: View {
 </pre>
 
 
+<p>
+Blue Gradient Version:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    @State private var inTemp: Double? = nil
+    @State private var outTemp: Double? = nil
+    @State private var inTempScale = "ºC"
+    @State private var outTempScale = "ºF"
+    @FocusState private var isInputFocused: Bool
+    
+    let tempUnits = ["ºC", "ºF"]
+    
+    var convertedTemp: Double? { // Change return type to Double?
+        // 1. Check if we actually have an input. If not, return nil immediately.
+        guard let input = inTemp else { return nil }
+        
+        // 2. Perform the "Base" conversion
+        let tempInCelsius = (inTempScale == "ºC") ? input : fahrenheitToCelsius(input)
+        
+        // 3. Perform the "Target" conversion
+        return (outTempScale == "ºC") ? tempInCelsius : celsiusToFahrenheit(tempInCelsius)
+    }
+
+    // Calculation Helpers
+    func fahrenheitToCelsius(_ temp: Double) -&gt; Double {
+        (temp - 32) * 5 / 9
+    }
+
+    func celsiusToFahrenheit(_ temp: Double) -&gt; Double {
+        (temp * 9 / 5) + 32
+    }
+    
+    var body: some View {
+            NavigationStack {
+                Form {
+                    Section("Enter Temperature") {
+                        TextField("Enter Temp Value", value: $inTemp, format: .number)
+                            .foregroundStyle(.primary) // Automatically picks the best "high contrast" color
+                            .keyboardType(.decimalPad)
+                            .focused($isInputFocused)
+                            .toolbar {
+                                ToolbarItemGroup(placement: .keyboard) {
+                                    Spacer()
+                                    Button("Done") {
+                                        isInputFocused = false // More "SwiftUI" way to dismiss
+                                    }
+                                }
+                            }
+                        Picker("Input Temperature", selection: $inTempScale) {
+                            ForEach(tempUnits, id: \.self) {
+                                Text($0)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    //.listRowBackground(Color.clear) // &lt;--- This makes the white box vanish!
+
+                    Section("Converted Temperature") {
+                        Picker("Converted Temperature", selection: $outTempScale) {
+                            ForEach(tempUnits, id: \.self) {
+                                Text($0)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        if let result = convertedTemp {
+                            Text(result.formatted(.number.precision(.fractionLength(0...1))))
+                        } else {
+                            Text("Waiting for input...")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } // End of Form
+                .navigationTitle("ConvertTemps")
+                .scrollContentBackground(.hidden)
+                .background(Color.blue.gradient)
+
+                .onChange(of: isInputFocused) { oldValue, newValue in
+                    if newValue { inTemp = nil }
+                }
+                .onChange(of: inTempScale) { _, newValue in
+                    outTempScale = (newValue == "ºC") ? "ºF" : "ºC"
+                }
+                .onChange(of: outTempScale) { _, newValue in
+                    inTempScale = (newValue == "ºC") ? "ºF" : "ºC"
+                }
+
+            } // End of NavigationStack
+
+
+        }
+} //End of View
+        
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <br>
