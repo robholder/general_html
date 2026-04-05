@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_54</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_53.html">Hacking With Swift - 53 - What is behind the main SwiftUI view?</a>
+
+</ul>
+<div id="Hacking With Swift - 54 - Why modifier order matters"><h1 id="Hacking With Swift - 54 - Why modifier order matters" class="header"><a href="#Hacking With Swift - 54 - Why modifier order matters">Hacking With Swift - 54 - Why modifier order matters</a></h1></div>
+
+
+<p>
+Almost every time we apply a modifier to a SwiftUI view, we actually create a new view with that change applied – we don’t just modify the existing view in place. If you think about it, this behavior makes sense: our views only hold the exact properties we give them, so if we set the background color or font size there is no place to store that data.
+</p>
+
+<p>
+We’re going to look at <em>why</em> this happens shortly, but first I want to look at the practical implications of this behavior. Take a look at this code:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        Button("hello, world!"){
+            //do nothing
+        }
+        .background(.red)
+        .frame(width: 200, height: 200)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
+What do you think that will look like when it runs?
+</p>
+
+<p>
+Chances are you guessed wrong: you won’t see a 200x200 red button with "Hello, world!" in the middle. Instead, you’ll see a 200x200 empty square (white, so it's invisible), with "Hello, world!" in the middle and with a red rectangle directly around "Hello, world!".
+</p>
+
+<p>
+You can understand what’s happening here if you think about the way modifiers work: each one creates a new struct with that modifier applied, rather than just setting a property on the view.
+</p>
+
+<p>
+You can peek into the underbelly of SwiftUI by asking for the type of our view’s body. Modify the button to this:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        Button("hello, world!"){
+            print(type(of: self.body))
+        }
+        .background(.red)
+        .frame(width: 200, height: 200)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
+Swift’s <code>type(of:)</code> function prints the exact type of a particular value, and in this instance it will print the following: <code>ModifiedContent&lt;ModifiedContent&lt;Button&lt;Text&gt;, _BackgroundStyleModifier&lt;Color&gt;&gt;, _FrameLayout&gt;</code>
+</p>
+
+<p>
+You can see two things here:
+</p>
+
+<ul>
+<li>
+Every time we modify a view SwiftUI applies that modifier by using generics: <code>ModifiedContent&lt;OurThing, OurModifier&gt;</code>.
+
+<li>
+When we apply multiple modifiers, they just stack up: <code>ModifiedContent&lt;ModifiedContent&lt;…</code>
+
+</ul>
+<p>
+To read what the type is, start from the innermost type and work your way out:
+</p>
+
+<ul>
+<li>
+The innermost type is <code>ModifiedContent&lt;Button&lt;Text&gt;, _BackgroundStyleModifier&lt;Color&gt;</code>: our button has some text with a background color applied.
+
+<li>
+Around that we have <code>ModifiedContent&lt;…, _FrameLayout&gt;</code>, which takes our first view (button + background color) and gives it a larger frame.
+
+</ul>
+<p>
+As you can see, we end with <code>ModifiedContent</code> types stacking up – each one takes a view to transform plus the actual change to make, rather than modifying the view directly.
+</p>
+
+<p>
+<span id="Hacking With Swift - 54 - Why modifier order matters-What this means is that the order of your modifiers matter."></span><strong id="What this means is that the order of your modifiers matter.">What this means is that the order of your modifiers matter.</strong> If we rewrite our code to apply the background color <em>after</em> the frame, then you might get the result you expected:
+</p>
+
+<pre swift>
+        Button("Hello, world!") {
+            print(type(of: self.body))
+        }
+        .frame(width: 200, height: 200) //Swop these two lines
+        .background(.red)
+</pre>
+
+<p>
+The best way to think about it for now is to imagine that SwiftUI renders your view after every single modifier. So, as soon as you say <code>.background(.red)</code> it colors the background in red, regardless of what frame you give it. If you then later expand the frame, it won’t magically redraw the background – that was already applied.
+</p>
+
+<p>
+Of course, this isn’t actually how SwiftUI works, because if it did it would be a performance nightmare, but it’s a neat mental shortcut to use while you’re learning.
+</p>
+
+<p>
+An important side effect of using modifiers is that we can apply the same effect multiple times: each one simply adds to whatever was there before.
+</p>
+
+<p>
+For example, SwiftUI gives us the <code>padding()</code> modifier, which adds a little space around a view so that it doesn’t push up against other views or the edge of the screen. If we apply padding then a background color, then more padding and a different background color, we can give a view multiple borders, like this:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        Text("Hello, world!")
+            .padding()
+            .background(.red)
+            .padding()
+            .background(.blue)
+            .padding()
+            .background(.green)
+            .padding()
+            .background(.yellow)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
+This results in "Hello, world!" surrounded by concentric rectangle frames of different colors.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+<ul>
+<li>
+<a href="swift_hws_55.html">Hacking With Swift - 55 - Why does SwiftUI use "some View" for its view type?</a>
+
+</ul>
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
