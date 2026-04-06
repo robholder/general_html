@@ -260,12 +260,152 @@ struct ContentView: View {
     ContentView()
 }
 </pre>
+
+<div id="Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment"><h2 id="AI Improvements to the Grid Alignment" class="header"><a href="#Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment">AI Improvements to the Grid Alignment</a></h2></div>
+
+<p>
+The alignment issue you're seeing—where columns don't line up because of different text lengths or icon widths—is because <code>HStack</code> and <code>VStack</code> are "selfish." Each row in your <code>GridStack</code> is calculating its own width independently based on its own content, rather than looking at the rows above or below it.
+</p>
+
+<p>
+To fix this on iOS 26, you have two options: the "Modern Way" (using the native Grid view) or the "Frame Hack" (fixing your current <code>GridStack</code>).
+</p>
+
+<div id="Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment-1. The Modern Way: Using Grid (Recommended)"><h3 id="1. The Modern Way: Using Grid (Recommended)" class="header"><a href="#Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment-1. The Modern Way: Using Grid (Recommended)">1. The Modern Way: Using Grid (Recommended)</a></h3></div>
+
+<p>
+Since you are on a modern OS, you should use the native Grid and GridRow views. Unlike stacks, these were built to synchronize column widths across the entire container automatically.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        // Native Grid handles the "column logic" for you
+        Grid(horizontalSpacing: 20, verticalSpacing: 20) {
+            ForEach(0..&lt;4, id: \.self) { row in
+                GridRow {
+                    ForEach(0..&lt;4, id: \.self) { col in
+                        VStack {
+                            Image(systemName: "\(row * 4 + col).circle")
+                            Text("R\(row) C\(col)")
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment-2. The &quot;Frame Hack&quot; (Fixing your GridStack)"><h3 id="2. The &quot;Frame Hack&quot; (Fixing your GridStack)" class="header"><a href="#Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment-2. The &quot;Frame Hack&quot; (Fixing your GridStack)">2. The "Frame Hack" (Fixing your GridStack)</a></h3></div>
+
+<p>
+If you want to keep your custom <code>GridStack</code> struct, you need to force every cell to occupy the exact same amount of space. You do this by giving each cell an invisible frame that expands to fill all available width.
+</p>
+
+<p>
+Update your <code>GridStack</code> body like this:
+</p>
+
+<pre swift>
+var body: some View {
+    VStack {
+        ForEach(0..&lt;rows, id: \.self) { row in
+            HStack {
+                ForEach(0..&lt;columns, id: \.self) { column in
+                    content(row, column)
+                        // This is the magic line:
+                        .frame(maxWidth: .infinity) 
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+Why this works: By setting <code>maxWidth: .infinity</code>, you're telling every cell, "Take as much room as you can." Since they are all inside an <code>HStack</code> together, they will divide the screen width equally, forcing the columns to align perfectly regardless of what's inside them.
+</p>
+
+<div id="Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment-3. Which one should you use?"><h3 id="3. Which one should you use?" class="header"><a href="#Hacking With Swift - 60a - Custom containers-AI Improvements to the Grid Alignment-3. Which one should you use?">3. Which one should you use?</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Feature
+</th>
+<th>
+Custom GridStack
+</th>
+<th>
+Native Grid
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Alignment
+</td>
+<td>
+Manual (.frame)
+</td>
+<td>
+Automatic
+</td>
+</tr>
+<tr>
+<td>
+Complexity
+</td>
+<td>
+High (Generic code)
+</td>
+<td>
+Low (Clean Syntax)
+</td>
+</tr>
+<tr>
+<td>
+Performance
+</td>
+<td>
+Good for small grids
+</td>
+<td>
+Optimized for iOS 16+
+</td>
+</tr>
+<tr>
+<td>
+Flexibility
+</td>
+<td>
+Total control
+</td>
+<td>
+Row/Column spans supported
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Using <code>HStack</code> for a grid is like trying to align a fleet of cars by eye—every car is a different length, so the line always looks jagged. Using the <code>.frame(maxWidth: .infinity)</code> trick or the native Grid is like putting them all into pre-painted parking spots. Everything snaps into place
+</p>
+
 <p>
 <br>
 <hr>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_61.html">Hacking With Swift - 61 - Views and modifiers: Wrap up</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
