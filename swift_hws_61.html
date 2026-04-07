@@ -67,6 +67,289 @@ Go back to project 2 and replace the <code>Image</code> view used for flags with
 Create a custom <code>ViewModifier</code> (and accompanying <code>View</code> extension) that makes a view have a large, blue font suitable for prominent titles in a view.
 
 </ul>
+<div id="Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-Project 1 - Add red if tip is 0%"><h3 id="Project 1 - Add red if tip is 0%" class="header"><a href="#Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-Project 1 - Add red if tip is 0%">Project 1 - Add red if tip is 0%</a></h3></div>
+
+<p>
+Make the background of the Amount Per Person field red:
+</p>
+
+<p>
+(Note: <code>Color.clear</code> renders 'as normal'.)
+</p>
+
+<pre swift>
+.listRowBackground(tipPercentage == 0 ? Color.red.opacity(0.4) : Color.clear)
+</pre>
+
+<p>
+Make the text in the Amount Per Person field red if tip is 0%:
+</p>
+
+<p>
+(Note: <code>.primary</code> is the default rendering.)
+</p>
+
+<pre swift>
+.foregroundStyle(tipPercentage == 0 ? .red : .primary)
+</pre>
+
+<div id="Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-In Context">In Context</a></h3></div>
+
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @State private var checkAmount: Double? = nil
+    @State private var numberOfPeople = 0 // A value of zero maps to minimum (2)
+    @State private var tipPercentage = 0
+    @FocusState private var amountIsFocused: Bool
+    
+    let tipPercentages = [0, 10, 15, 20, 25]
+    
+    var actualAmount: Double {
+        checkAmount ?? 0
+    }
+    
+    var totalTip: Double {
+        let tipSelection = Double(tipPercentage)
+        return actualAmount / 100 * tipSelection
+    }
+    
+    var totalWithTip: Double {
+        // Build on totalTip
+        return actualAmount + totalTip
+    }
+    
+    var totalPerPerson: Double {
+        let peopleCount = Double(numberOfPeople + 2)
+        // Build on totalWithTip
+        return totalWithTip / peopleCount
+    }
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Total Bill Amount", value: $checkAmount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                        .keyboardType(.decimalPad)
+                        .focused($amountIsFocused)
+                    
+                    Picker("Number of people", selection: $numberOfPeople) {
+                        ForEach(2..&lt;100) {
+                            Text("\($0) people")
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                }
+                
+                Section("How much tip do you want to leave?") {
+                    Picker("Tip percentage", selection: $tipPercentage) {
+                        ForEach(tipPercentages, id: \.self) {
+                            Text($0, format: .percent)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                
+                Section("Total tip"){
+                    Text(totalTip, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                }
+                
+                Section("Total including tip"){
+                    Text(totalWithTip, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                }
+                
+                // This is the area we add the color indication of a tip being 0%
+                Section("Amount Per Person"){
+                    Text(totalPerPerson, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                        //.foregroundStyle(tipPercentage == 0 ? .red : .primary)
+                        .listRowBackground(tipPercentage == 0 ? Color.red.opacity(1) : Color.clear)
+                }
+                
+            }
+            .navigationTitle("WeSplit")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        amountIsFocused = false
+                    }
+                }
+            }
+            .onChange(of: amountIsFocused) { oldValue, newValue in
+                if newValue {
+                    checkAmount = nil
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+        .preferredColorScheme(.dark)
+}
+</pre>
+
+
+<div id="Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-Project 2 - Guess The Flag - Function for Flag Rendering"><h3 id="Project 2 - Guess The Flag - Function for Flag Rendering" class="header"><a href="#Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-Project 2 - Guess The Flag - Function for Flag Rendering">Project 2 - Guess The Flag - Function for Flag Rendering</a></h3></div>
+
+<p>
+AI had already suggested this idea; so here it is again:
+</p>
+
+<pre swift>
+// Reusable components kept outside the main view
+struct FlagImage: View {
+    var name: String
+    var body: some View {
+        Image(name)
+            .clipShape(.rect(cornerRadius: 5))
+            .shadow(radius: 8)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 61 - Views and modifiers: Wrap up-Challenge-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @State private var countries = ["Estonia", "France", "Germany",
+                                    "Ireland", "Italy", "Monaco",
+                                    "Nigeria", "Poland",
+                                    "Spain", "UK", "Ukraine", "US"].shuffled()
+    @State private var correctAnswer = Int.random(in: 0...2)
+
+    @State private var score = 0
+    @State private var scoreTitle = ""
+    @State private var showingScore = false
+    @State private var tries = 0
+    @State private var complete = false
+    
+    let maxTries = 8 // Easier to adjust the game length here
+
+    var body: some View {
+        ZStack {
+            RadialGradient(stops: [
+                .init(color: Color(red: 0.1, green: 0.2, blue: 0.45), location: 0.3),
+                .init(color: Color(red: 0.76, green: 0.15, blue: 0.26), location: 0.3),
+            ], center: .top, startRadius: 200, endRadius: 700)
+            .ignoresSafeArea()
+
+            VStack {
+                Spacer()
+
+                Text("Guess the Flag")
+                    .whiteTitleStyle()
+                
+                VStack(spacing: 15) {
+                    VStack {
+                        Text("Tap the flag of")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline.weight(.heavy))
+                        
+                        Text(countries[correctAnswer])
+                            .font(.largeTitle.weight(.semibold))
+                    }
+                    
+                    ForEach(0..&lt;3) { number in
+                        Button {
+                            flagTapped(number)
+                        } label: {
+                            // This function call utilizes the flag draw function:
+                            FlagImage(name: countries[number])
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(.regularMaterial)
+                .clipShape(.rect(cornerRadius: 20))
+                
+                Spacer()
+                Spacer()
+                
+                Text("Score: \(score)")
+                    .whiteTitleStyle()
+                
+                Spacer()
+            }
+            .padding()
+        }
+        .alert(scoreTitle, isPresented: $showingScore) {
+            Button("Continue", action: askQuestion)
+        } message: {
+            Text("Your score is \(score)")
+        }
+        .alert("Game Over", isPresented: $complete) {
+            Button("Reset", action: reset)
+        } message: {
+            Text("Your final score is \(score) / \(maxTries)")
+        }
+    }
+
+    func flagTapped(_ number: Int) {
+        tries += 1
+        
+        if number == correctAnswer {
+            scoreTitle = "Correct"
+            score += 1
+        } else {
+            scoreTitle = "Wrong! That's the flag of \(countries[number])"
+        }
+
+        if tries &gt;= maxTries {
+            complete = true
+        } else {
+            showingScore = true
+        }
+    }
+
+    func askQuestion() {
+        countries.shuffle()
+        correctAnswer = Int.random(in: 0...2)
+    }
+
+    func reset() {
+        tries = 0
+        score = 0
+        askQuestion()
+    }
+}
+
+// Reusable components kept outside the main view
+struct FlagImage: View {
+    var name: String
+    var body: some View {
+        Image(name)
+            .clipShape(.rect(cornerRadius: 5))
+            .shadow(radius: 8)
+    }
+}
+
+struct WhiteTitle: ViewModifier {
+    func body(content: Content) -&gt; some View {
+        content
+            .font(.title.bold())
+            .foregroundStyle(.white)
+    }
+}
+
+extension View {
+    func whiteTitleStyle() -&gt; some View {
+        modifier(WhiteTitle())
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 <p>
 <br>
 <hr>
