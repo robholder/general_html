@@ -398,6 +398,10 @@ Button Style Placement: You applied <code>.buttonStyle()</code> inside the <code
 
 <div id="AI Input-5. Final Code Cleanup (The &quot;Pro&quot; Version)"><h2 id="5. Final Code Cleanup (The &quot;Pro&quot; Version)" class="header"><a href="#AI Input-5. Final Code Cleanup (The &quot;Pro&quot; Version)">5. Final Code Cleanup (The "Pro" Version)</a></h2></div>
 
+<p>
+Layout Redesign by AI on this version (with round buttons and larger starting symbol) - which I revert in subsequent additions on this page:
+</p>
+
 <pre swift>
 import SwiftUI
 
@@ -559,23 +563,49 @@ First, add a variable to track the "flash" color. We’ll start it as <code>Colo
 
 <div id="AI Input-AI Suggestion - Adding a Flash-2. Update the Background"><h3 id="2. Update the Background" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-2. Update the Background">2. Update the Background</a></h3></div>
 
+<div id="AI Input-AI Suggestion - Adding a Flash-2. Update the Background-The &quot;Fading Flash&quot; Implementation"><h4 id="The &quot;Fading Flash&quot; Implementation" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-2. Update the Background-The &quot;Fading Flash&quot; Implementation">The "Fading Flash" Implementation</a></h4></div>
+
 <p>
-In your <code>ZStack</code>, place this <code>feedbackColor</code> right above your main background. Using <code>.opacity</code> will keep it from being too jarring.
+Since you have a <code>LinearGradient</code>, we want the flash to sit on top of it. We will use a Rectangle with your <code>feedbackColor</code> and put it inside the <code>ZStack</code>.
 </p>
 
 <pre swift>
 ZStack {
-    Color.blue.opacity(0.2).ignoresSafeArea() // Your base color
+    // 1. Your existing Gradient (The bottom layer)
+    LinearGradient(colors: [.blue.opacity(0.3), .white], startPoint: .top, endPoint: .bottom)
+        .ignoresSafeArea()
     
-    feedbackColor
+    // 2. The Flash Layer (The middle layer)
+    Rectangle()
+        .fill(feedbackColor) // Use .fill() for colors on shapes
         .opacity(0.4)
         .ignoresSafeArea()
-        .animation(.default, value: feedbackColor) // Smooth transition
+        .animation(.default, value: feedbackColor) // Added the missing colon!
     
-    // ... rest of your VStack ...
+    // 3. Your UI (The top layer)
+    VStack {
+        // ... all your game text and buttons ...
+    }
 }
 </pre>
 
+<div id="AI Input-AI Suggestion - Adding a Flash-2. Update the Background-Why the Rectangle approach is better than not:"><h4 id="Why the Rectangle approach is better than not:" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-2. Update the Background-Why the Rectangle approach is better than not:">Why the Rectangle approach is better than not:</a></h4></div>
+
+<p>
+By using <code>Rectangle().fill(feedbackColor)</code>, you are being very explicit.
+</p>
+
+<ul>
+<li>
+Rectangle: "Cover the whole screen."
+
+<li>
+Fill: "Paint it this color."
+
+<li>
+Opacity: "Make it see-through so I can still see the gradient underneath."
+
+</ul>
 <div id="AI Input-AI Suggestion - Adding a Flash-3. Trigger the Flash in buttonTapped"><h3 id="3. Trigger the Flash in buttonTapped" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-3. Trigger the Flash in buttonTapped">3. Trigger the Flash in buttonTapped</a></h3></div>
 
 <p>
@@ -623,107 +653,725 @@ By adding this, you've moved into the realm of Juice. In game design, "Juice" re
 Now that you have visual feedback, would you like to add a subtle haptic "thump" (vibration) for the phone so the user can literally feel when they get a point?
 </p>
 
+<div id="AI Input-In Context"><h2 id="In Context" class="header"><a href="#AI Input-In Context">In Context</a></h2></div>
+
+<p>
+With background flash:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    // Create a struct so that the data is structured
+    struct Move: Equatable {
+        let emoji: String
+        let name: String
+        
+        // Logic to determine if this move beats another
+        func beats(_ other: Move) -&gt; Bool {
+            if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
+            if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
+            if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
+            return false
+        }
+    }
+    
+    let moves = [
+        Move(emoji: "🪨", name: "Rock"),
+        Move(emoji: "📄", name: "Paper"),
+        Move(emoji: "✂️", name: "Scissors")
+    ]
+    
+    // Game State
+    @State private var win = Bool.random()
+    @State private var currentMoveIndex = Int.random(in: 0...2)
+    @State private var score = 0
+    @State private var tries = 0
+    @State private var complete = false
+    
+    // Feedback States
+    @State private var feedbackColor = Color.clear
+    @State private var alertTitle = "Game Over"
+    
+    // Computed property to easily get the computer's move
+    var computerMove: Move {
+        moves[currentMoveIndex]
+    }
+    
+    // Custom Button Style for the "Squish" effect
+    struct BouncyButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -&gt; some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+                .opacity(configuration.isPressed ? 0.8 : 1.0)
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            // LAYER 1: The Base Background
+            LinearGradient(colors: [.blue.opacity(0.3), .white], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            
+            // LAYER 2: The Feedback Flash
+            Rectangle()
+                .fill(feedbackColor)
+                .opacity(0.4)
+                .ignoresSafeArea()
+                .animation(.default, value: feedbackColor)
+            
+            // LAYER 3: The UI
+            VStack {
+                Text("Rock-Paper-Scissors")
+                    .font(.largeTitle.bold())
+                
+                Spacer()
+                
+                // Computer Choice Display
+                VStack(spacing: 10) {
+                    Text(computerMove.emoji)
+                    Text(computerMove.name)
+                }
+                .font(.system(size: 30))
+                .bold()
+                .frame(width: 120, height: 100)
+                .background(.blue.opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                VStack {
+                    Text(win ? "Try to Win" : "Try to Lose")
+                        .font(.system(size: 50))
+                        .bold()
+                        .foregroundStyle(win ? .green : .red)
+                }
+                .padding(.vertical, 40)
+                
+                // Player Buttons
+                HStack(spacing: 20) {
+                    ForEach(moves.indices, id: \.self) { index in
+                        Button {
+                            buttonTapped(index)
+                        } label: {
+                            VStack(spacing: 10) {
+                                Text(moves[index].emoji)
+                                Text(moves[index].name)
+                            }
+                            .font(.system(size: 30))
+                            .foregroundStyle(.white)
+                            .frame(width: 110, height: 100)
+                            .background(.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
+                        }
+                        .buttonStyle(BouncyButtonStyle())
+                    }
+                }
+                
+                Spacer()
+                
+                Text("Score: \(score)")
+                    .font(.system(size: 40))
+                    .bold()
+                
+                Spacer()
+            }
+            .padding()
+        }
+        .alert(alertTitle, isPresented: $complete) {
+            Button("Play Again", action: resetFullGame)
+        } message: {
+            Text("Final Score is \(score) out of 10")
+        }
+    }
+    
+    // Logic Functions
+    func buttonTapped(_ index: Int) {
+        let playerMove = moves[index]
+        let playerActuallyWon = playerMove.beats(computerMove)
+        
+        // Check if player followed the 'Win/Lose' instruction
+        if playerActuallyWon == win {
+            score += 1
+            feedbackColor = .green
+        } else {
+            feedbackColor = .red
+        }
+        
+        // Fade the flash out after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            feedbackColor = .clear
+        }
+        
+        tries += 1
+        
+        if tries &gt;= 10 {
+            complete = true
+        } else {
+            prepareNextRound()
+        }
+    }
+    
+    func prepareNextRound() {
+        currentMoveIndex = Int.random(in: 0..&lt;moves.count)
+        win = Bool.random()
+    }
+    
+    func resetFullGame() {
+        tries = 0
+        score = 0
+        prepareNextRound()
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 <div id="AI Input-Haptic Bump"><h2 id="Haptic Bump" class="header"><a href="#AI Input-Haptic Bump">Haptic Bump</a></h2></div>
 
 <p>
-To add haptics (vibration) in SwiftUI, we use the UIImpactFeedbackGenerator. It’s the same physical "click" you feel when you toggle a switch in the iPhone Settings or use Apple Pay.
+To add haptics (vibration) in SwiftUI, we use the <code>UIImpactFeedbackGenerator</code>. It’s the same physical "click" you feel when you toggle a switch in the iPhone Settings or use Apple Pay.
 </p>
 
-<ol>
-<li>
-The Haptic Helper
+<div id="AI Input-Haptic Bump-1. The Haptic Helper"><h3 id="1. The Haptic Helper" class="header"><a href="#AI Input-Haptic Bump-1. The Haptic Helper">1. The Haptic Helper</a></h3></div>
 
-</ol>
 <p>
-Since you might want to use haptics in several places, it's cleanest to create a small function to trigger them. You can place this inside your ContentView or as a standalone utility.
+Since you might want to use haptics in several places, it's cleanest to create a small function to trigger them. You can place this inside your <code>ContentView</code> or as a standalone utility.
 </p>
 
-<p>
-Swift
+<pre swift>
 func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-</p>
-<pre><code>let generator = UIImpactFeedbackGenerator(style: style)
-generator.prepare() // Wakes up the haptic engine
-generator.impactOccurred()
-</code></pre>
-<p>
+    let generator = UIImpactFeedbackGenerator(style: style)
+    generator.prepare() // Wakes up the haptic engine
+    generator.impactOccurred()
 }
+</pre>
+
+<div id="AI Input-Haptic Bump-2. Adding it to your Game Logic"><h3 id="2. Adding it to your Game Logic" class="header"><a href="#AI Input-Haptic Bump-2. Adding it to your Game Logic">2. Adding it to your Game Logic</a></h3></div>
+
+<p>
+Now, in your <code>buttonTapped</code> function, you can provide different physical "feelings" for a correct answer versus a mistake.
 </p>
-<ol>
+
+<ul>
 <li>
-Adding it to your Game Logic
+<code>.heavy</code> or <code>.medium</code>: Feels like a solid "thump" (Great for scoring).
 
-</ol>
-<p>
-Now, in your buttonTapped function, you can provide different physical "feelings" for a correct answer versus a mistake.
-</p>
-
-<p>
-.heavy or .medium: Feels like a solid "thump" (Great for scoring).
-</p>
-
-<p>
-.light: A subtle tap (Good for general button presses).
-</p>
-
-<p>
-Swift
+<li>
+<code>.light</code>: A subtle tap (Good for general button presses).
+<pre swift>
 func buttonTapped(_ index: Int) {
-</p>
-<pre><code>let playerMove = moves[index]
-let playerWon = playerMove.beats(computerMove)
+    let playerMove = moves[index]
+    let playerWon = playerMove.beats(computerMove)
+    
+    if playerWon == win {
+        score += 1
+        feedbackColor = .green
+        triggerHaptic(.medium) // A satisfying "Good job" tap
+    } else {
+        feedbackColor = .red
+        triggerHaptic(.heavy) // A more noticeable "Oops" vibration
+    }
 
-if playerWon == win {
-score += 1
-feedbackColor = .green
-triggerHaptic(.medium) // A satisfying "Good job" tap
-} else {
-feedbackColor = .red
-triggerHaptic(.heavy) // A more noticeable "Oops" vibration
+    // ... reset logic ...
 }
-</code></pre>
-<pre><code>// ... reset logic ...
-</code></pre>
-<p>
-}
-</p>
-<ol>
-<li>
-Why prepare() matters
+</pre>
 
-</ol>
+</ul>
+<div id="AI Input-Haptic Bump-3. Why prepare() matters"><h3 id="3. Why prepare() matters" class="header"><a href="#AI Input-Haptic Bump-3. Why prepare() matters">3. Why prepare() matters</a></h3></div>
+
 <p>
-You’ll notice I included generator.prepare(). The haptic engine on an iPhone stays "asleep" to save battery. If you just call impactOccurred(), there might be a tiny millisecond of lag while the engine spins up. Calling prepare() ensures the vibration happens at the exact moment the finger touches the screen.
+You’ll notice I included <code>generator.prepare()</code>. The haptic engine on an iPhone stays "asleep" to save battery. If you just call <code>impactOccurred()</code>, there might be a tiny millisecond of lag while the engine spins up. Calling <code>prepare()</code> ensures the vibration happens at the exact moment the finger touches the screen.
 </p>
 
-<ol>
-<li>
-A Pro Touch: "Success" and "Error" Haptics
+<div id="AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics"><h3 id="4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics" class="header"><a href="#AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics">4. A Pro Touch: "Success" and "Error" Haptics</a></h3></div>
 
-</ol>
 <p>
-If you want even more distinct patterns (like the double-pulse you feel when FaceID fails), you can use UINotificationFeedbackGenerator:
+If you want even more distinct patterns (like the double-pulse you feel when FaceID fails), you can use <code>UINotificationFeedbackGenerator</code>:
 </p>
 
-<p>
-Swift
+<pre swift>
 let notification = UINotificationFeedbackGenerator()
 notification.notificationOccurred(.success) // A pleasant double-tap
 // OR
 notification.notificationOccurred(.error) // A rapid triple-pulse
-A Wit-y Peer Review
-</p>
+</pre>
+
+<div id="AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics-Summary"><h4 id="Summary" class="header"><a href="#AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics-Summary">Summary</a></h4></div>
 
 <p>
 By adding haptics, you’ve broken through the "Glass Barrier." Before, your game was just light and color; now, it has physical weight. It’s the difference between tapping on a window and tapping on a drum.
-<br>
 </p>
 
 <p>
+Adding haptics is the final step to making your game feel like a professional iOS app. We will use two different types of haptic feedback: Impact (for the physical tap) and Notification (for the final game over result).
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    struct Move: Equatable {
+        let emoji: String
+        let name: String
+        
+        func beats(_ other: Move) -&gt; Bool {
+            if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
+            if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
+            if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
+            return false
+        }
+    }
+    
+    let moves = [
+        Move(emoji: "🪨", name: "Rock"),
+        Move(emoji: "📄", name: "Paper"),
+        Move(emoji: "✂️", name: "Scissors")
+    ]
+    
+    @State private var win = Bool.random()
+    @State private var currentMoveIndex = Int.random(in: 0...2)
+    @State private var score = 0
+    @State private var tries = 0
+    @State private var complete = false
+    @State private var feedbackColor = Color.clear
+    
+    var computerMove: Move { moves[currentMoveIndex] }
+    
+    struct BouncyButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -&gt; some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+                .opacity(configuration.isPressed ? 0.8 : 1.0)
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [.blue.opacity(0.3), .white], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            
+            Rectangle()
+                .fill(feedbackColor)
+                .opacity(0.4)
+                .ignoresSafeArea()
+                .animation(.default, value: feedbackColor)
+            
+            VStack {
+                Text("Rock-Paper-Scissors")
+                    .font(.largeTitle.bold())
+                
+                Spacer()
+                
+                VStack(spacing: 10) {
+                    Text(computerMove.emoji)
+                    Text(computerMove.name)
+                }
+                .font(.system(size: 30))
+                .bold()
+                .frame(width: 120, height: 100)
+                .background(.blue.opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                VStack {
+                    Text(win ? "Try to Win" : "Try to Lose")
+                        .font(.system(size: 50))
+                        .bold()
+                        .foregroundStyle(win ? .green : .red)
+                }
+                .padding(.vertical, 40)
+                
+                HStack(spacing: 20) {
+                    ForEach(moves.indices, id: \.self) { index in
+                        Button {
+                            buttonTapped(index)
+                        } label: {
+                            VStack(spacing: 10) {
+                                Text(moves[index].emoji)
+                                Text(moves[index].name)
+                            }
+                            .font(.system(size: 30))
+                            .foregroundStyle(.white)
+                            .frame(width: 110, height: 100)
+                            .background(.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
+                        }
+                        .buttonStyle(BouncyButtonStyle())
+                    }
+                }
+                
+                Spacer()
+                
+                Text("Score: \(score)")
+                    .font(.system(size: 40))
+                    .bold()
+                
+                Spacer()
+            }
+            .padding()
+        }
+        .alert("Game Over", isPresented: $complete) {
+            Button("Play Again", action: resetFullGame)
+        } message: {
+            Text("Final Score is \(score) out of 10")
+        }
+    }
+    
+    // MARK: - Haptic Helper Function
+    func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+    
+    // MARK: - Logic Functions
+    func buttonTapped(_ index: Int) {
+        let playerMove = moves[index]
+        let playerActuallyWon = playerMove.beats(computerMove)
+        
+        if playerActuallyWon == win {
+            score += 1
+            feedbackColor = .green
+            // A light, crisp tap for a correct answer
+            triggerHaptic(.light)
+        } else {
+            feedbackColor = .red
+            // A heavier, more noticeable thump for a mistake
+            triggerHaptic(.medium)
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            feedbackColor = .clear
+        }
+        
+        tries += 1
+        
+        if tries &gt;= 10 {
+            // Success notification haptic (Double tap)
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            complete = true
+        } else {
+            prepareNextRound()
+        }
+    }
+    
+    func prepareNextRound() {
+        currentMoveIndex = Int.random(in: 0..&lt;moves.count)
+        win = Bool.random()
+    }
+    
+    func resetFullGame() {
+        tries = 0
+        score = 0
+        prepareNextRound()
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics-What was added?"><h4 id="What was added?" class="header"><a href="#AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics-What was added?">What was added?</a></h4></div>
+
+<ul>
+<li>
+<code>triggerHaptic Function</code>: This wraps the <code>UIImpactFeedbackGenerator</code>. It handles the <code>prepare()</code> and <code>impactOccurred()</code> steps for you so your main logic stays clean.
+
+<li>
+<code>triggerHaptic(.light)</code>: Added when the user gets it right. It's a subtle "Yes!" feeling.
+
+<li>
+<code>triggerHaptic(.medium)</code>: Added when the user gets it wrong. It feels slightly more "blunt," helping the user realize they made a mistake.
+
+<li>
+<code>UINotificationFeedbackGenerator</code>: Used when <code>tries &gt;= 10</code>. This creates a specific "Success" pattern (a quick double-pulse) that tells the player they've finished the game.
+
+</ul>
+<div id="AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics-Summary"><h4 id="Summary" class="header"><a href="#AI Input-Haptic Bump-4. A Pro Touch: &quot;Success&quot; and &quot;Error&quot; Haptics-Summary">Summary</a></h4></div>
+
+<p>
+By combining the Flash (Visual), the Bouncy Button (Animation), and the Haptics (Tactile), you have reached what developers call "The Trifecta of Feedback." Your app now communicates with the user through three different senses.
+</p>
+
+<div id="AI Input-QUESTION"><h2 id="QUESTION" class="header"><a href="#AI Input-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Is it possible to get the haptic feedback on the press rather than the release of the buttons?
+</p>
+
+<div id="AI Input-Gemini said"><h2 id="Gemini said" class="header"><a href="#AI Input-Gemini said">Gemini said</a></h2></div>
+
+<p>
+Yes, it is! In SwiftUI, the default <code>Button</code> action triggers on the <span id="AI Input-Gemini said-&quot;Touch Up&quot;"></span><strong id="&quot;Touch Up&quot;">"Touch Up"</strong> (when you release your finger). To get that immediate, satisfying haptic "click" the moment your finger hits the glass, we need to change how the button detects the press.
+</p>
+
+<div id="AI Input-Gemini said-The Solution: _onButtonGesture or SimultaneousGesture"><h3 id="The Solution: _onButtonGesture or SimultaneousGesture" class="header"><a href="#AI Input-Gemini said-The Solution: _onButtonGesture or SimultaneousGesture">The Solution: _onButtonGesture or SimultaneousGesture</a></h3></div>
+
+<p>
+To trigger an action on the "press" (Touch Down), we use a <code>DragGesture</code> with a <code>minimumDistance</code> of zero. This tells SwiftUI: "The second a finger touches this area, do something."
+</p>
+
+<p>
+Here is how to update your <code>ForEach</code> loop to make the haptics fire instantly:
+</p>
+
+<pre swift>
+ForEach(moves.indices, id: \.self) { index in
+    Button {
+        // The main game logic still happens here (on release)
+        buttonTapped(index)
+    } label: {
+        VStack(spacing: 10) {
+            Text(moves[index].emoji)
+            Text(moves[index].name)
+        }
+        .font(.system(size: 30))
+        .foregroundStyle(.white)
+        .frame(width: 110, height: 100)
+        .background(.blue)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+    .buttonStyle(BouncyButtonStyle())
+    // ADD THIS GESTURE:
+    .simultaneousGesture(
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                // This fires the MOMENT the finger touches the screen
+                triggerHaptic(.light)
+            }
+    )
+}
+</pre>
+
+<div id="AI Input-Gemini said-Why use simultaneousGesture?"><h3 id="Why use simultaneousGesture?" class="header"><a href="#AI Input-Gemini said-Why use simultaneousGesture?">Why use simultaneousGesture?</a></h3></div>
+
+<p>
+If you used a normal <code>.onTapGesture</code>, it would fight with the <code>Button</code> for control. By using <code>simultaneousGesture</code>, you allow the button to keep its "Bouncy" animation and its main action, while also listening for that initial touch to fire the haptic.
+</p>
+
+<div id="AI Input-Refined Haptic Logic"><h2 id="Refined Haptic Logic" class="header"><a href="#AI Input-Refined Haptic Logic">Refined Haptic Logic</a></h2></div>
+
+<p>
+If you trigger the haptic on the press, you should remove the <code>triggerHaptic</code> call from inside your <code>buttonTapped</code> function. Otherwise, the user will feel two vibrations (one on press and one on release), which can feel "cluttered."
+</p>
+
+<div id="AI Input-Refined Haptic Logic-Updated buttonTapped logic:"><h3 id="Updated buttonTapped logic:" class="header"><a href="#AI Input-Refined Haptic Logic-Updated buttonTapped logic:">Updated buttonTapped logic:</a></h3></div>
+
+<ul>
+<li>
+<span id="AI Input-Refined Haptic Logic-Updated buttonTapped logic:-On Press"></span><strong id="On Press">On Press</strong>: Trigger <code>.light</code> haptic (via the gesture above).
+
+<li>
+<span id="AI Input-Refined Haptic Logic-Updated buttonTapped logic:-On Release"></span><strong id="On Release">On Release</strong>: If they got it wrong, you could trigger a <code>.heavy</code> haptic inside <code>buttonTapped</code> to signal the error.
+
+</ul>
+<div id="AI Input-Refined Haptic Logic-Updated buttonTapped logic:-Summary"><h4 id="Summary" class="header"><a href="#AI Input-Refined Haptic Logic-Updated buttonTapped logic:-Summary">Summary</a></h4></div>
+
+<p>
+By moving the haptic to the "Press" phase, you’ve synchronized the physical sensation with the visual "squish" of your <code>BouncyButtonStyle</code>. It makes the screen feel like a physical button that you are actually pushing down, rather than a digital one that only reacts once you let go.
+</p>
+
+<div id="AI Input-In Context"><h2 id="In Context" class="header"><a href="#AI Input-In Context">In Context</a></h2></div>
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    struct Move: Equatable {
+        let emoji: String
+        let name: String
+        
+        func beats(_ other: Move) -&gt; Bool {
+            if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
+            if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
+            if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
+            return false
+        }
+    }
+    
+    let moves = [
+        Move(emoji: "🪨", name: "Rock"),
+        Move(emoji: "📄", name: "Paper"),
+        Move(emoji: "✂️", name: "Scissors")
+    ]
+    
+    @State private var win = Bool.random()
+    @State private var currentMoveIndex = Int.random(in: 0...2)
+    @State private var score = 0
+    @State private var tries = 0
+    @State private var complete = false
+    @State private var feedbackColor = Color.clear
+    
+    var computerMove: Move { moves[currentMoveIndex] }
+    
+    struct BouncyButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -&gt; some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+                .opacity(configuration.isPressed ? 0.8 : 1.0)
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [.blue.opacity(0.3), .white], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            
+            Rectangle()
+                .fill(feedbackColor)
+                .opacity(0.4)
+                .ignoresSafeArea()
+                .animation(.default, value: feedbackColor)
+            
+            VStack {
+                Text("Rock-Paper-Scissors")
+                    .font(.largeTitle.bold())
+                
+                Spacer()
+                
+                // Computer Choice Card
+                VStack(spacing: 10) {
+                    Text(computerMove.emoji)
+                    Text(computerMove.name)
+                }
+                .font(.system(size: 30))
+                .bold()
+                .frame(width: 120, height: 100)
+                .background(.blue.opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                VStack {
+                    Text(win ? "Try to Win" : "Try to Lose")
+                        .font(.system(size: 50))
+                        .bold()
+                        .foregroundStyle(win ? .green : .red)
+                }
+                .padding(.vertical, 40)
+                
+                HStack(spacing: 20) {
+                    ForEach(moves.indices, id: \.self) { index in
+                        Button {
+                            // This runs on RELEASE (Touch Up)
+                            buttonTapped(index)
+                        } label: {
+                            VStack(spacing: 10) {
+                                Text(moves[index].emoji)
+                                Text(moves[index].name)
+                            }
+                            .font(.system(size: 30))
+                            .foregroundStyle(.white)
+                            .frame(width: 110, height: 100)
+                            .background(.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
+                        }
+                        .buttonStyle(BouncyButtonStyle())
+                        // INSTANT HAPTIC GESTURE (Fires on PRESS)
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in
+                                    // Trigger a light haptic the moment they touch the button
+                                    triggerHaptic(.light)
+                                }
+                        )
+                    }
+                }
+                
+                Spacer()
+                
+                Text("Score: \(score)")
+                    .font(.system(size: 40))
+                    .bold()
+                
+                Spacer()
+            }
+            .padding()
+        }
+        .alert("Game Over", isPresented: $complete) {
+            Button("Play Again", action: resetFullGame)
+        } message: {
+            Text("Final Score is \(score) out of 10")
+        }
+    }
+    
+    // MARK: - Haptic Helper
+    func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+    
+    // MARK: - Logic Functions
+    func buttonTapped(_ index: Int) {
+        let playerMove = moves[index]
+        let playerActuallyWon = playerMove.beats(computerMove)
+        
+        if playerActuallyWon == win {
+            score += 1
+            feedbackColor = .green
+            // Note: We don't need a haptic here anymore because 
+            // the button press already triggered one!
+        } else {
+            feedbackColor = .red
+            // Optionally: Trigger a heavy "Error" haptic on release if they fail
+            triggerHaptic(.medium)
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            feedbackColor = .clear
+        }
+        
+        tries += 1
+        
+        if tries &gt;= 10 {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            complete = true
+        } else {
+            prepareNextRound()
+        }
+    }
+    
+    func prepareNextRound() {
+        currentMoveIndex = Int.random(in: 0..&lt;moves.count)
+        win = Bool.random()
+    }
+    
+    func resetFullGame() {
+        tries = 0
+        score = 0
+        prepareNextRound()
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
+
+<p>
+<br>
 <hr>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_62.html">Hacking With Swift - 62 - BetterRest: Introduction</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
