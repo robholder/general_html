@@ -2080,6 +2080,247 @@ By refactoring your code into separate files, you are creating Clean Code. It ma
 You’ve officially transitioned from "writing a script" to "architecting an application." It’s like moving from a studio apartment where your bed is next to your stove, to a three-bedroom house where everything has its own designated room.
 </p>
 
+<div id="Files Breakdown"><h1 id="Files Breakdown" class="header"><a href="#Files Breakdown">Files Breakdown</a></h1></div>
+
+<pre text>
+- RockScissorsPaper
+  |_ RockScissorsPaper
+     |_ Assets.xcassets -&gt; AppIcon
+     |_ ContentView.swift
+     |_ Move.swift
+     |_ RockScissorsPaperApp.swift
+     |_ Styles.swift
+</pre>
+
+<table>
+<tr>
+<td>
+Styles.swift
+</td>
+</tr>
+</table>
+
+<pre swift>
+import SwiftUI
+
+// UI Utitly
+struct BouncyButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -&gt; some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+    }
+}
+</pre>
+
+<table>
+<tr>
+<td>
+Move.swift
+</td>
+</tr>
+</table>
+
+<pre swift>
+import Foundation
+
+// Data model
+struct Move: Equatable {
+    let emoji: String
+    let name: String
+    
+    func beats(_ other: Move) -&gt; Bool {
+        if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
+        if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
+        if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
+        return false
+    }
+}
+</pre>
+
+<table>
+<tr>
+<td>
+ContentView
+</td>
+</tr>
+</table>
+
+<pre swift>
+import SwiftUI
+
+
+// Main Interfacej
+struct ContentView: View {
+    
+    let moves = [
+        Move(emoji: "🪨", name: "Rock"),
+        Move(emoji: "📄", name: "Paper"),
+        Move(emoji: "✂️", name: "Scissors")
+    ]
+    
+    @State private var win = Bool.random()
+    @State private var currentMoveIndex = Int.random(in: 0...2)
+    @State private var score = 0
+    @State private var tries = 0
+    @State private var complete = false
+    @State private var feedbackColor = Color.clear
+    
+    var computerMove: Move { moves[currentMoveIndex] }
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [.blue.opacity(0.3), .white], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            
+            Rectangle()
+                .fill(feedbackColor)
+                .opacity(0.4)
+                .ignoresSafeArea()
+                .animation(.default, value: feedbackColor)
+            
+            VStack {
+                Text("Rock-Paper-Scissors")
+                    .font(.largeTitle.bold())
+                
+                Spacer()
+                
+                VStack(spacing: 10) {
+                    Text(computerMove.emoji)
+                    Text(computerMove.name)
+                }
+                .font(.system(size: 30))
+                .bold()
+                .frame(width: 120, height: 100)
+                .background(.blue.opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                VStack {
+                    Text(win ? "Try to Win" : "Try to Lose")
+                        .font(.system(size: 50))
+                        .bold()
+                        .foregroundStyle(win ? .green : .red)
+                }
+                .padding(.vertical, 40)
+                
+                HStack(spacing: 20) {
+                    ForEach(moves.indices, id: \.self) { index in
+                        Button {
+                            buttonTapped(index)
+                        } label: {
+                            VStack(spacing: 10) {
+                                Text(moves[index].emoji)
+                                Text(moves[index].name)
+                            }
+                            .font(.system(size: 30))
+                            .foregroundStyle(.white)
+                            .frame(width: 110, height: 100)
+                            .background(.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
+                        }
+                        .buttonStyle(BouncyButtonStyle())
+                    }
+                }
+                
+                Spacer()
+                
+                Text("Score: \(score)")
+                    .font(.system(size: 40))
+                    .bold()
+                
+                Spacer()
+                Text("noddynodster@icloud.com")
+            }
+            .padding()
+        }
+        .alert("Game Over", isPresented: $complete) {
+            Button("Play Again", action: resetFullGame)
+        } message: {
+            Text("Final Score is \(score) out of 10")
+        }
+    }
+    
+    // MARK: - Haptic Helper Function
+    func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+    
+    // MARK: - Logic Functions
+    func buttonTapped(_ index: Int) {
+        let playerMove = moves[index]
+        let playerActuallyWon = playerMove.beats(computerMove)
+        
+        if playerActuallyWon == win {
+            score += 1
+            feedbackColor = .green
+            // A light, crisp tap for a correct answer
+            triggerHaptic(.light)
+        } else {
+            feedbackColor = .red
+            // A heavier, more noticeable thump for a mistake
+            triggerHaptic(.medium)
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            feedbackColor = .clear
+        }
+        
+        tries += 1
+        
+        if tries &gt;= 10 {
+            // Success notification haptic (Double tap)
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            complete = true
+        } else {
+            prepareNextRound()
+        }
+    }
+    
+    func prepareNextRound() {
+        currentMoveIndex = Int.random(in: 0..&lt;moves.count)
+        win = Bool.random()
+    }
+    
+    func resetFullGame() {
+        tries = 0
+        score = 0
+        prepareNextRound()
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<table>
+<tr>
+<td>
+RockScissorsPaperApp.swift
+</td>
+</tr>
+</table>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct RockScissorsPaperApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+
+
 <p>
 <br>
 <hr>
