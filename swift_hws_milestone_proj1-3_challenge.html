@@ -103,7 +103,623 @@ You don’t need to add graphics if you don’t want to; just some text views an
 </ul>
 <p>
 This should be a fun exercise: there’s a little bit of Swift, a little bit of SwiftUI, and a little bit of logic, all wrapped up in a game where you can really go to town on theming if you want to.
+</p>
+
+<div id="AI Assistance"><h1 id="AI Assistance" class="header"><a href="#AI Assistance">AI Assistance</a></h1></div>
+
+<p>
+Looking for icons and tips on their usage...
+</p>
+
+<p>
+Here are the icons:
+</p>
+
+<ul>
+<li>
+Rock: 🪨 (Rock)
+
+<li>
+Paper: 📄 (Page Facing Up) — Note: Some people also use ✋ (Raised Hand), but the rock emoji paired with the paper document emoji makes the game's theme very clear.
+
+<li>
+Scissors: ✂️ (Scissors)
+
+</ul>
+<div id="AI Assistance-Pro Tip: Using them in SwiftUI"><h4 id="Pro Tip: Using them in SwiftUI" class="header"><a href="#AI Assistance-Pro Tip: Using them in SwiftUI">Pro Tip: Using them in SwiftUI</a></h4></div>
+
+<p>
+If you want to use these as big, tappable buttons in your app, you can put them inside a Button like this:
+</p>
+
+<pre swift>
+Button {
+    // Play logic here
+} label: {
+    Text("🪨")
+        .font(.system(size: 80)) // Make it huge!
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(Circle())
+}
+</pre>
+
+<div id="AI Assistance-Summary"><h4 id="Summary" class="header"><a href="#AI Assistance-Summary">Summary</a></h4></div>
+
+<p>
+Emojis are the "cheat code" for independent developers. Why spend three hours in Figma designing custom assets when the Unicode Consortium has already given you a perfectly scalable 🪨 for free? It’s the ultimate "Minimum Viable Product" move.
+</p>
+
+<div id="My Attempt"><h1 id="My Attempt" class="header"><a href="#My Attempt">My Attempt</a></h1></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct ContentView: View {
+    
+    //Create a struct so that the dictionaries are structured:
+    struct Move {
+        let emoji: String
+        let name: String
+    }
+    
+    //Use the struct format to create a more solid 'ordered' dictionary:
+    
+    let moves = [
+        Move(emoji: "🪨", name: "Rock"),
+        Move(emoji: "📄", name: "Paper"),
+        Move(emoji: "✂️", name: "Scissors")
+    ]
+    
+    @State private var win = Bool.random()
+    //Set the currentMove to an empty placeholder
+    @State private var currentMoveIndex = 0
+    @State private var tries = 0
+    @State private var complete = false
+    @State private var score = 0
+    @State private var showAlert = false
+    @State private var alertTitle = ""
+    @State private var item = ""
+    
+    struct BouncyButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -&gt; some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.9 : 1.0) // Shrinks to 90% when pressed
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+                .opacity(configuration.isPressed ? 0.8 : 1.0) // Dims slightly
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            Color.blue.opacity(0.2)
+                .ignoresSafeArea()
+            
+            VStack {
+                
+                Text("Rock-Paper-Scissors")
+                    .font(Font.largeTitle.bold())
+                Spacer()
+                VStack(spacing: 10) {
+                    Text(moves[currentMoveIndex].emoji)
+                    Text(moves[currentMoveIndex].name)
+                }//End of VStack 2
+                .font(.system(size: 30)) // Make it huge!
+                .bold()
+                .foregroundStyle(.primary)
+                .frame(width: 120, height: 100) // The "Fixed Size" button magic
+                .background(.blue.opacity(0.4))
+                .clipShape(.rect(cornerRadius: 10))
+                
+                VStack {
+                    Text(win ? "Try to Win" : "Try to Lose")
+                        .font(.system(size: 50))
+                        .bold()
+                }
+                
+                HStack {
+                    ForEach(moves.indices, id: \.self) { index in
+                        Button {
+                            //action
+                            buttonTapped(index)
+                        } label: {
+                            VStack(spacing: 10) {
+                                Text(moves[index].emoji)
+                                Text(moves[index].name)
+                            }
+                            
+                        }// End of label
+                        //.font(.largeTitle)
+                        .font(.system(size: 30)) // Make it huge!
+                        .foregroundStyle(.white)
+                        .frame(width: 120, height: 100) // The "Fixed Size" button magic
+                        .background(.blue)
+                        .clipShape(.rect(cornerRadius: 10))
+                        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5) // Adds depth
+                        .buttonStyle(BouncyButtonStyle())
+                    }// End of ForEach
+                }// End of HStack
+                Spacer()
+                
+                VStack {
+                    Text("Score: \(score)")
+                        .font(.system(size: 40))
+                        .bold()
+                }
+                Spacer()
+            }// End of VStack 1
+            .padding()
+            .onAppear {
+                // This runs AFTER the 'house' is built, so 'moves' is ready!
+                currentMoveIndex = Int.random(in: 0..&lt;moves.count)
+                win = Bool.random()
+            }// End of onAppear
+        }// End of ZStack
+        //.alert(alertTitle, isPresented: $showAlert) {
+        //    Button("Try Again", action: resetGame)
+        //} message: {
+        //    Text("Your Score is \(score)")
+        //}
+        .alert(alertTitle, isPresented: $complete) {
+            Button("Play Again", action: reset)
+        } message: {
+            Text("Final Score is \(score)")
+        }
+    }// End of body
+
+    func buttonTapped(_ index: Int) {
+        
+        let computer = moves[currentMoveIndex]
+        let player = moves[index]
+        
+        var playerWins: Bool
+        
+        if player.name == computer.name {
+            playerWins = false
+        } else if (player.name == "Rock" &amp;&amp; computer.name == "Scissors") ||
+                  (player.name == "Paper" &amp;&amp; computer.name == "Rock") ||
+                  (player.name == "Scissors" &amp;&amp; computer.name == "Paper") {
+            playerWins = true
+        } else {
+            playerWins = false
+        }
+        
+        if win == playerWins {
+            score += 1
+        }
+        
+        tries += 1
+        
+        if tries &gt; 3 {
+            complete = true
+        } else {
+            showAlert = true
+            resetGame()
+        }
+    }
+    
+    func resetGame() {
+        currentMoveIndex = Int.random(in: 0..&lt;moves.count)
+        win = Bool.random()
+    }
+    
+    func reset() {
+        tries = 0
+        score = 0
+    }
+}// End of View
+
+#Preview {
+    ContentView()
+}// End of Preview
+</pre>
+
+<div id="AI Input"><h1 id="AI Input" class="header"><a href="#AI Input">AI Input</a></h1></div>
+
+<p>
+Here is a peer review with some "Pro" improvements to make your code cleaner, more robust, and more idiomatic.
+</p>
+
+<div id="AI Input-1. The &quot;Computed Property&quot; Shortcut"><h2 id="1. The &quot;Computed Property&quot; Shortcut" class="header"><a href="#AI Input-1. The &quot;Computed Property&quot; Shortcut">1. The "Computed Property" Shortcut</a></h2></div>
+
+<p>
+In your code, you have a few places where you are accessing moves[currentMoveIndex]. Instead of typing that out repeatedly, you can create a computed property. This makes the rest of your code much easier to read.
+</p>
+
+<pre swift>
+// Add this inside your ContentView
+var computerMove: Move {
+    moves[currentMoveIndex]
+}
+</pre>
+
+<p>
+Now, in your <code>VStack</code>, you can just type <code>Text(computerMove.emoji)</code>!
+</p>
+
+<div id="AI Input-2. Move Logic into the Struct"><h2 id="2. Move Logic into the Struct" class="header"><a href="#AI Input-2. Move Logic into the Struct">2. Move Logic into the Struct</a></h2></div>
+
+<p>
+Right now, your <code>buttonTapped</code> function is doing a lot of heavy lifting with if/else strings. A more "Swift-y" way is to let the Move struct determine if it beats another move.
+</p>
+
+<pre swift>
+struct Move: Equatable {
+    let emoji: String
+    let name: String
+    
+    // Logic moved here: "Self" vs "Other"
+    func beats(_ other: Move) -&gt; Bool {
+        if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
+        if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
+        if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
+        return false
+    }
+}
+</pre>
+
+<div id="AI Input-3. Simplify the `buttonTapped` Function"><h2 id="3. Simplify the `buttonTapped` Function" class="header"><a href="#AI Input-3. Simplify the `buttonTapped` Function">3. Simplify the <code>buttonTapped</code> Function</a></h2></div>
+
+<p>
+With the logic moved into the struct, your function becomes much shorter and easier to debug:
+</p>
+
+<pre swift>
+func buttonTapped(_ index: Int) {
+    let playerMove = moves[index]
+    
+    // Check if the player won based on the struct logic
+    let playerCorrect = (playerMove.beats(computerMove) == win)
+    
+    if playerCorrect {
+        score += 1
+    }
+    
+    tries += 1
+    
+    if tries &gt;= 10 { // Let's give them 10 tries!
+        complete = true
+    } else {
+        resetGame()
+    }
+}
+</pre>
+
+<div id="AI Input-4. Layout &amp; UI Polish"><h2 id="4. Layout &amp; UI Polish" class="header"><a href="#AI Input-4. Layout &amp; UI Polish">4. Layout &amp; UI Polish</a></h2></div>
+
+<p>
+The Alert Title: You have <code>alertTitle</code> as a state variable but you never set it. You could set it to "Game Over!" inside the if tries &gt; 3 block.
+</p>
+
+<p>
+Button Style Placement: You applied <code>.buttonStyle()</code> inside the <code>ForEach</code> but after the background and frame. For custom <code>ButtonStyles</code> that use <code>scaleEffect</code>, it's often best to put the style modifier first or ensure the background is part of the <code>ButtonStyle</code> label so the whole thing shrinks together.
+</p>
+
+<div id="AI Input-5. Final Code Cleanup (The &quot;Pro&quot; Version)"><h2 id="5. Final Code Cleanup (The &quot;Pro&quot; Version)" class="header"><a href="#AI Input-5. Final Code Cleanup (The &quot;Pro&quot; Version)">5. Final Code Cleanup (The "Pro" Version)</a></h2></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    struct BouncyButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -&gt; some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.9 : 1.0) // Shrinks to 90% when pressed
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+                .opacity(configuration.isPressed ? 0.8 : 1.0) // Dims slightly
+        }
+    }
+    
+    struct Move: Equatable {
+        let emoji: String
+        let name: String
+        
+        func beats(_ other: Move) -&gt; Bool {
+            if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
+            if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
+            if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
+            return false
+        }
+    }
+    
+    let moves = [
+        Move(emoji: "🪨", name: "Rock"),
+        Move(emoji: "📄", name: "Paper"),
+        Move(emoji: "✂️", name: "Scissors")
+    ]
+    
+    @State private var currentMoveIndex = Int.random(in: 0...2)
+    @State private var win = Bool.random()
+    @State private var score = 0
+    @State private var tries = 0
+    @State private var complete = false
+    
+    // Computed property for clarity
+    var computerMove: Move { moves[currentMoveIndex] }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [.blue.opacity(0.7), .white], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                VStack {
+                    Text("Rock-Paper-Scissors")
+                    
+                        .font(.system(size: 36))
+                        .bold()
+                }
+
+                // Computer's Move (The "Card")
+                VStack(spacing: 10) {
+                    Text(computerMove.emoji)
+                        .font(.system(size: 80))
+                    Text(computerMove.name)
+                        .font(.headline)
+                }
+                .frame(width: 160, height: 160)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .shadow(radius: 2)
+                
+                VStack {
+                    Text(win ? "Try to Win" : "Try to Lose")
+                        .font(.largeTitle.bold())
+                        .foregroundStyle(win ? .green : .red)
+                }
+                
+                HStack(spacing: 20) {
+                    ForEach(0..&lt;moves.count, id: \.self) { index in
+                        Button {
+                            buttonTapped(index)
+                        } label: {
+                            VStack {
+                                Text(moves[index].emoji)
+                                    .font(.largeTitle)
+                                Text(moves[index].name)
+                                    .font(.caption.bold())
+                            }
+                            .frame(width: 90, height: 90)
+                            .background(.blue)
+                            .foregroundStyle(.white)
+                            .clipShape(Circle()) // Circles look great for game buttons!
+                            .shadow(radius: 6)
+                        }
+                        .buttonStyle(BouncyButtonStyle())
+                    }
+                    
+                }
+                Text("Score: \(score)")
+                    .font(.system(size: 28))
+                    .bold()
+            }
+            .padding()
+        }
+        .alert("Game Over", isPresented: $complete) {
+            Button("Reset", action: resetAll)
+        } message: {
+            Text("You scored \(score) out of 10!")
+        }
+    }
+    
+    func buttonTapped(_ index: Int) {
+        let playerMove = moves[index]
+        let playerWon = playerMove.beats(computerMove)
+        
+        if playerWon == win {
+            score += 1
+        }
+        
+        tries += 1
+        
+        if tries &gt;= 10 {
+            complete = true
+        } else {
+            currentMoveIndex = Int.random(in: 0...2)
+            win = Bool.random()
+        }
+    }
+    
+    func resetAll() {
+        score = 0
+        tries = 0
+        currentMoveIndex = Int.random(in: 0...2)
+        win = Bool.random()
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="AI Input-5. Final Code Cleanup (The &quot;Pro&quot; Version)-Summary"><h3 id="Summary" class="header"><a href="#AI Input-5. Final Code Cleanup (The &quot;Pro&quot; Version)-Summary">Summary</a></h3></div>
+
+<p>
+You’ve gone from asking about <code>.count</code> to building a fully functional, state-driven game with custom animations. That's a huge leap! The code is much more modular now—by putting the <code>beats()</code> logic inside the Move struct, you’ve made the code "self-documenting."
+</p>
+
+<div id="AI Input-AI Suggestion - Adding a Flash"><h2 id="AI Suggestion - Adding a Flash" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash">AI Suggestion - Adding a Flash</a></h2></div>
+
+<p>
+Adding a visual "flash" for feedback is a great way to make the game feel responsive. Since you are already using a <code>ZStack</code> with a background color, we can achieve this by creating a new <code>@State</code> variable that changes briefly when a button is tapped.
+</p>
+
+<div id="AI Input-AI Suggestion - Adding a Flash-1. Add the Feedback State"><h3 id="1. Add the Feedback State" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-1. Add the Feedback State">1. Add the Feedback State</a></h3></div>
+
+<p>
+First, add a variable to track the "flash" color. We’ll start it as <code>Color.clear</code> so it doesn't show up until a move is made.
+</p>
+
+<pre swift>
+@State private var feedbackColor = Color.clear
+</pre>
+
+<div id="AI Input-AI Suggestion - Adding a Flash-2. Update the Background"><h3 id="2. Update the Background" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-2. Update the Background">2. Update the Background</a></h3></div>
+
+<p>
+In your <code>ZStack</code>, place this <code>feedbackColor</code> right above your main background. Using <code>.opacity</code> will keep it from being too jarring.
+</p>
+
+<pre swift>
+ZStack {
+    Color.blue.opacity(0.2).ignoresSafeArea() // Your base color
+    
+    feedbackColor
+        .opacity(0.4)
+        .ignoresSafeArea()
+        .animation(.default, value: feedbackColor) // Smooth transition
+    
+    // ... rest of your VStack ...
+}
+</pre>
+
+<div id="AI Input-AI Suggestion - Adding a Flash-3. Trigger the Flash in buttonTapped"><h3 id="3. Trigger the Flash in buttonTapped" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-3. Trigger the Flash in buttonTapped">3. Trigger the Flash in buttonTapped</a></h3></div>
+
+<p>
+Now, inside your logic, set the color based on whether the player was correct. We can use <code>DispatchQueue.main.asyncAfter</code> to turn the color back to clear after a fraction of a second.
+</p>
+
+<pre swift>
+func buttonTapped(_ index: Int) {
+    let playerMove = moves[index]
+    let playerWon = playerMove.beats(computerMove)
+    
+    if playerWon == win {
+        score += 1
+        feedbackColor = .green
+    } else {
+        feedbackColor = .red
+    }
+
+    // Reset the background color after 0.3 seconds
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        feedbackColor = .clear
+    }
+    
+    // ... existing tries and reset logic ...
+}
+</pre>
+
+<div id="AI Input-AI Suggestion - Adding a Flash-3. Trigger the Flash in buttonTapped-Why this works well"><h4 id="Why this works well" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-3. Trigger the Flash in buttonTapped-Why this works well">Why this works well</a></h4></div>
+
+<ul>
+<li>
+Non-Blocking: <code>DispatchQueue.main.asyncAfter</code> allows the code to keep running while the "timer" for the color reset counts down in the background.
+
+<li>
+Accessibility: Visual cues like color flashes help players understand the "rules" of your specific Win/Lose logic without having to read the score every single time.
+
+</ul>
+<div id="AI Input-AI Suggestion - Adding a Flash-Summary"><h3 id="Summary" class="header"><a href="#AI Input-AI Suggestion - Adding a Flash-Summary">Summary</a></h3></div>
+
+<p>
+By adding this, you've moved into the realm of Juice. In game design, "Juice" refers to those little animations and effects that make a game feel satisfying to play. A red flash on a mistake is a classic "unconscious" teacher—it tells the player's brain "Oops!" faster than any text alert ever could.
+</p>
+
+<p>
+Now that you have visual feedback, would you like to add a subtle haptic "thump" (vibration) for the phone so the user can literally feel when they get a point?
+</p>
+
+<div id="AI Input-Haptic Bump"><h2 id="Haptic Bump" class="header"><a href="#AI Input-Haptic Bump">Haptic Bump</a></h2></div>
+
+<p>
+To add haptics (vibration) in SwiftUI, we use the UIImpactFeedbackGenerator. It’s the same physical "click" you feel when you toggle a switch in the iPhone Settings or use Apple Pay.
+</p>
+
+<ol>
+<li>
+The Haptic Helper
+
+</ol>
+<p>
+Since you might want to use haptics in several places, it's cleanest to create a small function to trigger them. You can place this inside your ContentView or as a standalone utility.
+</p>
+
+<p>
+Swift
+func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+</p>
+<pre><code>let generator = UIImpactFeedbackGenerator(style: style)
+generator.prepare() // Wakes up the haptic engine
+generator.impactOccurred()
+</code></pre>
+<p>
+}
+</p>
+<ol>
+<li>
+Adding it to your Game Logic
+
+</ol>
+<p>
+Now, in your buttonTapped function, you can provide different physical "feelings" for a correct answer versus a mistake.
+</p>
+
+<p>
+.heavy or .medium: Feels like a solid "thump" (Great for scoring).
+</p>
+
+<p>
+.light: A subtle tap (Good for general button presses).
+</p>
+
+<p>
+Swift
+func buttonTapped(_ index: Int) {
+</p>
+<pre><code>let playerMove = moves[index]
+let playerWon = playerMove.beats(computerMove)
+
+if playerWon == win {
+score += 1
+feedbackColor = .green
+triggerHaptic(.medium) // A satisfying "Good job" tap
+} else {
+feedbackColor = .red
+triggerHaptic(.heavy) // A more noticeable "Oops" vibration
+}
+</code></pre>
+<pre><code>// ... reset logic ...
+</code></pre>
+<p>
+}
+</p>
+<ol>
+<li>
+Why prepare() matters
+
+</ol>
+<p>
+You’ll notice I included generator.prepare(). The haptic engine on an iPhone stays "asleep" to save battery. If you just call impactOccurred(), there might be a tiny millisecond of lag while the engine spins up. Calling prepare() ensures the vibration happens at the exact moment the finger touches the screen.
+</p>
+
+<ol>
+<li>
+A Pro Touch: "Success" and "Error" Haptics
+
+</ol>
+<p>
+If you want even more distinct patterns (like the double-pulse you feel when FaceID fails), you can use UINotificationFeedbackGenerator:
+</p>
+
+<p>
+Swift
+let notification = UINotificationFeedbackGenerator()
+notification.notificationOccurred(.success) // A pleasant double-tap
+// OR
+notification.notificationOccurred(.error) // A rapid triple-pulse
+A Wit-y Peer Review
+</p>
+
+<p>
+By adding haptics, you’ve broken through the "Glass Barrier." Before, your game was just light and color; now, it has physical weight. It’s the difference between tapping on a window and tapping on a drum.
 <br>
+</p>
+
+<p>
 <hr>
 </p>
 
