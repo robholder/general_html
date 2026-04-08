@@ -1182,16 +1182,20 @@ By moving the haptic to the "Press" phase, you’ve synchronized the physical se
 </p>
 
 <div id="AI Input-In Context"><h2 id="In Context" class="header"><a href="#AI Input-In Context">In Context</a></h2></div>
+
 <pre swift>
 import SwiftUI
 
 struct ContentView: View {
     
+    // Struct for the Dictionary (to give positional stability.
+    // Protocol type of 'Equatable' to allow for a comparison method.
     struct Move: Equatable {
         let emoji: String
         let name: String
         
         func beats(_ other: Move) -&gt; Bool {
+            // Method to compare 'calls'.
             if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
             if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
             if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
@@ -1199,12 +1203,14 @@ struct ContentView: View {
         }
     }
     
+    // Create the struct based data (positional Dictionary).
     let moves = [
         Move(emoji: "🪨", name: "Rock"),
         Move(emoji: "📄", name: "Paper"),
         Move(emoji: "✂️", name: "Scissors")
     ]
     
+    // Game states.
     @State private var win = Bool.random()
     @State private var currentMoveIndex = Int.random(in: 0...2)
     @State private var score = 0
@@ -1212,8 +1218,10 @@ struct ContentView: View {
     @State private var complete = false
     @State private var feedbackColor = Color.clear
     
+    // Select Computer's first move:
     var computerMove: Move { moves[currentMoveIndex] }
     
+    // Struct to style buttons using method to animate when pressed.
     struct BouncyButtonStyle: ButtonStyle {
         func makeBody(configuration: Configuration) -&gt; some View {
             configuration.label
@@ -1223,11 +1231,14 @@ struct ContentView: View {
         }
     }
     
+    //Start View/Layout.
     var body: some View {
         ZStack {
+            // General background
             LinearGradient(colors: [.blue.opacity(0.3), .white], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
             
+            // Flash that occupies background when result is given to each button press.
             Rectangle()
                 .fill(feedbackColor)
                 .opacity(0.4)
@@ -1235,12 +1246,13 @@ struct ContentView: View {
                 .animation(.default, value: feedbackColor)
             
             VStack {
+                // Title.
                 Text("Rock-Paper-Scissors")
                     .font(.largeTitle.bold())
                 
                 Spacer()
                 
-                // Computer Choice Card
+                // Computer Choice Card and render emoji &amp; name text.
                 VStack(spacing: 10) {
                     Text(computerMove.emoji)
                     Text(computerMove.name)
@@ -1251,6 +1263,7 @@ struct ContentView: View {
                 .background(.blue.opacity(0.4))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 
+                // Place text based on whether player need to try to win or lose.
                 VStack {
                     Text(win ? "Try to Win" : "Try to Lose")
                         .font(.system(size: 50))
@@ -1259,6 +1272,7 @@ struct ContentView: View {
                 }
                 .padding(.vertical, 40)
                 
+                // Set up three buttons (choices), and track ids.
                 HStack(spacing: 20) {
                     ForEach(moves.indices, id: \.self) { index in
                         Button {
@@ -1276,6 +1290,7 @@ struct ContentView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
                         }
+                        // Call BouncyButtonStyle struct. 
                         .buttonStyle(BouncyButtonStyle())
                         // INSTANT HAPTIC GESTURE (Fires on PRESS)
                         .simultaneousGesture(
@@ -1290,6 +1305,7 @@ struct ContentView: View {
                 
                 Spacer()
                 
+                // Render current score.
                 Text("Score: \(score)")
                     .font(.system(size: 40))
                     .bold()
@@ -1298,6 +1314,7 @@ struct ContentView: View {
             }
             .padding()
         }
+        // Define alert to show at game's end.
         .alert("Game Over", isPresented: $complete) {
             Button("Play Again", action: resetFullGame)
         } message: {
@@ -1305,18 +1322,19 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Haptic Helper
+    // Haptic Helper method, which takes in style (.medium in our case).
     func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
         let generator = UIImpactFeedbackGenerator(style: style)
         generator.prepare()
         generator.impactOccurred()
     }
     
-    // MARK: - Logic Functions
+    // Logic Functions: called with button press.
     func buttonTapped(_ index: Int) {
         let playerMove = moves[index]
         let playerActuallyWon = playerMove.beats(computerMove)
         
+        // Compare player result to win requirement (to win is true, to lose is false).
         if playerActuallyWon == win {
             score += 1
             feedbackColor = .green
@@ -1328,12 +1346,19 @@ struct ContentView: View {
             triggerHaptic(.medium)
         }
         
+        // Ease from color flash
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             feedbackColor = .clear
         }
         
+        // Increment the tries count.
         tries += 1
         
+        // This next block acts as the game's round-counter.
+        // Once 10 tries are reached, it stops the game and triggers a Success
+        // Notification Haptic, which provides a distinct double-pulse vibration
+        // to signal the end of the session, differing from the single 'impact'
+        // taps felt during gameplay." 
         if tries &gt;= 10 {
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
@@ -1360,6 +1385,117 @@ struct ContentView: View {
 }
 </pre>
 
+<div id="More Insight from AI"><h1 id="More Insight from AI" class="header"><a href="#More Insight from AI">More Insight from AI</a></h1></div>
+
+<div id="More Insight from AI-Equatable (Protocol)"><h2 id="Equatable (Protocol)" class="header"><a href="#More Insight from AI-Equatable (Protocol)">Equatable (Protocol)</a></h2></div>
+
+
+<p>
+What does the word Equatable mean in this case?
+</p>
+
+<pre swift>
+struct Move: Equatable {
+    let emoji: String
+    let name: String
+
+    func beats(_ other: Move) -&gt; Bool {
+        if self.name == "Rock" &amp;&amp; other.name == "Scissors" { return true }
+        if self.name == "Paper" &amp;&amp; other.name == "Rock" { return true }
+        if self.name == "Scissors" &amp;&amp; other.name == "Paper" { return true }
+        return false
+    }
+}
+</pre>
+
+<div id="More Insight from AI-Gemini said"><h2 id="Gemini said" class="header"><a href="#More Insight from AI-Gemini said">Gemini said</a></h2></div>
+
+<p>
+Equatable is a Protocol.
+</p>
+
+<p>
+In Swift, a Protocol is like a "contract." When you tell Swift that your Move struct is Equatable, you are signing a contract that says: "I promise that any two objects of this type can be compared to see if they are the same."
+</p>
+
+<div id="More Insight from AI-Gemini said-Is it a SwiftUI keyword?"><h3 id="Is it a SwiftUI keyword?" class="header"><a href="#More Insight from AI-Gemini said-Is it a SwiftUI keyword?">Is it a SwiftUI keyword?</a></h3></div>
+
+<p>
+Not exactly. Equatable is actually part of the Swift Standard Library. This means it works in any Swift program, whether you are building a website, a command-line tool, or a SwiftUI app.
+</p>
+
+<p>
+Many SwiftUI features (like animations and list updates) depend on being able to check if a piece of data has changed. If SwiftUI knows how to compare your data, it can run much faster.
+</p>
+
+<div id="More Insight from AI-Gemini said-Why do we need it?"><h3 id="Why do we need it?" class="header"><a href="#More Insight from AI-Gemini said-Why do we need it?">Why do we need it?</a></h3></div>
+
+<p>
+Imagine you have two Move objects:
+</p>
+
+<ul>
+<li>
+<code>let moveA = Move(emoji: "🪨", name: "Rock")</code>
+
+<li>
+<code>let moveB = Move(emoji: "🪨", name: "Rock")</code>
+
+</ul>
+<p>
+To you and me, these are obviously the same. But to a computer, these are just two different "bags of data" sitting in two different spots in the phone's memory.
+</p>
+
+<p>
+Without Equatable, if you asked Swift if moveA == moveB, it would get confused:
+</p>
+
+<ul>
+<li>
+Do you want to know if they are stored in the same memory address?
+
+<li>
+Do you want to know if the names match?
+
+<li>
+What if the names match but the emojis don't?
+
+</ul>
+<div id="More Insight from AI-Gemini said-The &quot;Automatic&quot; Magic"><h3 id="The &quot;Automatic&quot; Magic" class="header"><a href="#More Insight from AI-Gemini said-The &quot;Automatic&quot; Magic">The "Automatic" Magic</a></h3></div>
+
+<p>
+Because your <code>Move</code> struct only contains basic types (<code>String</code>), Swift is smart enough to "synthesize" the comparison for you. When you add <code>: Equatable</code>, Swift automatically writes a hidden function behind the scenes that looks like this:
+</p>
+
+<pre swift>
+// Swift writes this for you for free!
+static func == (lhs: Move, rhs: Move) -&gt; Bool {
+    return lhs.emoji == rhs.emoji &amp;&amp; lhs.name == rhs.name
+}
+</pre>
+
+<p>
+If you had a more complex struct—say, one that included a secret <code>ID</code> number—you could write that function yourself to tell Swift: "Only consider two Moves equal if their IDs match, I don't care if the names are different."
+</p>
+
+<div id="More Insight from AI-Gemini said-Summary of Terms"><h3 id="Summary of Terms" class="header"><a href="#More Insight from AI-Gemini said-Summary of Terms">Summary of Terms</a></h3></div>
+
+<ul>
+<li>
+<code>Move</code>: Your custom Type (the "Blueprint").
+
+<li>
+<code>struct</code>: The Keyword used to define that blueprint.
+
+<li>
+<code>Equatable</code>: The Protocol (the "Contract") that allows the <code>==</code> operator to work.
+
+</ul>
+<div id="More Insight from AI-Gemini said-Summary of Terms-Summary"><h4 id="Summary" class="header"><a href="#More Insight from AI-Gemini said-Summary of Terms-Summary">Summary</a></h4></div>
+
+<p>
+Think of <code>Equatable</code> as a "Member of the Comparison Club." Without that badge, your <code>Move</code> struct isn't allowed to play with the <code>==</code> or <code>!=</code> operators. By adding that one word, you’ve given your custom data the ability to act like a "real" built-in type, like an Integer or a String.
+</p>
 
 
 <p>
