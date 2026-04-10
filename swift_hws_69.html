@@ -88,6 +88,96 @@ static var defaultWakeTime: Date {
 That fixes our usability problem, because the majority of users will find the default wake up time is close to what they want to choose.
 </p>
 
+<div id="Hacking With Swift - 69 - Cleaning up the user interface-In Context"><h2 id="In Context" class="header"><a href="#Hacking With Swift - 69 - Cleaning up the user interface-In Context">In Context</a></h2></div>
+
+<p>
+This is where we are at this stage (after adding the static property):
+</p>
+<pre swift>
+import CoreML
+import SwiftUI
+
+struct ContentView: View {
+    
+    @State private var wakeUp = defaultWaketime
+    @State private var sleepAmount = 8.0
+    @State private var coffeeAmount = 1
+    
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+    @State private var showingAlert = false
+    
+    static var defaultWaketime: Date {
+        var components = DateComponents()
+        components.hour = 7
+        components.minute = 0
+        return Calendar.current.date(from: components) ?? .now
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack {
+                Text("When do you want to wake up?")
+                    .font(.headline)
+                
+                DatePicker("Please enter a time", selection: $wakeUp, displayedComponents:
+                        .hourAndMinute)
+                .labelsHidden()
+                
+                Text("Desired amount of sleep")
+                    .font(.headline)
+                
+                Stepper("\(sleepAmount.formatted()) hours", value: $sleepAmount, in: 4...12, step: 0.25)
+                
+                Text("Daily coffee intake")
+                    .font(.headline)
+                
+                Stepper("\(coffeeAmount) cup(s)", value: $coffeeAmount, in: 1...20)
+                
+            }
+            .navigationTitle("BetterRest")
+            .toolbar {
+                Button("Calculate", action: calculateBedtime)
+            }
+            .alert(alertTitle, isPresented: $showingAlert) {
+                Button("OK") { }
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
+    
+    func calculateBedtime() {
+        do {
+            let config = MLModelConfiguration()
+            let model = try SleepCalculator(configuration: config)
+            
+            let components = Calendar.current.dateComponents([.hour, .minute], from: wakeUp)
+            let hour = (components.hour ?? 0) * 60 * 60
+            let minute = (components.minute ?? 0) * 60
+            
+            let prediction = try model.prediction(wake: Double(hour + minute), estimatedSleep: sleepAmount, coffee: Double(coffeeAmount))
+            
+            let sleepTime = wakeUp - prediction.actualSleep
+            
+            alertMessage = "Your ideal bedtime is..."
+            alertMessage = sleepTime.formatted(date: .omitted, time: .shortened)
+        } catch {
+            alertTitle = "Error"
+            alertMessage = "Sorry, there was a problem calculating your bedtime."
+        }
+        
+        showingAlert = true
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Styling"><h1 id="Styling" class="header"><a href="#Styling">Styling</a></h1></div>
+
 <p>
 As for our styling, this requires more effort. A simple change to make is to switch to a Form rather than a <code>VStack</code>. So, find this:
 </p>
@@ -178,7 +268,98 @@ Stepper("^[\(coffeeAmount) cup](inflect: true)", value: $coffeeAmount, in: 1...2
 This is odd syntax, I know, but it's actually a specialized form of Markdown, which is a common text-format. This syntax tells SwiftUI that the word "cup" needs to be inflected to match whatever is in the <code>coffeeAmount</code> variable, which in this case means it will automatically be converted from "cup" to "cups" as appropriate.
 </p>
 
-<div id="Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info"><h2 id="AI Additional Info" class="header"><a href="#Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info">AI Additional Info</a></h2></div>
+<div id="Styling-In Context"><h2 id="In Context" class="header"><a href="#Styling-In Context">In Context</a></h2></div>
+
+<pre swift>
+import CoreML
+import SwiftUI
+
+struct ContentView: View {
+    
+    @State private var wakeUp = defaultWaketime
+    @State private var sleepAmount = 8.0
+    @State private var coffeeAmount = 1
+    
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+    @State private var showingAlert = false
+    
+    static var defaultWaketime: Date {
+        var components = DateComponents()
+        components.hour = 7
+        components.minute = 0
+        return Calendar.current.date(from: components) ?? .now
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("When do you want to wake up?")
+                        .font(.headline)
+                    
+                    DatePicker("Please enter a time", selection: $wakeUp, displayedComponents:
+                            .hourAndMinute)
+                    .labelsHidden()
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    
+                    Text("Desired amount of sleep")
+                        .font(.headline)
+                    
+                    Stepper("\(sleepAmount.formatted()) hours", value: $sleepAmount, in: 4...12, step: 0.25)
+                }
+                
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Daily coffee intake")
+                        .font(.headline)
+                    
+                    Stepper("^[\(coffeeAmount) cup](inflect: true)", value: $coffeeAmount, in: 1...20)
+                }
+                
+            }
+            .navigationTitle("BetterRest")
+            .toolbar {
+                Button("Calculate", action: calculateBedtime)
+            }
+            .alert(alertTitle, isPresented: $showingAlert) {
+                Button("OK") { }
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
+    
+    func calculateBedtime() {
+        do {
+            let config = MLModelConfiguration()
+            let model = try SleepCalculator(configuration: config)
+            
+            let components = Calendar.current.dateComponents([.hour, .minute], from: wakeUp)
+            let hour = (components.hour ?? 0) * 60 * 60
+            let minute = (components.minute ?? 0) * 60
+            
+            let prediction = try model.prediction(wake: Double(hour + minute), estimatedSleep: sleepAmount, coffee: Double(coffeeAmount))
+            
+            let sleepTime = wakeUp - prediction.actualSleep
+            
+            alertMessage = "Your ideal bedtime is..."
+            alertMessage = sleepTime.formatted(date: .omitted, time: .shortened)
+        } catch {
+            alertTitle = "Error"
+            alertMessage = "Sorry, there was a problem calculating your bedtime."
+        }
+        
+        showingAlert = true
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Styling-AI Additional Info"><h2 id="AI Additional Info" class="header"><a href="#Styling-AI Additional Info">AI Additional Info</a></h2></div>
 
 <p>
 That is a brilliant SwiftUI feature called Automatic Grammar Agreement, introduced alongside the Attributed String updates in iOS 15.
@@ -196,7 +377,7 @@ It solves the age-old problem where developers used to write clunky code like:
 Here is the breakdown of that specific syntax:
 </p>
 
-<div id="Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-1. The Anatomy of the String"><h3 id="1. The Anatomy of the String" class="header"><a href="#Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-1. The Anatomy of the String">1. The Anatomy of the String</a></h3></div>
+<div id="Styling-AI Additional Info-1. The Anatomy of the String"><h3 id="1. The Anatomy of the String" class="header"><a href="#Styling-AI Additional Info-1. The Anatomy of the String">1. The Anatomy of the String</a></h3></div>
 
 <p>
 SwiftUI treats that string as a localized Markdown string. Here is what each symbol does:
@@ -216,7 +397,7 @@ SwiftUI treats that string as a localized Markdown string. Here is what each sym
 <code>(inflect: true)</code>: This is the command to the compiler. It tells iOS to look at the number nearby (<code>coffeeAmount</code>) and automatically pluralize the root word based on that number.
 
 </ul>
-<div id="Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-2. How the &quot;Magic&quot; Works"><h3 id="2. How the &quot;Magic&quot; Works" class="header"><a href="#Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-2. How the &quot;Magic&quot; Works">2. How the "Magic" Works</a></h3></div>
+<div id="Styling-AI Additional Info-2. How the &quot;Magic&quot; Works"><h3 id="2. How the &quot;Magic&quot; Works" class="header"><a href="#Styling-AI Additional Info-2. How the &quot;Magic&quot; Works">2. How the "Magic" Works</a></h3></div>
 
 <p>
 The system is smarter than a simple "add an 's'" rule. Because it’s baked into the Foundation library's localization engine:
@@ -233,13 +414,13 @@ If <code>coffeeAmount</code> is 2, it renders: 2 cups
 The Localization Bonus: If your app is ever translated into a language with complex plural rules (like Arabic or Russian, which have different forms for 1, 2, or "many"), this syntax handles it automatically without you writing a single extra line of logic.
 
 </ul>
-<div id="Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-3. Why the Stepper loves it"><h3 id="3. Why the Stepper loves it" class="header"><a href="#Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-3. Why the Stepper loves it">3. Why the Stepper loves it</a></h3></div>
+<div id="Styling-AI Additional Info-3. Why the Stepper loves it"><h3 id="3. Why the Stepper loves it" class="header"><a href="#Styling-AI Additional Info-3. Why the Stepper loves it">3. Why the Stepper loves it</a></h3></div>
 
 <p>
 In a Stepper, the label is updated every time the state variable (<code>$coffeeAmount</code>) changes. SwiftUI re-evaluates the string, sees the new number, and updates the inflection instantly.
 </p>
 
-<div id="Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-3. Why the Stepper loves it-Pro-Tip: Adding more detail"><h4 id="Pro-Tip: Adding more detail" class="header"><a href="#Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-3. Why the Stepper loves it-Pro-Tip: Adding more detail">Pro-Tip: Adding more detail</a></h4></div>
+<div id="Styling-AI Additional Info-3. Why the Stepper loves it-Pro-Tip: Adding more detail"><h4 id="Pro-Tip: Adding more detail" class="header"><a href="#Styling-AI Additional Info-3. Why the Stepper loves it-Pro-Tip: Adding more detail">Pro-Tip: Adding more detail</a></h4></div>
 
 <p>
 You can even use this for adjectives! If you wrote:
@@ -250,7 +431,7 @@ You can even use this for adjectives! If you wrote:
 </pre>
 
 <p>
-The system is smart enough to know that in English, "large" doesn't change, but "cup" does. However, if you translated this into Spanish, it would automatically pluralize <span id="Hacking With Swift - 69 - Cleaning up the user interface-AI Additional Info-3. Why the Stepper loves it-Pro-Tip: Adding more detail-both"></span><strong id="both">both</strong> the adjective and the noun (1 taza grande vs 2 tazas grandes).
+The system is smart enough to know that in English, "large" doesn't change, but "cup" does. However, if you translated this into Spanish, it would automatically pluralize <span id="Styling-AI Additional Info-3. Why the Stepper loves it-Pro-Tip: Adding more detail-both"></span><strong id="both">both</strong> the adjective and the noun (1 taza grande vs 2 tazas grandes).
 </p>
 
 <p>
