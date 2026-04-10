@@ -442,6 +442,144 @@ It's a "set it and forget it" way to make your UI feel polished and grammaticall
 And now run the app one last time, because it’s done – good job!
 </p>
 
+<div id="Styling-More AI Stuff"><h2 id="More AI Stuff" class="header"><a href="#Styling-More AI Stuff">More AI Stuff</a></h2></div>
+
+<div id="Styling-More AI Stuff-For a centered Calculate button"><h4 id="For a centered Calculate button" class="header"><a href="#Styling-More AI Stuff-For a centered Calculate button">For a centered Calculate button</a></h4></div>
+
+<p>
+Add this to the Form (after the various VStacks):
+</p>
+
+<pre swift>
+HStack {
+    Spacer()
+        Button("Calculate", action: calculateBedtime)
+        .buttonStyle(.borderedProminent)
+        .tint(.blue.opacity(0.8))
+    Spacer()
+}
+</pre>
+
+<p>
+To add a 'section' to act as a long button:
+</p>
+
+<pre swift>
+Section {
+    Button(action: calculateBedtime) {
+        Text("Calculate")
+            .frame(maxWidth: .infinity) // Makes the text take up all available space
+            .fontWeight(.bold)
+    }
+    //.buttonStyle(.borderedProminent)
+    .listRowBackground(Color.white) // Optional: removes the white "box" behind the button
+}
+</pre>
+
+<div id="Styling-In Context"><h2 id="In Context" class="header"><a href="#Styling-In Context">In Context</a></h2></div>
+
+<pre swift>
+import CoreML
+import SwiftUI
+
+struct ContentView: View {
+    
+    @State private var wakeUp = defaultWaketime
+    @State private var sleepAmount = 8.0
+    @State private var coffeeAmount = 1
+    
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+    @State private var showingAlert = false
+    
+    static var defaultWaketime: Date {
+        var components = DateComponents()
+        components.hour = 7
+        components.minute = 0
+        return Calendar.current.date(from: components) ?? .now
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("When do you want to wake up?")
+                        .font(.headline)
+                    
+                    DatePicker("Please enter a time", selection: $wakeUp, displayedComponents:
+                            .hourAndMinute)
+                    .labelsHidden()
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    
+                    Text("Desired amount of sleep")
+                        .font(.headline)
+                    
+                    Stepper("\(sleepAmount.formatted()) hours", value: $sleepAmount, in: 4...12, step: 0.25)
+                }
+                
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Daily coffee intake")
+                        .font(.headline)
+                    
+                    Stepper("^[\(coffeeAmount) cup](inflect: true)", value: $coffeeAmount, in: 1...20)
+                }
+                Section {
+                    Button(action: calculateBedtime) {
+                        Text("Calculate")
+                            .frame(maxWidth: .infinity) // Makes the text take up all available space
+                            .fontWeight(.bold)
+                    }
+                    //.buttonStyle(.borderedProminent)
+                    .listRowBackground(Color.white) // Optional: removes the white "box" behind the button
+                }
+                
+            }
+            .navigationTitle("BetterRest")
+            // 1. Hide the default grey background
+            .scrollContentBackground(.hidden)
+            // 2. Add your blue background
+            .background(Color.blue)
+            //.toolbar {
+            //    Button("Calculate", action: calculateBedtime)
+            //}
+            .alert(alertTitle, isPresented: $showingAlert) {
+                Button("OK") { }
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
+    
+    func calculateBedtime() {
+        do {
+            let config = MLModelConfiguration()
+            let model = try SleepCalculator(configuration: config)
+            
+            let components = Calendar.current.dateComponents([.hour, .minute], from: wakeUp)
+            let hour = (components.hour ?? 0) * 60 * 60
+            let minute = (components.minute ?? 0) * 60
+            
+            let prediction = try model.prediction(wake: Double(hour + minute), estimatedSleep: sleepAmount, coffee: Double(coffeeAmount))
+            
+            let sleepTime = wakeUp - prediction.actualSleep
+            
+            alertMessage = "Your ideal bedtime is..."
+            alertMessage = sleepTime.formatted(date: .omitted, time: .shortened)
+        } catch {
+            alertTitle = "Error"
+            alertMessage = "Sorry, there was a problem calculating your bedtime."
+        }
+        
+        showingAlert = true
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 <br>
 <hr>
