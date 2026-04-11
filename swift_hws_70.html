@@ -75,6 +75,208 @@ Replace the “Number of cups” stepper with a <code>Picker</code> showing the 
 Change the user interface so that it always shows their recommended bedtime using a nice and large font. You should be able to remove the “Calculate” button entirely.
 
 </ul>
+<div id="Hacking With Swift - 70 - BetterRest: Wrap up-My Attempts"><h2 id="My Attempts" class="header"><a href="#Hacking With Swift - 70 - BetterRest: Wrap up-My Attempts">My Attempts</a></h2></div>
+
+<pre swift>
+var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("When do you want to wake up?")
+                        .font(.headline)
+                    
+                    DatePicker("Please enter a time", selection: $wakeUp, displayedComponents:
+                            .hourAndMinute)
+                    .labelsHidden()
+                }
+                Section {
+                    
+                    Text("Desired amount of sleep")
+                        .font(.headline)
+                    
+                    Stepper("\(sleepAmount.formatted()) hours", value: $sleepAmount, in: 4...12, step: 0.25)
+                }
+                
+                Section {
+                    Picker("Number of cups per day", selection: $coffeeAmount){
+                        ForEach(1...20, id: \.self) {
+                            Text("\($0)")
+                        }
+                        .pickerStyle(.wheel)
+                    }
+                }
+                Section {
+                    Button(action: calculateBedtime) {
+                        Text("Calculate")
+                            .frame(maxWidth: .infinity) // Makes the text take up all available space
+                            .fontWeight(.bold)
+                    }
+                    //.buttonStyle(.borderedProminent)
+                    .listRowBackground(Color.white) // Optional: removes the white "box" behind the button
+                }
+                
+            }
+            .navigationTitle("BetterRest")
+            // 1. Hide the default grey background
+            .scrollContentBackground(.hidden)
+            // 2. Add your blue background
+            .background(Color.blue)
+            //.toolbar {
+            //    Button("Calculate", action: calculateBedtime)
+            //}
+            .alert(alertTitle, isPresented: $showingAlert) {
+                Button("OK") { }
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
+</pre>
+
+<div id="AI Instruction on Extracting SleepTime"><h1 id="AI Instruction on Extracting SleepTime" class="header"><a href="#AI Instruction on Extracting SleepTime">AI Instruction on Extracting SleepTime</a></h1></div>
+
+<div id="AI Instruction on Extracting SleepTime-QUESTION"><h2 id="QUESTION" class="header"><a href="#AI Instruction on Extracting SleepTime-QUESTION">QUESTION</a></h2></div>
+
+<table>
+<tr>
+<td>
+How can we extract the result of Calculate and display it live on the screen at all times.
+</td>
+</tr>
+</table>
+
+<div id="AI Instruction on Extracting SleepTime-ANSWER"><h2 id="ANSWER" class="header"><a href="#AI Instruction on Extracting SleepTime-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a great step in moving from a "beginner" app structure to a more "pro" reactive one. In SwiftUI, the best way to do this is to convert your calculation logic into a computed property.
+</p>
+
+<p>
+Instead of waiting for a button click to trigger a function, a computed property will re-run automatically whenever any of the <code>@State</code> variables it relies on (<code>wakeUp</code>, <code>sleepAmount</code>, or <code>coffeeAmount</code>) change.
+</p>
+
+<div id="AI Instruction on Extracting SleepTime-ANSWER-Step 1: Create the Computed Property"><h3 id="Step 1: Create the Computed Property" class="header"><a href="#AI Instruction on Extracting SleepTime-ANSWER-Step 1: Create the Computed Property">Step 1: Create the Computed Property</a></h3></div>
+
+<p>
+Replace your <code>calculateBedtime()</code> function with a variable that returns a string. We will wrap the same logic in a <code>do-catch</code> block inside the property.
+</p>
+
+<pre swift>
+var sleepResults: String {
+    do {
+        let config = MLModelConfiguration()
+        let model = try SleepCalculator(configuration: config)
+        
+        let components = Calendar.current.dateComponents([.hour, .minute], from: wakeUp)
+        let hour = (components.hour ?? 0) * 60 * 60
+        let minute = (components.minute ?? 0) * 60
+        
+        let prediction = try model.prediction(wake: Double(hour + minute), estimatedSleep: sleepAmount, coffee: Double(coffeeAmount))
+        
+        let sleepTime = wakeUp - prediction.actualSleep
+        return sleepTime.formatted(date: .omitted, time: .shortened)
+    } catch {
+        return "Error"
+    }
+}
+</pre>
+
+<div id="AI Instruction on Extracting SleepTime-ANSWER-Step 2: Update the UI"><h3 id="Step 2: Update the UI" class="header"><a href="#AI Instruction on Extracting SleepTime-ANSWER-Step 2: Update the UI">Step 2: Update the UI</a></h3></div>
+
+<p>
+Now you can remove the "Calculate" button and the alert logic entirely. Just place a <code>Section</code> or a <code>Text</code> view inside your <code>Form</code> to display the result.
+</p>
+
+<pre swift>
+Form {
+    // ... your existing sections for Wake Up, Sleep Amount, and Coffee ...
+
+    Section("Your ideal bedtime is") {
+        Text(sleepResults)
+            .font(.largeTitle)
+            .foregroundStyle(.blue)
+    }
+}
+</pre>
+
+<div id="AI Instruction on Extracting SleepTime-How this works (The SwiftUI Way)"><h2 id="How this works (The SwiftUI Way)" class="header"><a href="#AI Instruction on Extracting SleepTime-How this works (The SwiftUI Way)">How this works (The SwiftUI Way)</a></h2></div>
+
+<p>
+In SwiftUI, the <code>body</code> property is refreshed whenever a <code>@State</code> variable changes. Because your new <code>sleepResults</code> property uses those <code>@State</code> variables, SwiftUI knows it needs to re-calculate that string and update the <code>Text</code> on the screen instantly.
+</p>
+
+<div id="AI Instruction on Extracting SleepTime-How this works (The SwiftUI Way)-Refined Code Structure"><h3 id="Refined Code Structure" class="header"><a href="#AI Instruction on Extracting SleepTime-How this works (The SwiftUI Way)-Refined Code Structure">Refined Code Structure</a></h3></div>
+
+<p>
+Here is how your <code>ContentView</code> looks with these changes integrated:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var wakeUp = defaultWaketime
+    @State private var sleepAmount = 8.0
+    @State private var coffeeAmount = 1
+
+    static var defaultWaketime: Date {
+        var components = DateComponents()
+        components.hour = 7
+        components.minute = 0
+        return Calendar.current.date(from: components) ?? .now
+    }
+
+    // This is the "Live" calculation engine
+    var sleepResults: String {
+        do {
+            let config = MLModelConfiguration()
+            let model = try SleepCalculator(configuration: config)
+            
+            let components = Calendar.current.dateComponents([.hour, .minute], from: wakeUp)
+            let hour = (components.hour ?? 0) * 60 * 60
+            let minute = (components.minute ?? 0) * 60
+            
+            let prediction = try model.prediction(wake: Double(hour + minute), estimatedSleep: sleepAmount, coffee: Double(coffeeAmount))
+            
+            let sleepTime = wakeUp - prediction.actualSleep
+            return sleepTime.formatted(date: .omitted, time: .shortened)
+        } catch {
+            return "Sorry, error calculating."
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("When do you want to wake up?") {
+                    DatePicker("Please enter a time", selection: $wakeUp, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                }
+
+                Section("Desired amount of sleep") {
+                    Stepper("\(sleepAmount.formatted()) hours", value: $sleepAmount, in: 4...12, step: 0.25)
+                }
+                
+                Section("Daily coffee intake") {
+                    Stepper("^[\(coffeeAmount) cup](inflect: true)", value: $coffeeAmount, in: 1...20)
+                }
+
+                // THE LIVE DISPLAY
+                Section("Your ideal bedtime is") {
+                    Text(sleepResults)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .navigationTitle("BetterRest")
+        }
+    }
+}
+</pre>
+
+<p>
+Note: You can now delete the <code>alertTitle</code>, <code>alertMessage</code>, and <code>showingAlert</code> variables, as well as the <code>.alert</code> modifier at the bottom of your <code>NavigationStack</code>. It’s much cleaner now!
+</p>
+
 <p>
 <br>
 <hr>
