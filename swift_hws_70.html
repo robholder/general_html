@@ -281,7 +281,260 @@ struct ContentView: View {
 Note: You can now delete the <code>alertTitle</code>, <code>alertMessage</code>, and <code>showingAlert</code> variables, as well as the <code>.alert</code> modifier at the bottom of your <code>NavigationStack</code>. It’s much cleaner now!
 </p>
 
+<div id="A Note On Entities"><h1 id="A Note On Entities" class="header"><a href="#A Note On Entities">A Note On Entities</a></h1></div>
+
+
+<div id="A Note On Entities-QUESTION"><h2 id="QUESTION" class="header"><a href="#A Note On Entities-QUESTION">QUESTION</a></h2></div>
+
 <p>
+I think I need to clarify what these entities are called:
+</p>
+
+<p>
+So this is a Computed Property:
+</p>
+
+<pre>
+var sleepResults: String {
+    do {
+        let config = MLModelConfiguration()
+        let model = try SleepCalculator(configuration: config)
+        
+        let components = Calendar.current.dateComponents([.hour, .minute], from: wakeUp)
+        let hour = (components.hour ?? 0) * 60 * 60
+        let minute = (components.minute ?? 0) * 60
+        
+        let prediction = try model.prediction(wake: Double(hour + minute), estimatedSleep: sleepAmount, coffee: Double(coffeeAmount))
+        
+        let sleepTime = wakeUp - prediction.actualSleep
+        return sleepTime.formatted(date: .omitted, time: .shortened)
+    } catch {
+        return "Error"
+    }
+}
+</pre>
+
+<p>
+And this is a function (or method inside a struct or class?):
+</p>
+
+<pre swift>
+    func calculateBedtime() {
+        do {
+            let config = MLModelConfiguration()
+            let model = try SleepCalculator(configuration: config)
+            
+            let components = Calendar.current.dateComponents([.hour, .minute], from: wakeUp)
+            let hour = (components.hour ?? 0) * 60 * 60
+            let minute = (components.minute ?? 0) * 60
+            
+            let prediction = try model.prediction(wake: Double(hour + minute), estimatedSleep: sleepAmount, coffee: Double(coffeeAmount))
+            
+            let sleepTime = wakeUp - prediction.actualSleep
+            
+            alertMessage = "Your ideal bedtime is..."
+            alertMessage = sleepTime.formatted(date: .omitted, time: .shortened)
+        } catch {
+            alertTitle = "Error"
+            alertMessage = "Sorry, there was a problem calculating your bedtime."
+        }
+        
+        showingAlert = true
+    }
+</pre>
+
+<p>
+And this is a static variable?
+</p>
+
+<pre swift>
+    static var defaultWaketime: Date {
+        var components = DateComponents()
+        components.hour = 7
+        components.minute = 0
+        return Calendar.current.date(from: components) ?? .now
+    }
+</pre>
+
+<div id="A Note On Entities-ANSWER"><h2 id="ANSWER" class="header"><a href="#A Note On Entities-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Spot on! You’ve correctly identified the three heavy hitters of Swift logic. Even though they look similar, they behave very differently in terms of "ownership" and "timing."
+</p>
+
+<p>
+Here is the breakdown of what they are and why we use them:
+</p>
+
+<div id="A Note On Entities-ANSWER-1. The Computed Property (var sleepResults)"><h3 id="1. The Computed Property (var sleepResults)" class="header"><a href="#A Note On Entities-ANSWER-1. The Computed Property (var sleepResults)">1. The Computed Property (var sleepResults)</a></h3></div>
+
+<p>
+A <span id="A Note On Entities-ANSWER-1. The Computed Property (var sleepResults)-Computed Property"></span><strong id="Computed Property">Computed Property</strong> doesn't actually "store" a value in memory. Instead, it runs its code every time you ask for it.
+</p>
+
+<ul>
+<li>
+Key characteristic:
+
+<ul>
+<li>
+It has no <code>()</code> and must always have a explicit type (like <code>: String</code>).
+
+</ul>
+<li>
+Why it's perfect for SwiftUI:
+
+<ul>
+<li>
+SwiftUI views are "reactive."
+
+<li>
+When you put <code>Text(sleepResults)</code> in your body, SwiftUI essentially watches the variables used inside that calculation.
+
+<ul>
+<li>
+If <code>coffeeAmount</code> changes, SwiftUI says, "Hey, <code>sleepResults</code> might be different now," and re-computes it automatically.
+
+</ul>
+</ul>
+</ul>
+<div id="A Note On Entities-ANSWER-2. The Method/Function (func calculateBedtime())"><h3 id="2. The Method/Function (func calculateBedtime())" class="header"><a href="#A Note On Entities-ANSWER-2. The Method/Function (func calculateBedtime())">2. The Method/Function (func calculateBedtime())</a></h3></div>
+
+<p>
+When a function is defined inside a struct or class, we call it a <span id="A Note On Entities-ANSWER-2. The Method/Function (func calculateBedtime())-Method"></span><strong id="Method">Method</strong>.
+</p>
+
+<ul>
+<li>
+Key characteristic:
+
+<ul>
+<li>
+It requires a manual "trigger" to run (like a button tap or a <code>.onAppear</code> modifier).
+
+</ul>
+<li>
+The distinction:
+
+<ul>
+<li>
+Methods are great for <span id="A Note On Entities-ANSWER-2. The Method/Function (func calculateBedtime())-actions"></span><strong id="actions">actions</strong> (saving data, showing an alert, deleting a record). Computed properties are better for <span id="A Note On Entities-ANSWER-2. The Method/Function (func calculateBedtime())-data transformation"></span><strong id="data transformation">data transformation</strong> (turning raw numbers into a pretty string for the UI).
+
+</ul>
+</ul>
+<div id="A Note On Entities-ANSWER-3. The Static Computed Property (static var defaultWaketime)"><h3 id="3. The Static Computed Property (static var defaultWaketime)" class="header"><a href="#A Note On Entities-ANSWER-3. The Static Computed Property (static var defaultWaketime)">3. The Static Computed Property (static var defaultWaketime)</a></h3></div>
+
+<p>
+This is a "Type Property."
+</p>
+
+<ul>
+<li>
+What "Static" means:
+
+<ul>
+<li>
+It belongs to the <code>ContentView</code> struct itself, rather than a specific <em>instance</em> of the view.
+
+</ul>
+<li>
+Why we use it here:
+
+<ul>
+<li>
+You noticed that <code>wakeUp</code> is initialized using <code>defaultWaketime</code>.
+
+<li>
+In Swift, you cannot use one instance property to initialize another during setup (because the object isn't fully "born" yet).
+
+<li>
+By making it static, it exists independently, allowing you to use it to set the starting value of <code>@State private var wakeUp</code>.
+
+</ul>
+</ul>
+<div id="A Note On Entities-ANSWER-Comparison at a Glance"><h3 id="Comparison at a Glance" class="header"><a href="#A Note On Entities-ANSWER-Comparison at a Glance">Comparison at a Glance</a></h3></div>
+
+<table>
+<tr>
+<td>
+Feature
+</td>
+<td>
+Computed Property
+</td>
+<td>
+Method (Function)
+</td>
+<td>
+Static Property
+</td>
+</tr>
+<tr>
+<td>
+Syntax
+</td>
+<td>
+var name: Type { ... }
+</td>
+<td>
+func name() { ... }
+</td>
+<td>
+static var name: Type { ... }
+</td>
+</tr>
+<tr>
+<td>
+Call style
+</td>
+<td>
+print(sleepResults)
+</td>
+<td>
+calculateBedtime()
+</td>
+<td>
+ContentView.defaultWaketime
+</td>
+</tr>
+<tr>
+<td>
+Storage
+</td>
+<td>
+None (calculated on the fly)
+</td>
+<td>
+None
+</td>
+<td>
+None
+</td>
+</tr>
+<tr>
+<td>
+Best for...
+</td>
+<td>
+Updating the UI live
+</td>
+<td>
+One-off actions/events
+</td>
+<td>
+Shared constants or setup logic
+</td>
+</tr>
+</table>
+
+<div id="A Note On Entities-ANSWER-A Quick Note on your Static Var"><h3 id="A Quick Note on your Static Var" class="header"><a href="#A Note On Entities-ANSWER-A Quick Note on your Static Var">A Quick Note on your Static Var</a></h3></div>
+
+<p>
+Your <code>defaultWaketime</code> is actually a <span id="A Note On Entities-ANSWER-A Quick Note on your Static Var-Static Computed Property"></span><strong id="Static Computed Property">Static Computed Property</strong>. Because it has <code>{ }</code> logic inside, it calculates those <code>DateComponents</code> every time it's called. If it were just <code>static let defaultNum = 7</code>, it would be a <span id="A Note On Entities-ANSWER-A Quick Note on your Static Var-Static Constant"></span><strong id="Static Constant">Static Constant</strong>.
+</p>
+
+<p>
+Does the distinction between "instance" (the regular var) and "static" (the type var) make sense in the context of how the app starts up?
 <br>
 <hr>
 </p>
