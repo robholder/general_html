@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_76</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_75.html">Hacking With Swift - 75 - Adding to a list of words</a>
+
+</ul>
+<div id="Hacking With Swift - 76 - Running code when our app launches"><h1 id="Hacking With Swift - 76 - Running code when our app launches" class="header"><a href="#Hacking With Swift - 76 - Running code when our app launches">Hacking With Swift - 76 - Running code when our app launches</a></h1></div>
+
+<p>
+When Xcode builds an iOS project, it puts your compiled program, your asset catalog, and any other assets into a single directory called a bundle, then gives that bundle the name YourAppName.app. This “.app” extension is automatically recognized by iOS and Apple’s other platforms, which is why if you double-click something like Notes.app on macOS it knows to launch the program inside the bundle.
+</p>
+
+<p>
+In our game, we’re going to include a file called “start.txt”, which includes over 10,000 eight-letter words that will be randomly selected for the player to work with. This was included in the files for this project that you should have downloaded from GitHub, so please drag start.txt into your project now.
+</p>
+
+<p>
+We already defined a property called <code>rootWord</code>, which will contain the word we want the player to spell from. What we need to do now is write a new method called <code>startGame()</code> that will:
+</p>
+
+<ul>
+<li>
+Find start.txt in our bundle
+
+<li>
+Load it into a string
+
+<li>
+Split that string into array of strings, with each element being one word
+
+<li>
+Pick one random word from there to be assigned to <code>rootWord</code>, or use a sensible default if the array is empty.
+
+</ul>
+<p>
+Each of those four tasks corresponds to one line of code, but there’s a twist: what if we can’t locate start.txt in our app bundle, or if we can <em>locate</em> it but we can’t <em>load</em> it? In that case we have a serious problem, because our app is really broken - either we forgot to include the file somehow (in which case our game won’t work), or we included it but for some reason iOS refused to let us read it (in which case our game won’t work, and our app is broken).
+</p>
+
+<p>
+Regardless of what caused it, this is a situation that never ought to happen, and Swift gives us a function called <code>fatalError()</code> that lets us respond to unresolvable problems really clearly. When we call <code>fatalError()</code> it will - unconditionally and always - cause our app to crash. It will just die. Not “might die” or “maybe die”: it will always just terminate straight away.
+</p>
+
+<p>
+I realize that sounds bad, but what it lets us do is important: for problems like this one, such as if we forget to include a file in our project, there is no point trying to make our app struggle on in a broken state. It’s much better to terminate immediately and give us a clear explanation of what went wrong so we can correct the problem, and that’s exactly what <code>fatalError()</code> does.
+</p>
+
+<p>
+Anyway, let’s take a look at the code - I’ve added comments matching the numbers above:
+</p>
+
+<pre swift>
+func startGame() {
+    // 1. Find the URL for start.txt in our app bundle
+    if let startWordsURL = Bundle.main.url(forResource: "start", withExtension: "txt") {
+        // 2. Load start.txt into a string
+        // Old way:
+        //if let startWords = try? String(contentsOf: startWordsURL) {
+        // Current way:
+        if let startWords = try? String(contentsOf: startWordsURL, encoding: .utf8) { 
+            // 3. Split the string up into an array of strings, splitting on line breaks
+            let allWords = startWords.components(separatedBy: "\n")
+
+            // 4. Pick one random word, or use "silkworm" as a sensible default
+            rootWord = allWords.randomElement() ?? "silkworm"
+
+            // If we are here everything has worked, so we can exit
+            return
+        }
+    }
+
+    // If were are *here* then there was a problem - trigger a crash and report the error
+    fatalError("Could not load start.txt from bundle.")
+}
+</pre>
+
+<p>
+Now that we have a method to load everything for the game, we need to actually call that thing when our view is shown. SwiftUI gives us a dedicated view modifier for running a closure when a view is shown, so we can use that to call <code>startGame()</code> and get things moving - add this modifier after <code>onSubmit()</code>:
+</p>
+
+<pre swift>
+.onAppear(perform: startGame)
+</pre>
+
+<p>
+If you run the game now you should see a random eight-letter word at the top of the navigation view. It doesn’t really <em>mean</em> anything yet, because players can still enter whatever words they want. Let’s fix that next…
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
