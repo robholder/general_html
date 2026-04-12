@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_75</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_74.html">Hacking With Swift - 74 - Working with strings</a>
+
+</ul>
+<div id="Hacking With Swift - 75 - Adding to a list of words"><h1 id="Hacking With Swift - 75 - Adding to a list of words" class="header"><a href="#Hacking With Swift - 75 - Adding to a list of words">Hacking With Swift - 75 - Adding to a list of words</a></h1></div>
+
+<p>
+The user interface for this app will be made up of three main SwiftUI views: a <code>NavigationStack</code> showing the word they are spelling from, a <code>TextField</code> where they can enter one answer, and a <code>List</code> showing all the words they have entered previously.
+</p>
+
+<p>
+For now, every time users enter a word into the text field, we’ll automatically add it to the list of used words. Later, though, we’ll add some validation to make sure the word hasn’t been used before, can actually be produced from the root word they’ve been given, and is a real word and not just some random letters.
+</p>
+
+<p>
+Let’s start with the basics: we need an array of words they have already used, a root word for them to spell other words from, and a string we can bind to a text field. So, add these three properties to <code>ContentView</code> now:
+</p>
+
+<pre swift>
+@State private var usedWords = [String]()
+@State private var rootWord = ""
+@State private var newWord = ""
+</pre>
+
+<p>
+As for the body of the view, we’re going to start off as simple as possible: a <code>NavigationStack</code> with <code>rootWord</code> for its title, then a couple of sections inside a list:
+</p>
+
+<pre swift>
+var body: some View {
+    NavigationStack {
+        List {
+            Section {
+                TextField("Enter your word", text: $newWord)
+            }
+
+            Section {
+                ForEach(usedWords, id: \.self) { word in
+                    Text(word)
+                }
+            }
+        }
+        .navigationTitle(rootWord)
+    }
+}
+</pre>
+
+<p>
+Note: Using <code>id: \.self</code> would cause problems if there were lots of duplicates in <code>usedWords</code>, but soon enough we’ll be disallowing that so it’s not a problem.
+</p>
+
+<p>
+Now, our text view has a problem: although we can type into the text box, we can’t submit anything from there – there’s no way of adding our entry to the list of used words.
+</p>
+
+<p>
+To fix that we’re going to write a new method called <code>addNewWord()</code> that will:
+</p>
+
+<ul>
+<li>
+Lowercase <code>newWord</code> and remove any whitespace
+
+<li>
+Check that it has at least 1 character otherwise exit
+
+<li>
+Insert that word at position 0 in the <code>usedWords</code> array
+
+<li>
+Set <code>newWord</code> back to be an empty string
+
+</ul>
+<p>
+Later on we’ll add some extra validation between steps 2 and 3 to make sure the word is allowable, but for now this method is straightforward:
+</p>
+
+<pre swift>
+func addNewWord() {
+    // lowercase and trim the word, to make sure we don't add duplicate words with case differences
+    let answer = newWord.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // exit if the remaining string is empty
+    guard answer.count &gt; 0 else { return }
+
+    // extra validation to come
+
+    usedWords.insert(answer, at: 0)
+    newWord = ""
+}
+</pre>
+
+<p>
+We want to call <code>addNewWord()</code> when the user presses return on the keyboard, and in SwiftUI we can do that by adding an <code>onSubmit()</code> modifier somewhere in our view hierarchy – it could be directly on the <code>textfield</code>, but it can be anywhere else in the view because it will be triggered when any text is submitted.
+</p>
+
+<p>
+<code>onSubmit()</code> needs to be given a function that accepts no parameters and returns nothing, which exactly matches the <code>addNewWord()</code> method we just wrote. So, we can pass that in directly by adding this modifier below <code>navigationTitle()</code>:
+</p>
+
+<pre swift>
+.onSubmit(addNewWord)
+</pre>
+
+<p>
+Run the app now and you’ll see that things are starting to come together already: we can now type words into the text field, press return, and see them appear in the list.
+</p>
+
+<p>
+Inside <code>addNewWord()</code> we used <code>usedWords.insert(answer, at: 0)</code> for a reason: if we had used <code>append(answer)</code> the new words would have appeared at the end of the list where they would probably be off screen, but by inserting words at the start of the array they automatically appear at the top of the list – much better.
+</p>
+
+<p>
+Before we put a title up in the navigation bar, I’m going to make two small changes to our layout.
+</p>
+
+<p>
+First, when we call <code>addNewWord()</code> it lowercases the word the user entered, which is helpful because it means the user can’t add “car”, “Car”, and “CAR”. However, it looks odd in practice: the text field automatically capitalizes the first letter of whatever the user types, so when they submit “Car” what they see in the list is “car”.
+</p>
+
+<p>
+To fix this, we can disable capitalization for the text field with another modifier: <code>textInputAutocapitalization()</code>. Please add this to the text field now:
+</p>
+
+<pre swift>
+.textInputAutocapitalization(.never)
+</pre>
+
+<p>
+The second thing we’ll change, just because we can, is to use Apple’s SF Symbols icons to show the length of each word next to the text. SF Symbols provides numbers in circles from 0 through 50, all named using the format “x.circle.fill” – so 1.circle.fill, 20.circle.fill.
+</p>
+
+<p>
+In this program we’ll be showing eight-letter words to users, so if they rearrange all those letters to make a new word the longest it will be is also eight letters. As a result, we can use those SF Symbols number circles just fine – we know that all possible word lengths are covered.
+</p>
+
+<p>
+So, we can wrap our word text in a <code>HStack</code>, and place an SF Symbol next to it using <code>Image(systemName:)</code> like this:
+</p>
+
+<pre swift>
+ForEach(usedWords, id: \.self) { word in
+    HStack {
+        Image(systemName: "\(word.count).circle")
+        Text(word)
+    }
+}
+</pre>
+
+<p>
+If you run the app now you’ll see you can type words in the text field, press return, then see them appear in the list with their length icon to the side. Nice!
+</p>
+
+<p>
+Now, if you wanted to we could add one sneaky little extra tweak in here. When we submit our text field right now, the text just appears in the list immediately, but we could animate that by modifying the <code>insert()</code> call inside <code>addNewWord()</code> to this:
+</p>
+
+<pre swift>
+withAnimation {
+    usedWords.insert(answer, at: 0)
+}
+</pre>
+
+<p>
+We haven’t looked at animations just yet, and we’re going to look at them much more shortly, but that change alone will make our new words slide in much more nicely – I think it’s a big improvement!
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
