@@ -40,6 +40,17 @@ In our game, we’re going to include a file called “start.txt”, which inclu
 </p>
 
 <p>
+Drag the txt file into the project navigator as a new item. Choose
+</p>
+<ul>
+<li>
+Copy files to destination.
+
+<li>
+Add to Targets (WordScramble app)
+
+</ul>
+<p>
 We already defined a property called <code>rootWord</code>, which will contain the word we want the player to spell from. What we need to do now is write a new method called <code>startGame()</code> that will:
 </p>
 
@@ -61,6 +72,8 @@ Pick one random word from there to be assigned to <code>rootWord</code>, or use 
 Each of those four tasks corresponds to one line of code, but there’s a twist: what if we can’t locate start.txt in our app bundle, or if we can <em>locate</em> it but we can’t <em>load</em> it? In that case we have a serious problem, because our app is really broken - either we forgot to include the file somehow (in which case our game won’t work), or we included it but for some reason iOS refused to let us read it (in which case our game won’t work, and our app is broken).
 </p>
 
+<div id="Hacking With Swift - 76 - Running code when our app launches-fatalError() Function"><h3 id="fatalError() Function" class="header"><a href="#Hacking With Swift - 76 - Running code when our app launches-fatalError() Function">fatalError() Function</a></h3></div>
+
 <p>
 Regardless of what caused it, this is a situation that never ought to happen, and Swift gives us a function called <code>fatalError()</code> that lets us respond to unresolvable problems really clearly. When we call <code>fatalError()</code> it will - unconditionally and always - cause our app to crash. It will just die. Not “might die” or “maybe die”: it will always just terminate straight away.
 </p>
@@ -68,6 +81,8 @@ Regardless of what caused it, this is a situation that never ought to happen, an
 <p>
 I realize that sounds bad, but what it lets us do is important: for problems like this one, such as if we forget to include a file in our project, there is no point trying to make our app struggle on in a broken state. It’s much better to terminate immediately and give us a clear explanation of what went wrong so we can correct the problem, and that’s exactly what <code>fatalError()</code> does.
 </p>
+
+<div id="Hacking With Swift - 76 - Running code when our app launches-startGame"><h2 id="startGame" class="header"><a href="#Hacking With Swift - 76 - Running code when our app launches-startGame">startGame</a></h2></div>
 
 <p>
 Anyway, let’s take a look at the code - I’ve added comments matching the numbers above:
@@ -78,7 +93,7 @@ func startGame() {
     // 1. Find the URL for start.txt in our app bundle
     if let startWordsURL = Bundle.main.url(forResource: "start", withExtension: "txt") {
         // 2. Load start.txt into a string
-        // Old way:
+        // Deprecated - Old way:
         //if let startWords = try? String(contentsOf: startWordsURL) {
         // Current way:
         if let startWords = try? String(contentsOf: startWordsURL, encoding: .utf8) { 
@@ -98,6 +113,20 @@ func startGame() {
 }
 </pre>
 
+<div id="Hacking With Swift - 76 - Running code when our app launches-startGame-Note on Deprecated Error"><h4 id="Note on Deprecated Error" class="header"><a href="#Hacking With Swift - 76 - Running code when our app launches-startGame-Note on Deprecated Error">Note on Deprecated Error</a></h4></div>
+
+<p>
+What changed?
+</p>
+
+<ul>
+<li>
+The Old Way: <code>String(contentsOf: URL)</code> tried to "guess" how the file was encoded. Sometimes it guessed wrong, leading to weird symbols or crashes.
+
+<li>
+The New Way: By adding <code>encoding: .utf8</code>, you are being explicit. It's safer, faster, and makes the compiler happy.
+
+</ul>
 <p>
 Now that we have a method to load everything for the game, we need to actually call that thing when our view is shown. SwiftUI gives us a dedicated view modifier for running a closure when a view is shown, so we can use that to call <code>startGame()</code> and get things moving - add this modifier after <code>onSubmit()</code>:
 </p>
@@ -110,12 +139,92 @@ Now that we have a method to load everything for the game, we need to actually c
 If you run the game now you should see a random eight-letter word at the top of the navigation view. It doesn’t really <em>mean</em> anything yet, because players can still enter whatever words they want. Let’s fix that next…
 </p>
 
+<div id="Hacking With Swift - 76 - Running code when our app launches-In Context"><h2 id="In Context" class="header"><a href="#Hacking With Swift - 76 - Running code when our app launches-In Context">In Context</a></h2></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    @State private var usedWords = [String]()
+    @State private var rootWord = ""
+    @State private var newWord = ""
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    TextField("Enter your word", text: $newWord)
+                }
+                .textInputAutocapitalization(.never)
+                
+                Section {
+                    ForEach(usedWords, id: \.self) { word in
+                        HStack {
+                            Image(systemName: "\(word.count).circle")
+                            Text(word)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(rootWord)
+            .onSubmit(addNewWord)
+            .onAppear(perform: startGame)
+        }
+    }
+    
+    func addNewWord() {
+        // lowercase and trim the word, to make sure we don't add duplicates
+        let answer = newWord.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // exit if the remaining string is empty
+        guard answer.count &gt; 0 else { return }
+        
+        // Extra validation to come
+        
+        withAnimation {
+            usedWords.insert(answer, at: 0)
+        }
+        newWord = ""
+        
+    }
+    
+    func startGame() {
+        // 1. Find the URL for start.txt in our app bundle
+        if let startWordsURL = Bundle.main.url(forResource: "start", withExtension: "txt") {
+            // 2. Load start.txt into a string
+            //if let startWords = try? String(contentsOf: startWordsURL) {
+            if let startWords = try? String(contentsOf: startWordsURL, encoding: .utf8) {
+                // 3. Split the string up into an array of strings, splitting on line breaks
+                let allWords = startWords.components(separatedBy: "\n")
+                
+                // 4. Pick one random word, or use "silkworm" as a sensible default
+                rootWord = allWords.randomElement() ?? "silkworm"
+                
+                // If we are here everything has worked, so we can exit
+                return
+            }
+        }
+        // If we're *here* then there was a problem - trigger a crash and report the error
+        fatalError("Could not load start.txt from bundle.")
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 <br>
 <hr>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_77.html">Hacking With Swift - 77 - Validating words with UITextChecker</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>

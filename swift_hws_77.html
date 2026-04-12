@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_77</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_76.html">Hacking With Swift - 76 - Running code when our app launches</a>
+
+</ul>
+<div id="Hacking With Swift - 77 - Validating words with UITextChecker"><h1 id="Hacking With Swift - 77 - Validating words with UITextChecker" class="header"><a href="#Hacking With Swift - 77 - Validating words with UITextChecker">Hacking With Swift - 77 - Validating words with UITextChecker</a></h1></div>
+
+<p>
+Now that our game is all set up, the last part of this project is to make sure the user can’t enter invalid words. We’re going to implement this as four small methods, each of which perform exactly one check: is the word original (it hasn’t been used already), is the word possible (they aren’t trying to spell “car” from “silkworm”), and is the word real (it’s an actual English word).
+</p>
+
+<p>
+If you were paying attention you’ll have noticed that was only three methods – that’s because the fourth method will be there to make showing error messages easier.
+</p>
+
+<p>
+Anyway, let’s start with the first method: this will accept a string as its only parameter, and return true or false depending on whether the word has been used before or not. We already have a usedWords array, so we can pass the word into its contains() method and send the result back like this:
+</p>
+
+<p>
+func isOriginal(word: String) -&gt; Bool {
+</p>
+<pre><code>!usedWords.contains(word)
+</code></pre>
+<p>
+}
+That’s one method down!
+</p>
+
+<p>
+The next one is slightly trickier: how can we check whether a random word can be made out of the letters from another random word?
+</p>
+
+<p>
+There are a couple of ways we could tackle this, but the easiest one is this: if we create a variable copy of the root word, we can then loop over each letter of the user’s input word to see if that letter exists in our copy. If it does, we remove it from the copy (so it can’t be used twice), then continue. If we make it to the end of the user’s word successfully then the word is good, otherwise there’s a mistake and we return false.
+</p>
+
+<p>
+So, here’s our second method:
+</p>
+
+<p>
+func isPossible(word: String) -&gt; Bool {
+</p>
+<pre><code>var tempWord = rootWord
+</code></pre>
+<pre><code>for letter in word {
+if let pos = tempWord.firstIndex(of: letter) {
+tempWord.remove(at: pos)
+} else {
+return false
+}
+}
+</code></pre>
+<pre><code>return true
+</code></pre>
+<p>
+}
+The final method is harder, because we need to use UITextChecker from UIKit. In order to bridge Swift strings to Objective-C strings safely, we need to create an instance of NSRange using the UTF-16 count of our Swift string. This isn’t nice, I know, but I’m afraid it’s unavoidable until Apple cleans up these APIs.
+</p>
+
+<p>
+So, our last method will make an instance of UITextChecker, which is responsible for scanning strings for misspelled words. We’ll then create an NSRange to scan the entire length of our string, then call rangeOfMisspelledWord() on our text checker so that it looks for wrong words. When that finishes we’ll get back another NSRange telling us where the misspelled word was found, but if the word was OK the location for that range will be the special value NSNotFound.
+</p>
+
+<p>
+So, here’s our final method:
+</p>
+
+<p>
+func isReal(word: String) -&gt; Bool {
+</p>
+<pre><code>let checker = UITextChecker()
+let range = NSRange(location: 0, length: word.utf16.count)
+let misspelledRange = checker.rangeOfMisspelledWord(in: word, range: range, startingAt: 0, wrap: false, language: "en")
+</code></pre>
+<pre><code>return misspelledRange.location == NSNotFound
+</code></pre>
+<p>
+}
+Before we can use those three, I want to add some code to make showing error alerts easier. First, we need some properties to control our alerts:
+</p>
+
+<p>
+@State private var errorTitle = ""
+@State private var errorMessage = ""
+@State private var showingError = false
+Now we can add a method that sets the title and message based on the parameters it receives, then flips the showingError Boolean to true:
+</p>
+
+<p>
+func wordError(title: String, message: String) {
+</p>
+<pre><code>errorTitle = title
+errorMessage = message
+showingError = true
+</code></pre>
+<p>
+}
+We can then pass those directly on to SwiftUI by adding an alert() modifier below .onAppear():
+</p>
+
+<p>
+.alert(errorTitle, isPresented: $showingError) {
+</p>
+<pre><code>Button("OK") { }
+</code></pre>
+<p>
+} message: {
+</p>
+<pre><code>Text(errorMessage)
+</code></pre>
+<p>
+}
+We’ve done that several times now, so hopefully it’s becoming second nature! In fact, now that you're familiar with basic alerts like that one, here's a pro tip for you: if you don't include any buttons in the code, you automatically get a simple "OK" button that dismisses the alert.
+</p>
+
+<p>
+So, if you prefer you can write this:
+</p>
+
+<p>
+.alert(errorTitle, isPresented: $showingError) { } message: {
+</p>
+<pre><code>Text(errorMessage)
+</code></pre>
+<p>
+}
+Yes, that looks a bit odd – choose whichever style you prefer.
+</p>
+
+<p>
+At long last it’s time to finish our game: replace the // extra validation to come comment in addNewWord() with this:
+</p>
+
+<p>
+guard isOriginal(word: answer) else {
+</p>
+<pre><code>wordError(title: "Word used already", message: "Be more original")
+return
+</code></pre>
+<p>
+}
+</p>
+
+<p>
+guard isPossible(word: answer) else {
+</p>
+<pre><code>wordError(title: "Word not possible", message: "You can't spell that word from '\(rootWord)'!")
+return
+</code></pre>
+<p>
+}
+</p>
+
+<p>
+guard isReal(word: answer) else {
+</p>
+<pre><code>wordError(title: "Word not recognized", message: "You can't just make them up, you know!")
+return
+</code></pre>
+<p>
+}
+If you run the app now you should find that it will refuse to let you use words if they fail our tests – trying a duplicate word won’t work, words that can’t be spelled from the root word won’t work, and gibberish words won’t work either.
+</p>
+
+<p>
+That’s another app done – good job!
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
