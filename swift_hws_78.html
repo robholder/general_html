@@ -67,6 +67,218 @@ Add a toolbar button that calls <code>startGame()</code>, so users can restart w
 Put a text view somewhere so you can track and show the player’s score for a given root word. How you calculate score is down to you, but something involving number of words and their letter count would be reasonable.
 
 </ul>
+<div id="Hacking With Swift - 78 - WordScramble: Wrap up-Challenge-Disallow Short Answers"><h3 id="Disallow Short Answers" class="header"><a href="#Hacking With Swift - 78 - WordScramble: Wrap up-Challenge-Disallow Short Answers">Disallow Short Answers</a></h3></div>
+
+<p>
+In addNewWord function:
+</p>
+
+<pre swift>
+// Challenge addition - not allow words of two letters or less
+guard answer.count &gt; 2 else {
+    wordError(title: "Word too short", message: "Words of less than 3 letters are not allowed. Try enter a longer word.")
+    return
+}
+</pre>
+
+<div id="Hacking With Swift - 78 - WordScramble: Wrap up-Challenge-Add Score Facility"><h3 id="Add Score Facility" class="header"><a href="#Hacking With Swift - 78 - WordScramble: Wrap up-Challenge-Add Score Facility">Add Score Facility</a></h3></div>
+
+<p>
+In body:
+</p>
+
+<pre swift>
+Section("2 per word, 1 per letter.\n10 points for full anagram") {
+    Text("Score: \(score)")
+}
+.bold()
+</pre>
+
+
+<p>
+In <code>startGame</code> function:
+</p>
+
+<pre swift>
+// add word score: 2 for a word, then 1 per letter
+score += answer.count + 2
+
+// Add bonus for a full anagram:
+if answer.count == 8 {
+    score += 10
+}
+</pre>
+
+
+<div id="Hacking With Swift - 78 - WordScramble: Wrap up-In Context"><h2 id="In Context" class="header"><a href="#Hacking With Swift - 78 - WordScramble: Wrap up-In Context">In Context</a></h2></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    @State private var usedWords = [String]()
+    @State private var rootWord = ""
+    @State private var newWord = ""
+    @State private var errorTitle = ""
+    @State private var errorMessage = ""
+    @State private var showingError = false
+    @State private var score = 0
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    TextField("Enter your word", text: $newWord)
+                }
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                
+                Section("2 per word, 1 per letter.\n10 points for full anagram") {
+                    Text("Score: \(score)")
+                }
+                .bold()
+                
+                Section {
+                    ForEach(usedWords, id: \.self) { word in
+                        HStack {
+                            Image(systemName: "\(word.count).circle")
+                            Text(word)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(rootWord)
+            .onSubmit(addNewWord)
+            .onAppear(perform: startGame)
+            // Full version of Error Message
+            //.alert(errorTitle, isPresented: $showingError) {
+            //    Button("OK") { }
+            //} message: {
+            //    Text(errorMessage)
+            //}
+            .alert(errorTitle, isPresented: $showingError) { } message: {
+                Text(errorMessage)
+            }
+        }
+    }
+    
+    func addNewWord() {
+        // lowercase and trim the word, to make sure we don't add duplicates
+        let answer = newWord.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // exit if the remaining string is empty
+        guard answer.count &gt; 0 else { return }
+        
+        // Challenge addition - not allow words of two letters or less
+        guard answer.count &gt; 2 else {
+            wordError(title: "Word too short", message: "Words of less than 3 letters are not allowed. Try enter a longer word.")
+            return
+        }
+        
+        // Challenge addition - don't allow original rootWord
+        guard isRootWord(word: answer) == false else {
+            wordError(title: "Word is root word", message: "You can't use the original word. Try another one.")
+           return
+        }
+        
+        guard isOriginal(word: answer) else {
+            wordError(title: "Word used already", message: "Be more original!")
+            return
+        }
+        
+        guard isPossible(word: answer) else {
+            wordError(title: "Word not possible", message: "You can't spell that word from '\(rootWord)'.")
+            return
+        }
+        
+        guard isReal(word: answer) else {
+            wordError(title: "Word not recognized", message: "You can't just make them up, you know!")
+            return
+        }
+        
+        // add word score: 2 for a word, then 1 per letter
+        score += answer.count + 2
+        
+        // Add bonus for a full anagram:
+        if answer.count == 8 {
+            score += 10
+        }
+        
+        withAnimation {
+            usedWords.insert(answer, at: 0)
+        }
+        newWord = ""
+        
+    }
+    
+    func startGame() {
+        // 1. Find the URL for start.txt in our app bundle
+        if let startWordsURL = Bundle.main.url(forResource: "start", withExtension: "txt") {
+            // 2. Load start.txt into a string
+            //if let startWords = try? String(contentsOf: startWordsURL) {
+            if let startWords = try? String(contentsOf: startWordsURL, encoding: .utf8) {
+                // 3. Split the string up into an array of strings, splitting on line breaks
+                let allWords = startWords.components(separatedBy: "\n")
+                
+                // 4. Pick one random word, or use "silkworm" as a sensible default
+                rootWord = allWords.randomElement() ?? "silkworm"
+                
+                // If we are here everything has worked, so we can exit
+                return
+            }
+        }
+        // If we're *here* then there was a problem - trigger a crash and report the error
+        fatalError("Could not load start.txt from bundle.")
+    }
+    
+    func isRootWord(word: String) -&gt; Bool {
+        word == rootWord
+    }
+    
+    func isOriginal(word: String) -&gt; Bool {
+        !usedWords.contains(word)
+    }
+    
+    func isPossible(word: String) -&gt; Bool {
+        var tempWord = rootWord
+        
+        for letter in word {
+            if let pos = tempWord.firstIndex(of: letter) {
+                tempWord.remove(at: pos)
+            } else {
+                return false
+            }
+        }
+        return true
+    }
+    
+    func isReal(word: String) -&gt; Bool {
+        let checker = UITextChecker()
+        let range = NSRange(location: 0, length:word.utf16.count)
+        let misspelledRange = checker.rangeOfMisspelledWord(in: word, range: range, startingAt: 0, wrap: false, language: "en")
+        
+        return misspelledRange.location == NSNotFound
+    }
+    
+    func wordError(title: String, message: String) {
+        errorTitle = title
+        errorMessage = message
+        showingError = true
+    }
+    
+    func addpoints(points: Int) {
+        score = score + points
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
+
 <p>
 <br>
 <hr>
