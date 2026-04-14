@@ -57,6 +57,8 @@ struct ContentView: View {
             .foregroundStyle(.white)
             .clipShape(.circle)
             .scaleEffect(animationAmount)
+            
+            Spacer()
         }
     }
 }
@@ -65,6 +67,160 @@ struct ContentView: View {
 <p>
 As you can see, the stepper can move <code>animationAmount</code> up and down, and tapping the button will add 1 to it – they are both tied to the same data, which in turn causes the size of the button to change. However, tapping the button changes <code>animationAmount</code> immediately, so the button will just jump up to its larger size. In contrast, the stepper is bound to <code>$animationAmount.animation()</code>, which means SwiftUI will automatically animate its changes.
 </p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background"><h2 id="AI Additional Background" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background">AI Additional Background</a></h2></div>
+
+<p>
+The syntax is different between a direct button property and the Stepper value setting because you are attacking the problem from two different angles: <span id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-Binding Animation"></span><strong id="Binding Animation">Binding Animation</strong> vs. <span id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-Implicit Animation"></span><strong id="Implicit Animation">Implicit Animation</strong> (or Explicit Animation, depending on how you finish that Button).
+</p>
+
+<p>
+Here is the breakdown of why they look so different.
+</p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-1. The Stepper: Binding Animation"><h3 id="1. The Stepper: Binding Animation" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-1. The Stepper: Binding Animation">1. The Stepper: Binding Animation</a></h3></div>
+
+<p>
+The syntax <code>$animationAmount.animation()</code> is specifically for <span id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-1. The Stepper: Binding Animation-Bindings"></span><strong id="Bindings">Bindings</strong>.
+</p>
+
+<p>
+When you use a Stepper, you aren't writing the code that says "change the number." The Stepper is doing it for you. By adding <code>.animation()</code> to the <code>$</code>, you are basically telling the Stepper:
+</p>
+
+<table>
+<tr>
+<td>
+"Whenever you reach into my @State and change this value, please make sure that change is animated."
+</td>
+</tr>
+</table>
+
+<p>
+Because the Stepper "owns" the action of changing the data, you have to attach the animation instructions to the link (the Binding) between the Stepper and the variable.
+</p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-2. The Button: The &quot;Manual&quot; Problem"><h3 id="2. The Button: The &quot;Manual&quot; Problem" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-2. The Button: The &quot;Manual&quot; Problem">2. The Button: The "Manual" Problem</a></h3></div>
+
+<p>
+In your Button code, you are changing the value directly: <code>animationAmount += 1</code>.
+</p>
+
+<p>
+Notice that your Button currently has <span id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-2. The Button: The &quot;Manual&quot; Problem-no animation at all"></span><strong id="no animation at all">no animation at all</strong>. If you tap it, the circle will just "snap" to the new size instantly. To make it match the Stepper's smooth movement, you have two choices, and this is where the syntax diverges:
+</p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-2. The Button: The &quot;Manual&quot; Problem-Option A: Implicit Animation (The Modifier)"><h4 id="Option A: Implicit Animation (The Modifier)" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-2. The Button: The &quot;Manual&quot; Problem-Option A: Implicit Animation (The Modifier)">Option A: Implicit Animation (The Modifier)</a></h4></div>
+
+<p>
+You can add a modifier to the Button (or the VStack) that watches the variable:
+</p>
+
+<pre swift>
+.scaleEffect(animationAmount)
+.animation(.default, value: animationAmount) // Watch this value!
+</pre>
+
+<p>
+This tells SwiftUI: "Any time <code>animationAmount</code> changes—no matter who changed it—animate the result."
+</p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-2. The Button: The &quot;Manual&quot; Problem-Option B: Explicit Animation (The Closure)"><h4 id="Option B: Explicit Animation (The Closure)" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-2. The Button: The &quot;Manual&quot; Problem-Option B: Explicit Animation (The Closure)">Option B: Explicit Animation (The Closure)</a></h4></div>
+
+<p>
+You can wrap the action itself in a function:
+</p>
+
+<pre swift>
+Button("Tap Me") {
+    withAnimation {
+        animationAmount += 1
+    }
+}
+</pre>
+
+<p>
+This tells SwiftUI: "Only animate the changes that happen specifically inside these curly braces."
+</p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-The Comparison Table"><h3 id="The Comparison Table" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-The Comparison Table">The Comparison Table</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Feature
+</th>
+<th>
+Stepper Syntax ($var.animation())
+</th>
+<th>
+Button Syntax (withAnimation { })
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Who is in charge?
+</td>
+<td>
+The UI Control (Stepper/Toggle).
+</td>
+<td>
+You (the Programmer).
+</td>
+</tr>
+<tr>
+<td>
+Why use it?
+</td>
+<td>
+You are passing a Binding and want its state changes to be smooth.
+</td>
+<td>
+You are writing a custom action and want to trigger a visual transition.
+</td>
+</tr>
+<tr>
+<td>
+Visual Analogy
+</td>
+<td>
+Like setting a "Slow" speed on a treadmill.
+</td>
+<td>
+Like choosing to walk slowly for one specific step.
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?"><h3 id="Why doesn't the Button use the $ syntax?" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?">Why doesn't the Button use the $ syntax?</a></h3></div>
+
+<p>
+Buttons don't use Bindings to perform their primary actions; they use closures (the code block inside <code>{ }</code>). Since there is no $ being passed to the Button's action, there is nothing to attach <code>.animation()</code> to!
+</p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?-Summary"><h4 id="Summary" class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?-Summary">Summary</a></h4></div>
+
+<p>
+The syntax isn't just different for the "item" (the Stepper vs the Button); it's different based on <span id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?-Summary-how the data is being changed"></span><strong id="how the data is being changed">how the data is being changed</strong>.
+</p>
+
+<ul>
+<li>
+Bindings ($) need the animation attached to the "remote control."
+
+<li>
+Direct Actions need the animation wrapped around the logic or attached as a modifier to the view.
+
+</ul>
+<p>
+If you add <code>withAnimation { animationAmount += 1 }</code> to your button, you'll see it finally starts behaving exactly like the Stepper!
+</p>
+
+<div id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?-Back to the tutorial.."><h4 id="Back to the tutorial.." class="header"><a href="#Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?-Back to the tutorial..">Back to the tutorial..</a></h4></div>
 
 <p>
 Now, as an experiment I’d like you to change the start of the <code>body</code> to this:
@@ -101,7 +257,7 @@ Stepper("Scale amount", value: $animationAmount.animation(
 </pre>
 
 <p>
-<span id="Hacking With Swift - 82 - Animating bindings-Tip"></span><strong id="Tip">Tip</strong>: With this variant of the <code>animation()</code> modifier, we don’t need to specify which value we’re watching for changes – it’s literally attached to the value it should watch!
+<span id="Hacking With Swift - 82 - Animating bindings-AI Additional Background-Why doesn't the Button use the $ syntax?-Back to the tutorial..-Tip"></span><strong id="Tip">Tip</strong>: With this variant of the <code>animation()</code> modifier, we don’t need to specify which value we’re watching for changes – it’s literally attached to the value it should watch!
 </p>
 
 <p>
