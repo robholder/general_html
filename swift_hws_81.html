@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_81</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_80.html">Hacking With Swift - 80 - Creating implicit animations</a>
+
+</ul>
+<div id="Hacking With Swift - 81 - Customizing animations in SwiftUI"><h1 id="Hacking With Swift - 81 - Customizing animations in SwiftUI" class="header"><a href="#Hacking With Swift - 81 - Customizing animations in SwiftUI">Hacking With Swift - 81 - Customizing animations in SwiftUI</a></h1></div>
+
+<p>
+When we attach the <code>animation()</code> modifier to a view, SwiftUI will automatically animate any changes that happen to that view using whatever is the default system animation, whenever the value we’re watching changes. In practice, that is a very gentle spring, which means iOS will start the animation slow, then make it pick up speed until it ever-so-slightly overshoots the target value, then it will end by going backwards just a touch until it reaches its end state.
+</p>
+
+<p>
+We can control the type of animation used by passing in different values to the modifier. For example, we could use <code>.linear</code> to make the animation move at a constant speed from start to finish:
+</p>
+
+<pre swift>
+.animation(.linear, value: animationAmount)
+</pre>
+
+<p>
+<span id="Hacking With Swift - 81 - Customizing animations in SwiftUI-Tip"></span><strong id="Tip">Tip</strong>: If you were curious, implicit animations always need to watch a particular value otherwise animations would be triggered for every small change – even rotating the device from portrait to landscape would trigger the animation, which would look strange.
+</p>
+
+<p>
+iOS chooses spring animations by default because they mimic what we're used to in the real world. These are hugely customizable: you can control roughly how long the spring should take to complete, and also how bouncy the spring should – whether it should bounce back and forwards more or less, where 1 is maximum bounciness and 0 is no bounciness.
+</p>
+
+<p>
+For example, this makes our button scale up quickly then bounce a lot:
+</p>
+
+<pre swift>
+.animation(.spring(duration: 1, bounce: 0.9), value: animationAmount)
+</pre>
+
+<p>
+For more precise control, we can customize the animation with a duration specified as a number of seconds. So, we could get an ease-in-out animation that lasts for two seconds like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var animationAmount = 1.0
+
+    var body: some View {
+        Button("Tap Me") {
+            animationAmount += 1
+        }
+        .padding(50)
+        .background(.red)
+        .foregroundStyle(.white)
+        .clipShape(.circle)
+        .scaleEffect(animationAmount)
+        .animation(.easeInOut(duration: 2), value: animationAmount)
+    }
+}
+</pre>
+
+<p>
+When we say <code>.easeInOut(duration: 2)</code> we’re actually creating an instance of an <code>Animation</code> struct that has its own set of modifiers. So, we can attach modifiers directly to the animation to add a delay like this:
+</p>
+
+<pre swift>
+.animation(
+    .easeInOut(duration: 2)
+        .delay(1),
+    value: animationAmount
+)
+</pre>
+
+<p>
+With that in place, tapping the button will now wait for a second before executing a two-second animation.
+</p>
+
+<p>
+We can also ask the animation to repeat a certain number of times, and even make it bounce back and forward by setting <code>autoreverses</code> to true. This creates a one-second animation that will bounce up and down before reaching its final size:
+</p>
+
+<pre swift>
+.animation(
+    .easeInOut(duration: 1)
+        .repeatCount(3, autoreverses: true),
+    value: animationAmount
+)
+</pre>
+
+<p>
+If we had set repeat count to 2 then the button would scale up then down again, then jump immediately back up to its larger scale. This is because ultimately the button must match the state of our program, regardless of what animations we apply – when the animation finishes the button must have whatever value is set in <code>animationAmount</code>.
+</p>
+
+<p>
+For continuous animations, there is a <code>repeatForever()</code> modifier that can be used like this:
+</p>
+
+<pre swift>
+.animation(
+    .easeInOut(duration: 1)
+        .repeatForever(autoreverses: true),
+    value: animationAmount
+)
+</pre>
+
+<p>
+We can use these <code>repeatForever()</code> animations in combination with <code>onAppear()</code> to make animations that start immediately and continue animating for the life of the view.
+</p>
+
+<p>
+To demonstrate this, we’re going to remove the animation from the button itself and instead apply it an overlay to make a sort of pulsating circle around the button. Overlays are created using an overlay() modifier, which lets us create new views at the same size and position as the view we’re overlaying.
+</p>
+
+<p>
+So, first add this overlay() modifier to the button before the animation() modifier:
+</p>
+
+<pre swift>
+.overlay(
+    Circle()
+        .stroke(.red)
+        .scaleEffect(animationAmount)
+        .opacity(2 - animationAmount)
+)
+</pre>
+
+<p>
+That makes a stroked red circle over our button, using an opacity value of <code>2 - animationAmount</code> so that when <code>animationAmount</code> is 1 the opacity is 1 (it’s opaque) and when <code>animationAmount</code> is 2 the opacity is 0 (it’s transparent).
+</p>
+
+<p>
+Next, remove the <code>scaleEffect()</code> and <code>blur()</code> modifiers from the button and comment out the <code>animationAmount += 1</code> action part too, because we don’t want that to change any more, and move its animation modifier up to the circle inside the overlay:
+</p>
+
+<pre swift>
+.overlay(
+    Circle()
+        .stroke(.red)
+        .scaleEffect(animationAmount)
+        .opacity(2 - animationAmount)
+        .animation(
+            .easeOut(duration: 1)
+                .repeatForever(autoreverses: false),
+            value: animationAmount
+        )
+)
+</pre>
+
+<p>
+I’ve switched <code>autoreverses</code> to false, but otherwise it’s the same animation.
+</p>
+
+<p>
+Finally, add an <code>onAppear()</code> modifier to the button, which will set <code>animationAmount</code> to 2:
+</p>
+
+<pre swift>
+.onAppear {
+    animationAmount = 2
+}
+</pre>
+
+<p>
+Because the overlay circle uses that for a “repeat forever” animation without autoreversing, you’ll see the overlay circle scale up and fade out continuously.
+</p>
+
+<p>
+Your finished code should look like this:
+</p>
+
+<pre swift>
+Button("Tap Me") {
+    // animationAmount += 1
+}
+.padding(50)
+.background(.red)
+.foregroundStyle(.white)
+.clipShape(.circle)
+.overlay(
+    Circle()
+        .stroke(.red)
+        .scaleEffect(animationAmount)
+        .opacity(2 - animationAmount)
+        .animation(
+            .easeInOut(duration: 1)
+                .repeatForever(autoreverses: false),
+            value: animationAmount
+        )
+)
+.onAppear {
+    animationAmount = 2
+}
+</pre>
+
+<p>
+Given how little work that involves, it creates a remarkably attractive effect!
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
