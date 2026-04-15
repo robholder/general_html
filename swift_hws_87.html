@@ -70,6 +70,8 @@ struct CornerRotateModifier: ViewModifier {
 The addition of <code>clipped()</code> there means that when the view rotates the parts that are lying outside its natural rectangle don’t get drawn.
 </p>
 
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier-Extension"><h3 id="Extension" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier-Extension">Extension</a></h3></div>
+
 <p>
 We can try that straight away using the <code>.modifier</code> transition, but it’s a little unwieldy. A better idea is to wrap that in an extension to <code>AnyTransition</code>, making it rotate from -90 to 0 on its top leading corner:
 </p>
@@ -84,6 +86,102 @@ extension AnyTransition {
     }
 }
 </pre>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights"><h2 id="AI Insights" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights">AI Insights</a></h2></div>
+
+<p>
+This is a <span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Type Extension"></span><strong id="Type Extension">Type Extension</strong> adding a custom static property. In SwiftUI, this is the standard "clean" way to create reusable transitions that look just like the built-in ones (e.g., <code>.transition(.opacity)</code>).
+</p>
+
+<p>
+Here is the dissection of what is happening under the hood.
+</p>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-1. The Extension Target"><h3 id="1. The Extension Target" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-1. The Extension Target">1. The Extension Target</a></h3></div>
+
+<p>
+<code>extension AnyTransition</code>
+</p>
+
+<p>
+You are extending the <code>AnyTransition</code> struct. By adding a <code>static var</code> here, you enable dot syntax in your views. Instead of typing a long constructor, you can simply write:
+</p>
+
+<p>
+<code>view.transition(.pivot)</code>
+</p>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-2. The Static Property"><h3 id="2. The Static Property" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-2. The Static Property">2. The Static Property</a></h3></div>
+
+<p>
+<code>static var pivot: AnyTransition { ... }</code>
+</p>
+
+<ul>
+<li>
+Static: This belongs to the type itself, not a specific instance of a transition.
+
+<li>
+Computed Property: Every time you call <code>.pivot</code>, it returns a new <code>AnyTransition</code> instance configured with your custom logic.
+
+</ul>
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-3. The .modifier Method"><h3 id="3. The .modifier Method" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-3. The .modifier Method">3. The .modifier Method</a></h3></div>
+
+<p>
+This is the "engine" of your transition. While SwiftUI has basic transitions like <code>opacity</code> or <code>move</code>, <code>.modifier</code> allows you to create completely custom geometric changes by wrapping a <code>ViewModifier</code>.
+</p>
+
+<p>
+It requires two states:
+</p>
+
+<ul>
+<li>
+<code>active</code>: This is how the view looks when it is "not there" (either just before it appears or just after it disappears). In your code, it's rotated <span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-3. The .modifier Method--90 degrees"></span><strong id="-90 degrees">-90 degrees</strong>.
+
+<li>
+<code>identity</code>: This is how the view looks when it is fully on screen. Here, the rotation is <code>0 degrees</code>.
+
+</ul>
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-4. CornerRotateModifier"><h3 id="4. CornerRotateModifier" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-4. CornerRotateModifier">4. CornerRotateModifier</a></h3></div>
+
+<p>
+<code>CornerRotateModifier(amount: ..., anchor: .topLeading)</code>
+</p>
+
+<p>
+This isn't a built-in SwiftUI tool; it's a <code>Custom ViewModifier</code> that we created above.
+</p>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow"><h3 id="Putting it all together: The &quot;Visual&quot; Flow" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow">Putting it all together: The "Visual" Flow</a></h3></div>
+
+<p>
+When you trigger this transition (e.g., inside an <code>if</code> block with <code>withAnimation</code>):
+</p>
+
+<ul>
+<li>
+Insertion: The view is added to the hierarchy. SwiftUI looks at the <code>active</code> state. The view starts at <span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow--90°"></span><strong id="-90°">-90°</strong> pinned to the <span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow-top-leading"></span><strong id="top-leading">top-leading</strong> corner. It then animates to the <code>identity</code> state (<span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow-0°"></span><strong id="0°">0°</strong>). It looks like the view is "swinging" down into place.
+
+<li>
+Removal: SwiftUI animates the view from identity (<span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow-0°"></span><strong id="0°">0°</strong>) back to active (<span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow--90°"></span><strong id="-90°">-90°</strong>) before removing it from the screen. It looks like the view is "swinging" up and out.
+
+</ul>
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow-Why do it this way?"><h4 id="Why do it this way?" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow-Why do it this way?">Why do it this way?</a></h4></div>
+
+<p>
+This pattern is powerful because it encapsulates complexity. Your View code stays clean:
+</p>
+
+<pre swift>
+if isShowing {
+    Rectangle()
+        .fill(.blue)
+        .transition(.pivot) // Clean and readable!
+}
+</pre>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-AI Insights-Putting it all together: The &quot;Visual&quot; Flow-Back to the tutorial">Back to the tutorial</a></h4></div>
 
 <p>
 With that in place we now attach the pivot animation to any view using this:
@@ -123,7 +221,155 @@ struct ContentView: View {
 }
 </pre>
 
-<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier-In Context">In Context</a></h3></div>
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights"><h2 id="More AI Insights" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights">More AI Insights</a></h2></div>
+
+<p>
+The <code>CornerRotateModifier</code> is the "engine" that makes the <code>pivot</code> transition possible. While it looks simple, there are three critical architectural details that explain why it works and how it behaves during an animation.
+</p>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-1. The &quot;Animatable&quot; Magic"><h3 id="1. The &quot;Animatable&quot; Magic" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-1. The &quot;Animatable&quot; Magic">1. The "Animatable" Magic</a></h3></div>
+
+<p>
+Even though you don’t see an <code>animatableData</code> property here, this struct works because it wraps a built-in SwiftUI modifier that is animatable: <code>.rotationEffect</code>.
+</p>
+
+<p>
+When SwiftUI transitions between the <code>active</code> state (-90°) and the <code>identity</code> state (0°), it doesn't just jump between the two. Because this struct is used inside an <code>AnyTransition</code>, SwiftUI looks at the <code>amount</code> property and interpolates the values. It calculates every fractional degree in between (e.g., -45°, -10°) to create a smooth swinging motion.
+</p>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-2. The Anchor Point (UnitPoint)"><h3 id="2. The Anchor Point (UnitPoint)" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-2. The Anchor Point (UnitPoint)">2. The Anchor Point (UnitPoint)</a></h3></div>
+
+<p>
+The <code>anchor</code> property is what defines the "hinge" of the pivot.
+</p>
+
+<ul>
+<li>
+By using <code>.topLeading</code>, you are telling SwiftUI to pin the top-left corner of the view.
+
+<li>
+If you changed that anchor to <code>.center</code>, the view would spin like a fan.
+
+<li>
+By pinning it to a corner, you create a "gate" or "page-turn" effect.
+
+</ul>
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()"><h3 id="3. The Role of .clipped()" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()">3. The Role of .clipped()</a></h3></div>
+
+<p>
+This is a small but vital inclusion in your <code>body</code> function.
+</p>
+
+<ul>
+<li>
+When a view rotates, its corners often extend past its original bounding box.
+
+<li>
+<code>.clipped()</code> ensures that the view doesn't overlap other UI elements during its "swing."
+
+<li>
+Note: Depending on your design, you might actually want to remove <code>.clipped()</code> if you want to see the view swinging "over" the surrounding content.
+
+</ul>
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()-How it fits into the &quot;Identity&quot; Concept"><h4 id="How it fits into the &quot;Identity&quot; Concept" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()-How it fits into the &quot;Identity&quot; Concept">How it fits into the "Identity" Concept</a></h4></div>
+
+<p>
+In SwiftUI transitions, Identity is a crucial concept.
+</p>
+
+<ul>
+<li>
+When <code>amount</code> is <code>0</code>, the modifier is in its "Identity" state—meaning it has <span id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()-How it fits into the &quot;Identity&quot; Concept-zero effect"></span><strong id="zero effect">zero effect</strong> on the view's appearance.
+
+</ul>
+<p>
+8 This is why the extension defines <code>identity: CornerRotateModifier(amount: 0, ...)</code>. It tells SwiftUI: "This is exactly how the view should look when it is fully settled on the screen."
+</p>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()-A Quick Experiment"><h4 id="A Quick Experiment" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()-A Quick Experiment">A Quick Experiment</a></h4></div>
+
+<p>
+To see how powerful this struct is, you can actually use it without the transition just to test it:
+</p>
+
+<pre swift>
+Rectangle()
+    .fill(.orange)
+    .frame(width: 100, height: 100)
+    .modifier(CornerRotateModifier(amount: -45, anchor: .topLeading))
+</pre>
+
+<p>
+This will show the rectangle permanently tilted at 45 degrees, hanging from its top-left corner.
+</p>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()-Summary Table: The Pivot Logic"><h4 id="Summary Table: The Pivot Logic" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-3. The Role of .clipped()-Summary Table: The Pivot Logic">Summary Table: The Pivot Logic</a></h4></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Property
+</th>
+<th>
+Value in active
+</th>
+<th>
+Value in identity
+</th>
+<th>
+Visual Result
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+amount
+</td>
+<td>
+-90
+</td>
+<td>
+0
+</td>
+<td>
+Swings from "standing up" to "laying flat."
+</td>
+</tr>
+<tr>
+<td>
+anchor
+</td>
+<td>
+.topLeading
+</td>
+<td>
+.topLeading
+</td>
+<td>
+The top-left corner never moves.
+</td>
+</tr>
+<tr>
+<td>
+clipped
+</td>
+<td>
+Active
+</td>
+<td>
+Active
+</td>
+<td>
+Keeps the rotation tidy within its frame.
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-More AI Insights-In Context">In Context</a></h3></div>
+
 <pre swift>
 import SwiftUI
 
