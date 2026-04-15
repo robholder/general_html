@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_84</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_83.html">Hacking With Swift - 83 - Creating explicit animations</a>
+
+</ul>
+<div id="Hacking With Swift - 84 - Controlling the animation stack"><h1 id="Hacking With Swift - 84 - Controlling the animation stack" class="header"><a href="#Hacking With Swift - 84 - Controlling the animation stack">Hacking With Swift - 84 - Controlling the animation stack</a></h1></div>
+
+<p>
+At this point, I want to put together two things that you already understand individually, but together might hurt your head a little.
+</p>
+
+<p>
+Previously we looked at how the order of modifiers matters. So, if we wrote code like this (Text of "Tap Me" with background of blue. A rectangle the size of the text string, but space around the item when in a stack to the tune of the frame):
+</p>
+
+<pre swift>
+Button("Tap Me") {
+    // do nothing
+}
+.background(.blue)
+.frame(width: 200, height: 200)
+.foregroundStyle(.white)
+</pre>
+
+<p>
+The result would look different from code like this (Large blue square with small 'Tap Me' text):
+</p>
+
+<pre swift>
+Button("Tap Me") {
+    // do nothing
+}
+.frame(width: 200, height: 200)    
+.background(.blue)
+.foregroundStyle(.white)
+</pre>
+
+<p>
+This is because if we color the background before adjusting the frame, only the original space is colored rather than the expanded space. If you recall, the underlying reason for this is the way SwiftUI wraps views with modifiers, allowing us to apply the same modifier multiple times – we repeated <code>background()</code> and <code>padding()</code> several times to create a striped border effect.
+</p>
+
+<p>
+That’s concept one: modifier order matters, because SwiftUI wraps views with modifiers in the order they are applied.
+</p>
+
+<p>
+Concept two is that we can apply an <code>animation()</code> modifier to a view in order to have it implicitly animate changes.
+</p>
+
+<p>
+To demonstrate this, we could modify our button code so that it shows different colors depending on some state. First, we define the state:
+</p>
+
+<pre swift>
+@State private var enabled = false
+</pre>
+
+<p>
+We can toggle that between true and false inside our button’s action:
+</p>
+
+<pre swift>
+enabled.toggle()
+</pre>
+
+<p>
+Then we can use a conditional value inside the <code>background()</code> modifier so the button is either blue or red:
+</p>
+
+<pre swift>
+.background(enabled ? .blue : .red)
+</pre>
+
+<p>
+Finally, we add the <code>animation()</code> modifier to the button to make those changes animate:
+</p>
+
+<pre swift>
+.animation(.default, value: enabled)
+</pre>
+
+<p>
+If you run the code you’ll see that tapping the button animates its color between blue and red.
+</p>
+
+<p>
+So: modifier order matters and we can attach one modifier several times to a view, and we can cause implicit animations to occur with the <code>animation()</code> modifier. All clear so far?
+</p>
+
+<p>
+Right. Brace yourself, because this might hurt.
+</p>
+
+<p>
+<span id="Hacking With Swift - 84 - Controlling the animation stack-You can attach the"></span><strong id="You can attach the">You can attach the</strong> <code>animation()</code> <span id="Hacking With Swift - 84 - Controlling the animation stack-modifier several times, and the order in which you use it matters."></span><strong id="modifier several times, and the order in which you use it matters.">modifier several times, and the order in which you use it matters.</strong>
+</p>
+
+<p>
+To demonstrate this, I’d like you to add this modifier to your button, after all the other modifiers:
+</p>
+
+<pre swift>
+.clipShape(.rect(cornerRadius: enabled ? 60 : 0))
+</pre>
+
+<p>
+That will cause the button to move between a square and a rounded rectangle depending on the state of the <code>enabled</code> Boolean.
+</p>
+
+<p>
+When you run the program, you’ll see that tapping the button causes it to animate between red and blue, but <em>jump</em> between square and rounded rectangle – that part <em>doesn’t</em> animate.
+</p>
+
+<p>
+Hopefully you can see where we’re going next: I’d like you to move the <code>clipShape()</code> modifier before the animation, like this:
+</p>
+
+<pre swift>
+.frame(width: 200, height: 200)
+.background(enabled ? .blue : .red)
+.foregroundStyle(.white)
+.clipShape(.rect(cornerRadius: enabled ? 60 : 0))
+.animation(.default, value: enabled)
+</pre>
+
+<p>
+And now when you run the code both the background color and clip shape animate.
+</p>
+
+<p>
+So, the order in which we apply animations matters: only changes that occur before the <code>animation()</code> modifier get animated.
+</p>
+
+<p>
+Now for the fun part: if we apply multiple <code>animation()</code> modifiers, each one controls everything before it up to the next animation. This allows us to animate state changes in all sorts of different ways rather than uniformly for all properties.
+</p>
+
+<p>
+For example, we could make the color change happen with the default animation, but use a spring for the clip shape:
+</p>
+
+<pre swift>
+Button("Tap Me") {
+    enabled.toggle()
+}
+.frame(width: 200, height: 200)
+.background(enabled ? .blue : .red)
+.animation(.default, value: enabled)
+.foregroundStyle(.white)
+.clipShape(.rect(cornerRadius: enabled ? 60 : 0))
+.animation(.spring(duration: 1, bounce: 0.6), value: enabled)
+</pre>
+
+<p>
+You can have as many <code>animation()</code> modifiers as you need to construct your design, which lets us split one state change into as many segments as we need.
+</p>
+
+<p>
+For even more control, it’s possible to disable animations entirely by passing <code>nil</code> to the modifier. For example, you might want the color change to happen immediately but the clip shape to retain its animation, in which case you’d write this:
+</p>
+
+<pre swift>
+Button("Tap Me") {
+    enabled.toggle()
+}
+.frame(width: 200, height: 200)
+.background(enabled ? .blue : .red)
+.animation(nil, value: enabled)
+.foregroundStyle(.white)
+.clipShape(.rect(cornerRadius: enabled ? 60 : 0))
+.animation(.spring(duration: 1, bounce: 0.6), value: enabled)
+</pre>
+
+<p>
+That kind of control wouldn’t be possible without multiple <code>animation()</code> modifiers – if you tried to move <code>background()</code> after the animation you’d find that it would just undo the work of <code>clipShape()</code>.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
