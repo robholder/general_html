@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_87</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_86.html">Hacking With Swift - 86 - Showing and hiding views with transitions</a>
+
+</ul>
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier"><h1 id="Hacking With Swift - 87 - Building custom transitions using ViewModifier" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier">Hacking With Swift - 87 - Building custom transitions using ViewModifier</a></h1></div>
+
+<p>
+It’s possible – and actually surprisingly easy – to create wholly new transitions for SwiftUI, allowing us to add and remove views using entirely custom animations.
+</p>
+
+<p>
+This functionality is made possible by the <code>.modifier</code> transition, which accepts any view modifier we want. The catch is that we need to be able to instantiate the modifier, which means it needs to be one we create ourselves.
+</p>
+
+<p>
+To try this out, we could write a view modifier that lets us mimic the Pivot animation in Keynote – it causes a new slide to rotate in from its top-left corner. In SwiftUI-speak, that means creating a view modifier that causes our view to rotate in from one corner, without escaping the bounds it’s supposed to be in. SwiftUI actually gives us modifiers to do just that: <code>rotationEffect()</code> lets us rotate a view in 2D space, and <code>clipped()</code> stops the view from being drawn outside of its rectangular space.
+</p>
+
+<p>
+<code>rotationEffect()</code> is similar to <code>rotation3DEffect()</code>, except it always rotates around the Z axis. However, it also gives us the ability to control the anchor point of the rotation – which part of the view should be fixed in place as the center of the rotation. SwiftUI gives us a <code>UnitPoint</code> type for controlling the anchor, which lets us specify an exact X/Y point for the rotation or use one of the many built-in options – <code>.topLeading</code>, .<code>bottomTrailing</code>, <code>.center</code>, and so on.
+</p>
+
+<p>
+Let’s put all this into code by creating a <code>CornerRotateModifier</code> struct that has an anchor point to control where the rotation should take place, and an amount to control how much rotation should be applied:
+</p>
+
+<pre swift>
+struct CornerRotateModifier: ViewModifier {
+    let amount: Double
+    let anchor: UnitPoint
+
+    func body(content: Content) -&gt; some View {
+        content
+            .rotationEffect(.degrees(amount), anchor: anchor)
+            .clipped()
+    }
+}
+</pre>
+
+<p>
+The addition of <code>clipped()</code> there means that when the view rotates the parts that are lying outside its natural rectangle don’t get drawn.
+</p>
+
+<p>
+We can try that straight away using the <code>.modifier</code> transition, but it’s a little unwieldy. A better idea is to wrap that in an extension to <code>AnyTransition</code>, making it rotate from -90 to 0 on its top leading corner:
+</p>
+
+<pre swift>
+extension AnyTransition {
+    static var pivot: AnyTransition {
+        .modifier(
+            active: CornerRotateModifier(amount: -90, anchor: .topLeading),
+            identity: CornerRotateModifier(amount: 0, anchor: .topLeading)
+        )
+    }
+}
+</pre>
+
+<p>
+With that in place we now attach the pivot animation to any view using this:
+</p>
+
+<pre swift>
+.transition(.pivot)
+</pre>
+
+<p>
+For example, we could use the <code>onTapGesture()</code> modifier to make a red rectangle pivot onto the screen, like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var isShowingRed = false
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.blue)
+                .frame(width: 200, height: 200)
+
+            if isShowingRed {
+                Rectangle()
+                    .fill(.red)
+                    .frame(width: 200, height: 200)
+                    .transition(.pivot)
+            }
+        }
+        .onTapGesture {
+            withAnimation {
+                isShowingRed.toggle()
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
