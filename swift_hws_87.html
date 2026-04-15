@@ -32,19 +32,21 @@
 <div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier"><h1 id="Hacking With Swift - 87 - Building custom transitions using ViewModifier" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier">Hacking With Swift - 87 - Building custom transitions using ViewModifier</a></h1></div>
 
 <p>
-It’s possible – and actually surprisingly easy – to create wholly new transitions for SwiftUI, allowing us to add and remove views using entirely custom animations.
+It’s possible - and actually surprisingly easy - to create wholly new transitions for SwiftUI, allowing us to add and remove views using entirely custom animations.
 </p>
 
 <p>
 This functionality is made possible by the <code>.modifier</code> transition, which accepts any view modifier we want. The catch is that we need to be able to instantiate the modifier, which means it needs to be one we create ourselves.
 </p>
 
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier"><h2 id="Creating a View Modifier" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier">Creating a View Modifier</a></h2></div>
+
 <p>
-To try this out, we could write a view modifier that lets us mimic the Pivot animation in Keynote – it causes a new slide to rotate in from its top-left corner. In SwiftUI-speak, that means creating a view modifier that causes our view to rotate in from one corner, without escaping the bounds it’s supposed to be in. SwiftUI actually gives us modifiers to do just that: <code>rotationEffect()</code> lets us rotate a view in 2D space, and <code>clipped()</code> stops the view from being drawn outside of its rectangular space.
+To try this out, we could write a view modifier that lets us mimic the Pivot animation in Keynote - it causes a new slide to rotate in from its top-left corner. In SwiftUI-speak, that means creating a view modifier that causes our view to rotate in from one corner, without escaping the bounds it’s supposed to be in. SwiftUI actually gives us modifiers to do just that: <code>rotationEffect()</code> lets us rotate a view in 2D space, and <code>clipped()</code> stops the view from being drawn outside of its rectangular space.
 </p>
 
 <p>
-<code>rotationEffect()</code> is similar to <code>rotation3DEffect()</code>, except it always rotates around the Z axis. However, it also gives us the ability to control the anchor point of the rotation – which part of the view should be fixed in place as the center of the rotation. SwiftUI gives us a <code>UnitPoint</code> type for controlling the anchor, which lets us specify an exact X/Y point for the rotation or use one of the many built-in options – <code>.topLeading</code>, .<code>bottomTrailing</code>, <code>.center</code>, and so on.
+<code>rotationEffect()</code> is similar to <code>rotation3DEffect()</code>, except it always rotates around the Z axis. However, it also gives us the ability to control the anchor point of the rotation - which part of the view should be fixed in place as the center of the rotation. SwiftUI gives us a <code>UnitPoint</code> type for controlling the anchor, which lets us specify an exact X/Y point for the rotation or use one of the many built-in options - <code>.topLeading</code>, .<code>bottomTrailing</code>, <code>.center</code>, and so on.
 </p>
 
 <p>
@@ -118,6 +120,59 @@ struct ContentView: View {
             }
         }
     }
+}
+</pre>
+
+<div id="Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 87 - Building custom transitions using ViewModifier-Creating a View Modifier-In Context">In Context</a></h3></div>
+<pre swift>
+import SwiftUI
+
+struct CornerRotateModifier: ViewModifier {
+    let amount: Double
+    let anchor: UnitPoint
+    
+    func body(content: Content) -&gt; some View {
+        content
+            .rotationEffect(.degrees(amount), anchor: anchor)
+            .clipped()
+    }
+}
+
+extension AnyTransition {
+    static var pivot: AnyTransition {
+        .modifier(
+            active: CornerRotateModifier(amount: -90, anchor: .topLeading),
+            identity: CornerRotateModifier(amount: 0, anchor: .topLeading)
+        )
+    }
+}
+struct ContentView: View {
+    @State private var isShowingRed = false
+    
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.blue)
+                .frame(width: 200, height: 200)
+            
+            if isShowingRed {
+                Rectangle()
+                    .fill(.red)
+                    .frame(width: 200, height: 200)
+                    .transition(.pivot)
+            }
+        }
+        .onTapGesture {
+            withAnimation {
+                isShowingRed.toggle()
+            }
+        }
+
+    }
+}
+
+#Preview {
+    ContentView()
 }
 </pre>
 
