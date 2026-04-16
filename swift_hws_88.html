@@ -298,6 +298,234 @@ extension View {
 </pre>
 
 
+<div id="Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks"><h2 id="Add Fading and Shrinking Non-Picks" class="header"><a href="#Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks">Add Fading and Shrinking Non-Picks</a></h2></div>
+
+<div id="Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-1. Add the state variable"><h3 id="1. Add the state variable" class="header"><a href="#Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-1. Add the state variable">1. Add the state variable</a></h3></div>
+
+<p>
+Add this near your other <code>@State</code> properties:
+</p>
+
+<pre swift>
+@State private var selectedNumber = -1 // -1 means nothing is tapped yet
+</pre>
+
+<div id="Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-2. Update the Button logic"><h3 id="2. Update the Button logic" class="header"><a href="#Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-2. Update the Button logic">2. Update the Button logic</a></h3></div>
+
+<p>
+Modify your Button action to set that number. Note that I removed the rotations = [0,0,0] reset from inside the button—resetting there would snap the flag back to 0 immediately, killing the 1-second animation you just started!
+</p>
+
+<pre swift>
+Button {
+    withAnimation(.spring(duration: 1, bounce: 0.5)) {
+        rotations[number] += 360
+        selectedNumber = number // Track which one was clicked
+    }
+    
+    // Slight delay so the user sees the animation before the alert pops up
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        flagTapped(number)
+    }
+} label: {
+    FlagImage(name: countries[number])
+}
+</pre>
+
+<div id="Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-3. Add the Opacity Ternary"><h3 id="3. Add the Opacity Ternary" class="header"><a href="#Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-3. Add the Opacity Ternary">3. Add the Opacity Ternary</a></h3></div>
+
+<p>
+Now, apply the opacity modifier to the button. The logic is: "If nothing is selected, opacity is 1. If something is selected, and it's NOT me, opacity is 0.25."
+</p>
+
+<pre swift>
+.rotation3DEffect(.degrees(rotations[number]), axis: (x: 1, y: 0, z: 0))
+// New Opacity Logic
+.opacity(selectedNumber == -1 || selectedNumber == number ? 1.0 : 0.25)
+// Bonus: Scale down the unselected ones for a better "pop" effect
+.scaleEffect(selectedNumber == -1 || selectedNumber == number ? 1.0 : 0.85)
+// Ensure the opacity change is animated
+.animation(.default, value: selectedNumber)
+</pre>
+
+<div id="Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-4. Reset in askQuestion"><h3 id="4. Reset in askQuestion" class="header"><a href="#Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-4. Reset in askQuestion">4. Reset in askQuestion</a></h3></div>
+
+<p>
+Finally, you need to "turn the lights back on" for the next round. Update your <code>askQuestion</code> function:
+</p>
+
+<pre swift>
+func askQuestion() {
+    countries.shuffle()
+    correctAnswer = Int.random(in: 0...2)
+    selectedNumber = -1       // Reset selection
+    rotations = [0.0, 0.0, 0.0] // Reset rotation values safely here
+}
+</pre>
+
+<div id="Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 88 - Animation: Wrap up-Add Fading and Shrinking Non-Picks-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @State private var countries = ["Estonia", "France", "Germany", "Ireland", "Italy", "Monaco", "Nigeria", "Poland", "Spain", "UK", "Ukraine", "US"].shuffled()
+    
+    @State private var correctAnswer = Int.random(in: 0...2)
+
+    @State private var score = 0
+    @State private var scoreTitle = ""
+    @State private var showingScore = false
+    @State private var tries = 0
+    @State private var complete = false
+    
+    @State private var rotations = [0.0, 0.0, 0.0] // three buttons, three rotations
+    @State private var selectedNumber = -1 // -1 means nothing is tapped yet
+    
+    
+    let maxTries = 8 // Easier to adjust the game length here
+
+    var body: some View {
+        ZStack {
+            RadialGradient(stops: [
+                .init(color: Color(red: 0.1, green: 0.2, blue: 0.45), location: 0.3),
+                .init(color: Color(red: 0.76, green: 0.15, blue: 0.26), location: 0.3),
+            ], center: .top, startRadius: 200, endRadius: 700)
+            .ignoresSafeArea()
+
+            VStack {
+                Spacer()
+
+                Text("Guess the Flag")
+                    .whiteTitleStyle()
+                
+                VStack(spacing: 15) {
+                    VStack {
+                        Text("Tap the flag of")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline.weight(.heavy))
+                        
+                        Text(countries[correctAnswer])
+                            .font(.largeTitle.weight(.semibold))
+                    }
+                    
+                    ForEach(0..&lt;3) { number in
+                        Button {
+                            // Spin 360 when clicked
+                            withAnimation(.spring(duration: 1, bounce: 0.5)) {
+                                rotations[number] += 360
+                                selectedNumber = number // Track which one was clicked
+                            }
+                            // Slight delay so the user sees the animation before the alert pops up
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                flagTapped(number)
+                                //Do this here to prevent unwinding effect:
+                                rotations = [0.0, 0.0, 0.0] // Reset rotation values safely here
+                            }
+                        } label: {
+                            FlagImage(name: countries[number])
+                        }
+                        // Actual rotation animation specs
+                        .rotation3DEffect(.degrees(rotations[number]), axis: (x: 1, y: 0, z: 0))
+                        // New Opacity Logic
+                        .opacity(selectedNumber == -1 || selectedNumber == number ? 1.0 : 0.25)
+                        // Bonus: Scale down the unselected ones for a better "pop" effect
+                        .scaleEffect(selectedNumber == -1 || selectedNumber == number ? 1.0 : 0.85)
+                        // Ensure the opacity change is animated
+                        .animation(.default, value: selectedNumber)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(.regularMaterial)
+                .clipShape(.rect(cornerRadius: 20))
+                
+                Spacer()
+                Spacer()
+                
+                Text("Score: \(score)")
+                    .whiteTitleStyle()
+                
+                Spacer()
+            }
+            .padding()
+        }
+        // Unified Alert logic (optional, but keeps the body shorter)
+        .alert(scoreTitle, isPresented: $showingScore) {
+            Button("Continue", action: askQuestion)
+        } message: {
+            Text("Your score is \(score)")
+        }
+        .alert("Game Over", isPresented: $complete) {
+            Button("Reset", action: reset)
+        } message: {
+            Text("Your final score is \(score) / \(maxTries)")
+        }
+    }
+
+    func flagTapped(_ number: Int) {
+        tries += 1
+        
+        if number == correctAnswer {
+            scoreTitle = "Correct"
+            score += 1
+        } else {
+            scoreTitle = "Wrong! That's the flag of \(countries[number])"
+        }
+
+        if tries &gt;= maxTries {
+            complete = true
+        } else {
+            showingScore = true
+        }
+    }
+
+    func askQuestion() {
+        countries.shuffle()
+        correctAnswer = Int.random(in: 0...2)
+        // Add reset assignments for animations
+        selectedNumber = -1       // Reset selection
+        //Do this here to have an unwinding effect:
+        //rotations = [0.0, 0.0, 0.0] // Reset rotation values safely here
+    }
+
+    func reset() {
+        tries = 0
+        score = 0
+        askQuestion()
+    }
+}
+
+// Reusable components kept outside the main view
+struct FlagImage: View {
+    var name: String
+    var body: some View {
+        Image(name)
+            .clipShape(.rect(cornerRadius: 5))
+            .shadow(radius: 8)
+    }
+}
+
+struct WhiteTitle: ViewModifier {
+    func body(content: Content) -&gt; some View {
+        content
+            .font(.title.bold())
+            .foregroundStyle(.white)
+    }
+}
+
+extension View {
+    func whiteTitleStyle() -&gt; some View {
+        modifier(WhiteTitle())
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 <p>
 <br>
 <hr>
