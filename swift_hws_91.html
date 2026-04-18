@@ -262,7 +262,225 @@ Customization: You can easily add icons or change colors for different difficult
 A quick tip for your code: You can replace <code>let tables = [1, 2, 3...]</code> with <code>let tables = Array(1...12)</code> to keep things concise!
 </p>
 
+<div id="Multiple Tile Selections"><h1 id="Multiple Tile Selections" class="header"><a href="#Multiple Tile Selections">Multiple Tile Selections</a></h1></div>
+
+<div id="Multiple Tile Selections-QUESTION"><h2 id="QUESTION" class="header"><a href="#Multiple Tile Selections-QUESTION">QUESTION</a></h2></div>
+
 <p>
+Is the <code>LazyVGrid</code> able to accept multiple selected 'tiles'?
+Yes, absolutely! Since the <code>LazyVGrid</code> approach uses Buttons rather than a single Picker binding, you can easily switch from tracking one integer to tracking a Set or Array of integers.
+</p>
+
+<div id="Multiple Tile Selections-ANSWER"><h2 id="ANSWER" class="header"><a href="#Multiple Tile Selections-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Here is how you would refactor your code to allow a player to toggle multiple tables at once:
+</p>
+
+<div id="Multiple Tile Selections-ANSWER-The &quot;Multi-Select&quot; Grid Logic"><h3 id="The &quot;Multi-Select&quot; Grid Logic" class="header"><a href="#Multiple Tile Selections-ANSWER-The &quot;Multi-Select&quot; Grid Logic">The "Multi-Select" Grid Logic</a></h3></div>
+
+<p>
+Instead of <code>@State private var selectedTable = 6</code>, you will use a <code>Set</code>. Using a <code>Set</code> is better than an <code>Array</code> here because it automatically prevents duplicates and makes it very fast to check if a specific number is "selected."
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let tables = Array(1...12)
+    
+    // 1. Change to a Set to hold multiple values
+    @State private var selectedTables: Set&lt;Int&gt; = [2, 5, 10] 
+    
+    let columns = Array(repeating: GridItem(.flexible()), count: 6)
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Pick your tables") {
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(tables, id: \.self) { table in
+                            Button {
+                                toggleSelection(for: table)
+                            } label: {
+                                Text("\(table)")
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 40)
+                                    // 2. Check if the set contains the number
+                                    .background(selectedTables.contains(table) ? Color.blue : Color(.systemGray5))
+                                    .foregroundColor(selectedTables.contains(table) ? .white : .primary)
+                                    .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 10)
+                }
+                
+                Section {
+                    Text("Selected: \(selectedTables.sorted().map(String.init).joined(separator: ", "))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Times Tables")
+        }
+    }
+
+    // 3. Logic to add/remove from the Set
+    private func toggleSelection(for table: Int) {
+        if selectedTables.contains(table) {
+            selectedTables.remove(table)
+        } else {
+            selectedTables.insert(table)
+        }
+    }
+}
+</pre>
+
+<div id="Multiple Tile Selections-ANSWER-Why this is better than a standard Picker"><h3 id="Why this is better than a standard Picker" class="header"><a href="#Multiple Tile Selections-ANSWER-Why this is better than a standard Picker">Why this is better than a standard Picker</a></h3></div>
+
+<ul>
+<li>
+Logical Flexibility: In a game context, you might want to allow the player to "Select All" or "Clear All." You can do this simply by modifying the <code>Set</code> with a single button press.
+
+<li>
+Visual Feedback: You can use different colors for different states (e.g., highlighting "Even" numbers in one color and "Odd" in another) which a standard Picker can't do easily.
+
+</ul>
+<p>
+Validation: You can easily add a rule that requires at least one table to be selected by checking <code>if selectedTables.count &gt; 1</code> inside your <code>toggleSelection</code> function.
+</p>
+
+<div id="Multiple Tile Selections-ANSWER-A Small UI Polish Tip"><h3 id="A Small UI Polish Tip" class="header"><a href="#Multiple Tile Selections-ANSWER-A Small UI Polish Tip">A Small UI Polish Tip</a></h3></div>
+
+<p>
+If this is for a game, you might want to add a subtle animation so the tiles "pop" when selected. Just add .animation(.default, value: <code>selectedTables</code>) to the <code>LazyVGrid</code>.
+</p>
+
+<div id="General Overview"><h1 id="General Overview" class="header"><a href="#General Overview">General Overview</a></h1></div>
+
+<div id="General Overview-QUESTION"><h2 id="QUESTION" class="header"><a href="#General Overview-QUESTION">QUESTION</a></h2></div>
+
+<p>
+_I'm going to make a friendly looking game that lets the user select one or more 'times tables' (1 to 12), then the user will be presented with 'number' x 'number' and offered either a text box to enter the answer (or preferably a scroll wheel or something more interactive) to give the integer answer.
+I figure a bank of two rows for picking the times tables along the top, then a big (possible art directed) presentation of the multiplication (8 x 6 for example). If possible, I'd like these to by visual assets.
+What do you think? Is this possible in a reasonably manageable way for someone starting out?_
+</p>
+
+<div id="General Overview-ANSWER"><h2 id="ANSWER" class="header"><a href="#General Overview-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a fantastic project for someone starting out! It touches on all the "big" SwiftUI concepts—State management, Layout (Grids), and User Input—but it's self-contained enough that you won't get overwhelmed.
+</p>
+
+<p>
+It is absolutely manageable. In fact, building it piece-by-piece will teach you more about "App Flow" than any tutorial.
+</p>
+
+<div id="General Overview-ANSWER-The Game Architecture"><h3 id="The Game Architecture" class="header"><a href="#General Overview-ANSWER-The Game Architecture">The Game Architecture</a></h3></div>
+
+<p>
+To keep it manageable, think of your app in three distinct layers:
+</p>
+
+<div id="General Overview-ANSWER-The Game Architecture-1. The Selection &quot;Dashboard&quot; (The Grid)"><h4 id="1. The Selection &quot;Dashboard&quot; (The Grid)" class="header"><a href="#General Overview-ANSWER-The Game Architecture-1. The Selection &quot;Dashboard&quot; (The Grid)">1. The Selection "Dashboard" (The Grid)</a></h4></div>
+
+<p>
+You already have the logic for this! Using the <code>LazyVGrid</code> with a <code>Set&lt;Int&gt;</code> is perfect. It’s clean, responsive, and easy to code.
+</p>
+
+<div id="General Overview-ANSWER-The Game Architecture-2. The Question Engine (The Logic)"><h4 id="2. The Question Engine (The Logic)" class="header"><a href="#General Overview-ANSWER-The Game Architecture-2. The Question Engine (The Logic)">2. The Question Engine (The Logic)</a></h4></div>
+
+<p>
+You’ll need a simple function that:
+</p>
+
+<ul>
+<li>
+Picks a random number from your <code>selectedTables</code> set.
+
+<li>
+Picks another random number from 1 to 12.
+
+<li>
+Calculates the product so it knows if the user is right.
+
+</ul>
+<div id="General Overview-ANSWER-The Game Architecture-3. The &quot;Art Directed&quot; Presentation"><h4 id="3. The &quot;Art Directed&quot; Presentation" class="header"><a href="#General Overview-ANSWER-The Game Architecture-3. The &quot;Art Directed&quot; Presentation">3. The "Art Directed" Presentation</a></h4></div>
+
+<p>
+For the big visual assets, you have two cool options:
+</p>
+
+<ul>
+<li>
+System Fonts: Use <code>Font.system(size: 80, weight: .heavy, design: .rounded)</code>. On macOS/iOS, this looks incredibly professional and "app-like" without needing actual image files.
+
+<li>
+SF Symbols: You can use symbols like <code>xmark</code> for the "times" sign or equal for the equals sign.
+
+</ul>
+<div id="General Overview-ANSWER-An Interactive &quot;Input&quot; Idea"><h3 id="An Interactive &quot;Input&quot; Idea" class="header"><a href="#General Overview-ANSWER-An Interactive &quot;Input&quot; Idea">An Interactive "Input" Idea</a></h3></div>
+
+<p>
+Since you mentioned a <span id="General Overview-ANSWER-An Interactive &quot;Input&quot; Idea-scroll wheel"></span><strong id="scroll wheel">scroll wheel</strong> or something interactive, a <code>Picker</code> with the <code>.wheel</code> style works, but for a game, you might want something more "tactile."
+</p>
+
+<p>
+What about a <span id="General Overview-ANSWER-An Interactive &quot;Input&quot; Idea-Number Pad"></span><strong id="Number Pad">Number Pad</strong> or a <span id="General Overview-ANSWER-An Interactive &quot;Input&quot; Idea-Horizontal Slider"></span><strong id="Horizontal Slider">Horizontal Slider</strong>? For a "friendly" game, a custom number pad allows for big, chunky buttons that feel satisfying to tap.
+</p>
+
+<div id="General Overview-ANSWER-A Starting Template"><h3 id="A Starting Template" class="header"><a href="#General Overview-ANSWER-A Starting Template">A Starting Template</a></h3></div>
+
+<p>
+Here is how you might structure the "Big Question" area to make it look art-directed and professional:
+</p>
+
+<pre swift>
+VStack(spacing: 20) {
+    HStack {
+        NumberCard(number: currentTable)
+        Text("×").font(.system(size: 60, weight: .bold, design: .rounded)).foregroundColor(.orange)
+        NumberCard(number: multiplier)
+    }
+    
+    // The Input Area
+    HStack {
+        Text("=")
+            .font(.system(size: 60, weight: .bold))
+        
+        TextField("?", text: $userAnswer)
+            .keyboardType(.numberPad)
+            .font(.system(size: 60, design: .rounded))
+            .multilineTextAlignment(.center)
+            .frame(width: 120)
+            .background(Color(.systemGray6))
+            .cornerRadius(15)
+    }
+}
+.padding()
+</pre>
+
+<div id="General Overview-ANSWER-Why this is a great &quot;Starter&quot; project:"><h3 id="Why this is a great &quot;Starter&quot; project:" class="header"><a href="#General Overview-ANSWER-Why this is a great &quot;Starter&quot; project:">Why this is a great "Starter" project:</a></h3></div>
+
+<ul>
+<li>
+Iterative Growth: Start with just text. Next week, add the grid. The week after, add a "Score" counter.
+
+<li>
+No Assets Needed: You can do 100% of the "Art Direction" using SwiftUI's <code>Colors</code>, <code>Gradients</code>, and <code>Shadows</code>. You don't need to be a graphic designer to make it look "friendly."
+
+<li>
+Instant Feedback: You can use a simple <code>.alert</code> to tell the user they got it right, which is very satisfying to code.
+
+</ul>
+<div id="General Overview-ANSWER-A Little Design Tip"><h3 id="A Little Design Tip" class="header"><a href="#General Overview-ANSWER-A Little Design Tip">A Little Design Tip</a></h3></div>
+
+<p>
+For that "friendly" look, try using a <span id="General Overview-ANSWER-A Little Design Tip-Linear Gradient"></span><strong id="Linear Gradient">Linear Gradient</strong> as the background of your main view and use the <span id="General Overview-ANSWER-A Little Design Tip-Rounded"></span><strong id="Rounded">Rounded</strong> font design. It instantly moves the app from "utility" to "toy."
+</p>
+
+<p>
+Do you want to see how to write that "Random Question" function so it automatically pulls from whichever tables the user selected in the grid?
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
 
