@@ -996,7 +996,191 @@ For that "friendly" look, try using a <span id="Why this is a great &quot;Starte
 Do you want to see how to write that "Random Question" function so it automatically pulls from whichever tables the user selected in the grid?
 </p>
 
+<div id="Coherent Overview"><h1 id="Coherent Overview" class="header"><a href="#Coherent Overview">Coherent Overview</a></h1></div>
 
+<p>
+Let's look at the "Big Picture" logic, fix a few Swift compiler errors in your code, and clarify the workflow.
+</p>
+
+<div id="Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)"><h2 id="1. The Big Picture Goal (The &quot;Coherent Process&quot;)" class="header"><a href="#Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)">1. The Big Picture Goal (The "Coherent Process")</a></h2></div>
+
+<p>
+Think of your app as a <span id="Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-Loop"></span><strong id="Loop">Loop</strong>. In SwiftUI, the data (State) drives the UI. When the data changes, the UI reacts automatically.
+</p>
+
+<div id="Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-The Workflow:"><h3 id="The Workflow:" class="header"><a href="#Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-The Workflow:">The Workflow:</a></h3></div>
+
+<ul>
+<li>
+Selection: User taps a number in the <code>LazyVGrid</code>.
+
+<li>
+State Update: <code>toggleSelection()</code> runs → <code>selectedTables</code> changes.
+
+<li>
+Observation: <code>.onChange(of: selectedTables)</code> notices the change and calls <code>generateQuestion()</code>.
+
+<li>
+Generation: <code>generateQuestion()</code> picks new values for <code>currentTable</code> and multiplier.
+
+<li>
+Reaction: SwiftUI sees <code>currentTable</code> changed → it redraws the <code>NumberCard</code>.
+
+</ul>
+<div id="Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-2. Fixing the &quot;Broken Links&quot; in your Code"><h3 id="2. Fixing the &quot;Broken Links&quot; in your Code" class="header"><a href="#Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-2. Fixing the &quot;Broken Links&quot; in your Code">2. Fixing the "Broken Links" in your Code</a></h3></div>
+
+<p>
+There are two small things preventing your code from running:
+</p>
+
+<ul>
+<li>
+The Type Mismatch: You defined <code>@State private var userAnswer = 0</code> (an Integer), but your <code>TextField</code> is trying to bind to a String (text: <code>$userAnswer</code>). In <code>generateQuestion</code>, you also try to set it to "".
+
+<ul>
+<li>
+Fix: Change <code>userAnswer</code> to a String.
+
+</ul>
+<li>
+The Initialization: The game starts with <code>7 x 6</code>, but the user might have different tables selected.
+
+<ul>
+<li>
+Fix: Use <code>.onAppear</code> to trigger the first question when the app opens.
+
+</ul>
+</ul>
+<div id="Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-3. The Re-Assembled &quot;Coherent&quot; Code"><h3 id="3. The Re-Assembled &quot;Coherent&quot; Code" class="header"><a href="#Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-3. The Re-Assembled &quot;Coherent&quot; Code">3. The Re-Assembled "Coherent" Code</a></h3></div>
+
+<p>
+Here is your code with those small fixes integrated. I've added comments to show how the "process" flows:
+</p>
+
+<pre swift>
+import SwiftUI
+
+// THE COMPONENT: A reusable "Brick"
+struct NumberCard: View {
+    let number: Int
+    var body: some View {
+        Text("\(number)")
+            .font(.system(size: 80, weight: .heavy, design: .rounded))
+            .frame(width: 120, height: 140)
+            .background(Color.blue.gradient)
+            .foregroundColor(.white)
+            .cornerRadius(20)
+            .shadow(radius: 5)
+    }
+}
+
+struct ContentView: View {
+    // DATA: The "Truth" of the app
+    let tables = Array(1...12)
+    let columns = Array(repeating: GridItem(.flexible()), count: 6)
+    
+    @State private var selectedTables: Set&lt;Int&gt; = [2, 5, 10]
+    @State private var currentTable = 0
+    @State private var multiplier = 0
+    @State private var userAnswer = "" // CHANGED TO STRING
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // INPUT SECTION: Selection
+                Section("Pick your tables") {
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(tables, id: \.self) { table in
+                            Button {
+                                toggleSelection(for: table)
+                            } label: {
+                                Text("\(table)")
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 40)
+                                    .background(selectedTables.contains(table) ? Color.blue : Color(.systemGray5))
+                                    .foregroundColor(selectedTables.contains(table) ? .white : .primary)
+                                    .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                // PRESENTATION SECTION: The "Art Directed" Part
+                Section {
+                    VStack(spacing: 20) {
+                        HStack {
+                            NumberCard(number: currentTable)
+                            Text("×")
+                                .font(.system(size: 60, weight: .bold, design: .rounded))
+                                .foregroundColor(.orange)
+                            NumberCard(number: multiplier)
+                        }
+                        
+                        HStack {
+                            Text("=")
+                                .font(.system(size: 60, weight: .bold))
+                            
+                            TextField("?", text: $userAnswer)
+                                .keyboardType(.numberPad)
+                                .font(.system(size: 60, design: .rounded))
+                                .multilineTextAlignment(.center)
+                                .frame(width: 120)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(15)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Times Tables")
+            // TRIGGER 1: When user changes selection
+            .onChange(of: selectedTables) { 
+                generateQuestion() 
+            }
+            // TRIGGER 2: When app first opens
+            .onAppear { 
+                generateQuestion() 
+            }
+        }
+    }
+
+    // LOGIC: The "Brain"
+    private func toggleSelection(for table: Int) {
+        if selectedTables.contains(table) {
+            if selectedTables.count &gt; 1 { // Safety: don't allow 0 selected
+                selectedTables.remove(table)
+            }
+        } else {
+            selectedTables.insert(table)
+        }
+    }
+    
+    func generateQuestion() {
+        if let randomTable = selectedTables.randomElement() {
+            currentTable = randomTable
+            multiplier = Int.random(in: 1...12)
+            userAnswer = "" 
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-What happens next?"><h3 id="What happens next?" class="header"><a href="#Coherent Overview-1. The Big Picture Goal (The &quot;Coherent Process&quot;)-What happens next?">What happens next?</a></h3></div>
+
+<p>
+You now have a "Selection" phase and a "Question" phase. The final logical piece you'll eventually need is the Verification phase:
+</p>
+
+<ul>
+<li>
+Checking if <code>Int(userAnswer) == currentTable * multiplier</code>.
+
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
