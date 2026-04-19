@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_95</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_94.html">Hacking With Swift - 94 - Sharing SwiftUI state with @Observable</a>
+
+</ul>
+<div id="Hacking With Swift - 95 - Showing and hiding views"><h1 id="Hacking With Swift - 95 - Showing and hiding views" class="header"><a href="#Hacking With Swift - 95 - Showing and hiding views">Hacking With Swift - 95 - Showing and hiding views</a></h1></div>
+
+<p>
+There are several ways of showing views in SwiftUI, and one of the most basic is a <em>sheet</em>: a new view presented on top of our existing one. On iOS this automatically gives us a card-like presentation where the current view slides away into the distance a little and the new view animates in on top.
+</p>
+
+<p>
+Sheets work much like alerts, in that we don’t present them directly with code such as <code>mySheet.present()</code> or similar. Instead, we define the <em>conditions</em> under which a sheet should be shown, and when those conditions become true or false the sheet will either be presented or dismissed respectively.
+</p>
+
+<p>
+Let’s start with a simple example, which will be showing one view from another using a sheet. First, we create the view we want to show inside a sheet, like this:
+</p>
+
+<pre swift>
+struct SecondView: View {
+    var body: some View {
+        Text("Second View")
+    }
+}
+</pre>
+
+<p>
+There’s nothing special about that view at all – it doesn’t know it’s going to be shown in a sheet, and doesn’t <code>need</code> to know it’s going to be shown in a sheet.
+</p>
+
+<p>
+Next we create our initial view, which will show the second view. We’ll make it simple, then add to it:
+</p>
+
+<pre swift>
+struct ContentView: View { 
+    var body: some View {
+        Button("Show Sheet") {
+            // show the sheet
+        }
+    }
+}
+</pre>
+
+<p>
+Filling that in requires four steps, and we’ll tackle them individually.
+</p>
+
+<p>
+First, we need some state to track whether the sheet is showing. Just as with alerts, this can be a simple Boolean, so add this property to <code>ContentView</code> now:
+</p>
+
+<pre swift>
+@State private var showingSheet = false
+</pre>
+
+<p>
+Second, we need to toggle that when our button is tapped, so replace the <code>// show the sheet</code> comment with this:
+</p>
+
+<pre swift>
+showingSheet.toggle()
+</pre>
+
+<p>
+Third, we need to attach our sheet somewhere to our view hierarchy. If you remember, we show alerts using <code>isPresented</code> with a two-way binding to our state property, and we use something almost identical here: <code>sheet(isPresented:)</code>.
+</p>
+
+<p>
+<code>sheet()</code> is a modifier just like <code>alert()</code>, so please add this modifier to our button now:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingSheet) {
+    // contents of the sheet
+}
+</pre>
+
+<p>
+Fourth, we need to decide what should actually be in the sheet. In our case, we already know exactly what we want: we want to create and show an instance of <code>SecondView</code>. In code that means writing <code>SecondView()</code>, then… er… well, that’s it.
+</p>
+
+<p>
+So, the finished <code>ContentView</code> struct should look like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var showingSheet = false
+
+    var body: some View {
+        Button("Show Sheet") {
+            showingSheet.toggle()
+        }
+        .sheet(isPresented: $showingSheet) {
+            SecondView()
+        }
+    }
+}
+</pre>
+
+<p>
+If you run the program now you’ll see you can tap the button to have our second view slide upwards from the bottom, and you can then drag that down to dismiss it.
+</p>
+
+<p>
+When you create a view like this, you can pass in any parameters it needs to work. For example, we could require that <code>SecondView</code> be sent a name it can display, like this:
+</p>
+
+<pre swift>
+struct SecondView: View {
+    let name: String
+
+    var body: some View {
+        Text("Hello, \(name)!")
+    }
+}
+</pre>
+
+<p>
+And now just using <code>SecondView()</code> in our sheet isn’t good enough – we need to pass in a name string to be shown. For example, we could pass in my Twitter username like this:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingSheet) {
+    SecondView(name: "@twostraws")
+}
+</pre>
+
+<p>
+Now the sheet will show “Hello, @twostraws”.
+</p>
+
+<p>
+Swift is doing a ton of work on our behalf here: as soon as we said that <code>SecondView</code> has a name property, Swift ensured that our code wouldn’t even build until all instances of <code>SecondView()</code> became <code>SecondView(name: "some name")</code>, which eliminates a whole range of possible errors.
+</p>
+
+<p>
+Before we move on, there’s one more thing I want to demonstrate, which is how to make a view dismiss itself. Yes, you’ve seen that the user can just swipe downwards, but sometimes you will want to dismiss views programmatically – to make the view go away because a button was pressed, for example.
+</p>
+
+<p>
+To dismiss another view we need another property wrapper – and yes, I realize that so often the solution to a problem in SwiftUI is to use another property wrapper.
+</p>
+
+<p>
+Anyway, this new one is called <code>@Environment</code>, and it allows us to create properties that store values provided to us externally. Is the user in light mode or dark mode? Have they asked for smaller or larger fonts? What timezone are they on? All these and more are values that come from the environment, and in this instance we’re going to ask the environment to dismiss our view.
+</p>
+
+<p>
+Yes, we need to ask the environment to dismiss our view, because it might have been presented in any number of different ways. So, we’re effectively saying “hey, figure out how my view was presented, then dismiss it appropriately.”
+</p>
+
+<p>
+To try it out add this property to <code>SecondView</code>, which creates a property called <code>dismiss</code> based on a value from the environment:
+</p>
+
+<pre swift>
+@Environment(\.dismiss) var dismiss
+</pre>
+
+<p>
+Now replace the text view in <code>SecondView</code> with this button:
+</p>
+
+<pre swift>
+Button("Dismiss") {
+    dismiss()
+}
+</pre>
+
+<p>
+Anyway, with that button in place, you should now find you can show and hide the sheet using button presses.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
