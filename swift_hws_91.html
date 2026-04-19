@@ -1765,6 +1765,188 @@ struct ContentView: View {
 </pre>
 
 </ul>
+<div id="Heavily Commented"><h1 id="Heavily Commented" class="header"><a href="#Heavily Commented">Heavily Commented</a></h1></div>
+
+<pre swift>
+import SwiftUI
+
+// THE COMPONENT: A reusable "Brick"
+// A View struct to define the large Number tiles:
+struct NumberCard: View {
+    // This is the 'number' argument to feed in as the Text item:
+    let number: Int
+    var body: some View {
+        Text("\(number)")
+            .font(.system(size: 80, weight: .heavy, design: .rounded))
+            .frame(width: 120, height: 140)
+            .background(Color.blue.gradient)
+            .foregroundColor(.white)
+            .cornerRadius(20)
+            .shadow(radius: 5)
+    }
+}
+
+struct ContentView: View {
+    
+    // Times Tables to draw from
+    let tables = Array(1...12)
+    // Array of grid objects (6 grid items in a flexible format)
+    let columns = Array(repeating: GridItem(.flexible()), count: 6)
+    
+    // A set to hold the 'selected' times tables (from the picker)
+    // with a default (starting) list of 6, 7, 8
+    @State private var selectedTables: Set&lt;Int&gt; = [6, 7, 8]
+    // This variable will hold the current 'table' based question number
+    @State private var currentTable = 0
+    // This is the random second number for the question
+    @State private var multiplier = 0
+    // Default answer (to set picker to before user entry)
+    @State private var userAnswer = 73
+
+    // Alert (view) boolean
+    @State private var showingAlert = false
+    // Alert box title (default - empty)
+    @State private var alertTitle = ""
+    // Alert mesage (default - empty)
+    [[@State]] private var alertMessage = ""
+
+    var body: some View {
+        NavigationStack {
+            // Adding stack for background gradient
+            ZStack {
+                LinearGradient(colors: [.blue.opacity(0.9), .blue.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+                // Start form stack
+                Form {
+                    // Tables picker (with section title):
+                    Section("Pick your tables") {
+                        // Grid of grid objects arranged as buttons
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            // Set and track each button (with 1-12 times table options)
+                            ForEach(tables, id: \.self) { table in
+                                Button {
+                                    toggleSelection(for: table)
+                                } label: {
+                                    Text("\(table)")
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 40)
+                                        .background(selectedTables.contains(table) ? Color.blue : Color(.systemGray5))
+                                        .foregroundColor(selectedTables.contains(table) ? .white : .primary)
+                                        .cornerRadius(8)
+                                }
+                                // Style of LazyVGrid buttons
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    
+                    // The 'question' section
+                    Section {
+                        VStack(spacing: 10) {
+                            // The Big Question
+                            HStack {
+                                // The NumberCard struct/View
+                                NumberCard(number: currentTable)
+                                // A multiplication sign
+                                Text("×").font(.system(size: 90, weight: .bold)).foregroundColor(.orange)
+                                // The second NumberCard struct/View
+                                NumberCard(number: multiplier)
+                                // Removed/optional equals sign
+                                //Text("=").font(.system(size: 40, weight: .bold))
+                            }
+                            
+                            // 2. THE WHEEL PICKER
+                            // We iterate from 0 to 150 to provide all possible answers
+                            Picker("Select Answer", selection: $userAnswer) {
+                                ForEach(0...150, id: \.self) { number in
+                                    Text("\(number)").font(.title)
+                                    // We apply a bold design here, though scaleEffect does the heavy lifting
+                                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .scaleEffect(1.5)            // This makes the text and the wheel itself 50% larger
+                            .frame(height: 180)          // We increase the frame to account for the scale
+                            .clipped()                   // Prevents the scaled wheel from overlapping other UI elements
+                            
+                            // 3. THE REINSTATED CHECK BUTTON
+                            Button(action: checkAnswer) {
+                                Text("Check Answer")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.orange.gradient)
+                                    .cornerRadius(15)
+                                    .shadow(radius: 3)
+                            }
+                            .padding(.top, 10)
+                        }
+                        .padding(.vertical)
+                    }
+                }
+                .scrollContentBackground(.hidden) // &lt;--- THIS IS TO SEE THE GRADIENT BEHIND THE FORM VIEW
+                .navigationTitle("Times Tables")
+                .onChange(of: selectedTables) { generateQuestion() }
+                .onAppear { generateQuestion() }
+                .alert(alertTitle, isPresented: $showingAlert) {
+                    Button("Next Question", action: generateQuestion)
+                } message: {
+                    Text(alertMessage)
+                }
+            }
+        }
+    }
+
+    // --- LOGIC REMAINS THE SAME, BUT CLEANER ---
+
+    private func toggleSelection(for table: Int) {
+        if selectedTables.contains(table) {
+            if selectedTables.count &gt; 1 { selectedTables.remove(table) }
+        } else {
+            selectedTables.insert(table)
+        }
+    }
+    
+    func generateQuestion() {
+        withAnimation(.easeInOut(duration: 0.5)) {
+            if let randomTable = selectedTables.randomElement() {
+                currentTable = randomTable
+                multiplier = Int.random(in: 1...12)
+                // Randomly flip numbers in interface
+                if Bool.random() {
+                    (currentTable, multiplier) = (multiplier, currentTable)
+                }
+                //userAnswer = 0 // Reset the wheel to 0 for each new question
+                // Start the wheel at the Table number times 2
+                // Just as a "friendly" head start!
+                // Your Ternary Logic here (with catch if the set is empty!)
+                let maxPossible = tables.max() ?? 12
+                userAnswer = (currentTable * (maxPossible / 2) &lt;= maxPossible * 6) ? (currentTable * 6) + 1 : 73            }
+        }
+    }
+    
+    func checkAnswer() {
+        let actualAnswer = currentTable * multiplier
+        
+        // No need to convert String to Int anymore!
+        if userAnswer == actualAnswer {
+            alertTitle = "Correct!"
+            alertMessage = "You got it! \(currentTable) x \(multiplier) is \(actualAnswer)."
+        } else {
+            alertTitle = "Not quite"
+            alertMessage = "The answer was \(actualAnswer). Try the next one!"
+        }
+        showingAlert = true
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 <p>
 <br>
 <hr>
