@@ -1181,6 +1181,171 @@ You now have a "Selection" phase and a "Question" phase. The final logical piece
 Checking if <code>Int(userAnswer) == currentTable * multiplier</code>.
 
 </ul>
+<div id="Game Completion"><h1 id="Game Completion" class="header"><a href="#Game Completion">Game Completion</a></h1></div>
+
+<p>
+There's no 'enter' or check functionality right now. Can we clean up the user entry, and incorporate the answer check?
+</p>
+
+<p>
+To turn this from a static screen into a playable game, we need to add a "Check" mechanism. Since you are using a <code>.numberPad</code> keyboard, there isn't a built-in "Return" key, so adding a prominent <code>"Check Answer"</code> button is the best way to go.
+</p>
+
+<p>
+Here is the plan to clean up the UI and implement the logic:
+</p>
+
+<div id="Game Completion-1. The Logic Goal: The &quot;Verification&quot; Phase"><h3 id="1. The Logic Goal: The &quot;Verification&quot; Phase" class="header"><a href="#Game Completion-1. The Logic Goal: The &quot;Verification&quot; Phase">1. The Logic Goal: The "Verification" Phase</a></h3></div>
+
+<p>
+We need a way to compare the user's input to the actual math.
+</p>
+
+<ul>
+<li>
+The Math: <code>currentTable * multiplier</code>.
+
+<li>
+The Input: <code>Int(userAnswer)</code> (we have to convert the text to a number).
+
+<li>
+The Feedback: We’ll use a simple <span id="Game Completion-1. The Logic Goal: The &quot;Verification&quot; Phase-Alert"></span><strong id="Alert">Alert</strong> to tell the user if they're right or wrong.
+
+</ul>
+<div id="Game Completion-2. The Cleaned-Up &quot;Input Area&quot;"><h3 id="2. The Cleaned-Up &quot;Input Area&quot;" class="header"><a href="#Game Completion-2. The Cleaned-Up &quot;Input Area&quot;">2. The Cleaned-Up "Input Area"</a></h3></div>
+
+<p>
+I've added a <span id="Game Completion-2. The Cleaned-Up &quot;Input Area&quot;-Button"></span><strong id="Button">Button</strong> below the TextField. I've also added a small logic check: if the user hasn't typed anything, the button is disabled.
+</p>
+
+<pre swift>
+HStack {
+    Text("=")
+        .font(.system(size: 60, weight: .bold))
+    
+    TextField("?", text: $userAnswer)
+        .keyboardType(.numberPad)
+        .font(.system(size: 60, design: .rounded))
+        .multilineTextAlignment(.center)
+        .frame(width: 120)
+        .background(Color(.systemGray6))
+        .cornerRadius(15)
+}
+
+// THE NEW CHECK BUTTON
+Button(action: checkAnswer) {
+    Text("Check Answer")
+        .font(.headline)
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(userAnswer.isEmpty ? Color.gray : Color.orange)
+        .foregroundColor(.white)
+        .cornerRadius(12)
+}
+.disabled(userAnswer.isEmpty)
+.padding(.top)
+</pre>
+
+<div id="Game Completion-3. Handling the Feedback"><h3 id="3. Handling the Feedback" class="header"><a href="#Game Completion-3. Handling the Feedback">3. Handling the Feedback</a></h3></div>
+
+<p>
+To show the alert, we need two new <code>@State</code> variables at the top of your <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var showingAlert = false
+@State private var alertTitle = ""
+@State private var alertMessage = ""
+</pre>
+
+<p>
+And then, add the <code>checkAnswer</code> function below your <code>generateQuestion</code> function:
+</p>
+
+<pre swift>
+func checkAnswer() {
+    // Convert the string answer to an integer
+    let actualAnswer = currentTable * multiplier
+    let typedAnswer = Int(userAnswer) ?? 0 // if it's not a number, treat as 0
+    
+    if typedAnswer == actualAnswer {
+        alertTitle = "Correct!"
+        alertMessage = "Well done! Let's try another."
+    } else {
+        alertTitle = "Not quite"
+        alertMessage = "The answer was \(actualAnswer). Keep going!"
+    }
+    
+    showingAlert = true
+}
+</pre>
+
+<div id="Game Completion-4. Putting it all together (The &quot;Game Loop&quot;)"><h3 id="4. Putting it all together (The &quot;Game Loop&quot;)" class="header"><a href="#Game Completion-4. Putting it all together (The &quot;Game Loop&quot;)">4. Putting it all together (The "Game Loop")</a></h3></div>
+
+<p>
+The final touch is attaching the alert to your view so it pops up, and then calling <code>generateQuestion()</code> when the user dismisses the alert.
+</p>
+
+<p>
+Add this to the end of your <code>NavigationStack</code>:
+</p>
+
+<pre swift>
+.alert(alertTitle, isPresented: $showingAlert) {
+    Button("Next Question", action: generateQuestion)
+} message: {
+    Text(alertMessage)
+}
+</pre>
+
+<div id="Game Completion-How the Full Logic Now Flows:"><h2 id="How the Full Logic Now Flows:" class="header"><a href="#Game Completion-How the Full Logic Now Flows:">How the Full Logic Now Flows:</a></h2></div>
+
+<ul>
+<li>
+User sees: <code>7 x 6</code>.
+
+<li>
+User types: <code>42</code> in the <code>TextField</code>.
+
+<li>
+User taps: <code>Check Answer</code>.
+
+<li>
+Swift runs: <code>checkAnswer()</code>. It compares 42 to 7×6.
+
+<li>
+Swift shows: An Alert saying "Correct!".
+
+<li>
+User taps: "Next Question" in the alert.
+
+<li>
+Swift runs: <code>generateQuestion()</code>, which picks new numbers and <span id="Game Completion-How the Full Logic Now Flows:-clears the text field"></span><strong id="clears the text field">clears the text field</strong>.
+
+</ul>
+<div id="Game Completion-How the Full Logic Now Flows:-A Small &quot;Entry&quot; Cleanup"><h3 id="A Small &quot;Entry&quot; Cleanup" class="header"><a href="#Game Completion-How the Full Logic Now Flows:-A Small &quot;Entry&quot; Cleanup">A Small "Entry" Cleanup</a></h3></div>
+
+<p>
+Using <code>TextField</code> for numbers can sometimes be finicky. Because you want a "friendly" game, you might notice the keyboard covers the "Check Answer" button on smaller iPhones.
+</p>
+
+<p>
+<span id="Game Completion-How the Full Logic Now Flows:-A Small &quot;Entry&quot; Cleanup-Pro Tip"></span><strong id="Pro Tip">Pro Tip</strong>: You can add a "Done" button to the keyboard toolbar to make it easier to dismiss:
+</p>
+
+<pre swift>
+.toolbar {
+    ToolbarItemGroup(placement: .keyboard) {
+        Spacer()
+        Button("Done") {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+    }
+}
+</pre>
+
+
+
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
