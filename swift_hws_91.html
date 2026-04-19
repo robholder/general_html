@@ -1810,7 +1810,7 @@ struct ContentView: View {
     // Alert box title (default - empty)
     @State private var alertTitle = ""
     // Alert mesage (default - empty)
-    [[@State]] private var alertMessage = ""
+    @State private var alertMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -1889,8 +1889,11 @@ struct ContentView: View {
                 }
                 .scrollContentBackground(.hidden) // &lt;--- THIS IS TO SEE THE GRADIENT BEHIND THE FORM VIEW
                 .navigationTitle("Times Tables")
+                // Look for changes on 'selectedTables' variable and call function
                 .onChange(of: selectedTables) { generateQuestion() }
+                // Call generateQuestion when this view appears
                 .onAppear { generateQuestion() }
+                // Set trigger for alert message when alert show is true
                 .alert(alertTitle, isPresented: $showingAlert) {
                     Button("Next Question", action: generateQuestion)
                 } message: {
@@ -1903,28 +1906,44 @@ struct ContentView: View {
     // --- LOGIC REMAINS THE SAME, BUT CLEANER ---
 
     private func toggleSelection(for table: Int) {
+        //"If this table is already active, try to turn it off (but only if
+        // it's not the only one active). Otherwise, turn it on."
+        // Function to look at each table candidate (selected) and manage set list
+        // If table was selected, deselect, but only if there is one or more selected
+        // to prevent a zero length set crash
         if selectedTables.contains(table) {
             if selectedTables.count &gt; 1 { selectedTables.remove(table) }
         } else {
+            // Add table number to set
             selectedTables.insert(table)
         }
     }
     
     func generateQuestion() {
         withAnimation(.easeInOut(duration: 0.5)) {
+            //"Try to grab a random number. If you actually find one, name it
+            //'randomTable' and run the code inside these braces. If the bag is
+            //empty, just skip the whole thing and do nothing."
             if let randomTable = selectedTables.randomElement() {
+                // Derive maximum multiplier number from tables array
+                let maxPossible = tables.max() ?? 12
+                
                 currentTable = randomTable
-                multiplier = Int.random(in: 1...12)
+                multiplier = Int.random(in: 1...maxPossible)
+                
                 // Randomly flip numbers in interface
                 if Bool.random() {
                     (currentTable, multiplier) = (multiplier, currentTable)
                 }
-                //userAnswer = 0 // Reset the wheel to 0 for each new question
-                // Start the wheel at the Table number times 2
-                // Just as a "friendly" head start!
-                // Your Ternary Logic here (with catch if the set is empty!)
-                let maxPossible = tables.max() ?? 12
-                userAnswer = (currentTable * (maxPossible / 2) &lt;= maxPossible * 6) ? (currentTable * 6) + 1 : 73            }
+                // Calculate the Wheel Starting Position
+                // Using your ternary logic:
+                // If the start position is within a reasonable range, use it; otherwise, go to 73.
+                let proposedStart = (currentTable * 6) + 1
+                let limit = maxPossible * 6
+                
+                userAnswer = (proposedStart &lt;= limit) ? proposedStart : 73
+                }
+            }
         }
     }
     
