@@ -1433,7 +1433,6 @@ User taps "Check Answer": The alert pops up, and the keyboard stays or dismisses
 <p>
 When the user gets the answer right and taps "Next Question," you might want the keyboard to disappear. You can add this tiny helper to your <code>generateQuestion()</code> function:
 </p>
-
 <pre swift>
 func generateQuestion() {
     // ... your existing code ...
@@ -1445,6 +1444,287 @@ func generateQuestion() {
 
 <p>
 Does moving the button to the "Keyboard Toolbar" feel like a better user experience for your player?
+</p>
+
+<div id="Game Completion-In Context"><h2 id="In Context" class="header"><a href="#Game Completion-In Context">In Context</a></h2></div>
+
+<pre swift>
+import SwiftUI
+
+// THE COMPONENT: A reusable "Brick"
+struct NumberCard: View {
+    let number: Int
+    var body: some View {
+        Text("\(number)")
+            .font(.system(size: 80, weight: .heavy, design: .rounded))
+            .frame(width: 120, height: 140)
+            .background(Color.blue.gradient)
+            .foregroundColor(.white)
+            .cornerRadius(20)
+            .shadow(radius: 5)
+    }
+}
+
+struct ContentView: View {
+    // DATA: The "Truth" of the app
+    let tables = Array(1...12)
+    let columns = Array(repeating: GridItem(.flexible()), count: 6)
+    
+    @State private var selectedTables: Set&lt;Int&gt; = [2, 5, 10]
+    @State private var currentTable = 0
+    @State private var multiplier = 0
+    @State private var userAnswer = "" // CHANGED TO STRING
+    
+    @State private var showingAlert = false
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+
+    var body: some View {
+            NavigationStack {
+                Form {
+                    // INPUT SECTION: Selection
+                    Section("Pick your tables") {
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            ForEach(tables, id: \.self) { table in
+                                Button {
+                                    toggleSelection(for: table)
+                                } label: {
+                                    Text("\(table)")
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 40)
+                                        .background(selectedTables.contains(table) ? Color.blue : Color(.systemGray5))
+                                        .foregroundColor(selectedTables.contains(table) ? .white : .primary)
+                                        .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    
+                    // PRESENTATION SECTION
+                    Section {
+                        VStack(spacing: 20) {
+                            HStack {
+                                NumberCard(number: currentTable)
+                                Text("×")
+                                    .font(.system(size: 60, weight: .bold, design: .rounded))
+                                    .foregroundColor(.orange)
+                                NumberCard(number: multiplier)
+                            }
+                            
+                            HStack {
+                                Text("=")
+                                    .font(.system(size: 60, weight: .bold))
+                                
+                                TextField("?", text: $userAnswer)
+                                    .keyboardType(.numberPad)
+                                    .font(.system(size: 60, design: .rounded))
+                                    .multilineTextAlignment(.center)
+                                    .frame(width: 120)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(15)
+                                    .toolbar {
+                                        ToolbarItemGroup(placement: .keyboard) {
+                                            Spacer()
+                                            Button("Check Answer") {
+                                                checkAnswer()
+                                            }
+                                            .fontWeight(.bold)
+                                            .disabled(userAnswer.isEmpty)
+                                        }
+                                    }
+                            }
+                            .padding()
+                        }
+                    }
+                }
+                .navigationTitle("Times Tables")
+                // --- MODIFIERS ATTACHED TO NAVIGATIONSTACK ---
+                .onChange(of: selectedTables) {
+                    generateQuestion()
+                }
+                .onAppear {
+                    generateQuestion()
+                }
+                // THIS IS THE MISSING ALERT CODE:
+                .alert(alertTitle, isPresented: $showingAlert) {
+                    Button("Next Question", action: generateQuestion)
+                } message: {
+                    Text(alertMessage)
+                }
+            }
+    }
+    // LOGIC: The "Brain"
+    private func toggleSelection(for table: Int) {
+        if selectedTables.contains(table) {
+            if selectedTables.count &gt; 1 { // Safety: don't allow 0 selected
+                selectedTables.remove(table)
+            }
+        } else {
+            selectedTables.insert(table)
+        }
+    }
+    
+    func generateQuestion() {
+        if let randomTable = selectedTables.randomElement() {
+            currentTable = randomTable
+            multiplier = Int.random(in: 1...12)
+            userAnswer = ""
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+
+        }
+    }
+    
+    func checkAnswer() {
+        // Convert the string answer to an integer
+        let actualAnswer = currentTable * multiplier
+        let typedAnswer = Int(userAnswer) ?? 0 // if it's not a number, treat as 0
+        
+        if typedAnswer == actualAnswer {
+            alertTitle = "Correct!"
+            alertMessage = "Well done! Let's try another."
+        } else {
+            alertTitle = "Not quite"
+            alertMessage = "The answer was \(actualAnswer). Keep going!"
+        }
+        
+        showingAlert = true
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="More Refinement"><h1 id="More Refinement" class="header"><a href="#More Refinement">More Refinement</a></h1></div>
+
+<div id="More Refinement-A Better Way to &quot;Check Answer&quot;"><h2 id="A Better Way to &quot;Check Answer&quot;" class="header"><a href="#More Refinement-A Better Way to &quot;Check Answer&quot;">A Better Way to "Check Answer"</a></h2></div>
+
+<p>
+Since the keyboard was covering your button, and you're dealing with the quirks of the <code>.numberPad</code>, let's make the "Check" functionality feel more like a real game.
+</p>
+
+<p>
+If you don't like the look of the "Toolbar" (which can sometimes look a bit tiny), you can use a ZStack. This allows you to place your "Check Answer" button at the very bottom of the screen, floating above the keyboard.
+</p>
+
+<ol>
+<li>
+The "Clean" Final Layout
+
+</ol>
+<p>
+Here is a refined version of your body that handles the keyboard professionally and keeps your "Art Directed" numbers front and center:
+</p>
+
+<p>
+Swift
+var body: some View {
+</p>
+<pre><code>NavigationStack {
+// Use a ZStack so the button can float
+ZStack(alignment: .bottom) {
+ScrollView {
+VStack(spacing: 30) {
+// 1. GRID SECTION
+SectionHeader(title: "Pick your tables")
+LazyVGrid(columns: columns, spacing: 10) {
+ForEach(tables, id: \.self) { table in
+TableButton(table: table, isSelected: selectedTables.contains(table)) {
+toggleSelection(for: table)
+}
+}
+}
+.padding(.horizontal)
+</code></pre>
+<pre><code>// 2. QUESTION SECTION
+VStack(spacing: 20) {
+HStack {
+NumberCard(number: currentTable)
+Text("×").font(.system(size: 60, weight: .bold, design: .rounded)).foregroundColor(.orange)
+NumberCard(number: multiplier)
+}
+</code></pre>
+<pre><code>HStack {
+Text("=").font(.system(size: 60, weight: .bold))
+TextField("?", text: $userAnswer)
+.keyboardType(.numberPad)
+.font(.system(size: 60, design: .rounded))
+.multilineTextAlignment(.center)
+.frame(width: 140)
+.background(Color(.systemGray6))
+.cornerRadius(15)
+}
+}
+// This creates space at the bottom so the ScrollView 
+// doesn't hide content behind the button
+Spacer(minLength: 100)
+}
+}
+
+// 3. FLOATING CHECK BUTTON
+Button(action: checkAnswer) {
+Text("Check Answer")
+.font(.title2)
+.fontWeight(.bold)
+.frame(maxWidth: .infinity)
+.padding()
+.background(userAnswer.isEmpty ? Color.gray : Color.orange)
+.foregroundColor(.white)
+.cornerRadius(15)
+.shadow(radius: 5)
+}
+.disabled(userAnswer.isEmpty)
+.padding()
+.background(.ultraThinMaterial) // Makes the area behind the button blurry
+}
+.navigationTitle("Times Tables")
+.alert(alertTitle, isPresented: $showingAlert) {
+Button("Next Question", action: generateQuestion)
+} message: {
+Text(alertMessage)
+}
+.onAppear(perform: generateQuestion)
+}
+</code></pre>
+<p>
+}
+Why this is a "Pro" move:
+</p>
+
+<p>
+.ultraThinMaterial: This gives you that "Apple-style" blurred background behind the button, so you can still see the grid scrolling behind it.
+</p>
+
+<p>
+ZStack(alignment: .bottom): By putting the ScrollView and the Button in a ZStack, the button stays stuck to the bottom of the screen.
+</p>
+
+<p>
+Keyboard Handling: SwiftUI automatically pushes the bottom of a ZStack up when the keyboard appears. This means your "Check Answer" button will now automatically "ride" the top of the keyboard.
+</p>
+
+<p>
+One last tip for your generateQuestion
+</p>
+
+<p>
+To make the transition smooth, make sure generateQuestion clears the answer:
+</p>
+
+<p>
+Swift
+func generateQuestion() {
+</p>
+<pre><code>if let randomTable = selectedTables.randomElement() {
+currentTable = randomTable
+multiplier = Int.random(in: 1...12)
+userAnswer = "" // This clears the text field for the next turn
+}
+</code></pre>
+<p>
+}
 </p>
 
 <p>
