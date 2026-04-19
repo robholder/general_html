@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_94</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_93.html">Hacking With Swift - 93 - Using @State with classes</a>
+
+</ul>
+<div id="Hacking With Swift - 94 - Sharing SwiftUI state with @Observable"><h1 id="Hacking With Swift - 94 - Sharing SwiftUI state with @Observable" class="header"><a href="#Hacking With Swift - 94 - Sharing SwiftUI state with @Observable">Hacking With Swift - 94 - Sharing SwiftUI state with @Observable</a></h1></div>
+
+<p>
+If you use <code>@State</code> with a struct, your SwiftUI view will update automatically when a value changes.
+</p>
+
+<p>
+But if you use <code>@State</code> with a class then you must mark that class with <code>@Observable</code> if you want SwiftUI to watch its contents for changes.
+</p>
+
+<p>
+To understand what's going on, let's take a look at this code in more detail:
+</p>
+
+<pre swift>
+@Observable
+class User {
+    var firstName = "Bilbo"
+    var lastName = "Baggins"
+}
+</pre>
+
+<p>
+This is a class with two string variables, but it starts with <code>@Observable</code>. That tells SwiftUI to watch each individual property inside the class for changes, and reload any view that relies on a property when it changes. I know that might sound a bit like magic, but it's not – it's just a whole lot of work carefully hidden.
+</p>
+
+<p>
+I want to dig in a little here so you can see what's really happening, and to do that I'd like you to add another <code>import</code> line to the top, next to <code>import SwiftUI</code>:
+</p>
+
+<pre swift>
+import Observation
+</pre>
+
+<p>
+That <code>@Observable</code> line is a macro, which is Swift's way of quietly rewriting our code to add extra functionality. Now that we've imported the framework it comes from, Xcode can do something really neat: if you right-click on <code>@Observable</code> in your code, you can choose Expand Macro to see exactly what rewriting is happening – Xcode will show you all the hidden code that's being generated.
+</p>
+
+<p>
+The whole expansion is below, but I do want to point out three things:
+</p>
+
+<ul>
+<li>
+Our two properties are marked <code>@ObservationTracked</code>, which means Swift and SwiftUI are watching them for changes.
+
+<li>
+If you right-click on <code>@ObservationTracked</code> you can expand that macro too – yes, it's a macro inside a macro. This macro has the job of tracking whenever any property is read or written, so that SwiftUI can update only views that absolutely need to be refreshed.
+
+<li>
+Our class is made to conform to the Observable protocol. This is important, because some parts of SwiftUI look for this to mean "this class can be watched for changes."
+
+</ul>
+<p>
+All three of those are important, but it's the middle one that is doing the heavy lifting: iOS keeps track of every SwiftUI view that reads properties from an <code>@Observed</code> object, so that when a property changes it can intelligently update all the views that depend on it while leaving the others unchanged.
+</p>
+
+<p>
+When working with structs, the <code>@State</code> property wrapper keeps a value alive and also watches it for changes. On the other hand, when working with classes, <code>@State</code> is just there for keeping object alive – all the watching for changes and updating the view is taken care of by @Observable.
+</p>
+
+
+<div id="Expanded Macro"><h1 id="Expanded Macro" class="header"><a href="#Expanded Macro">Expanded Macro</a></h1></div>
+
+<pre swift>
+@Observable
+class User {
+
+@ObservationTracked
+    var firstName = "Bilbo"
+@ObservationTracked
+    var lastName = "Baggins"
+    
+@ObservationIgnored private let _$observationRegistrar = Observation.ObservationRegistrar()
+
+internal nonisolated func access&lt;$s8iExpense4User10ObservablefMm_6MemberfMu_&gt;(
+  keyPath: KeyPath&lt;User, $s8iExpense4User10ObservablefMm_6MemberfMu_&gt;
+) {
+  _$observationRegistrar.access(self, keyPath: keyPath)
+}
+
+internal nonisolated func withMutation&lt;$s8iExpense4User10ObservablefMm_6MemberfMu0_, $s8iExpense4User10ObservablefMm_14MutationResultfMu_&gt;(
+  keyPath: KeyPath&lt;User, $s8iExpense4User10ObservablefMm_6MemberfMu0_&gt;,
+  _ mutation: () throws -&gt; $s8iExpense4User10ObservablefMm_14MutationResultfMu_
+) rethrows -&gt; $s8iExpense4User10ObservablefMm_14MutationResultfMu_ {
+  try _$observationRegistrar.withMutation(of: self, keyPath: keyPath, mutation)
+}
+
+private nonisolated func shouldNotifyObservers&lt;$s8iExpense4User10ObservablefMm_6MemberfMu1_&gt;(_ lhs: $s8iExpense4User10ObservablefMm_6MemberfMu1_, _ rhs: $s8iExpense4User10ObservablefMm_6MemberfMu1_) -&gt; Bool {
+    true
+}
+
+private nonisolated func shouldNotifyObservers&lt;$s8iExpense4User10ObservablefMm_6MemberfMu2_: Equatable&gt;(_ lhs: $s8iExpense4User10ObservablefMm_6MemberfMu2_, _ rhs: $s8iExpense4User10ObservablefMm_6MemberfMu2_) -&gt; Bool {
+    lhs != rhs
+}
+
+private nonisolated func shouldNotifyObservers&lt;$s8iExpense4User10ObservablefMm_6MemberfMu3_: AnyObject&gt;(_ lhs: $s8iExpense4User10ObservablefMm_6MemberfMu3_, _ rhs: $s8iExpense4User10ObservablefMm_6MemberfMu3_) -&gt; Bool {
+    lhs !== rhs
+}
+
+private nonisolated func shouldNotifyObservers&lt;$s8iExpense4User10ObservablefMm_6MemberfMu4_: Equatable &amp; AnyObject&gt;(_ lhs: $s8iExpense4User10ObservablefMm_6MemberfMu4_, _ rhs: $s8iExpense4User10ObservablefMm_6MemberfMu4_) -&gt; Bool {
+    lhs != rhs
+}
+}
+extension User: nonisolated Observation.Observable {
+}
+
+</pre>
+
+
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
