@@ -1597,135 +1597,144 @@ struct ContentView: View {
 }
 </pre>
 
-<div id="More Refinement"><h1 id="More Refinement" class="header"><a href="#More Refinement">More Refinement</a></h1></div>
+<div id="Swap Keyboard for Wheel"><h1 id="Swap Keyboard for Wheel" class="header"><a href="#Swap Keyboard for Wheel">Swap Keyboard for Wheel</a></h1></div>
 
-<div id="More Refinement-A Better Way to &quot;Check Answer&quot;"><h2 id="A Better Way to &quot;Check Answer&quot;" class="header"><a href="#More Refinement-A Better Way to &quot;Check Answer&quot;">A Better Way to "Check Answer"</a></h2></div>
+<pre swift>
+import SwiftUI
 
-<p>
-Since the keyboard was covering your button, and you're dealing with the quirks of the <code>.numberPad</code>, let's make the "Check" functionality feel more like a real game.
-</p>
-
-<p>
-If you don't like the look of the "Toolbar" (which can sometimes look a bit tiny), you can use a ZStack. This allows you to place your "Check Answer" button at the very bottom of the screen, floating above the keyboard.
-</p>
-
-<ol>
-<li>
-The "Clean" Final Layout
-
-</ol>
-<p>
-Here is a refined version of your body that handles the keyboard professionally and keeps your "Art Directed" numbers front and center:
-</p>
-
-<p>
-Swift
-var body: some View {
-</p>
-<pre><code>NavigationStack {
-// Use a ZStack so the button can float
-ZStack(alignment: .bottom) {
-ScrollView {
-VStack(spacing: 30) {
-// 1. GRID SECTION
-SectionHeader(title: "Pick your tables")
-LazyVGrid(columns: columns, spacing: 10) {
-ForEach(tables, id: \.self) { table in
-TableButton(table: table, isSelected: selectedTables.contains(table)) {
-toggleSelection(for: table)
-}
-}
-}
-.padding(.horizontal)
-</code></pre>
-<pre><code>// 2. QUESTION SECTION
-VStack(spacing: 20) {
-HStack {
-NumberCard(number: currentTable)
-Text("×").font(.system(size: 60, weight: .bold, design: .rounded)).foregroundColor(.orange)
-NumberCard(number: multiplier)
-}
-</code></pre>
-<pre><code>HStack {
-Text("=").font(.system(size: 60, weight: .bold))
-TextField("?", text: $userAnswer)
-.keyboardType(.numberPad)
-.font(.system(size: 60, design: .rounded))
-.multilineTextAlignment(.center)
-.frame(width: 140)
-.background(Color(.systemGray6))
-.cornerRadius(15)
-}
-}
-// This creates space at the bottom so the ScrollView 
-// doesn't hide content behind the button
-Spacer(minLength: 100)
-}
+// THE COMPONENT: A reusable "Brick"
+struct NumberCard: View {
+    let number: Int
+    var body: some View {
+        Text("\(number)")
+            .font(.system(size: 80, weight: .heavy, design: .rounded))
+            .frame(width: 120, height: 140)
+            .background(Color.blue.gradient)
+            .foregroundColor(.white)
+            .cornerRadius(20)
+            .shadow(radius: 5)
+    }
 }
 
-// 3. FLOATING CHECK BUTTON
-Button(action: checkAnswer) {
-Text("Check Answer")
-.font(.title2)
-.fontWeight(.bold)
-.frame(maxWidth: .infinity)
-.padding()
-.background(userAnswer.isEmpty ? Color.gray : Color.orange)
-.foregroundColor(.white)
-.cornerRadius(15)
-.shadow(radius: 5)
-}
-.disabled(userAnswer.isEmpty)
-.padding()
-.background(.ultraThinMaterial) // Makes the area behind the button blurry
-}
-.navigationTitle("Times Tables")
-.alert(alertTitle, isPresented: $showingAlert) {
-Button("Next Question", action: generateQuestion)
-} message: {
-Text(alertMessage)
-}
-.onAppear(perform: generateQuestion)
-}
-</code></pre>
-<p>
-}
-Why this is a "Pro" move:
-</p>
+struct ContentView: View {
+    let tables = Array(1...12)
+    let columns = Array(repeating: GridItem(.flexible()), count: 6)
+    
+    // 1. We change userAnswer back to an Int for the Picker
+    @State private var selectedTables: Set&lt;Int&gt; = [2, 5, 10]
+    @State private var currentTable = 0
+    @State private var multiplier = 0
+    @State private var userAnswer = 0
 
-<p>
-.ultraThinMaterial: This gives you that "Apple-style" blurred background behind the button, so you can still see the grid scrolling behind it.
-</p>
+    @State private var showingAlert = false
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
 
-<p>
-ZStack(alignment: .bottom): By putting the ScrollView and the Button in a ZStack, the button stays stuck to the bottom of the screen.
-</p>
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Pick your tables") {
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(tables, id: \.self) { table in
+                            Button {
+                                toggleSelection(for: table)
+                            } label: {
+                                Text("\(table)")
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 40)
+                                    .background(selectedTables.contains(table) ? Color.blue : Color(.systemGray5))
+                                    .foregroundColor(selectedTables.contains(table) ? .white : .primary)
+                                    .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                
+                Section {
+                    VStack(spacing: 10) {
+                        // The Big Question
+                        HStack {
+                            NumberCard(number: currentTable)
+                            Text("×").font(.system(size: 40, weight: .bold)).foregroundColor(.orange)
+                            NumberCard(number: multiplier)
+                            Text("=").font(.system(size: 40, weight: .bold))
+                        }
+                        
+                        // 2. THE WHEEL PICKER
+                        // We iterate from 0 to 150 to provide all possible answers
+                        Picker("Select Answer", selection: $userAnswer) {
+                            ForEach(0...150, id: \.self) { number in
+                                Text("\(number)").font(.title)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(height: 120) // Constrain the height so it doesn't take over
+                        
+                        // 3. THE REINSTATED CHECK BUTTON
+                        Button(action: checkAnswer) {
+                            Text("Check Answer")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.orange.gradient)
+                                .cornerRadius(15)
+                                .shadow(radius: 3)
+                        }
+                        .padding(.top, 10)
+                    }
+                    .padding(.vertical)
+                }
+            }
+            .navigationTitle("Times Tables")
+            .onChange(of: selectedTables) { generateQuestion() }
+            .onAppear { generateQuestion() }
+            .alert(alertTitle, isPresented: $showingAlert) {
+                Button("Next Question", action: generateQuestion)
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
 
-<p>
-Keyboard Handling: SwiftUI automatically pushes the bottom of a ZStack up when the keyboard appears. This means your "Check Answer" button will now automatically "ride" the top of the keyboard.
-</p>
+    // --- LOGIC REMAINS THE SAME, BUT CLEANER ---
 
-<p>
-One last tip for your generateQuestion
-</p>
-
-<p>
-To make the transition smooth, make sure generateQuestion clears the answer:
-</p>
-
-<p>
-Swift
-func generateQuestion() {
-</p>
-<pre><code>if let randomTable = selectedTables.randomElement() {
-currentTable = randomTable
-multiplier = Int.random(in: 1...12)
-userAnswer = "" // This clears the text field for the next turn
+    private func toggleSelection(for table: Int) {
+        if selectedTables.contains(table) {
+            if selectedTables.count &gt; 1 { selectedTables.remove(table) }
+        } else {
+            selectedTables.insert(table)
+        }
+    }
+    
+    func generateQuestion() {
+        if let randomTable = selectedTables.randomElement() {
+            currentTable = randomTable
+            multiplier = Int.random(in: 1...12)
+            userAnswer = 0 // Reset the wheel to 0 for each new question
+        }
+    }
+    
+    func checkAnswer() {
+        let actualAnswer = currentTable * multiplier
+        
+        // No need to convert String to Int anymore!
+        if userAnswer == actualAnswer {
+            alertTitle = "Correct!"
+            alertMessage = "You got it! \(currentTable) x \(multiplier) is \(actualAnswer)."
+        } else {
+            alertTitle = "Not quite"
+            alertMessage = "The answer was \(actualAnswer). Try the next one!"
+        }
+        showingAlert = true
+    }
 }
-</code></pre>
-<p>
+
+#Preview {
+    ContentView()
 }
-</p>
+</pre>
 
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
