@@ -159,12 +159,232 @@ ForEach(expenses.items, id: \.name) { item in
 Go ahead and run the app now, press + a few times, then swipe to delete the rows.
 </p>
 
+<div id="Hacking With Swift - 100 - Building a list we can delete from-Important Caveat!"><h2 id="Important Caveat!" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-Important Caveat!">Important Caveat!</a></h2></div>
+
 <p>
 Now, remember: when we say <code>id: \.name</code> we’re saying we can identify each item uniquely by its name, which isn’t true here – we have the same name multiple times, and we can’t guarantee our expenses will be unique either.
 </p>
 
 <p>
 Often this will Just Work, but sometimes it will cause bizarre, broken animations in your project, so let’s look at a better solution next.
+</p>
+
+<div id="Hacking With Swift - 100 - Building a list we can delete from-Important Caveat!-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-Important Caveat!-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct ExpenseItem {
+    let name: String
+    let type: String
+    let amount: Double
+}
+
+@Observable
+class Expenses {
+    var items = [ExpenseItem]()
+}
+
+struct ContentView: View {
+    @State private var expenses = Expenses()
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(expenses.items, id: \.name) { item in
+                    Text(item.name)
+                }
+                .onDelete(perform: removeItems)
+            }
+            .navigationTitle("iExpense")
+            .toolbar {
+                Button("Add Expense", systemImage: "plus") {
+                    let expense = ExpenseItem(name:"Test", type:"Personal", amount: 5)
+                    expenses.items.append(expense)
+                }
+            }
+        }
+
+    }
+    
+    func removeItems(at offsets: IndexSet) {
+        expenses.items.remove(atOffsets: offsets)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 100 - Building a list we can delete from-AI Insights"><h2 id="AI Insights" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-AI Insights">AI Insights</a></h2></div>
+
+<div id="Hacking With Swift - 100 - Building a list we can delete from-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-QUESTION">QUESTION</a></h2></div>
+
+<p>
+What's the difference between:
+</p>
+
+<pre swift>
+var item = [ExpenseItem]()
+</pre>
+
+<p>
+...and
+</p>
+
+<pre swift>
+var item: [ExpenseItem]
+</pre>
+
+<div id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a fundamental distinction in Swift: the difference between creating a box with nothing in it and describing what a box should hold.
+</p>
+
+<p>
+In programming terms, we call this Initialization vs. Declaration.
+</p>
+
+<div id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER-1. var item = [ExpenseItem]()"><h3 id="1. var item = [ExpenseItem]()" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-ANSWER-1. var item = [ExpenseItem]()">1. var item = [ExpenseItem]()</a></h3></div>
+
+<p>
+<span id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER-1. var item = [ExpenseItem]()-The Action"></span><strong id="The Action">The Action</strong>: Declaration + Initialization (Creation)
+</p>
+
+<p>
+When you include the parentheses <code>()</code> at the end, you are actually "calling" the array's initializer.
+</p>
+<ul>
+<li>
+The Result: You now have a real, living array. It is currently empty, but it exists in the computer's memory.
+
+<li>
+The Analogy: You went to the store, bought an empty plastic bin, and put it on your shelf. You can immediately start putting <code>ExpenseItem</code> objects into it.
+
+</ul>
+<div id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER-2. var item: [ExpenseItem]"><h3 id="2. var item: [ExpenseItem]" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-ANSWER-2. var item: [ExpenseItem]">2. var item: [ExpenseItem]</a></h3></div>
+
+<p>
+<span id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER-2. var item: [ExpenseItem]-The Action"></span><strong id="The Action">The Action</strong>: Declaration (Description)
+</p>
+
+<p>
+Here, you are only telling Swift what the "type" of the variable will be. You are saying: "Hey, I’m going to have a variable named <code>item</code>, and it will be an array of <code>ExpenseItem</code>... eventually."
+</p>
+<ul>
+<li>
+The Result: The array does not exist yet. If you try to call <code>item.append(someExpense)</code> on the very next line, your code will crash or refuse to compile because there is no actual "bin" to put the item in.
+
+<li>
+The Analogy: You wrote "Expense Bin" on a sticky note and stuck it to an empty spot on your shelf. You have the <em>plan</em> for a bin, but you haven't actually bought the plastic box yet.
+
+</ul>
+<div id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER-3. Comparison at a Glance"><h3 id="3. Comparison at a Glance" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-ANSWER-3. Comparison at a Glance">3. Comparison at a Glance</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Feature
+</th>
+<th>
+var item = [ExpenseItem]()
+</th>
+<th>
+var item: [ExpenseItem]
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Status
+</td>
+<td>
+Fully initialized and ready.
+</td>
+<td>
+Declared but "uninitialized."
+</td>
+</tr>
+<tr>
+<td>
+Memory
+</td>
+<td>
+Memory is allocated for an empty list.
+</td>
+<td>
+No memory is allocated yet.
+</td>
+</tr>
+<tr>
+<td>
+Usage
+</td>
+<td>
+Can be used immediately.
+</td>
+<td>
+Must be assigned a value before use.
+</td>
+</tr>
+<tr>
+<td>
+Common Use
+</td>
+<td>
+Creating a fresh list for a new app state.
+</td>
+<td>
+Used in init() or as a parameter.
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER-4. When do you use each?"><h3 id="4. When do you use each?" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-ANSWER-4. When do you use each?">4. When do you use each?</a></h3></div>
+
+<p>
+Use the <code>()</code> (Initialization) 90% of the time:
+</p>
+
+<p>
+In SwiftUI, specifically for your <code>@State</code> variables, you almost always want to initialize them immediately so the view has something to look at when the app starts.
+</p>
+
+<pre swift>
+@State private var items = [ExpenseItem]() // Ready to go!
+</pre>
+
+<p>
+Use the <code>:</code> (Declaration) when the value is coming from somewhere else:
+</p>
+
+<p>
+You use this when the data is going to be "injected" into the view later—for example, when you move from one screen to another.
+</p>
+
+<pre swift>
+struct DetailView: View {
+    let item: ExpenseItem // No () here! 
+    // We don't want a "new" empty item, we want the one the previous screen sends us.
+}
+</pre>
+
+<div id="Hacking With Swift - 100 - Building a list we can delete from-ANSWER-Pro Tip"><h3 id="Pro Tip" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from-ANSWER-Pro Tip">Pro Tip</a></h3></div>
+
+<p>
+You can also write the first version like this:
+</p>
+<pre swift>
+var item: [ExpenseItem] = []`
+</pre>
+
+<p>
+This is exactly the same as <code>[ExpenseItem]()</code>. It says: "The type is an array of ExpenseItems, and I want you to set it to an empty array right now.
 </p>
 
 <p>
