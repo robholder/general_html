@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_96</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_95.html">Hacking With Swift - 95 - Showing and hiding views</a>
+
+</ul>
+<div id="Hacking With Swift - 96 - Deleting items using onDelete()"><h1 id="Hacking With Swift - 96 - Deleting items using onDelete()" class="header"><a href="#Hacking With Swift - 96 - Deleting items using onDelete()">Hacking With Swift - 96 - Deleting items using onDelete()</a></h1></div>
+
+<p>
+SwiftUI gives us the <code>onDelete()</code> modifier for us to use to control how objects should be deleted from a collection. In practice, this is almost exclusively used with <code>List</code> and <code>ForEach</code>: we create a list of rows that are shown using <code>ForEach</code>, then attach <code>onDelete()</code> to that <code>ForEach</code> so the user can remove rows they don’t want.
+</p>
+
+<p>
+This is another place where SwiftUI does a heck of a lot of work on our behalf, but it does have a few interesting quirks as you’ll see.
+</p>
+
+<p>
+First, let’s construct an example we can work with: a list that shows numbers, and every time we tap the button a new number appears. Here’s the code for that:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var numbers = [Int]()
+    @State private var currentNumber = 1
+
+    var body: some View {
+        VStack {
+            List {
+                ForEach(numbers, id: \.self) {
+                    Text("Row \($0)")
+                }
+            }
+
+            Button("Add Number") {
+                numbers.append(currentNumber)
+                currentNumber += 1
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+Now, you might think that the <code>ForEach</code> isn’t needed – the list is made up of entirely dynamic rows, so we could write this instead:
+</p>
+
+<pre swift>
+List(numbers, id: \.self) {
+    Text("Row \($0)")
+}
+</pre>
+
+<p>
+That would also work, but here’s our first quirk: the <code>onDelete()</code> modifier only exists on <code>ForEach</code>, so if we want users to delete items from a list we must put the items inside a <code>ForEach</code>. This does mean a small amount of extra code for the times when we have only dynamic rows, but on the flip side it means it’s easier to create lists where only some rows can be deleted.
+</p>
+
+<p>
+In order to make <code>onDelete()</code> work, we need to implement a method that will receive a single parameter of type <code>IndexSet</code>. This is a bit like a set of integers, except it’s sorted, and it’s just telling us the positions of all the items in the <code>ForEach</code> that should be removed.
+</p>
+
+<p>
+Because our <code>ForEach</code> was created entirely from a single array, we can actually just pass that index set straight to our <code>numbers</code> array – it has a special <code>remove(atOffsets:)</code> method that accepts an index set.
+</p>
+
+<p>
+So, add this method to <code>ContentView</code> now:
+</p>
+
+<pre swift>
+func removeRows(at offsets: IndexSet) {
+    numbers.remove(atOffsets: offsets)
+} 
+</pre>
+
+<p>
+Finally, we can tell SwiftUI to call that method when it wants to delete data from the <code>ForEach</code>, by modifying it to this:
+</p>
+
+<pre swift>
+ForEach(numbers, id: \.self) {
+    Text("Row \($0)")
+}
+.onDelete(perform: removeRows)
+</pre>
+
+<p>
+Now go ahead and run your app, then add a few numbers. When you’re ready, swipe from right to left across any of the rows in your list, and you should find a delete button appears. You can tap that, or you can also use iOS’s swipe to delete functionality by swiping further.
+</p>
+
+<p>
+Given how easy that was, I think the result works really well. But SwiftUI has another trick up its sleeve: we can add an Edit/Done button to the navigation bar, that lets users delete several rows more easily.
+</p>
+
+<p>
+First, wrap your <code>VStack</code> in a <code>NavigationStack</code>, then add this modifier to the <code>VStack</code>:
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
