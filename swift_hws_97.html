@@ -38,7 +38,7 @@ Most users pretty much expect apps to store their data so they can create more c
 <div id="Hacking With Swift - 97 - Storing user settings with UserDefaults-UserDefaults"><h2 id="UserDefaults" class="header"><a href="#Hacking With Swift - 97 - Storing user settings with UserDefaults-UserDefaults">UserDefaults</a></h2></div>
 
 <p>
-One common way to store a small amount of data is called <code>UserDefaults</code>, and it’s great for simple user preferences. There is no specific number attached to “a small amount”, but everything you store in <code>UserDefaults</code> will automatically be loaded when your app launches – if you store a lot in there your app launch will slow down. To give you at least an idea, you should aim to store no more than 512KB in there.
+One common way to store a small amount of data is called <code>UserDefaults</code>, and it’s great for simple user preferences. There is no specific number attached to “a small amount”, but everything you store in <code>UserDefaults</code> will automatically be loaded when your app launches - if you store a lot in there your app launch will slow down. To give you at least an idea, you should aim to store no more than 512KB in there.
 </p>
 
 <p>
@@ -46,13 +46,13 @@ One common way to store a small amount of data is called <code>UserDefaults</cod
 </p>
 
 <p>
-<code>UserDefaults</code> is perfect for storing things like when the user last launched the app, which news story they last read, or other passively collected information. Even better, SwiftUI can often wrap up <code>UserDefaults</code> inside a nice and simple property wrapper called <code>@AppStorage</code> – it only supports a subset of functionality right now, but it can be really helpful.
+<code>UserDefaults</code> is perfect for storing things like when the user last launched the app, which news story they last read, or other passively collected information. Even better, SwiftUI can often wrap up <code>UserDefaults</code> inside a nice and simple property wrapper called <code>@AppStorage</code> - it only supports a subset of functionality right now, but it can be really helpful.
 </p>
 
 <div id="Hacking With Swift - 97 - Storing user settings with UserDefaults-Code"><h2 id="Code" class="header"><a href="#Hacking With Swift - 97 - Storing user settings with UserDefaults-Code">Code</a></h2></div>
 
 <p>
-Enough chat – let’s look at some code. Here’s a view with a button that shows a tap count, and increments that count every time the button is tapped:
+Enough chat - let’s look at some code. Here’s a view with a button that shows a tap count, and increments that count every time the button is tapped:
 </p>
 
 <pre swift>
@@ -89,8 +89,8 @@ We need to use <code>UserDefaults.standard</code>. This is the built-in instance
 
 </ul>
 <p>
-There is a single <code>set()</code> method that accepts any kind of data – integers, Booleans, strings, and more.
-We attach a string name to this data, in our case it’s the key “Tap”. This key is case-sensitive, just like regular Swift strings, and it’s important – we need to use the same key to read the data back out of <code>UserDefaults</code>.
+There is a single <code>set()</code> method that accepts any kind of data - integers, Booleans, strings, and more.
+We attach a string name to this data, in our case it’s the key “Tap”. This key is case-sensitive, just like regular Swift strings, and it’s important - we need to use the same key to read the data back out of <code>UserDefaults</code>.
 </p>
 
 <p>
@@ -101,16 +101,44 @@ Speaking of reading the data back, rather than start with <code>tapCount</code> 
 @State private var tapCount = UserDefaults.standard.integer(forKey: "Tap")
 </pre>
 
+<div id="Hacking With Swift - 97 - Storing user settings with UserDefaults-Code-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 97 - Storing user settings with UserDefaults-Code-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    //@State private var tapCount = 0
+    // Link the value to the stored data with key string of "Tap".
+    @State private var tapCount = UserDefaults.standard.integer(forKey: "Tap")
+
+    var body: some View {
+        Button("Tap count: \(tapCount)") {
+            tapCount += 1
+            // Set location for storage and set string for recall ("Tap")
+            UserDefaults.standard.set(tapCount, forKey: "Tap")
+        }
+    }
+}
+    
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 Notice how that uses exactly the same key name, which ensures it reads the same integer value.
 </p>
 
 <p>
-Go ahead and give the app a try and see what you think – you ought to be able tap the button a few times, go back to Xcode, run the app again, and see the number exactly where you left it.
+Go ahead and give the app a try and see what you think - you ought to be able tap the button a few times, go back to Xcode, run the app again, and see the number exactly where you left it.
 </p>
 
 <p>
-There are two things you can’t see in that code, but both matter. First, what happens if we don’t have the “Tap” key set? This will be the case the very first time the app is run, but as you just saw it works fine – if the key can’t be found it just sends back 0.
+There are two things you can’t see in that code, but both matter.
+</p>
+
+<p>
+<span id="Hacking With Swift - 97 - Storing user settings with UserDefaults-Code-In Context-First"></span><strong id="First">First</strong>, what happens if we don’t have the “Tap” key set? This will be the case the very first time the app is run, but as you just saw it works fine - if the key can’t be found it just sends back 0.
 </p>
 
 <p>
@@ -118,12 +146,14 @@ Sometimes having a default value like 0 is helpful, but other times it can be co
 </p>
 
 <p>
-Second, it takes iOS a little time to write your data to permanent storage – to actually save that change to the device. They don’t write updates immediately because you might make several back to back, so instead they wait some time then write out all the changes at once. How much time is another number we don’t know, but a couple of seconds ought to do it.
+<span id="Hacking With Swift - 97 - Storing user settings with UserDefaults-Code-In Context-Second"></span><strong id="Second">Second</strong>, it takes iOS a little time to write your data to permanent storage - to actually save that change to the device. They don’t write updates immediately because you might make several back to back, so instead they wait some time then write out all the changes at once. How much time is another number we don’t know, but a couple of seconds ought to do it.
 </p>
 
 <p>
-As a result of this, if you tap the button then quickly relaunch the app from Xcode, you’ll find your most recent tap count wasn’t saved. There used to be a way of forcing updates to be written immediately, but at this point it’s worthless – even if the user immediately started the process of terminating your app after making a choice, your defaults data would be written immediately so nothing will be lost.
+As a result of this, if you tap the button then quickly relaunch the app from Xcode, you’ll find your most recent tap count wasn’t saved. There used to be a way of forcing updates to be written immediately, but at this point it’s worthless - even if the user immediately started the process of terminating your app after making a choice, your defaults data would be written immediately so nothing will be lost.
 </p>
+
+<div id="Hacking With Swift - 97 - Storing user settings with UserDefaults-AppStorage"><h2 id="AppStorage" class="header"><a href="#Hacking With Swift - 97 - Storing user settings with UserDefaults-AppStorage">AppStorage</a></h2></div>
 
 <p>
 Now, I mentioned that SwiftUI provides an <code>@AppStorage</code> property wrapper around <code>UserDefaults</code>, and in simple situations like this one it’s really helpful. What it does is let us effectively ignore <code>UserDefaults</code> entirely, and just use <code>@AppStorage</code> rather than <code>@State</code>, like this:
@@ -141,19 +171,45 @@ struct ContentView: View {
 }
 </pre>
 
+<div id="Hacking With Swift - 97 - Storing user settings with UserDefaults-In Context"><h2 id="In Context" class="header"><a href="#Hacking With Swift - 97 - Storing user settings with UserDefaults-In Context">In Context</a></h2></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @AppStorage("tapCount") private var tapCount = 0
+
+    var body: some View {
+        Button("Tap count: \(tapCount)") {
+            tapCount += 1
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 Again, there are three things I want to point out in there:
 </p>
 
 <p>
 Our access to the <code>UserDefaults</code> system is through the <code>@AppStorage</code> property wrapper. This works like <code>@State</code>: when the value changes, it will reinvoked the body property so our UI reflects the new data.
-We attach a string name, which is the <code>UserDefaults</code> key where we want to store the data. I’ve used “tapCount”, but it can be anything at all – it doesn’t need to match the property name.
-The rest of the property is declared as normal, including providing a default value of 0. That will be used if there is no existing value saved inside <code>UserDefaults</code>.
-Clearly using <code>@AppStorage</code> is easier than <code>UserDefaults</code>: it’s one line of code rather than two, and it also means we don’t have to repeat the key name each time. However, right now at least <code>@AppStorage</code> doesn’t make it easy to handle storing complex objects such as Swift structs – perhaps because Apple wants us to remember that storing lots of data in there is a bad idea!
+We attach a string name, which is the <code>UserDefaults</code> key where we want to store the data. I’ve used “tapCount”, but it can be anything at all - it doesn’t need to match the property name.
 </p>
 
 <p>
-<span id="Hacking With Swift - 97 - Storing user settings with UserDefaults-Code-Important"></span><strong id="Important">Important</strong>: When it comes to you submitting an app to the App Store, Apple asks that you let them know why you're loading and saving data using <code>UserDefaults</code>. This also applies to the <code>@AppStorage</code> property wrapper. It's nothing to worry about, they just want to make sure developers aren't trying to identify users across apps.
+The rest of the property is declared as normal, including providing a default value of 0. That will be used if there is no existing value saved inside <code>UserDefaults</code>.
+</p>
+
+<p>
+Clearly using <code>@AppStorage</code> is easier than <code>UserDefaults</code>: it’s one line of code rather than two, and it also means we don’t have to repeat the key name each time. However, right now at least <code>@AppStorage</code> doesn’t make it easy to handle storing complex objects such as Swift structs - perhaps because Apple wants us to remember that storing lots of data in there is a bad idea!
+</p>
+
+<p>
+<span id="Hacking With Swift - 97 - Storing user settings with UserDefaults-In Context-Important"></span><strong id="Important">Important</strong>: When it comes to you submitting an app to the App Store, Apple asks that you let them know why you're loading and saving data using <code>UserDefaults</code>. This also applies to the <code>@AppStorage</code> property wrapper. It's nothing to worry about, they just want to make sure developers aren't trying to identify users across apps.
 <br>
 <hr>
 </p>
