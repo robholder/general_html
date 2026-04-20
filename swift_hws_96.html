@@ -89,6 +89,10 @@ List(numbers, id: \.self) {
 That would also work, but here’s our first quirk: the <code>onDelete()</code> modifier only exists on <code>ForEach</code>, so if we want users to delete items from a list we must put the items inside a <code>ForEach</code>. This does mean a small amount of extra code for the times when we have only dynamic rows, but on the flip side it means it’s easier to create lists where only some rows can be deleted.
 </p>
 
+<p>
+Lists can be made of Static and Dynamic items, and delete will only work on non-constant dynamic items. That's why we need to use ForEach to make deletion possible.
+</p>
+
 <div id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility"><h2 id="Add Deletion Facility" class="header"><a href="#Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility">Add Deletion Facility</a></h2></div>
 
 <p>
@@ -108,6 +112,104 @@ func removeRows(at offsets: IndexSet) {
     numbers.remove(atOffsets: offsets)
 } 
 </pre>
+
+<p>
+When you first see this function, it looks like a tongue-twister of "offsets" and "atOffsets," but there is a very logical reason for that repetition.
+</p>
+
+<p>
+Let's pull the mask off this function to see which parts are Swift's requirements and which parts you chose.
+</p>
+
+<div id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms"><h3 id="1. Keywords vs. User Terms" class="header"><a href="#Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms">1. Keywords vs. User Terms</a></h3></div>
+
+<pre swift>
+// 1          // 2         // 3          // 4
+func removeRows(at offsets: IndexSet) {
+    numbers.remove(atOffsets: offsets)
+//     ^ 5                ^ 6
+}
+</pre>
+
+<ul>
+<li>
+<code>func</code>: <span id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms-Keyword"></span><strong id="Keyword">Keyword</strong>. This tells Swift you are defining a block of logic.
+
+<li>
+<code>removeRows</code>: <span id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms-User Term"></span><strong id="User Term">User Term</strong>. You can name this anything! You could call it <code>func</code> <code>deleteTheThing</code>.
+
+<li>
+<code>at</code>: <span id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms-Keyword (Argument Label)"></span><strong id="Keyword (Argument Label)">Keyword (Argument Label)</strong>. This is a "label" that makes the function read like English when called: <code>removeRows(at: someIndex)</code>.
+
+<li>
+<code>offsets</code>: <span id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms-User Term (Parameter Name)"></span><strong id="User Term (Parameter Name)">User Term (Parameter Name)</strong>. This is the "internal" name you use to refer to the data inside the function.
+
+<li>
+<code>numbers</code>: <span id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms-User Term"></span><strong id="User Term">User Term</strong>. This is the name of your specific array (the <code>@State</code> variable you created earlier).
+
+<li>
+<code>atOffsets</code>: <span id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-1. Keywords vs. User Terms-Keyword (SwiftUI Method)"></span><strong id="Keyword (SwiftUI Method)">Keyword (SwiftUI Method)</strong>. This is a built-in command specifically designed for arrays in SwiftUI to handle deletions.
+
+</ul>
+<div id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-2. What is an IndexSet?"><h3 id="2. What is an IndexSet?" class="header"><a href="#Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-2. What is an IndexSet?">2. What is an IndexSet?</a></h3></div>
+
+<p>
+Think of a standard <span id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-2. What is an IndexSet?-Index"></span><strong id="Index">Index</strong> (an <code>Int</code>) as a single finger pointing at one item in a list (e.g., "Item #3").
+</p>
+
+<p>
+An <code>IndexSet</code> is like a hand that can point to multiple items at once.
+</p>
+
+<p>
+In a list, a user might use "Edit Mode" to select three different rows and hit delete. SwiftUI doesn't want to run your function three separate times (which would be slow and might cause the list to shift around). Instead, it bundles all those locations into an <code>IndexSet</code> and hands it to you in one go.
+</p>
+
+<div id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-3. Why the &quot;atOffsets: offsets&quot; part?"><h3 id="3. Why the &quot;atOffsets: offsets&quot; part?" class="header"><a href="#Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-3. Why the &quot;atOffsets: offsets&quot; part?">3. Why the "atOffsets: offsets" part?</a></h3></div>
+
+<p>
+You might be wondering: "Why can't I just use <code>numbers.remove(at: 1)</code>?"
+</p>
+
+<p>
+If you have a list of numbers: <code>[10, 20, 30, 40]</code>
+</p>
+
+<p>
+And you delete the first item, the list becomes: <code>[20, 30, 40]</code>
+</p>
+
+<p>
+Now, "Item #2" (which was 30) has moved! If you try to delete multiple items one-by-one using standard indices, the list shifts and you'll end up deleting the wrong things.
+</p>
+
+<p>
+<code>remove(atOffsets:)</code> is a specialized tool. It looks at the <code>IndexSet</code>, calculates all the positions at once, and performs the deletion safely so that the remaining items don't get "misaligned" during the process.
+</p>
+
+<div id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-The &quot;Plain English&quot; Translation"><h3 id="The &quot;Plain English&quot; Translation" class="header"><a href="#Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-The &quot;Plain English&quot; Translation">The "Plain English" Translation</a></h3></div>
+
+<p>
+If you read your function out loud, it says:
+</p>
+
+<p>
+<em>"I'm making a function called removeRows. When it's called, it will be handed a collection of positions called offsets. I will then tell my numbers array to remove whatever is located at those offsets."</em>
+</p>
+
+<div id="Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-Why at offsets?"><h3 id="Why at offsets?" class="header"><a href="#Hacking With Swift - 96 - Deleting items using onDelete()-Add Deletion Facility-Why at offsets?">Why at offsets?</a></h3></div>
+
+<p>
+You’ll notice that when you attach this to a list, you just write:
+</p>
+
+<pre swift>
+.onDelete(perform: removeRows)
+</pre>
+
+<p>
+Swift is smart enough to know that <code>onDelete</code> automatically provides an <code>IndexSet</code>. It "plugs" that <code>IndexSet</code> into your offsets variable for you.
+</p>
 
 <p>
 Finally, we can tell SwiftUI to call that method when it wants to delete data from the <code>ForEach</code>, by modifying it to this:
