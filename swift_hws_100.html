@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_100</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_99.html">Hacking With Swift - 99 - Project 7 - part two</a>
+
+</ul>
+<div id="Hacking With Swift - 100 - Building a list we can delete from"><h1 id="Hacking With Swift - 100 - Building a list we can delete from" class="header"><a href="#Hacking With Swift - 100 - Building a list we can delete from">Hacking With Swift - 100 - Building a list we can delete from</a></h1></div>
+
+<p>
+In this project we want a list that can show some expenses, and previously we would have done this using an <code>@State</code> array of objects. Here, though, we’re going to take a different approach: we’re going to create an <code>Expenses</code> class that will be attached to our list using @State.
+</p>
+
+<p>
+This might sound like we’re over-complicating things a little, but it actually makes things much easier because we can make the <code>Expenses</code> class load and save itself seamlessly – it will be almost invisible, as you’ll see.
+</p>
+
+<p>
+First, we need to decide what an expense is – what do we want it to store? In this instance it will be three things: the name of the item, whether it’s business or personal, and its cost as a <code>Double</code>.
+</p>
+
+<p>
+We’ll add more to this later, but for now we can represent all that using a single <code>ExpenseItem</code> struct. You can put this into a new Swift file called <code>ExpenseItem.swift</code>, but you don’t need to – you can just put this into <code>ContentView.swift</code> if you like, as long as you don’t put it inside the <code>ContentView</code> struct itself.
+</p>
+
+<p>
+Regardless of where you put it, this is the code to use:
+</p>
+
+<pre swift>
+struct ExpenseItem {
+    let name: String
+    let type: String
+    let amount: Double
+}
+</pre>
+
+<p>
+Now that we have something that represents a single expense, the next step is to create something to store an array of those expense items inside a single object. This needs to use the <code>@Observable</code> macro so it can be watched by SwiftUI.
+</p>
+
+<p>
+As with the <code>ExpenseItem</code> struct, this will start off simple and we’ll add to it later, so add this new class now:
+</p>
+
+<pre swift>
+@Observable
+class Expenses {
+    var items = [ExpenseItem]()
+}
+</pre>
+
+<p>
+That finishes all the data required for our main view: we have a struct to represent a single item of expense, and a class to store an array of all those items.
+</p>
+
+<p>
+Let’s now put that into action with our SwiftUI view, so we can actually see our data on the screen. Most of our view will just be a <code>List</code> showing the items in our expenses, but because we want users to delete items they no longer want we can’t just use a simple <code>List</code> – we need to use a <code>ForEach</code> inside the list, so we get access to the <code>onDelete()</code> modifier.
+</p>
+
+<p>
+First, we need to add a <code>@State</code> property in our view, that will create an instance of our <code>Expenses</code> class:
+</p>
+
+<pre swift>
+@State private var expenses = Expenses()
+</pre>
+
+<p>
+Remember, using <code>@State</code> here keeps the object alive, but it's the <code>@Observable</code> macro that actually gives SwiftUI the power to watch the object for any changes.
+</p>
+
+<p>
+Second, we can use that <code>Expenses</code> object with a <code>NavigationStack</code>, a List, and a <code>ForEach</code>, to create our basic layout:
+</p>
+
+<pre swift>
+NavigationStack {
+    List {
+        ForEach(expenses.items, id: \.name) { item in
+            Text(item.name)
+        }
+    }
+    .navigationTitle("iExpense")
+}
+</pre>
+
+<p>
+That tells the <code>ForEach</code> to identify each expense item uniquely by its name, then prints the name out as the list row.
+</p>
+
+<p>
+We’re going to add two more things to our simple layout before we’re done: the ability to add new items for testing purposes, and the ability to delete items with a swipe.
+</p>
+
+<p>
+We’re going to let users add their own items soon, but it’s important to check that our list actually works well before we continue. So, we’re going to add a toolbar button that adds example <code>ExpenseItem</code> instances for us to work with – add this modifier to the <code>List</code> now:
+</p>
+
+<pre swift>
+.toolbar {
+    Button("Add Expense", systemImage: "plus") {
+        let expense = ExpenseItem(name: "Test", type: "Personal", amount: 5)
+        expenses.items.append(expense)
+    }
+}
+</pre>
+
+<p>
+That brings our app to life: you can launch it now, then press the + button repeatedly to add lots of testing expenses.
+</p>
+
+<p>
+Now that we can add expenses, we can also add code to remove them. This means adding a method capable of deleting an <code>IndexSet</code> of list items, then passing that directly on to our <code>expenses</code> array:
+</p>
+
+<pre swift>
+func removeItems(at offsets: IndexSet) {
+    expenses.items.remove(atOffsets: offsets)
+}
+</pre>
+
+<p>
+And to attach that to SwiftUI, we add an <code>onDelete()</code> modifier to our <code>ForEach</code>, like this:
+</p>
+
+<pre swift>
+ForEach(expenses.items, id: \.name) { item in
+    Text(item.name)
+}
+.onDelete(perform: removeItems)
+</pre>
+
+<p>
+Go ahead and run the app now, press + a few times, then swipe to delete the rows.
+</p>
+
+<p>
+Now, remember: when we say <code>id: \.name</code> we’re saying we can identify each item uniquely by its name, which isn’t true here – we have the same name multiple times, and we can’t guarantee our expenses will be unique either.
+</p>
+
+<p>
+Often this will Just Work, but sometimes it will cause bizarre, broken animations in your project, so let’s look at a better solution next.
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
