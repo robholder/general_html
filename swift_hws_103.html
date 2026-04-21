@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_103</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_102.html">Hacking With Swift - 102 - Sharing an observed object with a new view</a>
+
+</ul>
+<div id="Hacking With Swift - 103 - Making changes permanent with UserDefaults"><h1 id="Hacking With Swift - 103 - Making changes permanent with UserDefaults" class="header"><a href="#Hacking With Swift - 103 - Making changes permanent with UserDefaults">Hacking With Swift - 103 - Making changes permanent with UserDefaults</a></h1></div>
+
+<p>
+At this point, our app’s user interface is functional: you’ve seen we can add and delete items, and now we have a sheet showing a user interface to create new expenses. However, the app is far from working: any data placed into <code>AddView</code> is completely ignored, and even if it weren’t ignored then it still wouldn’t be saved for future times the app is run.
+</p>
+
+<p>
+We’ll tackle those problems in order, starting with actually doing something with the data from <code>AddView</code>. We already have properties that store the values from our form, and previously we added a property to store an <code>Expenses</code> object passed in from the <code>ContentView</code>.
+</p>
+
+<p>
+We need to put those two things together: we need a button that, when tapped, creates an <code>ExpenseItem</code> out of our properties and adds it to the <code>expenses</code> items.
+</p>
+
+<p>
+Add this modifier below <code>navigationTitle()</code> in <code>AddView</code>:
+</p>
+
+<pre swift>
+.toolbar {
+    Button("Save") {
+        let item = ExpenseItem(name: name, type: type, amount: amount)
+        expenses.items.append(item)
+    }
+}
+</pre>
+
+<p>
+Although we have more work to do, I encourage you to run the app now because it’s actually coming together - you can now show the add view, enter some details, press “Save”, then swipe to dismiss, and you’ll see your new item in the list. That means our data synchronization is working perfectly: both the SwiftUI views are reading from the same list of expense items.
+</p>
+
+<p>
+Now try launching the app again, and you’ll immediately hit our second problem: any data you add isn’t stored, meaning that everything starts blank every time you relaunch the app.
+</p>
+
+<p>
+This is obviously a pretty terrible user experience, but thanks to the way we have <code>Expense</code> as a separate class it’s actually not that hard to fix.
+</p>
+
+<p>
+We’re going to leverage four important technologies to help us save and load data in a clean way:
+</p>
+
+<ul>
+<li>
+The <code>Codable</code> protocol, which will allow us to archive all the existing expense items ready to be stored.
+
+<li>
+<code>UserDefaults</code>, which will let us save and load that archived data.
+
+<li>
+A custom initializer for the <code>Expenses</code> class, so that when we make an instance of it we load any saved data from <code>UserDefaults</code>
+
+<li>
+A <code>didSet</code> property observer on the <code>items</code> property of <code>Expenses</code>, so that whenever an item gets added or removed we’ll write out changes.
+
+</ul>
+<p>
+Let’s tackle writing the data first. We already have this property in the Expenses class:
+</p>
+
+<pre swift>
+var items = [ExpenseItem]()
+</pre>
+
+<p>
+That’s where we store all the expense item structs that have been created, and that’s also where we’re going to attach our property observer to write out changes as they happen.
+</p>
+
+<p>
+This takes four steps in total: we need to create an instance of <code>JSONEncoder</code> that will do the work of converting our data to JSON, we ask that to try encoding our <code>items</code> array, and then we can write that to <code>UserDefaults</code> using the key “Items”.
+</p>
+
+<p>
+Modify the <code>items</code> property to this:
+</p>
+
+<pre swift>
+var items = [ExpenseItem]() {
+    didSet {
+        if let encoded = try? JSONEncoder().encode(items) {
+            UserDefaults.standard.set(encoded, forKey: "Items")
+        }
+    }
+}
+</pre>
+
+<p>
+Tip: Using <code>JSONEncoder().encode()</code> means “create an encoder and use it to encode something,” all in one step, rather than creating the encoder first then using it later.
+</p>
+
+<p>
+Now, if you’re following along you’ll notice that code doesn’t actually compile. And if you’re following along closely you’ll have noticed that I said this process takes four steps while only listing three.
+</p>
+
+<p>
+The problem is that the <code>encode()</code> method can only archive objects that conform to the <code>Codable</code> protocol. Remember, conforming to <code>Codable</code> is what asks the compiler to generate code for us able to handle archiving and unarchiving objects, and if we don’t add a conformance for that then our code won’t build.
+</p>
+
+<p>
+Helpfully, we don’t need to do any work other than add <code>Codable</code> to <code>ExpenseItem</code>, like this:
+</p>
+
+<pre swift>
+struct ExpenseItem: Identifiable, Codable {
+    let id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+}
+</pre>
+
+<p>
+Swift already includes <code>Codable</code> conformances for the <code>UUID</code>, <code>String</code>, and <code>Double</code> properties of <code>ExpenseItem</code>, and so it’s able to make <code>ExpenseItem</code> conform automatically as soon as we ask for it.
+</p>
+
+<p>
+However, you will see a warning that <code>id</code> will not be decoded because we made it a constant and assigned a default value. This is actually the behavior we want, but Swift is trying to be helpful because it’s possible you did plan to decode this value from JSON. To make the warning go away, make the property variable like this:
+</p>
+
+<pre swift>
+var id = UUID()
+</pre>
+
+<p>
+With that change, we’ve written all the code needed to make sure our items are saved when the user adds them. However, it’s not effective by itself: the data might be saved, but it isn’t loaded again when the app relaunches.
+</p>
+
+<p>
+To solve that we need to implement a custom initializer. That will:
+</p>
+
+<ul>
+<li>
+Attempt to read the “Items” key from <code>UserDefaults</code>.
+
+<li>
+Create an instance of <code>JSONDecoder</code>, which is the counterpart of <code>JSONEncoder</code> that lets us go from JSON data to Swift objects.
+
+<li>
+Ask the decoder to convert the data we received from <code>UserDefaults</code> into an array of <code>ExpenseItem</code> objects.
+
+<li>
+If that worked, assign the resulting array to items and exit.
+
+<li>
+Otherwise, set items to be an empty array.
+
+</ul>
+<p>
+Add this initializer to the Expenses class now:
+</p>
+
+<pre swift>
+init() {
+    if let savedItems = UserDefaults.standard.data(forKey: "Items") {
+        if let decodedItems = try? JSONDecoder().decode([ExpenseItem].self, from: savedItems) {
+            items = decodedItems
+            return
+        }
+    }
+
+    items = []
+}
+</pre>
+
+<p>
+The two key parts of that code are the <code>data(forKey: "Items")</code> line, which attempts to read whatever is in “Items” as a <code>Data</code> object, and <code>try? JSONDecoder().decode([ExpenseItem].self, from: savedItems)</code>, which does the actual job of unarchiving the <code>Data</code> object into an array of <code>ExpenseItem</code> objects.
+</p>
+
+<p>
+It’s common to do a bit of a double take when you first see <code>[ExpenseItem].self</code> - what does the <code>.self</code> mean? Well, if we had just used <code>[ExpenseItem]</code>, Swift would want to know what we meant - are we trying to make a copy of the class? Were we planning to reference a static property or method? Did we perhaps mean to create an instance of the class? To avoid confusion - to say that we mean we’re referring to the type itself, known as the type object - we write <code>.self</code> after it.
+</p>
+
+<p>
+Now that we have both loading and saving in place, you should be able to use the app. It’s not finished quite yet, though - let’s add some final polish!
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
