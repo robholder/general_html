@@ -46,7 +46,7 @@ When the user is ready, we’ll add that to our <code>Expenses</code> class, whi
 <div id="Hacking With Swift - 102 - Working with Identifiable items in SwiftUI-New View, New File"><h2 id="New View, New File" class="header"><a href="#Hacking With Swift - 102 - Working with Identifiable items in SwiftUI-New View, New File">New View, New File</a></h2></div>
 
 <p>
-To make a new SwiftUI view you can either press <code>&lt;Cmd&gt;+N</code> or go to the File menu and choose New > File. Either way, you should select “SwiftUI View” under the User Interface category, then name the file <code>AddView.swift</code>. Xcode will ask you where to save the file, so make sure you see a folder icon next to “iExpense”, then click Create to have Xcode show you the new view, ready to edit.
+To make a new SwiftUI view you can either press <code>&lt;Cmd&gt;+N</code> or go to the File menu and choose New > File > File from Template. Either way, you should select “SwiftUI View” under the User Interface category, then name the file <code>AddView.swift</code>. Xcode will ask you where to save the file, so make sure you see a folder icon next to “iExpense”, then click Create to have Xcode show you the new view, ready to edit.
 </p>
 
 <p>
@@ -104,7 +104,11 @@ In order to present <code>AddView</code> as a new view, we need to make three ch
 </pre>
 
 <p>
-Next, we need to tell SwiftUI to use that Boolean as a condition for showing a sheet – a pop-up window. This is done by attaching the <code>sheet()</code> modifier somewhere to our view hierarchy. You can use the <code>List</code> if you want, but the <code>NavigationStack</code> works just as well. Either way, add this code as a modifier to one of the views in <code>ContentView</code>:
+Next, we need to tell SwiftUI to use <em>that Boolean</em> as a condition for showing a sheet – a pop-up window. This is done by attaching the <code>sheet()</code> modifier somewhere to our view hierarchy. You can use the <code>List</code> if you want, but the <code>NavigationStack</code> works just as well.
+</p>
+
+<p>
+Either way, add this code as a modifier to one of the views in <code>ContentView</code>:
 </p>
 
 <pre swift>
@@ -124,7 +128,7 @@ The third step is to put something inside the sheet. Often that will just be an 
 </pre>
 
 <p>
-Here, though, we need something more. You see, we already have the <code>expenses</code> property in our content view, and inside <code>AddView</code> we’re going to be writing code to add expense items. We don’t want to create a second instance of the <code>Expenses</code> class in <code>AddView</code>, but instead want it to share the existing instance from <code>ContentView</code>.
+Here, though, we need something more. We already have the <code>expenses</code> property in our content view, and inside <code>AddView</code> we’re going to be writing code to add expense items. We don’t want to create a second instance of the <code>Expenses</code> class in <code>AddView</code>, but instead want it to share the existing instance from <code>ContentView</code>.
 </p>
 
 <p>
@@ -176,6 +180,102 @@ Button("Add Expense", systemImage: "plus") {
 <p>
 If you run the app now the whole sheet should be working as intended – you start with <code>ContentView</code>, tap the + button to bring up an <code>AddView</code> where you can type in the various fields, then can swipe to dismiss.
 </p>
+
+<div id="Hacking With Swift - 102 - Working with Identifiable items in SwiftUI-Update ContentView-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 102 - Working with Identifiable items in SwiftUI-Update ContentView-In Context">In Context</a></h3></div>
+
+<p>
+ContentView:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ExpenseItem: Identifiable {
+    let id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+}
+
+@Observable
+class Expenses {
+    var items = [ExpenseItem]()
+}
+
+struct ContentView: View {
+    @State private var expenses = Expenses()
+    
+    @State private var showingAddExpense = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(expenses.items) { item in
+                    Text(item.name)
+                }
+                .onDelete(perform: removeItems)
+            }
+            .navigationTitle("iExpense")
+            .toolbar {
+                Button("Add Expense", systemImage: "plus") {
+                    showingAddExpense = true
+                }
+            }
+            .sheet(isPresented: $showingAddExpense) {
+                AddView(expenses: expenses)
+            }
+        }
+
+    }
+    
+    func removeItems(at offsets: IndexSet) {
+        expenses.items.remove(atOffsets: offsets)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 102 - Working with Identifiable items in SwiftUI-Update ContentView-AddView"><h3 id="AddView" class="header"><a href="#Hacking With Swift - 102 - Working with Identifiable items in SwiftUI-Update ContentView-AddView">AddView</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct AddView: View {
+    
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    let types = ["Business", "Personal"]
+    
+    var expenses: Expenses
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+                
+                Picker("Type", selection: $type) {
+                    ForEach(types, id: \.self) {
+                        Text($0)
+                    }
+                }
+                TextField("Aumount", value: $amount, format: .currency(code: "USD")).keyboardType(.decimalPad)
+            }
+            .navigationTitle("Add new expense")
+        }
+    }
+}
+
+#Preview {
+    // We need to add argument here
+    AddView(expenses: Expenses())
+}
+</pre>
+
 
 <p>
 <br>
