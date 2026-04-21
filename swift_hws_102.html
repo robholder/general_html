@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_102</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_101.html">Hacking With Swift - 101 - Building a list we can delete from</a>
+
+</ul>
+<div id="Hacking With Swift - 102 - Working with Identifiable items in SwiftUI"><h1 id="Hacking With Swift - 102 - Working with Identifiable items in SwiftUI" class="header"><a href="#Hacking With Swift - 102 - Working with Identifiable items in SwiftUI">Hacking With Swift - 102 - Working with Identifiable items in SwiftUI</a></h1></div>
+
+<p>
+Classes that use <code>@Observable</code> can be used in more than one SwiftUI view, and all of those views will be updated when the properties of the class change. SwiftUI is really smart here: it will only update those views if they actually used the properties that changed.
+</p>
+
+<p>
+In this app, we’re going to design a view specially for adding new expense items. When the user is ready, we’ll add that to our <code>Expenses</code> class, which will automatically cause the original view to refresh its data so the expense item can be shown.
+</p>
+
+<p>
+To make a new SwiftUI view you can either press <code>&lt;Cmd&gt;+N</code> or go to the File menu and choose New > File. Either way, you should select “SwiftUI View” under the User Interface category, then name the file <code>AddView.swift</code>. Xcode will ask you where to save the file, so make sure you see a folder icon next to “iExpense”, then click Create to have Xcode show you the new view, ready to edit.
+</p>
+
+<p>
+As with our other views, our first pass at <code>AddView</code> will be simple and we’ll add to it. That means we’re going to add text fields for the expense name and amount, plus a picker for the type, all wrapped up in a form and a navigation stack.
+</p>
+
+<p>
+This should all be old news to you by now, so let’s get into the code:
+</p>
+
+<pre swift>
+struct AddView: View {
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+
+    let types = ["Business", "Personal"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+
+                Picker("Type", selection: $type) {
+                    ForEach(types, id: \.self) {
+                        Text($0)
+                    }
+                }
+
+                TextField("Amount", value: $amount, format: .currency(code: "USD"))
+                    .keyboardType(.decimalPad)
+            }
+            .navigationTitle("Add new expense")
+        }
+    }
+}
+</pre>
+
+<p>
+Yes, that always uses US dollars for the currency type – you’ll need to make that smarter in the challenges for this project.
+</p>
+
+<p>
+We’ll come back to the rest of that code in a moment, but first let’s add some code to <code>ContentView</code> so we can show <code>AddView</code> when the + button is tapped.
+</p>
+
+<p>
+In order to present <code>AddView</code> as a new view, we need to make three changes to <code>ContentView</code>. First, we need some state to track whether or not <code>AddView</code> is being shown, so add this as a property now:
+</p>
+
+<pre swift>
+@State private var showingAddExpense = false
+</pre>
+
+<p>
+Next, we need to tell SwiftUI to use that Boolean as a condition for showing a sheet – a pop-up window. This is done by attaching the <code>sheet()</code> modifier somewhere to our view hierarchy. You can use the <code>List</code> if you want, but the <code>NavigationStack</code> works just as well. Either way, add this code as a modifier to one of the views in <code>ContentView</code>:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingAddExpense) {
+    // show an AddView here
+}
+</pre>
+
+<p>
+The third step is to put something inside the sheet. Often that will just be an instance of the view type you want to show, like this:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingAddExpense) {
+    AddView()
+}
+</pre>
+
+<p>
+Here, though, we need something more. You see, we already have the <code>expenses</code> property in our content view, and inside <code>AddView</code> we’re going to be writing code to add expense items. We don’t want to create a second instance of the <code>Expenses</code> class in <code>AddView</code>, but instead want it to share the existing instance from <code>ContentView</code>.
+</p>
+
+<p>
+So, what we’re going to do is add a property to <code>AddView</code> to store an <code>Expenses</code> object. Please add this property to <code>AddView</code>:
+</p>
+
+<pre swift>
+var expenses: Expenses
+</pre>
+
+<p>
+And now we can pass our existing <code>Expenses</code> object from one view to another – they will both share the same object, and will both monitor it for changes. Modify your <code>sheet()</code> modifier in <code>ContentView</code> to this:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingAddExpense) {
+    AddView(expenses: expenses)
+}
+</pre>
+
+<p>
+We’re not quite done with this step yet, for two reasons: our code won’t compile, and even if it <em>did</em> compile it wouldn’t work because our button doesn’t trigger the sheet.
+</p>
+
+<p>
+The compilation failure happens because when we made the new SwiftUI view, Xcode also added some preview code so we can look at the design of the view while we were coding. If you find that down at the bottom of <code>AddView.swift</code>, you’ll see that it tries to create an <code>AddView</code> instance without providing a value for the <code>expenses</code> property.
+</p>
+
+<p>
+That isn’t allowed any more, but we can just pass in a dummy value instead, like this:
+</p>
+
+<pre swift>
+#Preview {
+    AddView(expenses: Expenses())
+}
+</pre>
+
+<p>
+The second problem is that we don’t actually have any code to show the sheet, because right now the + button in <code>ContentView</code> adds test expenses. Fortunately, the fix is trivial – just replace the existing action with code to toggle our <code>showingAddExpense</code> Boolean, like this:
+</p>
+
+<pre swift>
+Button("Add Expense", systemImage: "plus") {
+    showingAddExpense = true
+}
+</pre>
+
+<p>
+If you run the app now the whole sheet should be working as intended – you start with <code>ContentView</code>, tap the + button to bring up an <code>AddView</code> where you can type in the various fields, then can swipe to dismiss.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
