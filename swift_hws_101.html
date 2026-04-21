@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_101</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_100.html">Hacking With Swift - 100 - Building a list we can delete from</a>
+
+</ul>
+<div id="Hacking With Swift - 101 - Building a list we can delete from"><h1 id="Hacking With Swift - 101 - Building a list we can delete from" class="header"><a href="#Hacking With Swift - 101 - Building a list we can delete from">Hacking With Swift - 101 - Building a list we can delete from</a></h1></div>
+
+<p>
+When we create static views in SwiftUI – when we hard-code a <code>VStack</code>, then a <code>TextField</code>, then a <code>Button</code>, and so on – SwiftUI can see exactly which views we have, and is able to control them, animate them, and more. But when we use <code>List</code> or <code>ForEach</code> to make dynamic views, SwiftUI needs to know how it can identify each item uniquely otherwise it will struggle to compare view hierarchies to figure out what has changed.
+</p>
+
+<p>
+In our current code, we have this:
+</p>
+
+<pre swift>
+ForEach(expenses.items, id: \.name) { item in
+    Text(item.name)
+}
+
+.onDelete(perform: removeItems)
+</pre>
+
+<p>
+In English, that means “create a new row for every item in the expense items, identified uniquely by its name, showing that name in the row, and calling the <code>removeItems()</code> method to delete it.”
+</p>
+
+<p>
+Then, later, we have this code:
+</p>
+
+<pre swift>
+Button("Add Expense", systemImage: "plus") {
+    let expense = ExpenseItem(name: "Test", type: "Personal", amount: 5)
+    expenses.items.append(expense)
+}
+</pre>
+
+<p>
+Every time that button is pressed, it adds a test expense to our list, so we can make sure adding and deleting works.
+</p>
+
+<p>
+Can you see the problem?
+</p>
+
+<p>
+Every time we create an example expense item we’re using the name “Test”, but we’ve also told SwiftUI that it can use the expense name as a unique identifier. So, when our code runs and we delete an item, SwiftUI looks at the array beforehand – “Test”, “Test”, “Test”, “Test” – then looks at the array <em>afterwards</em> – “Test”, “Test”, “Test” – and can’t easily tell what changed. <em>Something</em> has changed, because one item has disappeared, but SwiftUI can’t be sure which.
+</p>
+
+<p>
+In this situation we’re lucky, because <code>List</code> knows exactly which row we were swiping on, but in many other places that extra information won’t be available and our app will start to behave strangely.
+</p>
+
+<p>
+This is a logic error on our behalf: our code is fine, and it doesn’t crash at runtime, but we’ve applied the wrong logic to get to that end result – we’ve told SwiftUI that something will be a unique identifier, when it isn’t unique at all.
+</p>
+
+<p>
+To fix this we need to think more about our <code>ExpenseItem</code> struct. Right now it has three properties: <code>name</code>, <code>type</code>, and <code>amount</code>. The name by itself <em>might</em> be unique in practice, but it’s also likely not to be – as soon as the user enters “Lunch” twice we’ll start hitting problems. We could perhaps try to combine the name, type and amount into a new computed property, but even then we’re just delaying the inevitable; it’s still not really unique.
+</p>
+
+<p>
+The smart solution here is to add something to <code>ExpenseItem</code> that is unique, such as an ID number that we assign by hand. That would work, but it does mean tracking the last number we assigned so we don’t use duplicates there either.
+</p>
+
+<p>
+There is in fact an easier solution, and it’s called <code>UUID</code> – short for “universally unique identifier”, and if that doesn’t sound unique I’m not sure what does.
+</p>
+
+<p>
+UUIDs are long hexadecimal strings such as this one: <code>08B15DB4-2F02-4AB8-A965-67A9C90D8A44</code>. So, that’s eight digits, four digits, four digits, four digits, then twelve digits, of which the only requirement is that there’s a 4 in the first number of the third block. If we subtract the fixed 4, we end up with 31 digits, each of which can be one of 16 values – if we generated 1 <code>UUID</code> every second for a billion years, we might begin to have the slightest chance of generating a duplicate.
+</p>
+
+<p>
+Now, we could update <code>ExpenseItem</code> to have a <code>UUID</code> property like this:
+</p>
+
+<pre swift>
+struct ExpenseItem {
+    let id: UUID
+    let name: String
+    let type: String
+    let amount: Double
+}
+</pre>
+
+<p>
+And that would work. However, it would also mean we need to generate a <code>UUID</code> by hand, then load and save the <code>UUID</code> along with our other data. So, in this instance we’re going to ask Swift to generate a <code>UUID</code> automatically for us like this:
+</p>
+
+<pre swift>
+struct ExpenseItem {
+    let id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+}
+</pre>
+
+<p>
+Now we don’t need to worry about the <code>id</code> value of our expense items – Swift will make sure they are always unique.
+</p>
+
+<p>
+With that in place we can now fix our <code>ForEach</code>, like this:
+</p>
+
+<pre swift>
+ForEach(expenses.items, id: \.id) { item in
+    Text(item.name)
+}
+</pre>
+
+<p>
+If you run the app now you’ll see our problem is fixed: SwiftUI can now see exactly which expense item got deleted, and will animate everything correctly.
+</p>
+
+<p>
+We’re not done with this step quite yet, though. Instead, I’d like you to modify the <code>ExpenseItem</code> to make it conform to a new protocol called <code>Identifiable</code>, like this:
+</p>
+
+<pre swift>
+struct ExpenseItem: Identifiable {
+    let id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+}
+</pre>
+
+<p>
+All we’ve done is add <code>Identifiable</code> to the list of protocol conformances, nothing more. This is one of the protocols built into Swift, and means “this type can be identified uniquely.” It has only one requirement, which is that there must be a property called id that contains a unique identifier. We just added that, so we don’t need to do any extra work – our type conforms to <code>Identifiable</code> just fine.
+</p>
+
+<p>
+Now, you might wonder why we added that, because our code was working fine before. Well, because our expense items are now guaranteed to be identifiable uniquely, we no longer need to tell <code>ForEach</code> which property to use for the identifier – it knows there will be an <code>id</code> property and that it will be unique, because that’s the point of the <code>Identifiable</code> protocol.
+</p>
+
+<p>
+So, as a result of this change we can modify the <code>ForEach</code> again, to this:
+</p>
+
+<pre swift>
+ForEach(expenses.items) { item in
+    Text(item.name)
+}
+</pre>
+
+<p>
+Much better!
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
