@@ -32,6 +32,219 @@
 <div id="Hacking With Swift - 104 - Final polish"><h1 id="Hacking With Swift - 104 - Final polish" class="header"><a href="#Hacking With Swift - 104 - Final polish">Hacking With Swift - 104 - Final polish</a></h1></div>
 
 <p>
+If you try using the app, you’ll soon see it has two problems:
+</p>
+
+<ul>
+<li>
+When you add an expense, you can’t actually see any details about it.
+
+<li>
+Adding an expense doesn’t dismiss <code>AddView</code>; it just stays there.
+
+</ul>
+<p>
+Before we wrap up this project, let’s fix those to make the whole thing feel a little more polished.
+</p>
+
+<div id="Hacking With Swift - 104 - Final polish-Dismissing AddView"><h2 id="Dismissing AddView" class="header"><a href="#Hacking With Swift - 104 - Final polish-Dismissing AddView">Dismissing AddView</a></h2></div>
+
+<p>
+First, dismissing <code>AddView</code> is done by calling <code>dismiss()</code> on the environment when the time is right. This is controlled by the view’s environment, and links to the <code>isPresented</code> parameter for our sheet – that Boolean gets set to true by us to show <code>AddView</code>, but will be flipped back to false by the environment when we call <code>dismiss()</code>.
+</p>
+
+<p>
+Start by adding this property to AddView:
+</p>
+
+<pre swift>
+@Environment(\.dismiss) var dismiss
+</pre>
+
+<p>
+You’ll notice we don’t specify a type for that – Swift can figure it out thanks to the <code>@Environment</code> property wrapper.
+</p>
+
+<p>
+Next, we need to call <code>dismiss()</code> when we want the view to dismiss itself. This causes the <code>showingAddExpense</code> Boolean in <code>ContentView</code> to go back to false, and hides the <code>AddView</code>. We already have a Save button in <code>AddView</code> that creates a new expense item and appends it to our existing expenses, so add this on the line directly after:
+</p>
+
+<pre swift>
+dismiss()
+</pre>
+<div id="Hacking With Swift - 104 - Final polish-Dismissing AddView-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 104 - Final polish-Dismissing AddView-In Context">In Context</a></h3></div>
+
+<p>
+AddView.swift:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct AddView: View {
+    
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    let types = ["Business", "Personal"]
+    
+    var expenses: Expenses
+    
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+                
+                Picker("Type", selection: $type) {
+                    ForEach(types, id: \.self) {
+                        Text($0)
+                    }
+                }
+                TextField("Aumount", value: $amount, format: .currency(code: "USD")).keyboardType(.decimalPad)
+            }
+            .navigationTitle("Add new expense")
+            .toolbar {
+                Button("Save") {
+                    let item = ExpenseItem(name: name, type: type, amount: amount)
+                    expenses.items.append(item)
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    // We need to add argument here
+    AddView(expenses: Expenses())
+}
+</pre>
+
+<div id="Hacking With Swift - 104 - Final polish-Adding More Expense Details"><h2 id="Adding More Expense Details" class="header"><a href="#Hacking With Swift - 104 - Final polish-Adding More Expense Details">Adding More Expense Details</a></h2></div>
+
+<p>
+That solves the first problem, which just leaves the second: we show the name of each expense item but nothing more. This is because the <code>ForEach</code> for our list is trivial:
+</p>
+
+<pre swift>
+ForEach(expenses.items) { item in
+    Text(item.name)
+}
+</pre>
+
+<p>
+We’re going to replace that with a stack within another stack, to make sure all the information looks good on screen. The inner stack will be a <code>VStack</code> showing the expense name and type, then around that will be a <code>HStack</code> with the <code>VStack</code> on the left, then a spacer, then the expense amount. This kind of layout is common on iOS: title and subtitle on the left, and more information on the right.
+</p>
+
+<p>
+Replace the existing <code>ForEach</code> in <code>ContentView</code> with this:
+</p>
+
+<pre swift>
+ForEach(expenses.items) { item in
+    HStack {
+        VStack(alignment: .leading) {
+            Text(item.name)
+                .font(.headline)
+            Text(item.type)
+        }
+
+        Spacer()
+        Text(item.amount, format: .currency(code: "USD"))
+    }
+}
+</pre>
+
+<p>
+Now run the program one last time and try it out – we’re done!
+</p>
+
+<div id="Hacking With Swift - 104 - Final polish-Adding More Expense Details-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 104 - Final polish-Adding More Expense Details-In Context">In Context</a></h3></div>
+
+<p>
+ContentView.swift:
+</p>
+
+<pre swift>
+import SwiftUI
+
+// Add Codable to the struct protocol list:
+struct ExpenseItem: Identifiable, Codable {
+    // Change id from 'let' to 'var'
+    var id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+}
+
+@Observable
+class Expenses {
+    var items = [ExpenseItem]() {
+        // Add the didSet code to save data
+        didSet {
+            if let encoded = try? JSONEncoder().encode(items) {
+                UserDefaults.standard.set(encoded, forKey: "Items")
+            }
+        }
+    }
+    init() {
+        if let savedItems = UserDefaults.standard.data(forKey: "Items") {
+            if let decodedItems = try? JSONDecoder().decode([ExpenseItem].self, from: savedItems) {
+                items = decodedItems
+                return
+            }
+        }
+    }
+}
+
+struct ContentView: View {
+    @State private var expenses = Expenses()
+    
+    @State private var showingAddExpense = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(expenses.items) { item in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(item.name)
+                                .font(.headline)
+                            Text(item.type)
+                        }
+                        Spacer()
+                        Text(item.amount, format: .currency(code: "USD"))
+                    }
+                }
+                .onDelete(perform: removeItems)
+            }
+            .navigationTitle("iExpense")
+            .toolbar {
+                Button("Add Expense", systemImage: "plus") {
+                    showingAddExpense = true
+                }
+            }
+            .sheet(isPresented: $showingAddExpense) {
+                AddView(expenses: expenses)
+            }
+        }
+
+    }
+    
+    func removeItems(at offsets: IndexSet) {
+        expenses.items.remove(atOffsets: offsets)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
 <br>
 <hr>
 </p>
