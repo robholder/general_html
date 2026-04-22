@@ -60,6 +60,52 @@ Add this modifier below <code>navigationTitle()</code> in <code>AddView</code>:
 Although we have more work to do, I encourage you to run the app now because it’s actually coming together - you can now show the add view, enter some details, press “Save”, then swipe to dismiss, and you’ll see your new item in the list. That means our data synchronization is working perfectly: both the SwiftUI views are reading from the same list of expense items.
 </p>
 
+<div id="Hacking With Swift - 103 - Making changes permanent with UserDefaults-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 103 - Making changes permanent with UserDefaults-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 103 - Making changes permanent with UserDefaults-In Context-AddView.swift:"><h4 id="AddView.swift:" class="header"><a href="#Hacking With Swift - 103 - Making changes permanent with UserDefaults-In Context-AddView.swift:">AddView.swift:</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct AddView: View {
+    
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    let types = ["Business", "Personal"]
+    
+    var expenses: Expenses
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+                
+                Picker("Type", selection: $type) {
+                    ForEach(types, id: \.self) {
+                        Text($0)
+                    }
+                }
+                TextField("Aumount", value: $amount, format: .currency(code: "USD")).keyboardType(.decimalPad)
+            }
+            .navigationTitle("Add new expense")
+            .toolbar {
+                Button("Save") {
+                    let item = ExpenseItem(name: name, type: type, amount: amount)
+                    expenses.items.append(item)
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    // We need to add argument here
+    AddView(expenses: Expenses())
+}
+
+</pre>
 <p>
 Now try launching the app again, and you’ll immediately hit our second problem: any data you add isn’t stored, meaning that everything starts blank every time you relaunch the app.
 </p>
@@ -67,6 +113,8 @@ Now try launching the app again, and you’ll immediately hit our second problem
 <p>
 This is obviously a pretty terrible user experience, but thanks to the way we have <code>Expense</code> as a separate class it’s actually not that hard to fix.
 </p>
+
+<div id="Hacking With Swift - 103 - Making changes permanent with UserDefaults-Saving Data"><h2 id="Saving Data" class="header"><a href="#Hacking With Swift - 103 - Making changes permanent with UserDefaults-Saving Data">Saving Data</a></h2></div>
 
 <p>
 We’re going to leverage four important technologies to help us save and load data in a clean way:
@@ -99,9 +147,22 @@ That’s where we store all the expense item structs that have been created, and
 </p>
 
 <p>
-This takes four steps in total: we need to create an instance of <code>JSONEncoder</code> that will do the work of converting our data to JSON, we ask that to try encoding our <code>items</code> array, and then we can write that to <code>UserDefaults</code> using the key “Items”.
+This takes four steps in total:
 </p>
+<ul>
+<li>
+Create an instance of <code>JSONEncoder</code> that will do the work of converting our data to <code>JSON</code>,
 
+<li>
+Try encoding our <code>items</code> array,
+
+<li>
+Write that to <code>UserDefaults</code> using the key “Items”.
+
+<li>
+Make the <code>ExpenseItem</code> struct conform to the <code>Codable</code> protocol.
+
+</ul>
 <p>
 Modify the <code>items</code> property to this:
 </p>
@@ -117,7 +178,7 @@ var items = [ExpenseItem]() {
 </pre>
 
 <p>
-Tip: Using <code>JSONEncoder().encode()</code> means “create an encoder and use it to encode something,” all in one step, rather than creating the encoder first then using it later.
+<span id="Hacking With Swift - 103 - Making changes permanent with UserDefaults-Saving Data-Tip"></span><strong id="Tip">Tip</strong>: Using <code>JSONEncoder().encode()</code> means “create an encoder and use it to encode something,” all in one step, rather than creating the encoder first then using it later.
 </p>
 
 <p>
@@ -152,6 +213,8 @@ However, you will see a warning that <code>id</code> will not be decoded because
 <pre swift>
 var id = UUID()
 </pre>
+
+<div id="Hacking With Swift - 103 - Making changes permanent with UserDefaults-Loading Data"><h2 id="Loading Data" class="header"><a href="#Hacking With Swift - 103 - Making changes permanent with UserDefaults-Loading Data">Loading Data</a></h2></div>
 
 <p>
 With that change, we’ve written all the code needed to make sure our items are saved when the user adds them. However, it’s not effective by itself: the data might be saved, but it isn’t loaded again when the app relaunches.
@@ -196,15 +259,127 @@ init() {
 </pre>
 
 <p>
-The two key parts of that code are the <code>data(forKey: "Items")</code> line, which attempts to read whatever is in “Items” as a <code>Data</code> object, and <code>try? JSONDecoder().decode([ExpenseItem].self, from: savedItems)</code>, which does the actual job of unarchiving the <code>Data</code> object into an array of <code>ExpenseItem</code> objects.
+The two key parts of that code are:
+</p>
+<ul>
+<li>
+the <code>data(forKey: "Items")</code> line,
+
+<ul>
+<li>
+which attempts to read whatever is in “Items” as a <code>Data</code> object,
+
+</ul>
+<li>
+and <code>try? JSONDecoder().decode([ExpenseItem].self, from: savedItems)</code>,
+
+<ul>
+<li>
+which does the actual job of unarchiving the <code>Data</code> object into an array of <code>ExpenseItem</code> objects.
+
+</ul>
+</ul>
+<p>
+It’s common to do a bit of a double take when you first see <code>[ExpenseItem].self</code> - what does the <code>.self</code> mean?
 </p>
 
 <p>
-It’s common to do a bit of a double take when you first see <code>[ExpenseItem].self</code> - what does the <code>.self</code> mean? Well, if we had just used <code>[ExpenseItem]</code>, Swift would want to know what we meant - are we trying to make a copy of the class? Were we planning to reference a static property or method? Did we perhaps mean to create an instance of the class? To avoid confusion - to say that we mean we’re referring to the type itself, known as the type object - we write <code>.self</code> after it.
+Well, if we had just used <code>[ExpenseItem]</code>, Swift would want to know what we meant:
+</p>
+<ul>
+<li>
+Are we trying to make a copy of the class?
+
+<li>
+Were we planning to reference a static property or method?
+
+<li>
+Did we perhaps mean to create an instance of the class?
+
+</ul>
+<p>
+To avoid confusion - to say that we mean we’re referring to the type itself, known as the type object - we write <code>.self</code> after it.
 </p>
 
 <p>
 Now that we have both loading and saving in place, you should be able to use the app. It’s not finished quite yet, though - let’s add some final polish!
+</p>
+
+<div id="Hacking With Swift - 103 - Making changes permanent with UserDefaults-Loading Data-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 103 - Making changes permanent with UserDefaults-Loading Data-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+// Add Codable to the struct protocol list:
+struct ExpenseItem: Identifiable, Codable {
+    // Change id from 'let' to 'var'
+    var id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+}
+
+@Observable
+class Expenses {
+    var items = [ExpenseItem]() {
+        // Add the didSet code to save the app data
+        didSet {
+            if let encoded = try? JSONEncoder().encode(items) {
+                UserDefaults.standard.set(encoded, forKey: "Items")
+            }
+        }
+    }
+    // read and initialize the stored ExpenseItem array
+    init() {
+        // read saved data using the "Items" key
+        if let savedItems = UserDefaults.standard.data(forKey: "Items") {
+            // decode the ExpenseItem array into decodedItems
+            if let decodedItems = try? JSONDecoder().decode([ExpenseItem].self, from: savedItems) {
+                // Put the decoded ExpenseItem array into the class 'items' property
+                items = decodedItems
+                return
+            }
+        }
+    }
+}
+
+struct ContentView: View {
+    @State private var expenses = Expenses()
+    
+    @State private var showingAddExpense = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(expenses.items) { item in
+                    Text(item.name)
+                }
+                .onDelete(perform: removeItems)
+            }
+            .navigationTitle("iExpense")
+            .toolbar {
+                Button("Add Expense", systemImage: "plus") {
+                    showingAddExpense = true
+                }
+            }
+            .sheet(isPresented: $showingAddExpense) {
+                AddView(expenses: expenses)
+            }
+        }
+
+    }
+    
+    func removeItems(at offsets: IndexSet) {
+        expenses.items.remove(atOffsets: offsets)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
 <br>
 <hr>
 </p>
