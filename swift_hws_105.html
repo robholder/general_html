@@ -882,6 +882,114 @@ The Helper Function: I moved the <code>HStack</code> into a function called <cod
 One final warning: SwiftUI can sometimes be a bit "lazy" with <code>onDelete</code> inside multiple sections. If you find the swipe-to-delete animation looks a little jumpy, it’s usually just the Simulator being the Simulator. It should be buttery smooth on a real device!
 </p>
 
+<div id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct"><h2 id="Integrate the Color function into the ExpenseRow Struct" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct">Integrate the Color function into the ExpenseRow Struct</a></h2></div>
+
+<p>
+To integrate the <code>color(for:)</code> logic into the <code>ExpenseRow</code> structure, you have two main paths. You can either keep it as a <span id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-function"></span><strong id="function">function</strong> inside the struct or turn it into a <span id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-computed property"></span><strong id="computed property">computed property</strong>.
+</p>
+
+<p>
+Since the color depends entirely on the <code>item.amount</code>, turning it into a <span id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-computed property"></span><strong id="computed property">computed property</strong> is the most "SwiftUI" way to handle it—it makes the color feel like a natural attribute of the row.
+</p>
+
+<div id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Option 1: The Computed Property (Cleanest)"><h3 id="Option 1: The Computed Property (Cleanest)" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Option 1: The Computed Property (Cleanest)">Option 1: The Computed Property (Cleanest)</a></h3></div>
+
+<p>
+By placing the logic inside the <code>ExpenseRow</code>, you make the row self-sufficient. It doesn't need to ask the <code>ContentView</code> for instructions on how to color itself.
+</p>
+
+<pre swift>
+struct ExpenseRow: View {
+    let item: ExpenseItem
+
+    // This property lives inside the row and handles the logic
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10:
+            return .primary // or .black
+        case 10..&lt;100:
+            return .green
+        default:
+            return .red
+        }
+    }
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor) // Now just call the property
+        }
+    }
+}
+</pre>
+
+<div id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Option 2: The Logic Inside the Model (Best for Reusability)"><h3 id="Option 2: The Logic Inside the Model (Best for Reusability)" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Option 2: The Logic Inside the Model (Best for Reusability)">Option 2: The Logic Inside the Model (Best for Reusability)</a></h3></div>
+
+<p>
+If you moved the <code>color</code> logic into your <code>ExpenseItem</code> struct earlier (as discussed a few steps ago), the row becomes incredibly simple because you are just accessing data:
+</p>
+
+<pre swift>
+struct ExpenseRow: View {
+    let item: ExpenseItem
+
+    var body: some View {
+        HStack {
+            // ... name and type views ...
+            Spacer()
+            Text(item.amount, format: .currency(code: "USD"))
+                .foregroundStyle(item.color) // Logic lives inside the ExpenseItem struct
+        }
+    }
+}
+</pre>
+
+<div id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?"><h3 id="Why move it into the ExpenseRow?" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?">Why move it into the ExpenseRow?</a></h3></div>
+
+<p>
+When you keep the color function in <code>ContentView</code>, you have to "pass" the logic down or call it explicitly. By moving it into the <code>ExpenseRow</code> (Option 1):
+</p>
+
+<ul>
+<li>
+Encapsulation: The ContentView doesn't need to know how an expense is colored; it just needs to display the row.
+
+<li>
+Readability: Your <code>List</code> code stays focused on the hierarchy (Sections and Rows) rather than the nitty-gritty details of currency thresholds.
+
+<li>
+Maintenance: If you decide that $50 should be the new "red" threshold, you only change it in the <code>ExpenseRow</code> struct, and every list in your app updates automatically.
+
+</ul>
+<div id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?-How to use it in your List"><h4 id="How to use it in your List" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?-How to use it in your List">How to use it in your List</a></h4></div>
+
+<p>
+Now that the logic is tucked away inside the row, your <code>ForEach</code> in the <code>ContentView</code> becomes a one-liner:
+</p>
+
+<pre swift>
+Section("Personal") {
+    ForEach(personalExpenses) { item in
+        ExpenseRow(item: item) // All the color magic happens inside here now!
+    }
+    .onDelete { offsets in
+        removeItems(at: offsets, in: personalExpenses)
+    }
+}
+</pre>
+
+<p>
+<span id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?-How to use it in your List-Quick catch"></span><strong id="Quick catch">Quick catch</strong>: If you move the logic into the <code>ExpenseRow</code> struct, remember to <span id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?-How to use it in your List-delete"></span><strong id="delete">delete</strong> the <code>func color(for amount: Double)</code> from your <code>ContentView</code> to avoid having duplicate code in two places!
+</p>
+
 <p>
 <br>
 <hr>
