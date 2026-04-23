@@ -333,7 +333,165 @@ Use a more specific name: Instead of just <code>.color</code>, name it <code>.am
 <code>Extension</code> is a "Global Upgrade"—it gives a new superpower to every instance of that type in your code.
 
 </ul>
-<div id="Color Code Values-Where Should They Be Placed?"><h2 id="Where Should They Be Placed?" class="header"><a href="#Color Code Values-Where Should They Be Placed?">Where Should They Be Placed?</a></h2></div>
+<div id="Complications in this App"><h1 id="Complications in this App" class="header"><a href="#Complications in this App">Complications in this App</a></h1></div>
+
+<p>
+Since you are iterating through a list of ExpenseItem objects, the logic needs to know <span id="Complications in this App-which"></span><strong id="which">which</strong> item it’s looking at. Your guess was close—you could use a function inside the View, but there is an even more "Swift-like" way to do this given your setup.
+</p>
+
+<p>
+You have three solid options based on where you want the logic to live.
+</p>
+
+<div id="Complications in this App-Option 1: The &quot;Data-Driven&quot; Way (Best for Architecture)"><h3 id="Option 1: The &quot;Data-Driven&quot; Way (Best for Architecture)" class="header"><a href="#Complications in this App-Option 1: The &quot;Data-Driven&quot; Way (Best for Architecture)">Option 1: The "Data-Driven" Way (Best for Architecture)</a></h3></div>
+
+<p>
+Since the color depends entirely on the amount inside the <code>ExpenseItem</code>, you can put the logic directly inside the <code>ExpenseItem</code> struct. This keeps the data and its styling rules together.
+</p>
+
+<pre swift>
+struct ExpenseItem: Identifiable, Codable {
+    var id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+    
+    // Add this computed property here
+    var color: Color {
+        if amount &lt;= 10 {
+            return .green
+        } else if amount &lt; 100 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+}
+</pre>
+
+<p>
+In your ContentView:
+</p>
+
+<pre swift>
+Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+    .foregroundStyle(item.color) // Simple and clean!
+</pre>
+
+<div id="Complications in this App-Option 2: The View Function (What you guessed)"><h3 id="Option 2: The View Function (What you guessed)" class="header"><a href="#Complications in this App-Option 2: The View Function (What you guessed)">Option 2: The View Function (What you guessed)</a></h3></div>
+
+<p>
+If you prefer to keep your Data Struct "pure" (only holding data, no UI colors), you can write a helper function inside your <code>ContentView</code>.
+</p>
+
+<p>
+Inside your ContentView struct:
+</p>
+
+<pre swift>
+func color(for amount: Double) -&gt; Color {
+    switch amount {
+    case ..&lt;10: return .green
+    case 10..&lt;100: return .orange
+    default: return .red
+    }
+}
+</pre>
+
+<p>
+In your body:
+</p>
+
+<pre swift>
+Text(item.amount, format: .currency(code: ...))
+    .foregroundStyle(color(for: item.amount))
+</pre>
+
+<div id="Complications in this App-Option 3: The &quot;Local View&quot; Method"><h3 id="Option 3: The &quot;Local View&quot; Method" class="header"><a href="#Complications in this App-Option 3: The &quot;Local View&quot; Method">Option 3: The "Local View" Method</a></h3></div>
+
+<p>
+If you only ever plan to use this color logic inside this one <code>List</code>, you can define a small helper variable inside the <code>ForEach</code> loop.
+</p>
+
+<pre swift>
+ForEach(expenses.items) { item in
+    // Define a local constant for the color right here
+    let amountColor: Color = if item.amount &lt;= 10 {
+        .green
+    } else if item.amount &lt; 100 {
+        .orange
+    } else {
+        .red
+    }
+
+    HStack {
+        // ... (your other code)
+        Text(item.amount, format: .currency(code: ...))
+            .foregroundStyle(amountColor)
+    }
+}
+</pre>
+
+<div id="Complications in this App-Option 3: The &quot;Local View&quot; Method-Which one should you choose?"><h4 id="Which one should you choose?" class="header"><a href="#Complications in this App-Option 3: The &quot;Local View&quot; Method-Which one should you choose?">Which one should you choose?</a></h4></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Method
+</th>
+<th>
+Recommendation
+</th>
+<th>
+Why?
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Option 1 (Struct)
+</td>
+<td>
+Highly Recommended
+</td>
+<td>
+It makes the most sense. An expense "knows" its own status. If you ever show these expenses in a different view, the color logic goes with them automatically.
+</td>
+</tr>
+<tr>
+<td>
+Option 2 (Function)
+</td>
+<td>
+Good
+</td>
+<td>
+Best if you feel that a Data Struct shouldn't know about SwiftUI Color types (useful if you were sharing the code with a non-UI framework).
+</td>
+</tr>
+<tr>
+<td>
+Option 3 (Inline)
+</td>
+<td>
+Least Favorite
+</td>
+<td>
+It clutters your body code. SwiftUI views get long very quickly; keeping the logic out of the body is usually better for your sanity!
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Complications in this App-Option 3: The &quot;Local View&quot; Method-A Quick Tip on Color and Codable"><h4 id="A Quick Tip on Color and Codable" class="header"><a href="#Complications in this App-Option 3: The &quot;Local View&quot; Method-A Quick Tip on Color and Codable">A Quick Tip on Color and Codable</a></h4></div>
+
+<p>
+If you choose <span id="Complications in this App-Option 3: The &quot;Local View&quot; Method-A Quick Tip on Color and Codable-Option 1"></span><strong id="Option 1">Option 1</strong>, you might notice that <code>ExpenseItem</code> is <code>Codable</code>. Since <code>Color</code> is not easily codable, making it a <span id="Complications in this App-Option 3: The &quot;Local View&quot; Method-A Quick Tip on Color and Codable-computed property"></span><strong id="computed property">computed property</strong> (using <code>var color: Color { ... }</code>) is perfect because computed properties are <span id="Complications in this App-Option 3: The &quot;Local View&quot; Method-A Quick Tip on Color and Codable-ignored"></span><strong id="ignored">ignored</strong> by the JSON Encoder. It won't mess up your <code>UserDefaults</code> saving!
+</p>
+
+<div id="Complications in this App-Where Should They Be Placed?"><h2 id="Where Should They Be Placed?" class="header"><a href="#Complications in this App-Where Should They Be Placed?">Where Should They Be Placed?</a></h2></div>
 
 <p>
 Here is where the logic should live. Think of the area above the body as the "brain" and the body itself as the "skeleton."
@@ -368,7 +526,7 @@ struct ContentView: View {
 }
 </pre>
 
-<div id="Color Code Values-Where Should They Be Placed?-Why this is the preferred spot:"><h4 id="Why this is the preferred spot:" class="header"><a href="#Color Code Values-Where Should They Be Placed?-Why this is the preferred spot:">Why this is the preferred spot:</a></h4></div>
+<div id="Complications in this App-Where Should They Be Placed?-Why this is the preferred spot:"><h4 id="Why this is the preferred spot:" class="header"><a href="#Complications in this App-Where Should They Be Placed?-Why this is the preferred spot:">Why this is the preferred spot:</a></h4></div>
 
 <ul>
 <li>
@@ -381,7 +539,7 @@ Performance: SwiftUI is highly optimized for computed properties. Every time amo
 Encapsulation: By keeping the logic inside the <code>ContentView</code> struct, the logic is "privately owned" by this view. It doesn't clutter up the rest of your app.
 
 </ul>
-<div id="Color Code Values-Where Should They Be Placed?-A Note on &quot;The Gap&quot;"><h3 id="A Note on &quot;The Gap&quot;" class="header"><a href="#Color Code Values-Where Should They Be Placed?-A Note on &quot;The Gap&quot;">A Note on "The Gap"</a></h3></div>
+<div id="Complications in this App-Where Should They Be Placed?-A Note on &quot;The Gap&quot;"><h3 id="A Note on &quot;The Gap&quot;" class="header"><a href="#Complications in this App-Where Should They Be Placed?-A Note on &quot;The Gap&quot;">A Note on "The Gap"</a></h3></div>
 
 <p>
 You can technically put these properties above or below the body view, as long as they are inside the struct curly braces. However, the standard convention is:
@@ -398,10 +556,10 @@ Computed properties next.
 The <code>body</code> view last.
 
 </ul>
-<div id="Color Code Values-Where Should They Be Placed?-When would it go OUTSIDE the struct?"><h3 id="When would it go OUTSIDE the struct?" class="header"><a href="#Color Code Values-Where Should They Be Placed?-When would it go OUTSIDE the struct?">When would it go OUTSIDE the struct?</a></h3></div>
+<div id="Complications in this App-Where Should They Be Placed?-When would it go OUTSIDE the struct?"><h3 id="When would it go OUTSIDE the struct?" class="header"><a href="#Complications in this App-Where Should They Be Placed?-When would it go OUTSIDE the struct?">When would it go OUTSIDE the struct?</a></h3></div>
 
 <p>
-Only if you want that logic to be shared across <span id="Color Code Values-Where Should They Be Placed?-When would it go OUTSIDE the struct?-many different views"></span><strong id="many different views">many different views</strong>. In that case, you would move it into an <code>extension</code> (like the <code>Double</code> extension I mentioned earlier) or a separate <code>ViewModel</code> class. But for a single screen, keeping it right above the <code>body</code> is the "Sweet Spot."
+Only if you want that logic to be shared across <span id="Complications in this App-Where Should They Be Placed?-When would it go OUTSIDE the struct?-many different views"></span><strong id="many different views">many different views</strong>. In that case, you would move it into an <code>extension</code> (like the <code>Double</code> extension I mentioned earlier) or a separate <code>ViewModel</code> class. But for a single screen, keeping it right above the <code>body</code> is the "Sweet Spot."
 </p>
 
 <p>
