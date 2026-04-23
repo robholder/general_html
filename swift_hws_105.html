@@ -656,6 +656,231 @@ struct ContentView: View {
 }
 </pre>
 
+<div id="Challenge 3 - Separate Expense Type Lists"><h1 id="Challenge 3 - Separate Expense Type Lists" class="header"><a href="#Challenge 3 - Separate Expense Type Lists">Challenge 3 - Separate Expense Type Lists</a></h1></div>
+
+<p>
+This is a classic architectural pivot in SwiftUI. While you could create two separate arrays in your Expenses class, that often leads to "data desync" (where you delete from one list but forget to update the other).
+</p>
+
+<p>
+The most elegant way to handle this—and the way Apple usually recommends—is to use <span id="Challenge 3 - Separate Expense Type Lists-computed properties"></span><strong id="computed properties">computed properties</strong> to filter your single "source of truth" array into two views.
+</p>
+
+<div id="Challenge 3 - Separate Expense Type Lists-The &quot;Filtered View&quot; Approach"><h2 id="The &quot;Filtered View&quot; Approach" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-The &quot;Filtered View&quot; Approach">The "Filtered View" Approach</a></h2></div>
+
+<p>
+You keep your one <code>items</code> array in the <code>Expenses</code> class, but in your <code>ContentView</code>, you create two "virtual" lists.
+</p>
+
+<div id="Challenge 3 - Separate Expense Type Lists-The &quot;Filtered View&quot; Approach-1. Create the Filtered Properties"><h3 id="1. Create the Filtered Properties" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-The &quot;Filtered View&quot; Approach-1. Create the Filtered Properties">1. Create the Filtered Properties</a></h3></div>
+
+<p>
+Add these inside your <code>ContentView</code> struct (right above the <code>body</code>). They will automatically re-run whenever <code>expenses.items</code> changes.
+</p>
+
+<pre swift>
+var personalExpenses: [ExpenseItem] {
+    expenses.items.filter { $0.type == "Personal" }
+}
+
+var businessExpenses: [ExpenseItem] {
+    expenses.items.filter { $0.type == "Business" }
+}
+</pre>
+
+<div id="Challenge 3 - Separate Expense Type Lists-The &quot;Filtered View&quot; Approach-2. Update the List with Section"><h3 id="2. Update the List with Section" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-The &quot;Filtered View&quot; Approach-2. Update the List with Section">2. Update the List with Section</a></h3></div>
+
+<p>
+Now, instead of one big <code>ForEach</code>, you use <code>Section</code> views. This gives you the nice iOS-native headers for free.
+</p>
+
+<pre swift>
+List {
+    Section("Personal") {
+        ForEach(personalExpenses) { item in
+            ExpenseRow(item: item) // Let's clean this up (see below)
+        }
+        .onDelete { offsets in
+            removeItems(at: offsets, in: personalExpenses)
+        }
+    }
+
+    Section("Business") {
+        ForEach(businessExpenses) { item in
+            ExpenseRow(item: item)
+        }
+        .onDelete { offsets in
+            removeItems(at: offsets, in: businessExpenses)
+        }
+    }
+}
+</pre>
+
+<div id="Challenge 3 - Separate Expense Type Lists-The &quot;Deletion&quot; Challenge"><h2 id="The &quot;Deletion&quot; Challenge" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-The &quot;Deletion&quot; Challenge">The "Deletion" Challenge</a></h2></div>
+
+<p>
+When you use filtered arrays, <code>onDelete</code> gives you the index of the item in that filtered list, not the main array. If you delete the 1st "Business" item, it might actually be the 10th item in your main array!
+</p>
+
+<p>
+To fix this, update your <code>removeItems</code> function to find the "real" ID:
+</p>
+
+<pre swift>
+func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+    for offset in offsets {
+        let item = source[offset]
+        if let index = expenses.items.firstIndex(where: { $0.id == item.id }) {
+            expenses.items.remove(at: index)
+        }
+    }
+}
+</pre>
+
+<div id="Challenge 3 - Separate Expense Type Lists-Pro-Tip: The &quot;Sub-View&quot; Refactor"><h2 id="Pro-Tip: The &quot;Sub-View&quot; Refactor" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Pro-Tip: The &quot;Sub-View&quot; Refactor">Pro-Tip: The "Sub-View" Refactor</a></h2></div>
+
+<p>
+Since you are now using the same <code>HStack</code> code twice (once for Personal, once for Business), your <code>body</code> is going to get messy. Create a small helper view inside the same file to keep things tidy:
+</p>
+
+<pre swift>
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    // You can move your color logic here too!
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name).font(.headline)
+                Text(item.type)
+            }
+            Spacer()
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+        }
+    }
+}
+</pre>
+
+<div id="Challenge 3 - Separate Expense Type Lists-Why this is the &quot;Best&quot; way:"><h2 id="Why this is the &quot;Best&quot; way:" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Why this is the &quot;Best&quot; way:">Why this is the "Best" way:</a></h2></div>
+
+<ul>
+<li>
+Single Source of Truth: You still only have one <code>items</code> array to save to <code>UserDefaults</code>.
+
+<li>
+Automatic Updates: Because Expenses is <code>@Observable</code>, any time you add an item in <code>AddView</code>, these filtered properties re-calculate instantly.
+
+<li>
+Native Feel: Using <code>Section</code> in a <code>List</code> provides the standard iOS grouping that users expect.
+
+</ul>
+<div id="Challenge 3 - Separate Expense Type Lists-Completed"><h2 id="Completed" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Completed">Completed</a></h2></div>
+
+<p>
+Here is the complete picture of how your <code>ContentView</code> should look with the <span id="Challenge 3 - Separate Expense Type Lists-Completed-Filtered Properties"></span><strong id="Filtered Properties">Filtered Properties</strong>, the <span id="Challenge 3 - Separate Expense Type Lists-Completed-Sections"></span><strong id="Sections">Sections</strong>, and the <span id="Challenge 3 - Separate Expense Type Lists-Completed-Corrected Deletion"></span><strong id="Corrected Deletion">Corrected Deletion</strong> Logic.
+</p>
+
+<div id="Challenge 3 - Separate Expense Type Lists-Completed-The Updated ContentView"><h3 id="The Updated ContentView" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Completed-The Updated ContentView">The Updated ContentView</a></h3></div>
+
+<pre swift>
+struct ContentView: View {
+    @State private var expenses = Expenses()
+    @State private var showingAddExpense = false
+
+    // 1. Filtered Computed Properties
+    var personalExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Personal" }
+    }
+
+    var businessExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Business" }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // 2. Personal Section
+                Section("Personal Expenses") {
+                    ForEach(personalExpenses) { item in
+                        expenseRow(for: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: personalExpenses)
+                    }
+                }
+
+                // 3. Business Section
+                Section("Business Expenses") {
+                    ForEach(businessExpenses) { item in
+                        expenseRow(for: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: businessExpenses)
+                    }
+                }
+            }
+            .navigationTitle("iExpense")
+            .toolbar {
+                Button("Add Expense", systemImage: "plus") {
+                    showingAddExpense = true
+                }
+            }
+            .sheet(isPresented: $showingAddExpense) {
+                AddView(expenses: expenses)
+            }
+        }
+    }
+
+    // 4. Helper View Function (to avoid repeating the HStack code)
+    func expenseRow(for item: ExpenseItem) -&gt; some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(color(for: item.amount))
+        }
+    }
+
+    // 5. Updated Deletion Logic
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            if let index = expenses.items.firstIndex(where: { $0.id == item.id }) {
+                expenses.items.remove(at: index)
+            }
+        }
+    }
+
+    func color(for amount: Double) -&gt; Color {
+        if amount &lt; 10 { return .primary }
+        if amount &lt; 100 { return .blue }
+        return .red
+    }
+}
+</pre>
+
+<div id="Challenge 3 - Separate Expense Type Lists-Completed-Why this works:"><h3 id="Why this works:" class="header"><a href="#Challenge 3 - Separate Expense Type Lists-Completed-Why this works:">Why this works:</a></h3></div>
+
+<ul>
+<li>
+The Delete Logic: This is the most critical part. When you delete the second item in the "Business" section, <code>offsets</code> says "Index 1." But in your main <code>expenses.items</code> array, that might actually be index 5. The new <code>removeItems</code> function looks at the <span id="Challenge 3 - Separate Expense Type Lists-Completed-Why this works:-UUID"></span><strong id="UUID">UUID</strong> of the item at "Index 1 of Business" and finds where that exact UUID lives in the master list.
+
+<li>
+The Section Header: Using <code>Section("Title")</code> inside a <code>List</code> automatically gives you the native iOS grouped look, which handles the spacing and font styling for you.
+
+<li>
+The Helper Function: I moved the <code>HStack</code> into a function called <code>expenseRow</code>. This means if you want to change the font or layout later, you only have to change it in one place instead of updating both the Personal and Business blocks.
+
+</ul>
+<p>
+One final warning: SwiftUI can sometimes be a bit "lazy" with <code>onDelete</code> inside multiple sections. If you find the swipe-to-delete animation looks a little jumpy, it’s usually just the Simulator being the Simulator. It should be buttery smooth on a real device!
+</p>
 
 <p>
 <br>
