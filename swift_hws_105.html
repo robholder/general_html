@@ -990,6 +990,172 @@ Section("Personal") {
 <span id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?-How to use it in your List-Quick catch"></span><strong id="Quick catch">Quick catch</strong>: If you move the logic into the <code>ExpenseRow</code> struct, remember to <span id="Challenge 3 - Separate Expense Type Lists-Integrate the Color function into the ExpenseRow Struct-Why move it into the ExpenseRow?-How to use it in your List-delete"></span><strong id="delete">delete</strong> the <code>func color(for amount: Double)</code> from your <code>ContentView</code> to avoid having duplicate code in two places!
 </p>
 
+<div id="Keeping Braces Organized"><h1 id="Keeping Braces Organized" class="header"><a href="#Keeping Braces Organized">Keeping Braces Organized</a></h1></div>
+
+<div id="Keeping Braces Organized-The &quot;Re-Indent&quot; Magic Trick:"><h3 id="The &quot;Re-Indent&quot; Magic Trick:" class="header"><a href="#Keeping Braces Organized-The &quot;Re-Indent&quot; Magic Trick:">The "Re-Indent" Magic Trick:</a></h3></div>
+
+<p>
+If your code starts looking like a zig-zag, highlight everything (<code>&lt;Cmd&gt; a</code>) and press <code>&lt;Ctrl&gt;&lt;Shift&gt;i</code>. Xcode will automatically snap every brace and line back to its proper indentation. If a block doesn't move where you expect it to, you’ve likely found a missing or extra brace.
+</p>
+
+<div id="Keeping Braces Organized-Click the &quot;Closing Brace&quot;:"><h3 id="Click the &quot;Closing Brace&quot;:" class="header"><a href="#Keeping Braces Organized-Click the &quot;Closing Brace&quot;:">Click the "Closing Brace":</a></h3></div>
+
+<table>
+<tr>
+<td>
+NOT In Vim Mode
+</td>
+</tr>
+</table>
+
+<p>
+If you click on a closing brace }, Xcode will subtly highlight the corresponding opening brace { at the top.
+</p>
+
+<div id="Keeping Braces Organized-The &quot;Folding&quot; Ribbon:"><h3 id="The &quot;Folding&quot; Ribbon:" class="header"><a href="#Keeping Braces Organized-The &quot;Folding&quot; Ribbon:">The "Folding" Ribbon:</a></h3></div>
+
+<table>
+<tr>
+<td>
+Must be activated in Xcode Settings
+</td>
+</tr>
+</table>
+
+<ul>
+<li>
+<code>Edit &gt; Settings &gt; Editing &gt; Display &gt; Code folding ribbon -&gt; on</code>
+
+</ul>
+<p>
+To the left of the code (between the line numbers and the code), you can hover to see the "folding" arrows. Clicking these collapses a block. Collapse the Stacks to see the "big picture" of the Stacks (like the <code>List</code> and <code>NavigationStack</code> structure).
+</p>
+
+<div id="Keeping Braces Organized-In Context"><h3 id="In Context" class="header"><a href="#Keeping Braces Organized-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+// Add Codable to the struct protocol list:
+struct ExpenseItem: Identifiable, Codable {
+    // Change id from 'let' to 'var'
+    var id = UUID()
+    let name: String
+    let type: String
+    let amount: Double
+}
+
+@Observable
+class Expenses {
+    var items = [ExpenseItem]() {
+        // Add the didSet code to save data
+        didSet {
+            if let encoded = try? JSONEncoder().encode(items) {
+                UserDefaults.standard.set(encoded, forKey: "Items")
+            }
+        }
+    }
+    init() {
+        if let savedItems = UserDefaults.standard.data(forKey: "Items") {
+            if let decodedItems = try? JSONDecoder().decode(
+                [ExpenseItem].self,
+                from: savedItems
+            ) {
+                items = decodedItems
+                return
+            }
+        }
+    }
+}
+
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary
+        case ..&lt;100: return .green
+        default: return .red
+        }
+    }
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name).font(.headline)
+                Text(item.type).font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(
+                item.amount,
+                format: .currency(
+                    code: Locale.current.currency?.identifier ?? "USD"
+                )
+            )
+            .foregroundStyle(amountColor)
+        }
+    }
+}
+
+struct ContentView: View {
+    
+    @State private var expenses = Expenses()
+    @State private var showingAddExpense = false
+    
+    var personalExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Personal" }
+    }
+    var businessExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Business" }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Personal") {
+                    ForEach(personalExpenses) { item in
+                        ExpenseRow(item: item)  // All the color already fixed inside
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: personalExpenses)
+                    }
+                }
+                Section("Business") {
+                    ForEach(businessExpenses) { item in
+                        ExpenseRow(item: item)  // All the color already fixed inside
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: businessExpenses)
+                    }
+                }
+            }
+            .navigationTitle("iExpense")
+            .toolbar {
+                Button("Add Expense", systemImage: "plus") {
+                    showingAddExpense = true
+                }
+            }
+            .sheet(isPresented: $showingAddExpense) {
+                AddView(expenses: expenses)
+            }
+        }
+    }
+    
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            if let index = expenses.items.firstIndex(where: { $0.id == item.id }
+            ) {
+                expenses.items.remove(at: index)
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 <br>
 <hr>
