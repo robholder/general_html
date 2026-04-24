@@ -1125,6 +1125,19 @@ The Minimap: If you have the Minimap enabled (on the right side of the editor), 
 It’s basically a way of saying to yourself (or other developers): <em>"Hey, this specific section of the file is for these specific things."</em> It's a hallmark of professional-grade Swift code!
 </p>
 
+<div id="Keeping Braces Organized-Full Code Walkthrough-In Context"><h3 id="In Context" class="header"><a href="#Keeping Braces Organized-Full Code Walkthrough-In Context">In Context</a></h3></div>
+
+<p>
+Two modules:
+</p>
+<ul>
+<li>
+<code>ContentView.swift</code>
+
+<li>
+<code>AddView.swift</code>
+
+</ul>
 <div id="Keeping Braces Organized-The ContentView Module"><h2 id="The ContentView Module" class="header"><a href="#Keeping Braces Organized-The ContentView Module">The ContentView Module</a></h2></div>
 
 <pre swift>
@@ -1428,201 +1441,6 @@ Form vs. List: While they look similar, a <code>Form</code> is optimized for inp
 Keyboard Type: <code>.decimalPad</code> is a "Quality of Life" feature. It prevents users from accidentally typing letters into your <code>Double</code> variable, which would cause the save to fail or behave oddly.
 
 </ul>
-<div id="Keeping Braces Organized-The AddView Module-In Context"><h3 id="In Context" class="header"><a href="#Keeping Braces Organized-The AddView Module-In Context">In Context</a></h3></div>
-
-<p>
-Two modules:
-</p>
-<ul>
-<li>
-<code>ContentView.swift</code>
-
-<li>
-<code>AddView.swift</code>
-
-</ul>
-<div id="Keeping Braces Organized-The AddView Module-In Context-ContentView"><h4 id="ContentView" class="header"><a href="#Keeping Braces Organized-The AddView Module-In Context-ContentView">ContentView</a></h4></div>
-
-<pre swift>
-import SwiftUI
-
-// Add Codable to the struct protocol list:
-struct ExpenseItem: Identifiable, Codable {
-    // Change id from 'let' to 'var'
-    var id = UUID()
-    let name: String
-    let type: String
-    let amount: Double
-}
-
-@Observable
-class Expenses {
-    var items = [ExpenseItem]() {
-        // Add the didSet code to save data
-        didSet {
-            if let encoded = try? JSONEncoder().encode(items) {
-                UserDefaults.standard.set(encoded, forKey: "Items")
-            }
-        }
-    }
-    init() {
-        if let savedItems = UserDefaults.standard.data(forKey: "Items") {
-            if let decodedItems = try? JSONDecoder().decode(
-                [ExpenseItem].self,
-                from: savedItems
-            ) {
-                items = decodedItems
-                return
-            }
-        }
-    }
-}
-
-struct ExpenseRow: View {
-    let item: ExpenseItem
-    
-    var amountColor: Color {
-        switch item.amount {
-        case ..&lt;10: return .primary
-        case ..&lt;100: return .green
-        default: return .red
-        }
-    }
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(item.name).font(.headline)
-                Text(item.type).font(.subheadline).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(
-                item.amount,
-                format: .currency(
-                    code: Locale.current.currency?.identifier ?? "USD"
-                )
-            )
-            .foregroundStyle(amountColor)
-        }
-    }
-}
-
-struct ContentView: View {
-    
-    @State private var expenses = Expenses()
-    @State private var showingAddExpense = false
-    
-    var personalExpenses: [ExpenseItem] {
-        expenses.items.filter { $0.type == "Personal" }
-    }
-    var businessExpenses: [ExpenseItem] {
-        expenses.items.filter { $0.type == "Business" }
-    }
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Personal") {
-                    ForEach(personalExpenses) { item in
-                        ExpenseRow(item: item)  // All the color already fixed inside
-                    }
-                    .onDelete { offsets in
-                        removeItems(at: offsets, in: personalExpenses)
-                    }
-                }
-                Section("Business") {
-                    ForEach(businessExpenses) { item in
-                        ExpenseRow(item: item)  // All the color already fixed inside
-                    }
-                    .onDelete { offsets in
-                        removeItems(at: offsets, in: businessExpenses)
-                    }
-                }
-            }
-            .navigationTitle("iExpense")
-            .toolbar {
-                Button("Add Expense", systemImage: "plus") {
-                    showingAddExpense = true
-                }
-            }
-            .sheet(isPresented: $showingAddExpense) {
-                AddView(expenses: expenses)
-            }
-        }
-    }
-    
-    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
-        for offset in offsets {
-            let item = source[offset]
-            if let index = expenses.items.firstIndex(where: { $0.id == item.id }
-            ) {
-                expenses.items.remove(at: index)
-            }
-        }
-    }
-}
-
-#Preview {
-    ContentView()
-}
-</pre>
-
-<div id="Keeping Braces Organized-The AddView Module-In Context-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#Keeping Braces Organized-The AddView Module-In Context-AddView.swift">AddView.swift</a></h4></div>
-
-<pre swift>
-//
-//  AddView.swift
-//  iExpenses
-//
-//  Created by Robert Holder on 4/21/26.
-//
-
-import SwiftUI
-
-struct AddView: View {
-    
-    // Create an Environment key for dismiss as a variable (dismiss)
-    @Environment(\.dismiss) var dismiss
-       
-    @State private var name = ""
-    @State private var type = "Personal"
-    @State private var amount = 0.0
-    
-    let types = ["Business", "Personal"]
-    
-    var expenses: Expenses
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Name", text: $name)
-                
-                Picker("Type", selection: $type) {
-                    ForEach(types, id: \.self) {
-                        Text($0)
-                    }
-                }
-                TextField("Aumount", value: $amount, format: .currency(code: "USD")).keyboardType(.decimalPad)
-            }
-            .navigationTitle("Add new expense")
-            .toolbar {
-                Button("Save") {
-                    let item = ExpenseItem(name: name, type: type, amount: amount)
-                    expenses.items.append(item)
-                    // Add the Environment var 'dismiss' as a function to close view.
-                    // This will flip the showingAddExpense to false.
-                    dismiss()
-                }
-            }
-        }
-    }
-}
-
-#Preview {
-    // We need to add argument here
-    AddView(expenses: Expenses())
-}
-</pre>
-
 <div id="The Next Challenge (Outside of the Hacking With Swift course)"><h1 id="The Next Challenge (Outside of the Hacking With Swift course)" class="header"><a href="#The Next Challenge (Outside of the Hacking With Swift course)">The Next Challenge (Outside of the Hacking With Swift course)</a></h1></div>
 
 <p>
