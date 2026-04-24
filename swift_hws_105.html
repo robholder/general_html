@@ -1031,7 +1031,221 @@ Must be activated in Xcode Settings
 To the left of the code (between the line numbers and the code), you can hover to see the "folding" arrows. Clicking these collapses a block. Collapse the Stacks to see the "big picture" of the Stacks (like the <code>List</code> and <code>NavigationStack</code> structure).
 </p>
 
-<div id="Keeping Braces Organized-In Context"><h3 id="In Context" class="header"><a href="#Keeping Braces Organized-In Context">In Context</a></h3></div>
+<div id="Keeping Braces Organized-Full Code Walkthrough"><h2 id="Full Code Walkthrough" class="header"><a href="#Keeping Braces Organized-Full Code Walkthrough">Full Code Walkthrough</a></h2></div>
+
+<p>
+This is a great way to "freeze" what you've learned and create a reference map for future projects. I’ve added detailed comments to every section, explaining the why behind the syntax.
+</p>
+
+<pre swift>
+import SwiftUI
+
+// MARK: - DATA MODEL
+// Structs are "Value Types." Use them to define the shape of your data.
+struct ExpenseItem: Identifiable, Codable {
+    // Identifiable: Lets the List know which item is which using a unique ID.
+    // Codable: Allows this data to be converted to JSON for saving (encoding/decoding).
+    
+    var id = UUID() // Generates a unique "Universally Unique Identifier."
+    let name: String
+    let type: String
+    let amount: Double
+}
+
+// MARK: - DATA STORAGE (THE "BRAIN")
+// @Observable: A macro that tells SwiftUI to watch this class for changes.
+// Classes are "Reference Types." Use them to share data across different views.
+@Observable
+class Expenses {
+    // The "Source of Truth" array.
+    var items = [ExpenseItem]() {
+        // didSet is a "Property Observer." It runs every time the array changes.
+        didSet {
+            // Convert the array into JSON data (encoding).
+            if let encoded = try? JSONEncoder().encode(items) {
+                // Save that JSON to the phone's permanent storage (UserDefaults).
+                UserDefaults.standard.set(encoded, forKey: "Items")
+            }
+        }
+    }
+    
+    // The initializer runs when the app first creates this object.
+    init() {
+        // Check if there is data saved under the key "Items."
+        if let savedItems = UserDefaults.standard.data(forKey: "Items") {
+            // Try to convert the JSON data back into an array of ExpenseItems (decoding).
+            if let decodedItems = try? JSONDecoder().decode([ExpenseItem].self, from: savedItems) {
+                items = decodedItems
+                return
+            }
+        }
+    }
+}
+
+// MARK: - COMPONENT VIEW (A REUSABLE ROW)
+// Extracting logic into a sub-view keeps the main layout clean.
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    // Computed Property: Logic that returns a specific type (Color).
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary      // Standard text color
+        case ..&lt;100: return .green      // Mid-range
+        default: return .red            // High expense
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary) // Faded grey look
+            }
+            
+            Spacer() // Pushes the following content to the far right
+            
+            // Format the Double as a currency based on the user's phone settings.
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor) // Applies our custom switch-case color
+        }
+    }
+}
+
+// MARK: - MAIN INTERFACE
+struct ContentView: View {
+    // @State: Tells SwiftUI that this view "owns" this data. 
+    // If 'expenses' changes, the view will re-draw.
+    @State private var expenses = Expenses()
+    
+    // Controls whether the AddView sheet is currently visible.
+    @State private var showingAddExpense = false
+    
+    // Filtered Computed Properties: 
+    // These create "virtual lists" based on the master 'items' array.
+    var personalExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Personal" }
+    }
+    var businessExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Business" }
+    }
+    
+    var body: some View {
+        // NavigationStack: Provides the header area and manages view transitions.
+        NavigationStack {
+            // List: Provides the scrolling, grouped look and swipe actions.
+            List {
+                // Section: Groups rows with a header.
+                Section("Personal") {
+                    ForEach(personalExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        // Pass the offsets and the specific filtered list.
+                        removeItems(at: offsets, in: personalExpenses)
+                    }
+                }
+                
+                Section("Business") {
+                    ForEach(businessExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: businessExpenses)
+                    }
+                }
+            }
+            .navigationTitle("iExpense") // Sets the text in the NavigationStack
+            .toolbar {
+                // Button with a system icon (SF Symbols).
+                Button("Add Expense", systemImage: "plus") {
+                    showingAddExpense = true
+                }
+            }
+            // A Modal Sheet that slides up when 'showingAddExpense' becomes true.
+            .sheet(isPresented: $showingAddExpense) {
+                // Passes the 'expenses' class so AddView can add items to it.
+                AddView(expenses: expenses)
+            }
+        }
+    }
+    
+    // FUNCTION: Handles item deletion across sections.
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            // We find the ID of the filtered item within the MASTER array.
+            if let index = expenses.items.firstIndex(where: { $0.id == item.id }) {
+                expenses.items.remove(at: index)
+            }
+        }
+    }
+}
+
+// MARK: - PREVIEW
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:"><h3 id="Key Concepts to Remember:" class="header"><a href="#Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:">Key Concepts to Remember:</a></h3></div>
+
+<ul>
+<li>
+Property Observers (<code>didSet</code>): Great for "silent" tasks like saving data every time a variable changes.
+
+<li>
+Computed Properties: Use these for UI logic (like colors or filtering) so your <code>body</code> stays focused on the layout.
+
+<li>
+Identifiable: Without <code>id = UUID()</code>, the <code>ForEach</code> wouldn't know which item you are trying to delete.
+
+<li>
+Locale.current: Using this makes your app "World-Ready"—it will show Euros for a user in France or Yen for a user in Japan automatically.
+
+</ul>
+<p>
+You’ve essentially built a mini "Model-View-ViewModel" (MVVM) architecture here:
+</p>
+
+<ul>
+<li>
+The Model: <code>ExpenseItem</code> (The data)
+
+<li>
+The View: <code>ContentView</code> and <code>ExpenseRow</code> (The interface)
+
+<li>
+The <code>ViewModel</code>: Expenses class (The logic that manages and saves the data)
+
+</ul>
+<p>
+By keeping these layers separate, your code stays "modular." If you decided tomorrow to save your data to the Cloud instead of <code>UserDefaults</code>, you’d only have to change the code inside the <code>Expenses</code> class—the rest of your app wouldn't even need to know anything had changed!
+</p>
+
+<p>
+Now that you have this annotated "Master Script," you have a perfect template for almost any data-entry app you want to build in the future.
+</p>
+
+<p>
+== In Context ===
+</p>
+
+<p>
+Two modules:
+</p>
+<ul>
+<li>
+<code>ContentView.swift</code>
+
+<li>
+<code>AddView.swift</code>
+
+</ul>
+<div id="Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-ContentView"><h4 id="ContentView" class="header"><a href="#Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-ContentView">ContentView</a></h4></div>
 
 <pre swift>
 import SwiftUI
@@ -1153,6 +1367,63 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+}
+</pre>
+
+<div id="Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-AddView.swift">AddView.swift</a></h4></div>
+
+<pre swift>
+//
+//  AddView.swift
+//  iExpenses
+//
+//  Created by Robert Holder on 4/21/26.
+//
+
+import SwiftUI
+
+struct AddView: View {
+    
+    // Create an Environment key for dismiss as a variable (dismiss)
+    @Environment(\.dismiss) var dismiss
+       
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    let types = ["Business", "Personal"]
+    
+    var expenses: Expenses
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+                
+                Picker("Type", selection: $type) {
+                    ForEach(types, id: \.self) {
+                        Text($0)
+                    }
+                }
+                TextField("Aumount", value: $amount, format: .currency(code: "USD")).keyboardType(.decimalPad)
+            }
+            .navigationTitle("Add new expense")
+            .toolbar {
+                Button("Save") {
+                    let item = ExpenseItem(name: name, type: type, amount: amount)
+                    expenses.items.append(item)
+                    // Add the Environment var 'dismiss' as a function to close view.
+                    // This will flip the showingAddExpense to false.
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    // We need to add argument here
+    AddView(expenses: Expenses())
 }
 </pre>
 
