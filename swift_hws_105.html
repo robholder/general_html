@@ -1230,9 +1230,109 @@ By keeping these layers separate, your code stays "modular." If you decided tomo
 Now that you have this annotated "Master Script," you have a perfect template for almost any data-entry app you want to build in the future.
 </p>
 
+<div id="Keeping Braces Organized-The AddView Module"><h2 id="The AddView Module" class="header"><a href="#Keeping Braces Organized-The AddView Module">The AddView Module</a></h2></div>
+
 <p>
-== In Context ===
+While <code>ContentView</code> is about reading data, this module is all about creating it and safely passing it back to the "Source of Truth."
 </p>
+
+<p>
+Here is the annotated walk-through for your <code>AddView.swift</code> file:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct AddView: View {
+    // MARK: - ENVIRONMENT &amp; STATE
+    
+    // @Environment: Accesses system-wide values. 
+    // Here, we grab the "dismiss" action, which allows the view to close itself.
+    @Environment(\.dismiss) var dismiss
+       
+    // @State: Local "Single Source of Truth" for the form fields.
+    // These hold the data temporarily until the user hits "Save."
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    // Data source for our Picker.
+    let types = ["Business", "Personal"]
+    
+    // MARK: - EXTERNAL DATA
+    
+    // This receives the 'Expenses' class instance from ContentView.
+    // Because it is a class (Reference Type), adding an item here 
+    // updates the same list seen in ContentView automatically.
+    var expenses: Expenses
+    
+    // MARK: - USER INTERFACE
+    var body: some View {
+        NavigationStack {
+            // Form: A specialized container that automatically styles rows 
+            // to look like standard iOS settings or input screens.
+            Form {
+                // $name: The '$' creates a "Two-Way Binding."
+                // 1. The TextField shows what's in the variable.
+                // 2. Typing in the field updates the variable instantly.
+                TextField("Name", text: $name)
+                
+                // Picker: Linking the 'selection' to our 'type' state.
+                Picker("Type", selection: $type) {
+                    // \.self: Tells SwiftUI to use the String itself as the unique ID.
+                    ForEach(types, id: \.self) {
+                        Text($0) // '$0' is shorthand for "the current string in the loop"
+                    }
+                }
+                
+                // TextField for numbers: Uses 'value' and 'format' instead of 'text'.
+                TextField("Amount", value: $amount, format: .currency(code: "USD"))
+                    .keyboardType(.decimalPad) // Forces the numeric keypad with a decimal point
+            }
+            .navigationTitle("Add new expense")
+            
+            // MARK: - ACTIONS
+            .toolbar {
+                Button("Save") {
+                    // 1. Package the local @State into a new ExpenseItem struct.
+                    let item = ExpenseItem(name: name, type: type, amount: amount)
+                    
+                    // 2. Append the new item to the shared Expenses class.
+                    expenses.items.append(item)
+                    
+                    // 3. Dismiss the view. 
+                    // This triggers the 'isPresented' binding in ContentView to become false.
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - PREVIEW
+#Preview {
+    // The Preview needs a "dummy" version of Expenses to render correctly.
+    AddView(expenses: Expenses())
+}
+</pre>
+
+<div id="Keeping Braces Organized-The AddView Module-Key Logic Annotations:"><h3 id="Key Logic Annotations:" class="header"><a href="#Keeping Braces Organized-The AddView Module-Key Logic Annotations:">Key Logic Annotations:</a></h3></div>
+
+<ul>
+<li>
+The Power of <code>dismiss()</code>: This is much cleaner than passing a boolean binding back and forth. You are telling the system, "I’m done with whatever modal state I’m in; please take me back."
+
+<li>
+Two-Way Bindings (<code>\(</code>): This is a core SwiftUI concept. Without that <code>\)</code>, the <code>TextField</code> could read the value but wouldn't be able to change it.
+
+<li>
+Form vs. List: While they look similar, a <code>Form</code> is optimized for input (handling focus, keyboard avoidance, and specific row alignment), whereas a <code>List</code> is optimized for displaying many rows of data.
+
+<li>
+Keyboard Type: <code>.decimalPad</code> is a "Quality of Life" feature. It prevents users from accidentally typing letters into your <code>Double</code> variable, which would cause the save to fail or behave oddly.
+
+</ul>
+<div id="Keeping Braces Organized-The AddView Module-In Context"><h3 id="In Context" class="header"><a href="#Keeping Braces Organized-The AddView Module-In Context">In Context</a></h3></div>
 
 <p>
 Two modules:
@@ -1245,7 +1345,7 @@ Two modules:
 <code>AddView.swift</code>
 
 </ul>
-<div id="Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-ContentView"><h4 id="ContentView" class="header"><a href="#Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-ContentView">ContentView</a></h4></div>
+<div id="Keeping Braces Organized-The AddView Module-In Context-ContentView"><h4 id="ContentView" class="header"><a href="#Keeping Braces Organized-The AddView Module-In Context-ContentView">ContentView</a></h4></div>
 
 <pre swift>
 import SwiftUI
@@ -1370,7 +1470,7 @@ struct ContentView: View {
 }
 </pre>
 
-<div id="Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#Keeping Braces Organized-Full Code Walkthrough-Key Concepts to Remember:-AddView.swift">AddView.swift</a></h4></div>
+<div id="Keeping Braces Organized-The AddView Module-In Context-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#Keeping Braces Organized-The AddView Module-In Context-AddView.swift">AddView.swift</a></h4></div>
 
 <pre swift>
 //
