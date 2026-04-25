@@ -199,22 +199,27 @@ It works in just the same way as <code>String(contentsOf:)</code>: give it a fil
 </p>
 
 <p>
-Add this to Bundle-Decodable.swift now:
+Add this to Bundle-Decodable.swift:
 </p>
 
 <pre swift>
 extension Bundle {
+    // Process the JSON file:
+    // '_' allows for unnamed arg, then 'file' as internal name
     func decode(_ file: String) -&gt; [String: Astronaut] {
+        // Create a dictionary structure of Astronaut instances (from the JSON file):
         guard let url = self.url(forResource: file, withExtension: nil) else {
             fatalError("Failed to locate \(file) in bundle.")
         }
-
+        // Using Data instead of String (because the struct uses 'codable' data not strings)
+        // create data from url
         guard let data = try? Data(contentsOf: url) else {
             fatalError("Failed to load \(file) from bundle.")
         }
 
         let decoder = JSONDecoder()
 
+        // Decode each string Astronaut struct dictionary item from 'data' 
         guard let loaded = try? decoder.decode([String: Astronaut].self, from: data) else {
             fatalError("Failed to decode \(file) from bundle.")
         }
@@ -448,6 +453,81 @@ do {
 It's not a big change, but it means the method will now tell you what went wrong with decoding - it's great for times when your Swift code and JSON file don't quite match up!
 </p>
 
+<div id="Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context-Astronaut.swift"><h4 id="Astronaut.swift" class="header"><a href="#Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context-Astronaut.swift">Astronaut.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Astronaut: Codable, Identifiable {
+    let id: String
+    let name: String
+    let description: String
+}
+</pre>
+
+<div id="Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context-Bundle-Decodable.swift"><h4 id="Bundle-Decodable.swift" class="header"><a href="#Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context-Bundle-Decodable.swift">Bundle-Decodable.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+extension Bundle {
+    func decode(_ file: String) -&gt; [String: Astronaut] {
+        guard let url = self.url(forResource: file, withExtension: nil) else {
+            fatalError("Failed to locate \(file) in bundle.")
+        }
+        
+        guard let data = try? Data(contentsOf: url) else {
+            fatalError("Failed to load \(file) from bundle.")
+        }
+        
+        let decoder = JSONDecoder()
+        
+//        // Simple version
+//        guard let loaded = try? decoder.decode([String: Astronaut].self, from: data) else {
+//            fatalError("Failed to decode \(file) from bundle.")
+//        }
+//        
+//        return loaded
+        
+        // Verbose errors if error thrown
+        do {
+            return try decoder.decode([String: Astronaut].self, from: data)
+        } catch DecodingError.keyNotFound(let key, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing key '\(key.stringValue)' - \(context.debugDescription)")
+        } catch DecodingError.typeMismatch(_, let context) {
+            fatalError("Failed to decode \(file) from bundle due to type mismatch - \(context.debugDescription)")
+        } catch DecodingError.valueNotFound(let type, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing \(type) value - \(context.debugDescription)")
+        } catch DecodingError.dataCorrupted(_) {
+            fatalError("Failed to decode \(file) from bundle because it appears to be invalid JSON.")
+        } catch {
+            fatalError("Failed to decode \(file) from bundle: \(error.localizedDescription)")
+        }
+
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 112 - Loading a specific kind of Codable data-The &quot;Decoupling&quot; Philosophy-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    let astronauts = Bundle.main.decode("astronauts.json")
+    
+    var body: some View {
+        Text(String(astronauts.count))
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <br>
