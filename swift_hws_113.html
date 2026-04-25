@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_113</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_112.html">Hacking With Swift - 112 - Loading a specific kind of Codable data</a>
+
+</ul>
+<div id="Hacking With Swift - 113 - Using generics to load any kind of Codable data"><h1 id="Hacking With Swift - 113 - Using generics to load any kind of Codable data" class="header"><a href="#Hacking With Swift - 113 - Using generics to load any kind of Codable data">Hacking With Swift - 113 - Using generics to load any kind of Codable data</a></h1></div>
+
+<p>
+We added a <code>Bundle</code> extension for loading one specific type of JSON data from our app bundle, but now we have a second type: missions.json. This contains slightly more complex JSON:
+</p>
+
+<ul>
+<li>
+Every mission has an ID number, which means we can use <code>Identifiable</code> easily.
+
+<li>
+Every mission has a description, which is a free text string taken from Wikipedia.
+
+<li>
+Every mission has an array of crew, where each crew member has a name and role.
+
+<li>
+All but one missions has a launch date. Sadly, Apollo 1 never launched because a launch rehearsal cabin fire destroyed the command module and killed the crew.
+
+</ul>
+<p>
+Let’s start converting that to code. Crew roles need to be represented as their own struct, storing the name string and role string. So, create a new Swift file called Mission.swift and give it this code:
+</p>
+
+<pre swift>
+struct CrewRole: Codable {
+    let name: String
+    let role: String
+}
+</pre>
+
+<p>
+As for the missions, this will be an ID integer, an array of <code>CrewRole</code>, and a description string. But what about the launch date – we might have one, but we also might not have one. What should <em>that</em> be?
+</p>
+
+<p>
+Well, think about it: how does Swift represent this “maybe, maybe not” elsewhere? How would we store “might be a string, might be nothing at all”? I hope the answer is clear: we use optionals.
+</p>
+
+<pre swift>
+// Optional example:
+let launchDate: String?
+</pre>
+
+<p>
+In fact, if we mark a property as optional <code>Codable</code> will automatically skip over it if the value is missing from our input JSON.
+</p>
+
+<p>
+So, add this second struct to Mission.swift now:
+</p>
+
+<pre swift>
+struct Mission: Codable, Identifiable {
+    let id: Int
+    let launchDate: String?
+    let crew: [CrewRole]
+    let description: String
+}
+</pre>
+
+<p>
+Before we look at how to load JSON into that, I want to demonstrate one more thing: our <code>CrewRole</code> struct was made specifically to hold data about missions, and as a result we can actually put the <code>CrewRole</code> struct inside the <code>Mission</code> struct like this:
+</p>
+
+<pre swift>
+struct Mission: Codable, Identifiable {
+    struct CrewRole: Codable {
+        let name: String
+        let role: String
+    }
+
+    let id: Int
+    let launchDate: String?
+    let crew: [CrewRole]
+    let description: String
+}
+</pre>
+
+<p>
+This is called a nested struct, and is simply one struct placed inside of another. This won’t affect our code in this project, but elsewhere it’s useful to help keep your code organized: rather than saying <code>CrewRole</code> you’d write <code>Mission.CrewRole</code>. If you can imagine a project with several hundred custom types, adding this extra context can really help!
+</p>
+
+<p>
+Now let’s think about how we can load <code>missions.json</code> into an array of <code>Mission</code> structs. We already added a <code>Bundle</code> extension that loads some JSON file into a dictionary of <code>Astronaut</code> structs, so we could very easily copy and paste that, then tweak it so it loads missions rather than astronauts. However, there’s a better solution: we can leverage Swift’s generics system.
+</p>
+
+<p>
+Generics allow us to write code that is capable of working with a variety of different types. In this project, we wrote the <code>Bundle</code> extension to work with dictionary of astronauts, but really we want to be able to handle dictionaries of astronauts, arrays of missions, or potentially lots of other things.
+</p>
+
+<p>
+To make a method generic, we give it a placeholder for certain types. This is written in angle brackets (<code>&lt;</code> and <code>&gt;</code>) after the method name but before its parameters, like this:
+</p>
+
+<pre swift>
+func decode&lt;T&gt;(_ file: String) -&gt; [String: Astronaut] {
+</pre>
+
+<p>
+We can use anything for that placeholder – we could have written “Type”, “TypeOfThing”, or even “Fish”; it doesn’t matter. “T” is a bit of a convention in coding, as a short-hand placeholder for “type”.
+</p>
+
+<p>
+Inside the method, we can now use “T” everywhere we would use <code>[String: Astronaut]</code> – it is literally a placeholder for the type we want to work with. So, rather than returning <code>[String: Astronaut]</code> we would use this:
+</p>
+
+<pre swift>
+func decode&lt;T&gt;(_ file: String) -&gt; T {
+</pre>
+
+<p>
+<span id="Hacking With Swift - 113 - Using generics to load any kind of Codable data-Be very careful"></span><strong id="Be very careful">Be very careful</strong>: There is a big difference between <code>T</code> and <code>[T]</code>. Remember, <code>T</code> is a placeholder for whatever type we ask for, so if we say “decode our dictionary of astronauts,” then <code>T</code> becomes <code>[String: Astronaut]</code>. If we attempt to return <code>[T]</code> from <code>decode()</code> then we would actually be returning <code>[String: Astronaut]</code> – an array of dictionaries of astronauts!
+</p>
+
+<p>
+Towards the middle of the <code>decode()</code> method there’s another place where <code>[String: Astronaut]</code> is used:
+</p>
+
+<pre swift>
+return try decoder.decode([String: Astronaut].self, from: data)
+</pre>
+
+<p>
+Again, please change that to T, like this:
+</p>
+
+<pre swift>
+return try decoder.decode(T.self, from: data)
+</pre>
+
+<p>
+So, what we’ve said is that <code>decode()</code> will be used with some sort of type, such as <code>[String: Astronaut]</code>, and it should attempt to decode the file it has loaded to be that type.
+</p>
+
+<p>
+If you try compiling this code, you’ll see an error in Xcode: “Instance method 'decode(_:from:)' requires that 'T' conform to 'Decodable’”. What it means is that <code>T</code> could be anything: it could be a dictionary of astronauts, or it could be a dictionary of something else entirely. The problem is that Swift can’t be sure the type we’re working with conforms to the <code>Codable</code> protocol, so rather than take a risk it’s refusing to build our code.
+</p>
+
+<p>
+Fortunately we can fix this with a constraint: we can tell Swift that <code>T</code> can be whatever we want, as long as that thing conforms to <code>Codable</code>. That way Swift knows it’s safe to use, and will make sure we don’t try to use the method with a type that doesn’t conform to <code>Codable</code>.
+</p>
+
+<p>
+To add the constraint, change the method signature to this:
+</p>
+
+<pre swift>
+func decode&lt;T: Codable&gt;(_ file: String) -&gt; T {
+</pre>
+
+<p>
+If you try compiling again, you’ll see that things <em>still</em> aren’t working, but now it’s for a different reason: “Generic parameter 'T' could not be inferred”, over in the <code>astronauts</code> property of <code>ContentView</code>. This line worked fine before, but there has been an important change now: before <code>decode()</code> would always return a dictionary of astronauts, but now it returns anything we want as long as it conforms to <code>Codable</code>.
+</p>
+
+<p>
+<em>We</em> know it will <em>still</em> return a dictionary of astronauts because the actual underlying data hasn’t changed, but Swift <em>doesn’t</em> know that. Our problem is that <code>decode()</code> can return any type that conforms to <code>Codable</code>, but Swift needs more information – it wants to know exactly what type it will be.
+</p>
+
+<p>
+So, to fix this we need to use a type annotation so Swift knows exactly what <code>astronauts</code> will be:
+</p>
+
+<pre swift>
+let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+</pre>
+
+<p>
+Finally – after all that work! – we can now also load <code>mission.json</code> into another property in <code>ContentView</code>. Please add this below <code>astronauts</code>:
+</p>
+
+<pre swift>
+let missions: [Mission] = Bundle.main.decode("missions.json")
+</pre>
+
+<p>
+And <em>that</em> is the power of generics: we can use the same <code>decode()</code> method to load any JSON from our bundle into any Swift type that conforms to <code>Codable</code> – we don’t need half a dozen variants of the same method.
+</p>
+
+<p>
+Before we’re done, there’s one last thing I’d like to explain. Earlier you saw the message “Instance method 'decode(_:from:)' requires that 'T' conform to 'Decodable’”, and you might have wondered what <code>Decodable</code> was – after all, we’ve been using <code>Codable</code> everywhere. Well, behind the scenes, <code>Codable</code> is just an alias for two separate protocols: <code>Encodable</code> and <code>Decodable</code>. You can use <code>Codable</code> if you want, or you can use <code>Encodable</code> and <code>Decodable</code> if you prefer being specific – it’s down to you.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
