@@ -32,25 +32,147 @@
 <div id="Hacking With Swift - 116 - Merging Codable structs"><h1 id="Hacking With Swift - 116 - Merging Codable structs" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs">Hacking With Swift - 116 - Merging Codable structs</a></h1></div>
 
 <p>
-Below our mission description we want to show the pictures, names, and roles of each crew member, which means matching up data that came from two different JSON files.
+Below our mission description we want to show:
+</p>
+<ul>
+<li>
+pictures,
+
+<li>
+names,
+
+<li>
+roles
+
+</ul>
+<p>
+...of each crew member, which means matching up data that came from two different JSON files.
 </p>
 
 <p>
-If you remember, our JSON data is split across <code>missions.json</code> and <code>astronauts.json</code>.
+If you remember, our JSON data is split across:
 </p>
+<ul>
+<li>
+<code>missions.json</code> and
 
+<li>
+<code>astronauts.json</code>.
+
+</ul>
 <p>
 This eliminates duplication in our data, because some astronauts took part in multiple missions, but it also means we need to write some code to join our data together - to resolve “armstrong” to “Neil A. Armstrong”, for example.
 </p>
 
-<p>
-On one side we have missions that know crew member “armstrong” had the role “Commander”, but has no idea who “armstrong” is, and on the other side we have “Neil A. Armstrong” and a description of him, but no concept that he was the commander on Apollo 11.
-</p>
+<div id="Hacking With Swift - 116 - Merging Codable structs-astronaut.json"><h4 id="astronaut.json" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-astronaut.json">astronaut.json</a></h4></div>
 
 <p>
-So, what we need to do is make our <code>MissionView</code> accept the mission that got tapped, along with our full astronauts dictionary, then have it figure out which astronauts actually took part in the launch.
+Truncated:
 </p>
 
+<table>
+<tr>
+<td>
+Note the "id" holds the common name format in both json files.
+</td>
+</tr>
+</table>
+
+<pre json>
+{
+    "grissom": {
+        "id": "grissom",
+		"name": "Virgil I. \"Gus\" Grissom",
+		"description": "Virgil Ivan \"Gus\" Grissom (April 3, 1926 – January 27, 1967) was one of...blah."
+	},
+    "white": {
+        "id": "white",
+		"name": "Edward H. White II",
+		"description": "Edward Higgins White II (November 14, 1930 – January 27, 1967) (Lt Col, USAF) was...blah."
+	},
+}
+</pre>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-mission.json"><h4 id="mission.json" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-mission.json">mission.json</a></h4></div>
+
+<p>
+Truncated:
+</p>
+
+<table>
+<tr>
+<td>
+Note the crew"["name"] holds the common name format in both json files.
+</td>
+</tr>
+</table>
+
+<pre json>
+[
+	{
+		"id": 1,
+		"crew": [
+            {
+                "name": "grissom",
+                "role": "Command Pilot"
+            },
+            {
+                "name": "white",
+                "role": "Senior Pilot"
+            },
+            {
+                "name": "chaffee",
+                "role": "Pilot"
+            }
+		],
+		"description": "Apollo 1, initially designated AS-204, was the first...blah."
+	},
+	{
+		"id": 7,
+        "launchDate": "1968-10-11",
+		"crew": [
+            {
+                "name": "schirra",
+                "role": "Commander"
+            },
+            {
+                "name": "eisele",
+                "role": "Command Module Pilot"
+            },
+            {
+                "name": "cunningham",
+                "role": "Lunar Module Pilot"
+            }
+		],
+		"description": "Apollo 7 was an October 1968 human spaceflight mission carried...blah."
+	},
+]
+</pre>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Situation"><h3 id="Situation" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Situation">Situation</a></h3></div>
+
+<ul>
+<li>
+In <code>missionsjson</code> we know crew member “armstrong” had the role “Commander”, but have no idea who “armstrong” is.
+
+<li>
+In <code>astronoats.json</code> we have “Neil A. Armstrong” and a description of him, but no concept that he was the commander on Apollo 11.
+
+</ul>
+<p>
+So, what we need to do is make our <code>MissionView</code> accept:
+</p>
+<ul>
+<li>
+the mission that got selected,
+
+<li>
+the full astronauts dictionary
+
+<li>
+then have it figure out which astronauts actually took part in the launch.
+
+</ul>
 <p>
 Add this nested struct inside <code>MissionView</code> now:
 </p>
@@ -63,7 +185,7 @@ struct CrewMember {
 </pre>
 
 <p>
-Now for the tricky part: we need to add a property to <code>MissionView</code> that stores an array of <code>CrewMember</code> objects - these are the fully resolved role / astronaut pairings. At first that’s as simple as adding another property:
+We need to add a property to <code>MissionView</code> that stores an array of <code>CrewMember</code> objects - these are the fully resolved role / astronaut pairings. At first that’s as simple as adding another property:
 </p>
 
 <pre swift>
@@ -88,31 +210,54 @@ Then for each crew member, look in the dictionary to find the one that has a mat
 <li>
 When we find a matching crew member ID, we can convert that and their role into a <code>CrewMember</code> object,
 
+</ul>
+<div id="Hacking With Swift - 116 - Merging Codable structs-Situation-Point of Failure"><h4 id="Point of Failure" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Situation-Point of Failure">Point of Failure</a></h4></div>
+
+<ul>
 <li>
 But if we don’t it means somehow we have a crew role with an invalid or unknown name.
 
 </ul>
 <p>
-<span id="Hacking With Swift - 116 - Merging Codable structs-That latter case should never happen."></span><strong id="That latter case should never happen.">That latter case should never happen.</strong> To be clear, if you’ve added some JSON to your project that points to missing data in your app, you’ve made a fundamental mistake - it’s not the kind of thing you should try to write error handling for at runtime, because it should never be allowed to happen in the first place. So, this is a great example of where <code>fatalError()</code> is useful: if we can’t find an astronaut using their ID, we should exit immediately and complain loudly.
+<span id="Hacking With Swift - 116 - Merging Codable structs-Situation-Point of Failure-That latter case should never happen."></span><strong id="That latter case should never happen.">That latter case should never happen.</strong> To be clear, if you’ve added some JSON to your project that points to missing data in your app, you’ve made a fundamental mistake - it’s not the kind of thing you should try to write error handling for at runtime, because it should never be allowed to happen in the first place. So, this is a great example of where <code>fatalError()</code> is useful: if we can’t find an astronaut using their ID, we should exit immediately and complain loudly.
+</p>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Custom Initializer"><h2 id="Custom Initializer" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Custom Initializer">Custom Initializer</a></h2></div>
+
+<p>
+Using a custom initializer for <code>MissionView</code>. Like I said, this will accept the mission it represents along with all the astronauts, and its job is to store the mission away then figure out the array of resolved astronauts.
 </p>
 
 <p>
-Let’s put all that into code, using a custom initializer for <code>MissionView</code>. Like I said, this will accept the mission it represents along with all the astronauts, and its job is to store the mission away then figure out the array of resolved astronauts.
-</p>
-
-<p>
-Here’s the code:
+Here’s the <code>init</code> code inside the MissionView:
 </p>
 
 <pre swift>
-init(mission: Mission, astronauts: [String: Astronaut]) {
-    self.mission = mission
+struct MissionView: View {
+    
+    struct CrewMember {
+        let role: String
+        let astronaut: Astronaut
+    }
+    
+    let mission: Mission
+    let crew: [CrewMember]
+    
+    var body: some View {
+        ScrollView {
+    // All the view setup code
+    // ...
+    }
 
-    self.crew = mission.crew.map { member in
-        if let astronaut = astronauts[member.name] {
-            return CrewMember(role: member.role, astronaut: astronaut)
-        } else {
-            fatalError("Missing \(member.name)")
+    init(mission: Mission, astronauts: [String: Astronaut]) {
+        self.mission = mission
+
+        self.crew = mission.crew.map { member in
+            if let astronaut = astronauts[member.name] {
+                return CrewMember(role: member.role, astronaut: astronaut)
+            } else {
+                fatalError("Missing \(member.name)")
+            }
         }
     }
 }
@@ -357,6 +502,275 @@ struct MissionView: View {
 }
 </pre>
 
+<div id="Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Astronaut.swift"><h4 id="Astronaut.swift" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Astronaut.swift">Astronaut.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Astronaut: Codable, Identifiable {
+    let id: String
+    let name: String
+    let description: String
+}
+</pre>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Mission.swift"><h4 id="Mission.swift" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Mission.swift">Mission.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Mission: Codable, Identifiable {
+    struct CrewRole: Codable {
+        let name: String
+        let role: String
+    }
+    let id: Int
+    //let launchDate: String?
+    let launchDate: Date?
+    var formattedLaunchDate: String {
+        launchDate?.formatted(date: .abbreviated, time: .omitted) ?? "N/A"
+    }
+    let crew: [CrewRole]
+    let description: String
+    
+    var displayName: String {
+        "Apollo \(id)"
+    }
+    
+    var image: String {
+        "apollo\(id)"
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Color-Theme.swift"><h4 id="Color-Theme.swift" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Color-Theme.swift">Color-Theme.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+extension ShapeStyle where Self == Color {
+    static var darkBackground: Color {
+        Color(red: 0.1, green: 0.1, blue: 0.2)
+    }
+    
+    static var lightBackground: Color {
+        Color(red: 0.2, green: 0.2, blue: 0.3)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Bundle-Decodable.swift"><h4 id="Bundle-Decodable.swift" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-Bundle-Decodable.swift">Bundle-Decodable.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+extension Bundle {
+    // Use the Generics feature, and make a generic method
+    func decode&lt;T: Codable&gt;(_ file: String) -&gt; T {
+        guard let url = self.url(forResource: file, withExtension: nil) else {
+            fatalError("Failed to locate \(file) in bundle.")
+        }
+        
+        guard let data = try? Data(contentsOf: url) else {
+            fatalError("Failed to load \(file) from bundle.")
+        }
+        
+        let decoder = JSONDecoder()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "y-MM-dd"
+        decoder.dateDecodingStrategy = .formatted(formatter)
+        
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch DecodingError.keyNotFound(let key, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing key '\(key.stringValue)' - \(context.debugDescription)")
+        } catch DecodingError.typeMismatch(_, let context) {
+            fatalError("Failed to decode \(file) from bundle due to type mismatch - \(context.debugDescription)")
+        } catch DecodingError.valueNotFound(let type, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing \(type) value - \(context.debugDescription)")
+        } catch DecodingError.dataCorrupted(_) {
+            fatalError("Failed to decode \(file) from bundle because it appears to be invalid JSON.")
+        } catch {
+            fatalError("Failed to decode \(file) from bundle: \(error.localizedDescription)")
+        }
+
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-MissionView.swift"><h4 id="MissionView.swift" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-MissionView.swift">MissionView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct MissionView: View {
+    
+    struct CrewMember {
+        let role: String
+        let astronaut: Astronaut
+    }
+    
+    let mission: Mission
+    let crew: [CrewMember]
+    
+    var body: some View {
+        ScrollView {
+            VStack {
+                Image(mission.image)
+                    .resizable()
+                    .scaledToFit()
+                    .containerRelativeFrame(.horizontal) { width, axis in
+                        width * 0.6
+                    }
+                    .padding(.top)
+                
+                VStack(alignment: .leading) {
+                    
+                    // Custom divider
+                    Rectangle()
+                        .frame(height: 2)
+                        .foregroundStyle(.lightBackground)
+                        .padding(.vertical)
+                    
+                    Text("Mission Highlights")
+                        .font(.title.bold())
+                        .padding(.bottom, 5)
+                    
+                    Text(mission.description)
+                    
+                    // Custom divider
+                    Rectangle()
+                        .frame(height: 2)
+                        .foregroundStyle(.lightBackground)
+                        .padding(.vertical)
+                    Text("Crew")
+                        .font(.title.bold())
+                        .padding(.bottom, 5)
+                    
+                }
+                .padding(.horizontal)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack {
+                        ForEach(crew, id: \.role) { crewMember in
+                            NavigationLink {
+                                Text("Astronaut details")
+                            } label: {
+                                HStack {
+                                    Image(crewMember.astronaut.id)
+                                        .resizable()
+                                        .frame(width: 104, height: 72)
+                                        .clipShape(.capsule)
+                                        .overlay(
+                                            Capsule()
+                                            .strokeBorder(.white, lineWidth: 1)
+                                         )
+                                    VStack(alignment: .leading) {
+                                        Text(crewMember.astronaut.name)
+                                            .foregroundStyle(.white)
+                                            .font(.headline)
+                                        Text(crewMember.role)
+                                            .foregroundStyle(.white.opacity(0.5))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.bottom)
+        }
+        .navigationTitle(mission.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .background(.darkBackground)
+    }
+    init(mission: Mission, astronauts: [String: Astronaut]) {
+        self.mission = mission
+        
+        self.crew = mission.crew.map { member in
+            if let astronaut = astronauts[member.name] {
+                return CrewMember(role: member.role, astronaut: astronaut)
+            } else {
+                fatalError("missing \(member.name)")
+            }
+        }
+    }
+}
+
+#Preview {
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    
+    return MissionView(mission: missions[0], astronauts: astronauts)
+        .preferredColorScheme(.dark)
+}
+</pre>
+
+<div id="Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 116 - Merging Codable structs-Title for Crew-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+mport SwiftUI
+
+struct ContentView: View {
+    
+    let columns = [
+    GridItem(.adaptive(minimum: 150))
+    ]
+    // Give type before assignment to allow use with Generic methods
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    // Give type before assignment to allow use with Generic methods
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns) {
+                    ForEach(missions) { mission in
+                        NavigationLink {
+                            Text("Detail view")
+                        } label: {
+                            VStack {
+                                Image(mission.image)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 100, height: 100)
+                                    .padding()
+                                
+                                VStack {
+                                    Text(mission.displayName)
+                                        .font(.headline)
+                                        .foregroundStyle(.white)
+                                    Text(mission.formattedLaunchDate)
+                                        .font(.caption)
+                                        .foregroundStyle(.white.opacity(0.8))
+                                }
+                                .padding(.vertical)
+                                .frame(maxWidth: .infinity)
+                                .background(.lightBackground)
+                            }
+                            .clipShape(.rect(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(.lightBackground)
+                            )
+                        }
+                    }
+                }
+                .padding([.horizontal, .bottom])
+            }
+            .navigationTitle("Moonshot")
+            .background(.darkBackground)
+            .preferredColorScheme(.dark)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <br>
