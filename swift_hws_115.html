@@ -50,13 +50,34 @@ Be curious - take the time to explore your skills and it will pay off!
 <div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Showing mission details with ScrollView and containerRelativeFrame()"><h2 id="Showing mission details with ScrollView and containerRelativeFrame()" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Showing mission details with ScrollView and containerRelativeFrame()">Showing mission details with ScrollView and containerRelativeFrame()</a></h2></div>
 
 <p>
-When the user selects one of the Apollo missions from our main list, we want to show information about the mission: its mission badge, its mission description, and all the astronauts that were on the crew along with their roles. The first two of those aren’t too hard, but the third requires a little more work because we need to match up crew IDs with crew details across our two JSON files.
+When the user selects one of the Apollo missions from our main list, we want to show information about the mission:
+</p>
+<ul>
+<li>
+its mission badge,
+
+<li>
+its mission description,
+
+<li>
+and all the astronauts that were on the crew along with their roles.
+
+</ul>
+<p>
+The first two of those aren’t too hard, but the third requires a little more work because we need to match up crew IDs with crew details across our two JSON files.
 </p>
 
 <p>
-Let’s start simple and work our way up: make a new SwiftUI view called <code>MissionView.swift</code>. Initially this will just have a <code>mission</code> property so that we can show the mission badge and description, but shortly we’ll add more to it.
+Let’s start simple and work our way up:
 </p>
+<ul>
+<li>
+make a new <span id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Showing mission details with ScrollView and containerRelativeFrame()-SwiftUI View"></span><strong id="SwiftUI View">SwiftUI View</strong> (<em>not plain file</em>) called <code>MissionView.swift</code>.
 
+<li>
+Initially this will just have a <code>mission</code> property so that we can show the mission badge and description, but shortly we’ll add more to it.
+
+</ul>
 <p>
 In terms of layout, this thing needs to have a scrolling <code>VStack</code> with a resizable image for the mission badge, then a text view. We’ll use <code>containerRelativeFrame()</code> to set the width of the mission image - through some trial and error I found that the mission badge worked best when it wasn’t full width - somewhere between 50% and 70% width looked better, to avoid it becoming weirdly big on the screen.
 </p>
@@ -99,29 +120,90 @@ struct MissionView: View {
 </pre>
 
 <p>
-Placing a <code>VStack</code> inside another <code>VStack</code> allows us to control alignment for one specific part of our view - our main mission image can be centered, while the mission details can be aligned to the leading edge.
+Placing a <code>VStack</code> inside another <code>VStack</code> allows us to control alignment for one specific part of our view:
+</p>
+<ul>
+<li>
+our main mission image can be centered,
+
+<li>
+while the mission details can be aligned to the leading edge.
+
+</ul>
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Fixing the Preview"><h2 id="Fixing the Preview" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Fixing the Preview">Fixing the Preview</a></h2></div>
+
+<p>
+With the new view in place the code will no longer build. The preview needs a <code>Mission</code> object passed in so it has something to render.
 </p>
 
 <p>
-Anyway, with that new view in place the code will no longer build, all because of the previews struct below it - that thing needs a <code>Mission</code> object passed in so it has something to render. Fortunately, our <code>Bundle</code> extension is available here as well:
+Fortunately, our <code>Bundle</code> extension is available here as well:
 </p>
 
 <pre swift>
 #Preview {
+    // View needs data to display!
     let missions: [Mission] = Bundle.main.decode("missions.json")
 
+    // Show the first item in the json data:
     return MissionView(mission: missions[0])
         .preferredColorScheme(.dark)
 }
 </pre>
 
 <p>
-<span id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Showing mission details with ScrollView and containerRelativeFrame()-Tip"></span><strong id="Tip">Tip</strong>: This view will automatically have a dark color scheme because it’s applied to the <code>NavigationStack</code> in <code>ContentView</code>, but the <code>MissionView</code> preview doesn’t know that so we need to enable it by hand.
+<span id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Fixing the Preview-Tip"></span><strong id="Tip">Tip</strong>: This view will automatically have a dark color scheme because it’s applied to the <code>NavigationStack</code> in <code>ContentView</code>, but the <code>MissionView</code> preview doesn’t know that so we need to enable it by hand.
 </p>
 
 <p>
 If you look in the preview you’ll see that’s a good start, but the next part is trickier: we want to show the list of astronauts who took part in the mission below the description. Let’s tackle that next…
 </p>
+
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Fixing the Preview-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Fixing the Preview-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Fixing the Preview-In Context-MissionView.swift"><h4 id="MissionView.swift" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-Fixing the Preview-In Context-MissionView.swift">MissionView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct MissionView: View {
+    let mission: Mission
+    
+    var body: some View {
+        ScrollView {
+            VStack {
+                Image(mission.image)
+                    .resizable()
+                    .scaledToFit()
+                    .containerRelativeFrame(.horizontal) { width, axis in
+                        width * 0.6
+                    }
+                    .padding(.top)
+                
+                VStack(alignment: .leading) {
+                    Text("Mission Highlights")
+                        .font(.title.bold())
+                        .padding(.bottom, 5)
+                    
+                    Text(mission.description)
+                }
+                .padding(.horizontal)
+            }
+            .padding(.bottom)
+        }
+        .navigationTitle(mission.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .background(.darkBackground)
+    }
+}
+
+#Preview {
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+    
+    return MissionView(mission: missions[0])
+        .preferredColorScheme(.dark)
+}
+</pre>
 
 
 <p>
