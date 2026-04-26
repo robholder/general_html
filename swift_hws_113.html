@@ -205,7 +205,11 @@ func decode&lt;T: Codable&gt;(_ file: String) -&gt; T {
 </pre>
 
 <p>
-If you try compiling again, you’ll see that things <em>still</em> aren’t working, but now it’s for a different reason: “Generic parameter 'T' could not be inferred”, over in the <code>astronauts</code> property of <code>ContentView</code>. This line worked fine before, but there has been an important change now: before <code>decode()</code> would always return a dictionary of astronauts, but now it returns anything we want as long as it conforms to <code>Codable</code>.
+If you try compiling again, you’ll see that things <em>still</em> aren’t working, but now it’s for a different reason: “Generic parameter 'T' could not be inferred”, over in the <code>astronauts</code> property of <code>ContentView</code>.
+</p>
+
+<p>
+This line worked fine before, but there has been an important change now: before <code>decode()</code> would always return a dictionary of astronauts, but now it returns anything we want as long as it conforms to <code>Codable</code>.
 </p>
 
 <p>
@@ -232,10 +236,265 @@ let missions: [Mission] = Bundle.main.decode("missions.json")
 And <em>that</em> is the power of generics: we can use the same <code>decode()</code> method to load any JSON from our bundle into any Swift type that conforms to <code>Codable</code> – we don’t need half a dozen variants of the same method.
 </p>
 
+<div id="Hacking With Swift - 113 - Using generics to load any kind of Codable data-Codable -&gt; Encodable &amp; Decodable"><h2 id="Codable -&gt; Encodable &amp; Decodable" class="header"><a href="#Hacking With Swift - 113 - Using generics to load any kind of Codable data-Codable -&gt; Encodable &amp; Decodable">Codable -&gt; Encodable &amp; Decodable</a></h2></div>
+
 <p>
 Before we’re done, there’s one last thing I’d like to explain. Earlier you saw the message “Instance method 'decode(_:from:)' requires that 'T' conform to 'Decodable’”, and you might have wondered what <code>Decodable</code> was – after all, we’ve been using <code>Codable</code> everywhere. Well, behind the scenes, <code>Codable</code> is just an alias for two separate protocols: <code>Encodable</code> and <code>Decodable</code>. You can use <code>Codable</code> if you want, or you can use <code>Encodable</code> and <code>Decodable</code> if you prefer being specific – it’s down to you.
 </p>
 
+<div id="AI Notes - on Data Type"><h1 id="AI Notes - on Data Type" class="header"><a href="#AI Notes - on Data Type">AI Notes - on Data Type</a></h1></div>
+
+<div id="AI Notes - on Data Type-QUESTION"><h2 id="QUESTION" class="header"><a href="#AI Notes - on Data Type-QUESTION">QUESTION</a></h2></div>
+
+<p>
+When we assign using two different structs, like this:
+</p>
+<pre swift>
+let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+let missions: [Mission] = Bundle.main.decode("missions.json")
+</pre>
+
+<p>
+...from these structs:
+</p>
+
+<pre swift>
+struct Astronaut: Codable, Identifiable {
+    let id: String
+    let name: String
+    let description: String
+}
+</pre>
+
+<p>
+...and
+</p>
+
+<pre swift>
+struct Mission: Codable, Identifiable {
+    struct CrewRole: Codable {
+        let name: String
+        let role: String
+    }
+    let id: Int
+    let launchDate: String?
+    let crew: [CrewRole]
+    let description: String
+}
+</pre>
+
+<p>
+...why is it that the Astronaut type is described as:
+</p>
+
+<pre swift>
+[String: Astronaut]
+</pre>
+
+<p>
+...and the Mission type as
+</p>
+
+<pre swift>
+[Mission]
+</pre>
+
+<p>
+If I remove the <code>String:</code> from the <code>Astronaut</code> struct reference, the app crashes. When we assign using two different structs, like this:
+</p>
+<pre swift>
+let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+let missions: [Mission] = Bundle.main.decode("missions.json")
+</pre>
+
+<p>
+...from these structs:
+</p>
+
+<pre swift>
+struct Astronaut: Codable, Identifiable {
+    let id: String
+    let name: String
+    let description: String
+}
+</pre>
+
+<p>
+...and
+</p>
+
+<pre swift>
+struct Mission: Codable, Identifiable {
+    struct CrewRole: Codable {
+        let name: String
+        let role: String
+    }
+    let id: Int
+    let launchDate: String?
+    let crew: [CrewRole]
+    let description: String
+}
+</pre>
+
+<p>
+...why is it that the Astronaut type is described as: <code>[String: Astronaut]</code>
+</p>
+
+<p>
+...and the Mission type as <code>[Mission]</code>.
+</p>
+
+<p>
+If I remove the 'String:' from the Astronaut struct reference, the app crashes.
+</p>
+
+<div id="AI Notes - on Data Type-ANSWER"><h2 id="ANSWER" class="header"><a href="#AI Notes - on Data Type-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a classic "JSON structure" puzzle. The reason one requires <code>[String: Astronaut]</code> and the other only <code>[Mission]</code> has nothing to do with Swift's preferences and everything to do with how the data is written inside those <code>.json</code> files.
+</p>
+
+<p>
+In short: <code>astronauts.json</code> is a <code>Dictionary</code>, while <code>missions.json</code> is an <code>Array</code>.
+</p>
+
+<div id="AI Notes - on Data Type-ANSWER-1. The Astronauts (A Dictionary/Map)"><h3 id="1. The Astronauts (A Dictionary/Map)" class="header"><a href="#AI Notes - on Data Type-ANSWER-1. The Astronauts (A Dictionary/Map)">1. The Astronauts (A Dictionary/Map)</a></h3></div>
+
+<p>
+If you open <code>astronauts.json</code>, you will see it looks like this:
+</p>
+
+<pre json>
+{
+    "grissom": {
+        "id": "grissom",
+        "name": "Virgil I. \"Gus\" Grissom",
+        "description": "..."
+    },
+    "white": {
+        "id": "white",
+        "name": "Edward H. White II",
+        "description": "..."
+    }
+}
+</pre>
+
+<ul>
+<li>
+Notice the <span id="AI Notes - on Data Type-ANSWER-1. The Astronauts (A Dictionary/Map)-curly braces"></span><strong id="curly braces">curly braces</strong> <code>{ }</code> at the very top. In JSON, this means an <span id="AI Notes - on Data Type-ANSWER-1. The Astronauts (A Dictionary/Map)-Object"></span><strong id="Object">Object</strong> (or Dictionary).
+
+<li>
+Each astronaut is "stored" under a <span id="AI Notes - on Data Type-ANSWER-1. The Astronauts (A Dictionary/Map)-Key"></span><strong id="Key">Key</strong> (like <code>"grissom"</code> or <code>"white"</code>).
+
+<li>
+In Swift, to represent a collection of values accessed by a name, we use a Dictionary: <code>[Key: Value]</code>. Since the keys are names, we use <code>[String: Astronaut]</code>.
+
+</ul>
+<div id="AI Notes - on Data Type-ANSWER-2. The Missions (An Array/List)"><h3 id="2. The Missions (An Array/List)" class="header"><a href="#AI Notes - on Data Type-ANSWER-2. The Missions (An Array/List)">2. The Missions (An Array/List)</a></h3></div>
+
+<p>
+Now, if you open <code>missions.json</code>, you will likely see this:
+</p>
+
+<pre json>
+[
+    {
+        "id": 1,
+        "crew": [...],
+        "description": "..."
+    },
+    {
+        "id": 2,
+        "crew": [...],
+        "description": "..."
+    }
+]
+</pre>
+
+<ul>
+<li>
+Notice the square brackets <code>[ ]</code> at the very top. In JSON, this means an <span id="AI Notes - on Data Type-ANSWER-2. The Missions (An Array/List)-Array"></span><strong id="Array">Array</strong> (an ordered list).
+
+<li>
+There are no "keys" (like "apollo1"). It’s just a list of mission objects appearing one after the other.
+
+<li>
+In Swift, a simple list is an Array: <code>[Mission]</code>.
+
+</ul>
+<div id="AI Notes - on Data Type-ANSWER-3. Why the App Crashes"><h3 id="3. Why the App Crashes" class="header"><a href="#AI Notes - on Data Type-ANSWER-3. Why the App Crashes">3. Why the App Crashes</a></h3></div>
+
+<p>
+When you call <code>Bundle.main.decode()</code>, the <code>JSONDecoder</code> looks at the file and then looks at the <span id="AI Notes - on Data Type-ANSWER-3. Why the App Crashes-Type"></span><strong id="Type">Type</strong> you requested.
+</p>
+
+<ul>
+<li>
+If you say <code>let astronauts: [Astronaut]</code>, you are telling Swift: <em>"Expect a list starting with a square bracket [."</em>
+
+<li>
+Swift opens the file, sees a curly brace <code>{</code>, and panics. It says, <em>"You promised me an Array, but this is a Dictionary!"</em> - and it throws a <code>fatalError</code>.
+
+</ul>
+<div id="AI Notes - on Data Type-ANSWER-4. How to identify them at a glance"><h3 id="4. How to identify them at a glance" class="header"><a href="#AI Notes - on Data Type-ANSWER-4. How to identify them at a glance">4. How to identify them at a glance</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+JSON Starts With...
+</th>
+<th>
+Swift Type
+</th>
+<th>
+Description
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>{</code> (Curly)
+</td>
+<td>
+<code>[String: Type]</code>
+</td>
+<td>
+<span id="AI Notes - on Data Type-ANSWER-4. How to identify them at a glance-Dictionary:"></span><strong id="Dictionary:">Dictionary:</strong> Data is "labeled" with keys.
+</td>
+</tr>
+<tr>
+<td>
+<code>[</code> (Square)
+</td>
+<td>
+<code>[Type]</code>
+</td>
+<td>
+<span id="AI Notes - on Data Type-ANSWER-4. How to identify them at a glance-Array:"></span><strong id="Array:">Array:</strong> Data is a "simple list."
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="AI Notes - on Data Type-ANSWER-A Vim Tip for JSON"><h3 id="A Vim Tip for JSON" class="header"><a href="#AI Notes - on Data Type-ANSWER-A Vim Tip for JSON">A Vim Tip for JSON</a></h3></div>
+
+<p>
+If you want to verify the file structure quickly without leaving your keyboard:
+</p>
+
+<ul>
+<li>
+Use <code>&lt;Cmd&gt;&lt;Shift&gt; o</code> (this calls the Xcode search) and type <code>astronauts.json</code>. 
+
+<li>
+In Vim mode, press <code>gg</code> to go to the very first character of the file.
+
+<li>
+If you see <code>{</code>, you know you need <code>[String: ...]</code>. If you see <code>[</code>, you know you need <code>[...]</code>.
+
+</ul>
 <p>
 <br>
 <hr>
