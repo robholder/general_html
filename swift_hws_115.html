@@ -90,7 +90,108 @@ Initially this will just have a <code>mission</code> property so that we can sho
 In terms of layout, this thing needs to have a scrolling <code>VStack</code> with a resizable image for the mission badge, then a text view. We’ll use <code>containerRelativeFrame()</code> to set the width of the mission image - through some trial and error I found that the mission badge worked best when it wasn’t full width - somewhere between 50% and 70% width looked better, to avoid it becoming weirdly big on the screen.
 </p>
 
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()"><h2 id="containerRelativeFrame()" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()">containerRelativeFrame()</a></h2></div>
+
 <p>
+<code>containerRelativeFrame()</code> is one of the coolest additions to SwiftUI, but the syntax is definitely a bit "math-heavy" at first glance.
+</p>
+
+<p>
+To understand <code>width</code> and <code>axis</code>, you have to realize that <code>.containerRelativeFrame</code> isn't just a size setting—it's a calculation.
+</p>
+
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-1. The Big Picture"><h3 id="1. The Big Picture" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-1. The Big Picture">1. The Big Picture</a></h3></div>
+
+<p>
+Usually, if you want a view to be 60% of the screen, you’d have to use a <code>GeometryReader</code>, which is famously clunky. <code>containerRelativeFrame</code> is the modern, cleaner way to say: <em>"Look at my parent container, see how much space it has, and then let me run some math on that number."</em>
+</p>
+
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-2. The Arguments: width and axis"><h3 id="2. The Arguments: width and axis" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-2. The Arguments: width and axis">2. The Arguments: width and axis</a></h3></div>
+
+<p>
+When you write the closure <code>{ width, axis in ... }</code>, SwiftUI is handing you two variables to help you decide the final size.
+</p>
+
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-2. The Arguments: width and axis-width (The Measurement)"><h4 id="width (The Measurement)" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-2. The Arguments: width and axis-width (The Measurement)">width (The Measurement)</a></h4></div>
+
+<p>
+Even though the variable is named <code>width</code>, it’s better to think of it as <span id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-2. The Arguments: width and axis-width (The Measurement)-&quot;The Available Dimension.&quot;"></span><strong id="&quot;The Available Dimension.&quot;">"The Available Dimension."</strong>
+</p>
+
+<ul>
+<li>
+Because you passed <code>.horizontal</code> as the first argument, SwiftUI calculates the total width of the screen (or the nearest container).
+
+<li>
+It then hands you that number (e.g., <code>390.0</code> on an iPhone 15) and says: <em>"Here is the total horizontal space. What do you want to do with it?"</em>
+
+</ul>
+<p>
+By writing <code>width * 0.6</code>, you are saying: <em>"Take that 390.0 and give me back 60% of it."</em>
+</p>
+
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-2. The Arguments: width and axis-axis (The Direction)"><h4 id="axis (The Direction)" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-2. The Arguments: width and axis-axis (The Direction)">axis (The Direction)</a></h4></div>
+
+<p>
+The <code>axis</code> tells you which direction you are currently calculating.
+</p>
+
+<ul>
+<li>
+In your code, <code>axis</code> will be <code>.horizontal</code>.
+
+<li>
+Why is this there? If you were using this modifier for both width and height at the same time, the <code>axis</code> variable would tell the code which one it's currently working on so you could use different math for each. (In 90% of cases, you'll ignore this variable, but SwiftUI provides it just in case).
+
+</ul>
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-3. Why use this in the Moonshot project?"><h3 id="3. Why use this in the Moonshot project?" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-3. Why use this in the Moonshot project?">3. Why use this in the Moonshot project?</a></h3></div>
+
+<p>
+In the Mission project, we use this for the mission badges or the horizontal scroll views.
+</p>
+
+<ul>
+<li>
+If we just gave the images a fixed width (like <code>200</code>), they might look great on an iPhone SE but tiny on an iPad.
+
+<li>
+By using <code>width * 0.6</code>, the badge will <span id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-3. Why use this in the Moonshot project?-always"></span><strong id="always">always</strong> take up 60% of the screen, regardless of whether the user is on a tiny phone or a giant tablet.
+
+</ul>
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-4. The View of the Closure"><h3 id="4. The View of the Closure" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-4. The View of the Closure">4. The View of the Closure</a></h3></div>
+
+<p>
+If it helps you visualize the "stages" of logic, think of the closure as a tiny function that SwiftUI runs every time the screen rotates:
+</p>
+
+<pre swift>
+// What SwiftUI is doing behind the scenes:
+func calculateSize(width: CGFloat, axis: Axis) -&gt; CGFloat {
+    // 1. SwiftUI sees you want .horizontal
+    // 2. SwiftUI measures the screen: "Okay, it's 400 points wide."
+    // 3. It runs your math:
+    return 400 * 0.6  // Result: 240
+}
+</pre>
+
+<div id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-Summary"><h3 id="Summary" class="header"><a href="#Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-Summary">Summary</a></h3></div>
+
+<ul>
+<li>
+<code>.horizontal</code>: Tells SwiftUI to measure the width.
+
+<li>
+<code>width</code>: Is the actual number (in points) of that width.
+
+<li>
+<code>axis</code>: Is a label reminding you that you're working on the horizontal plane.
+
+<li>
+<code>width * 0.6</code>: Is your "magic formula" to keep things proportional.
+
+</ul>
+<p>
+If you changed <code>.horizontal</code> to <code>.vertical</code>, that <code>width</code> variable would suddenly represent the <span id="Hacking With Swift - 115 - Showing mission details with ScrollView and containerRelativeFrame-containerRelativeFrame()-Summary-height"></span><strong id="height">height</strong> of the screen. It’s a bit of a misnomer, but "dimension" would have been a more accurate (albeit longer) name!
 Put this code into <code>MissionView.swift</code> now:
 </p>
 
