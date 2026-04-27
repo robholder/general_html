@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_117_codereview</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_117.html">Hacking With Swift - 117 - Finishing up with one last view</a>
+
+</ul>
+<div id="Hacking With Swift - 117a - Code Review"><h1 id="Hacking With Swift - 117a - Code Review" class="header"><a href="#Hacking With Swift - 117a - Code Review">Hacking With Swift - 117a - Code Review</a></h1></div>
+
+<div id="Hacking With Swift - 117a - Code Review-Astronaut.swift"><h4 id="Astronaut.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-Astronaut.swift">Astronaut.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Astronaut: Codable, Identifiable {
+    let id: String
+    let name: String
+    let description: String
+}
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-astronauts.json"><h4 id="astronauts.json" class="header"><a href="#Hacking With Swift - 117a - Code Review-astronauts.json">astronauts.json</a></h4></div>
+
+<p>
+Truncated:
+</p>
+<pre json>
+{
+    "grissom": {
+        "id": "grissom",
+		"name": "Virgil I. \"Gus\" Grissom",
+		"description": "Virgil Ivan \"Gus\" Grissom (April 3, 1926 – January 27, 1967) was.."
+	},
+    "white": {
+        "id": "white",
+		"name": "Edward H. White II",
+		"description": "Edward Higgins White II (November 14, 1930 – January 27, 1967) (Lt Col, USAF) was.."
+	},
+]
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-AstronautView.swift"><h4 id="AstronautView.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-AstronautView.swift">AstronautView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct AstronautView: View {
+    
+    let astronaut: Astronaut
+    
+    var body: some View {
+        ScrollView {
+            VStack {
+                Image(astronaut.id)
+                    .resizable()
+                    .scaledToFit()
+                
+                Text(astronaut.description)
+                    .padding()
+            }
+        }
+        .background(.darkBackground)
+        .navigationTitle(astronaut.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+#Preview {
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    
+    return AstronautView(astronaut: astronauts["aldrin"]!)
+        .preferredColorScheme(.dark)
+}
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-Bundle-Decodable.swift"><h4 id="Bundle-Decodable.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-Bundle-Decodable.swift">Bundle-Decodable.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+extension Bundle {
+    // Use the Generics feature, and make a generic method
+    func decode&lt;T: Codable&gt;(_ file: String) -&gt; T {
+        guard let url = self.url(forResource: file, withExtension: nil) else {
+            fatalError("Failed to locate \(file) in bundle.")
+        }
+        
+        guard let data = try? Data(contentsOf: url) else {
+            fatalError("Failed to load \(file) from bundle.")
+        }
+        
+        let decoder = JSONDecoder()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "y-MM-dd"
+        decoder.dateDecodingStrategy = .formatted(formatter)
+        
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch DecodingError.keyNotFound(let key, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing key '\(key.stringValue)' - \(context.debugDescription)")
+        } catch DecodingError.typeMismatch(_, let context) {
+            fatalError("Failed to decode \(file) from bundle due to type mismatch - \(context.debugDescription)")
+        } catch DecodingError.valueNotFound(let type, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing \(type) value - \(context.debugDescription)")
+        } catch DecodingError.dataCorrupted(_) {
+            fatalError("Failed to decode \(file) from bundle because it appears to be invalid JSON.")
+        } catch {
+            fatalError("Failed to decode \(file) from bundle: \(error.localizedDescription)")
+        }
+
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-Color-Theme.swift"><h4 id="Color-Theme.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-Color-Theme.swift">Color-Theme.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+extension ShapeStyle where Self == Color {
+    static var darkBackground: Color {
+        Color(red: 0.1, green: 0.1, blue: 0.2)
+    }
+    
+    static var lightBackground: Color {
+        Color(red: 0.2, green: 0.2, blue: 0.3)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    
+    // make grid item object
+    let columns = [
+    GridItem(.adaptive(minimum: 150))
+    ]
+    // Load data from two JSON files:
+    // From "astronauts.json":
+    // Give type [String: Astronaut] before assignment to allow use with Generic methods
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    // From "missions.json":
+    // Give type [Mission] before assignment to allow use with Generic methods
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                // Load and arrange grid object - from columns var
+                LazyVGrid(columns: columns) {
+                    // Loop through each 'mission' in 'missions', the local var from JSON
+                    ForEach(missions) { mission in
+                        NavigationLink {
+                            // Pass the specific mission data and the whole astronauts dict.
+                            // from the vars above.
+                            // MissionView (call view)
+                            // mission(MissionView arg): mission (this view's var),
+                            // astronauts (MissionView arg): astronauts (this view var)
+                            MissionView(mission: mission, astronauts: astronauts)
+                        } label: {
+                            VStack {
+                                // Show mission logo/image (from mission object property)
+                                Image(mission.image)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 100, height: 100)
+                                    .padding()
+                                
+                                VStack {
+                                    // Show mission name (from mission object property)
+                                    Text(mission.displayName)
+                                        .font(.headline)
+                                        .foregroundStyle(.white)
+                                    // Show mission date (from mission object property)
+                                    Text(mission.formattedLaunchDate)
+                                        .font(.caption)
+                                        .foregroundStyle(.white.opacity(0.8))
+                                }
+                                // Format mission labels
+                                .padding(.vertical)
+                                .frame(maxWidth: .infinity)
+                                .background(.lightBackground)
+                            }
+                            // Frame mission labels
+                            .clipShape(.rect(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(.lightBackground)
+                            )
+                        }
+                    }
+                }
+                .padding([.horizontal, .bottom])
+            }
+            .navigationTitle("Moonshot")
+            .background(.darkBackground)
+            .preferredColorScheme(.dark)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-Mission.swift"><h4 id="Mission.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-Mission.swift">Mission.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Mission: Codable, Identifiable {
+    struct CrewRole: Codable {
+        let name: String
+        let role: String
+    }
+    let id: Int
+    //let launchDate: String?
+    let launchDate: Date?
+    var formattedLaunchDate: String {
+        launchDate?.formatted(date: .abbreviated, time: .omitted) ?? "N/A"
+    }
+    let crew: [CrewRole]
+    let description: String
+    
+    var displayName: String {
+        "Apollo \(id)"
+    }
+    
+    var image: String {
+        "apollo\(id)"
+    }
+}
+</pre>
+
+
+<div id="Hacking With Swift - 117a - Code Review-missions.json"><h4 id="missions.json" class="header"><a href="#Hacking With Swift - 117a - Code Review-missions.json">missions.json</a></h4></div>
+
+<p>
+Truncated:
+</p>
+<pre json>
+[
+	{
+		"id": 1,
+		"crew": [
+            {
+                "name": "grissom",
+                "role": "Command Pilot"
+            },
+            {
+                "name": "white",
+                "role": "Senior Pilot"
+            },
+            {
+                "name": "chaffee",
+                "role": "Pilot"
+            }
+		],
+		"description": "Apollo 1, initially designated AS-204, was..."
+	},
+	{
+		"id": 7,
+        "launchDate": "1968-10-11",
+		"crew": [
+            {
+                "name": "schirra",
+                "role": "Commander"
+            },
+            {
+                "name": "eisele",
+                "role": "Command Module Pilot"
+            },
+            {
+                "name": "cunningham",
+                "role": "Lunar Module Pilot"
+            }
+		],
+        "description": "Apollo 7 was an October 1968 human spaceflight mission carried out by..."
+	}, 
+]
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-MissionView.swift"><h4 id="MissionView.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-MissionView.swift">MissionView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct MissionView: View {
+    
+    struct CrewMember {
+        let role: String
+        let astronaut: Astronaut
+    }
+    
+    let mission: Mission
+    let crew: [CrewMember] // Combined data
+    
+    var body: some View {
+        ScrollView {
+            VStack {
+                Image(mission.image)
+                    .resizable()
+                    .scaledToFit()
+                    .containerRelativeFrame(.horizontal) { width, axis in
+                        width * 0.6
+                    }
+                    .padding(.top)
+                
+                VStack(alignment: .leading) {
+                    
+                    // Custom divider
+                    Rectangle()
+                        .frame(height: 2)
+                        .foregroundStyle(.lightBackground)
+                        .padding(.vertical)
+                    
+                    Text("Mission Highlights")
+                        .font(.title.bold())
+                        .padding(.bottom, 5)
+                    
+                    Text(mission.description)
+                    
+                    // Custom divider
+                    Rectangle()
+                        .frame(height: 2)
+                        .foregroundStyle(.lightBackground)
+                        .padding(.vertical)
+                    Text("Crew")
+                        .font(.title.bold())
+                        .padding(.bottom, 5)
+                    
+                }
+                .padding(.horizontal)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack {
+                        ForEach(crew, id: \.role) { crewMember in
+                            NavigationLink {
+                                AstronautView(astronaut: crewMember.astronaut)
+                            } label: {
+                                HStack {
+                                    Image(crewMember.astronaut.id)
+                                        .resizable()
+                                        .frame(width: 104, height: 72)
+                                        .clipShape(.capsule)
+                                        .overlay(
+                                            Capsule()
+                                            .strokeBorder(.white, lineWidth: 1)
+                                         )
+                                    VStack(alignment: .leading) {
+                                        Text(crewMember.astronaut.name)
+                                            .foregroundStyle(.white)
+                                            .font(.headline)
+                                        Text(crewMember.role)
+                                            .foregroundStyle(.white.opacity(0.5))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.bottom)
+        }
+        .navigationTitle(mission.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .background(.darkBackground)
+    }
+    init(mission: Mission, astronauts: [String: Astronaut]) {
+        self.mission = mission
+        
+        self.crew = mission.crew.map { member in
+            if let astronaut = astronauts[member.name] {
+                return CrewMember(role: member.role, astronaut: astronaut)
+            } else {
+                fatalError("missing \(member.name)")
+            }
+        }
+    }
+}
+
+#Preview {
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    
+    return MissionView(mission: missions[0], astronauts: astronauts)
+        .preferredColorScheme(.dark)
+}
+</pre>
+
+<div id="Hacking With Swift - 117a - Code Review-MoonshotApp.swift"><h4 id="MoonshotApp.swift" class="header"><a href="#Hacking With Swift - 117a - Code Review-MoonshotApp.swift">MoonshotApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct MoonshotApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
