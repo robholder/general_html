@@ -127,7 +127,7 @@ struct MissionView: View {
     init(mission: Mission, astronauts: [String: Astronaut]) {
         self.mission = mission
 
-        // This is the "Search and Match" logic
+        // This is the "Search and Match" logic using 'map'
         self.crew = mission.crew.map { member in
             if let astronaut = astronauts[member.name] {
                 return CrewMember(role: member.role, astronaut: astronaut)
@@ -153,7 +153,7 @@ Before <code>map</code> starts, we have two pieces of data that don't quite fit 
 
 <ul>
 <li>
-The Mission Crew: A list of <code>CrewRole</code> (which only contains the name <code>"armstrong"</code> and the role <code>"Commander"</code>).
+The Mission Crew: A list of <code>CrewRole</code> (which only contains the <span id="Hacking With Swift - 116 - AI Supplement-The Map Process-1. The Setup: Two Different Shapes-name"></span><strong id="name">name</strong> <code>"armstrong"</code> and the <span id="Hacking With Swift - 116 - AI Supplement-The Map Process-1. The Setup: Two Different Shapes-role"></span><strong id="role">role</strong> <code>"Commander"</code>).
 
 <li>
 The Astronaut Dictionary: A big directory where the key <code>"armstrong"</code> points to the full <code>Astronaut</code> struct (photo, bio, etc.).
@@ -254,7 +254,153 @@ Now do the same for <code>astronaut</code>. Xcode will show you it's being pulle
 Think of it like this: <code>map</code> is just a factory that takes a list of <span id="Hacking With Swift - 116 - AI Supplement-The Map Process-The Vim &quot;Trace&quot; Technique-keys"></span><strong id="keys">keys</strong> and uses them to go find the <span id="Hacking With Swift - 116 - AI Supplement-The Map Process-The Vim &quot;Trace&quot; Technique-treasures"></span><strong id="treasures">treasures</strong> they belong to, returning a list of the treasures.
 </p>
 
-<div id="Hacking With Swift - 116 - AI Supplement-The &quot;Aha!&quot; Moment"><h2 id="The &quot;Aha!&quot; Moment" class="header"><a href="#Hacking With Swift - 116 - AI Supplement-The &quot;Aha!&quot; Moment">The "Aha!" Moment</a></h2></div>
+<div id="Hacking With Swift - 116 - AI Supplement-The Data"><h2 id="The Data" class="header"><a href="#Hacking With Swift - 116 - AI Supplement-The Data">The Data</a></h2></div>
+
+<p>
+Let's look at the "Incoming" data shapes and how they merge into the "Result" shape.
+</p>
+
+<ol>
+<li>
+The Inputs (The raw materials)
+
+</ol>
+<p>
+Item A: The CrewRole (From missions.json)
+</p>
+
+<p>
+This is just a simple piece of a list. It is thin data.
+</p>
+
+<p>
+JSON
+{ "name": "white", "role": "Senior Pilot" }
+In Swift: member.name is "white", member.role is "Senior Pilot".
+</p>
+
+<p>
+Item B: The Astronauts Dictionary (From astronauts.json)
+</p>
+
+<p>
+This is the "Filing Cabinet." You don't loop through this; you target it. Every drawer has a label (the Key).
+</p>
+
+<p>
+Key: "white"
+</p>
+
+<p>
+Value (The Folder): Astronaut(id: "white", name: "Edward H. White II", description: "...")
+</p>
+
+<ol>
+<li>
+The map Loop: Frame by Frame
+
+</ol>
+<p>
+Imagine the map function running on Apollo 1. It sees a list of 3 crew members. Let's watch it process Edward White.
+</p>
+
+<p>
+Step 1: The Input
+map grabs the first CrewRole.
+</p>
+
+<p>
+It sees: name: "white".
+</p>
+
+<p>
+Step 2: The Lookup (The "Match")
+The code says: astronauts["white"].
+</p>
+
+<p>
+Swift goes to the Dictionary.
+</p>
+
+<p>
+It finds the key "white".
+</p>
+
+<p>
+It pulls out the entire Astronaut struct.
+</p>
+
+<p>
+Step 3: The Assembly
+Now map has two distinct things in its hands:
+</p>
+
+<p>
+The Role string: "Senior Pilot" (from the Mission list).
+</p>
+
+<p>
+The Astronaut object: {id: "white", name: "Edward...", desc: "..."} (from the Dictionary).
+</p>
+
+<p>
+It stuffs them both into the CrewMember struct.
+</p>
+
+<ol>
+<li>
+The Result: CrewMember
+
+</ol>
+<p>
+By the time map is finished, it has created a brand new array of CrewMember objects. Each one looks like this internally:
+</p>
+
+<p>
+Swift
+CrewMember {
+</p>
+<pre><code>let role: String = "Senior Pilot"
+let astronaut: Astronaut = Astronaut(
+id: "white",
+name: "Edward H. White II",
+description: "Edward Higgins White II was..."
+)
+</code></pre>
+<p>
+}
+Why this is brilliant (and confusing)
+</p>
+
+<p>
+You are taking a Key from one file and using it to "unlock" a Full Object from another file.
+</p>
+
+<p>
+Before map: You had a name string, but no biography or photo.
+</p>
+
+<p>
+After map: You have a CrewMember object that contains everything—the specific role they played plus their entire life story.
+</p>
+
+<p>
+Visualizing the Data "In-Flight"
+</p>
+
+<p>
+If you were to look at the data at the moment of the "Match," it would look like this:
+</p>
+
+<p>
+Source	Piece of Data	Purpose
+missions.json	"white"	The Key used to find the person.
+missions.json	"Senior Pilot"	The Role assigned to this specific person.
+astronauts.json	{ id, name, description }	The Details pulled out of the filing cabinet.
+Combined Result	CrewMember	A single object holding both the Role and the Details.
+</p>
+
+<div id="The &quot;Aha!&quot; Moment"><h1 id="The &quot;Aha!&quot; Moment" class="header"><a href="#The &quot;Aha!&quot; Moment">The "Aha!" Moment</a></h1></div>
 
 <p>
 Think of it like this:
@@ -268,10 +414,10 @@ Think of it like this:
 <code>Astronauts</code> is a big filing cabinet.
 
 <li>
-<code>MissionView</code> goes to the filing cabinet, looks for the folder labeled <code>armstrong</code>, and pulls out the <span id="Hacking With Swift - 116 - AI Supplement-The &quot;Aha!&quot; Moment-full biography and image."></span><strong id="full biography and image.">full biography and image.</strong>
+<code>MissionView</code> goes to the filing cabinet, looks for the folder labeled <code>armstrong</code>, and pulls out the <span id="The &quot;Aha!&quot; Moment-full biography and image."></span><strong id="full biography and image.">full biography and image.</strong>
 
 </ul>
-<div id="Hacking With Swift - 116 - AI Supplement-Tracking the Variables"><h2 id="Tracking the Variables" class="header"><a href="#Hacking With Swift - 116 - AI Supplement-Tracking the Variables">Tracking the Variables</a></h2></div>
+<div id="The &quot;Aha!&quot; Moment-Tracking the Variables"><h2 id="Tracking the Variables" class="header"><a href="#The &quot;Aha!&quot; Moment-Tracking the Variables">Tracking the Variables</a></h2></div>
 
 <p>
 To keep your sanity while using Xcode, track them by their pluralization and types:
@@ -354,7 +500,7 @@ The result of combining a mission with specific astronauts.
 </tbody>
 </table>
 
-<div id="Hacking With Swift - 116 - AI Supplement-Summary of the Path"><h2 id="Summary of the Path" class="header"><a href="#Hacking With Swift - 116 - AI Supplement-Summary of the Path">Summary of the Path</a></h2></div>
+<div id="The &quot;Aha!&quot; Moment-Summary of the Path"><h2 id="Summary of the Path" class="header"><a href="#The &quot;Aha!&quot; Moment-Summary of the Path">Summary of the Path</a></h2></div>
 
 <ul>
 <li>
