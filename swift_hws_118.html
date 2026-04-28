@@ -537,7 +537,162 @@ struct MissionView: View {
 }
 </pre>
 
+<div id="Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views"><h2 id="Challenge 3: Allow User to Alternate between Grid &amp; List Views" class="header"><a href="#Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views">Challenge 3: Allow User to Alternate between Grid &amp; List Views</a></h2></div>
 
+<p>
+This is a significant refactor, but it follows the same "conveyor belt" and "packaging" logic we discussed earlier. You are essentially taking that big block of <code>ScrollView</code> code and moving it into its own specialized "box" (a subview), then creating a second box for the List version.
+</p>
+
+<div id="Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-1. Create the GridLayout Subview"><h3 id="1. Create the GridLayout Subview" class="header"><a href="#Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-1. Create the GridLayout Subview">1. Create the GridLayout Subview</a></h3></div>
+
+<p>
+First, we move your existing <code>ScrollView</code> logic out of <code>ContentView</code>. Notice that we have to pass in <code>astronauts</code> and <code>missions</code> as arguments so the view has data to work with.
+</p>
+
+<pre swift>
+struct GridLayout: View {
+    let astronauts: [String: Astronaut]
+    let missions: [Mission]
+
+    let columns = [
+        GridItem(.adaptive(minimum: 150))
+    ]
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns) {
+                ForEach(missions) { mission in
+                    NavigationLink {
+                        MissionView(mission: mission, astronauts: astronauts)
+                    } label: {
+                        VStack {
+                            Image(mission.image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 100, height: 100)
+                                .padding()
+
+                            VStack {
+                                Text(mission.displayName)
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                Text(mission.formattedLaunchDate)
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                            .padding(.vertical)
+                            .frame(maxWidth: .infinity)
+                            .background(.lightBackground)
+                        }
+                        .clipShape(.rect(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(.lightBackground)
+                        )
+                    }
+                }
+            }
+            .padding([.horizontal, .bottom])
+        }
+    }
+}
+</pre>
+
+<div id="Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-2. Create the ListLayout Subview"><h3 id="2. Create the ListLayout Subview" class="header"><a href="#Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-2. Create the ListLayout Subview">2. Create the ListLayout Subview</a></h3></div>
+
+<p>
+For the "List" version, we use a standard <code>List</code> (or a <code>LazyVStack</code> inside a <code>ScrollView</code>). This is usually much simpler code:
+</p>
+
+<pre swift>
+struct ListLayout: View {
+    let astronauts: [String: Astronaut]
+    let missions: [Mission]
+
+    var body: some View {
+        List(missions) { mission in
+            NavigationLink {
+                MissionView(mission: mission, astronauts: astronauts)
+            } label: {
+                HStack {
+                    Image(mission.image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 50, height: 50)
+                        .padding(.trailing, 5)
+
+                    VStack(alignment: .leading) {
+                        Text(mission.displayName)
+                            .font(.headline)
+                        Text(mission.formattedLaunchDate)
+                            .font(.caption)
+                    }
+                }
+            }
+            .listRowBackground(Color.darkBackground) // Keep it dark
+        }
+        .listStyle(.plain)
+    }
+}
+</pre>
+
+<div id="Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-3. Putting it all together in ContentView"><h3 id="3. Putting it all together in ContentView" class="header"><a href="#Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-3. Putting it all together in ContentView">3. Putting it all together in ContentView</a></h3></div>
+
+<p>
+Now we add the <code>@State</code> variable to track which view to show and a <code>.toolbar</code> button to flip that switch.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+
+    // 1. The Toggle State
+    @State private var showingGrid = true
+
+    var body: some View {
+        NavigationStack {
+            // 2. The Conditional Switch
+            Group {
+                if showingGrid {
+                    GridLayout(astronauts: astronauts, missions: missions)
+                } else {
+                    ListLayout(astronauts: astronauts, missions: missions)
+                }
+            }
+            .navigationTitle("Moonshot")
+            .background(.darkBackground)
+            .preferredColorScheme(.dark)
+            // 3. The Toolbar Button
+            .toolbar {
+                Button(showingGrid ? "Show List" : "Show Grid") {
+                    showingGrid.toggle()
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-3. Putting it all together in ContentView-Group"><h4 id="Group" class="header"><a href="#Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-3. Putting it all together in ContentView-Group">Group</a></h4></div>
+
+<p>
+The reason we put that <code>if/else</code> inside a <code>Group</code> is that SwiftUI's body property expects to return <span id="Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-3. Putting it all together in ContentView-Group-one single thing"></span><strong id="one single thing">one single thing</strong>. Without the <code>Group</code>, Swift sees two possible branches and gets "Type Confusion." The <code>Group</code> acts like a single envelope containing two different letters; Swift is happy just holding the envelope.
+</p>
+
+<div id="Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-What changed?"><h3 id="What changed?" class="header"><a href="#Challenges-Challenge 3: Allow User to Alternate between Grid &amp; List Views-What changed?">What changed?</a></h3></div>
+
+<ul>
+<li>
+Encapsulation: <code>ContentView</code> no longer cares how the missions are drawn; it only cares which layout is active.
+
+<li>
+The Toolbar: We used a ternary operator <code>showingGrid ? "Show List" : "Show Grid"</code> inside the button label so the button text changes depending on what the user sees.
+
+<li>
+Group: The <code>Group</code> is necessary here because <code>if/else</code> logic inside a <code>View</code> can confuse Swift unless it's wrapped in a container that can hold "either/or."
+
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
