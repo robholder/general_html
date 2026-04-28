@@ -295,6 +295,112 @@ CustomDivider(color: .red)
 CustomDivider(color: .lightBackground)
 </pre>
 
+<div id="Challenges-More Complex Example"><h2 id="More Complex Example" class="header"><a href="#Challenges-More Complex Example">More Complex Example</a></h2></div>
+
+<p>
+This is the perfect candidate for a custom view. When a view gets nested deeply - like a <code>NavigationLink</code> inside a <code>ForEach</code> inside an <code>HStack</code> inside a <code>ScrollView</code> - it becomes very hard to see the "forest for the trees."
+</p>
+
+<p>
+To extract this, you need to decide what data the new view needs to do its job. In this case, it needs the entire <code>CrewMember</code> object.
+</p>
+
+<div id="Challenges-More Complex Example-1. The New Custom View: CrewView"><h3 id="1. The New Custom View: CrewView" class="header"><a href="#Challenges-More Complex Example-1. The New Custom View: CrewView">1. The New Custom View: CrewView</a></h3></div>
+
+<p>
+You can create a new file or add this to the bottom of your current one. Notice how we pass in <code>crewMember</code> as a property.
+</p>
+
+<pre swift>
+struct CrewView: View {
+    // This is the 'argument' the view needs to function
+    let crewMember: MissionView.CrewMember
+
+    var body: some View {
+        HStack {
+            Image(crewMember.astronaut.id)
+                .resizable()
+                .frame(width: 104, height: 72)
+                .clipShape(.capsule)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(.white, lineWidth: 1)
+                )
+
+            VStack(alignment: .leading) {
+                Text(crewMember.astronaut.name)
+                    .foregroundStyle(.white)
+                    .font(.headline)
+                Text(crewMember.role)
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+</pre>
+
+<div id="Challenges-More Complex Example-2. The Updated (Clean) Usage"><h3 id="2. The Updated (Clean) Usage" class="header"><a href="#Challenges-More Complex Example-2. The Updated (Clean) Usage">2. The Updated (Clean) Usage</a></h3></div>
+
+<p>
+Now, look at how much more readable your <code>MissionView</code> becomes. You’ve separated the <span id="Challenges-More Complex Example-2. The Updated (Clean) Usage-layout"></span><strong id="layout">layout</strong> (ScrollView/HStack) from the <span id="Challenges-More Complex Example-2. The Updated (Clean) Usage-content"></span><strong id="content">content</strong> (the individual crew row).
+</p>
+
+<pre swift>
+ScrollView(.horizontal, showsIndicators: false) {
+    HStack {
+        ForEach(crew, id: \.role) { crewMember in
+            NavigationLink {
+                AstronautView(astronaut: crewMember.astronaut)
+            } label: {
+                // We just pass the current member into our new view
+                CrewView(crewMember: crewMember)
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Challenges-More Complex Example-3. Why this specific &quot;Argument&quot; choice?"><h3 id="3. Why this specific &quot;Argument&quot; choice?" class="header"><a href="#Challenges-More Complex Example-3. Why this specific &quot;Argument&quot; choice?">3. Why this specific "Argument" choice?</a></h3></div>
+
+<p>
+You might ask: <em>"Why not pass in the name, image, and role as separate strings?"</em>
+</p>
+
+<ul>
+<li>
+Passing the whole object: <code>CrewView(crewMember: crewMember)</code> is simpler. If you later decide the <code>CrewView</code> should also show the astronaut's description, you don't have to change the arguments; the view already has access to the whole <code>astronaut</code> struct inside the <code>crewMember</code>.
+
+<li>
+Namespace Tip: If you defined <code>CrewMember</code> inside <code>MissionView</code>, you refer to its type as <code>MissionView.CrewMember</code>.
+
+</ul>
+<div id="Challenges-More Complex Example-4. Handling the Preview"><h3 id="4. Handling the Preview" class="header"><a href="#Challenges-More Complex Example-4. Handling the Preview">4. Handling the Preview</a></h3></div>
+
+<p>
+When you extract a view that requires an argument, the <code>#Preview</code> block will complain because it doesn't have a <code>CrewMember</code> to display. You’ll need to "mock" one:
+</p>
+
+<pre swift>
+#Preview {
+    // We have to load the data just like we did for the other previews
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+    
+    // Create a single mock crew member for the preview
+    let tempCrew = MissionView.CrewMember(role: "Commander", astronaut: astronauts["aldrin"]!)
+
+    return CrewView(crewMember: tempCrew)
+        .background(.darkBackground) // Add background so white text is visible
+}
+</pre>
+
+<div id="Challenges-More Complex Example-The &quot;Aha!&quot; Moment"><h3 id="The &quot;Aha!&quot; Moment" class="header"><a href="#Challenges-More Complex Example-The &quot;Aha!&quot; Moment">The "Aha!" Moment</a></h3></div>
+
+<p>
+By doing this, you've turned a 20-line block of code into a <span id="Challenges-More Complex Example-The &quot;Aha!&quot; Moment-single, reusable component"></span><strong id="single, reusable component">single, reusable component</strong>. If you decide to add a "Crew List" to a different part of the app later, you can just use <code>CrewView</code> again!
+</p>
+
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
