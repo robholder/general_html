@@ -32,11 +32,15 @@
 <div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically"><h1 id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically">Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically</a></h1></div>
 
 <p>
-It's common to be several levels deep in a <code>NavigationStack</code>, then to decide you want to return to the beginning. For example, perhaps your user is placing an order, and has worked their way through screens showing their basket, asking for shipping details, asking for payment details, then confirming the order, but when they are done you want to go back to the very start – back to the root view of your <code>NavigationStack</code>.
+It's common to be several levels deep in a <code>NavigationStack</code>, then to decide to return to the beginning.
 </p>
 
 <p>
-To demonstrate this, we can create a little sandbox that can push to new views endlessly by generating new random numbers each time.
+For example, perhaps your user is placing an order, and has worked their way through screens - then wants to go back to the root view of <code>NavigationStack</code>.
+</p>
+
+<p>
+To demonstrate this, we can create a sandbox that can push to new views endlessly by generating new random numbers each time.
 </p>
 
 <p>
@@ -74,8 +78,55 @@ struct ContentView: View {
 </pre>
 
 <p>
-When you run that back you'll see you can keep pushing your way through views endlessly – you can go 20, 50, or even 500 views deep if you like.
+When you run that back you'll see you can keep pushing your way through views endlessly - you can go 20, 50, or even 500 views deep if you like.
 </p>
+
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-In Context">In Context</a></h3></div>
+
+<p>
+This has some feed back lines added to show that the DetailView view struct updates the <code>path</code> variable every time it gets called/run:
+</p>
+
+<pre swift>
+import SwiftUI
+
+
+struct DetailView: View {
+    var number: Int
+    var body: some View {
+        // This random int gets appended to 'path'
+        NavigationLink("Go to Random Number", value: Int.random(in: 1...1000))
+            .navigationTitle("Number: \(number)")
+    }
+}
+
+struct ContentView: View {
+    // path var to keep a record of each number click
+    @State private var path = [Int]()
+    
+    var body: some View {
+        NavigationStack(path: $path) {
+            DetailView(number: 0)
+                .navigationDestination(for: Int.self) { i in
+                    DetailView(number: i)
+            }
+        }
+        // Keep record of the depth of the view stack and show at the base:
+        .toolbar {
+            ToolbarItem(placement: .bottomBar) {
+                Text("Stack Depth: \(path.count). \(path.description)")
+                    .fixedSize()
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-Return to Root"><h2 id="Return to Root" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-Return to Root">Return to Root</a></h2></div>
 
 <p>
 Now, if you're 10 views deep in there and decide you want to return home you have two options:
@@ -93,12 +144,14 @@ If you're using <code>NavigationPath</code> for your path, you can set it to a n
 However, there's a bigger problem: how you can do that from the subview, when you don't have access to the original <code>path</code> property?
 </p>
 
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-@Binding"><h2 id="@Binding" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-@Binding">@Binding</a></h2></div>
+
 <p>
 Here you have two options: either store your path in an external class that uses <code>@Observable</code>, or bring in a new property wrapper called <code>@Binding</code>. I've already demonstrated <code>@Observable</code> previously, so let's focus on <code>@Binding</code> here.
 </p>
 
 <p>
-You've seen how <code>@State</code> lets us create some storage inside our view, so we can modify values while our app is running. The <code>@Binding</code> property wrapper lets us pass an <code>@State</code> property into another view and modify it from there – we can share an <code>@State</code> property in several places, and changing it in one place will change it everywhere.
+You've seen how <code>@State</code> lets us create some storage inside our view, so we can modify values while our app is running. The <code>@Binding</code> property wrapper lets us pass a <code>@State</code> property into another view and modify it from there - we can share a <code>@State</code> property in several places, and changing it in one place will change it everywhere.
 </p>
 
 <p>
@@ -121,7 +174,7 @@ DetailView(number: 0, path: $path)
 </pre>
 
 <p>
-As you can see, we're passing in <code>＄path</code> because we want to pass the binding in – we want <code>DetailView</code> to be able to read and write the path.
+As you can see, we're passing in <code>＄path</code> because we want to pass the binding in - we want <code>DetailView</code> to be able to read and write the path.
 </p>
 
 <p>
@@ -149,8 +202,172 @@ And if you're using <code>NavigationPath</code> you'd use this:
 </pre>
 
 <p>
-Sharing a binding like this is common – it's exactly how <code>TextField</code>, <code>Stepper</code>, and other controls work. In fact, we'll look at <code>@Binding</code> again in project 11 when we create our own custom component, because it's really helpful.
+Sharing a binding like this is common - it's exactly how <code>TextField</code>, <code>Stepper</code>, and other controls work. In fact, we'll look at <code>@Binding</code> again in project 11 when we create our own custom component, because it's really helpful.
 </p>
+
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-@Binding-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-@Binding-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct DetailView: View {
+    
+    var number: Int
+    @Binding var path: [Int]
+    var body: some View {
+        NavigationLink("Go to Random Number", value: Int.random(in: 1...1000))
+            .navigationTitle("Number: \(number)")
+            .toolbar {
+                Button("home") {
+                    path.removeAll()
+            }
+        }
+    }
+}
+
+struct ContentView: View {
+    @State private var path = [Int]()
+    
+    var body: some View {
+        NavigationStack(path: $path) {
+            DetailView(number: 0, path: $path)
+                .navigationDestination(for: Int.self) { i in
+                    DetailView(number: i, path: $path)
+                }
+
+            }
+            // Keep record of the depth of the view stack
+            .toolbar {
+                ToolbarItem(placement: .bottomBar) {
+                    Text("Stack Depth: \(path.count). \(path.description)")
+                        .fixedSize()
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight"><h2 id="AI Insight" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight">AI Insight</a></h2></div>
+
+<p>
+In this specific code, the <code>path</code> lines feel redundant because the user is doing all the work by tapping links.
+</p>
+
+<p>
+However, they represent the shift from Implicit Navigation (SwiftUI does it for you) to Explicit Navigation (You own the data).
+</p>
+
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-1. The Role of the @State path"><h3 id="1. The Role of the @State path" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-1. The Role of the @State path">1. The Role of the @State path</a></h3></div>
+
+<p>
+Without path, navigation is a "black box." With it, you have a two-way mirror:
+</p>
+
+<ul>
+<li>
+User Action: When a user taps a <code>NavigationLink</code>, SwiftUI automatically appends that <code>Int</code> to your <code>path</code> array.
+
+<li>
+Developer Action: If you change that <code>path</code> array in code, the UI will jump to match it.
+
+</ul>
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-2. Why it seems like a placeholder"><h3 id="2. Why it seems like a placeholder" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-2. Why it seems like a placeholder">2. Why it seems like a placeholder</a></h3></div>
+
+<p>
+In your current code, you aren't actually reading or writing to <code>path</code> inside your <code>body</code>. The <code>NavigationStack</code> is just dutifully updating the array in the background every time you tap "Go to Random Number."
+</p>
+
+<p>
+It becomes useful the moment you want to do something Programmatic. For example, if you wanted a "Back to Start" button on a view 10 levels deep:
+</p>
+
+<pre swift>
+// Without the path variable, this is impossible. 
+// With it, it's one line:
+Button("Go Home") {
+    path.removeAll() 
+}
+</pre>
+
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-3. The &quot;Binding&quot; (＄path)"><h3 id="3. The &quot;Binding&quot; (＄path)" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-3. The &quot;Binding&quot; (＄path)">3. The "Binding" (＄path)</a></h3></div>
+
+<p>
+The <code>＄</code> is the "Handshake." It tells the <code>NavigationStack</code>:
+</p>
+
+<p>
+<blockquote>
+"Don't just use your own internal memory to track where we are. Use this specific array instead. If the user taps 'Back', remove an item from my array. If I empty the array, pop everything off the screen."
+</blockquote>
+</p>
+
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-4. Comparison: Implicit vs. Explicit"><h3 id="4. Comparison: Implicit vs. Explicit" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically-AI Insight-4. Comparison: Implicit vs. Explicit">4. Comparison: Implicit vs. Explicit</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+feature
+</th>
+<th>
+NavigationStack { ... }
+</th>
+<th>
+NavigationStack(path: ＄path) { ... }
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Logic
+</td>
+<td>
+Implicit (Internal)
+</td>
+<td>
+Explicit (Programmatic)
+</td>
+</tr>
+<tr>
+<td>
+Control
+</td>
+<td>
+User-driven only
+</td>
+<td>
+User-driven AND Code-driven
+</td>
+</tr>
+<tr>
+<td>
+Deep Linking
+</td>
+<td>
+Hard to implement
+</td>
+<td>
+Easy (just pre-fill the array)
+</td>
+</tr>
+<tr>
+<td>
+Reset to Root
+</td>
+<td>
+Not easily possible
+</td>
+<td>
+path = []
+</td>
+</tr>
+</tbody>
+</table>
 
 <p>
 <hr>
