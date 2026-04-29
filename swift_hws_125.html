@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_125</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_124.html">Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically</a>
+
+</ul>
+<div id="Hacking With Swift - 125 - How to save NavigationStack paths using Codable"><h1 id="Hacking With Swift - 125 - How to save NavigationStack paths using Codable" class="header"><a href="#Hacking With Swift - 125 - How to save NavigationStack paths using Codable">Hacking With Swift - 125 - How to save NavigationStack paths using Codable</a></h1></div>
+
+<p>
+You can save and load the navigation stack path using <code>Codable</code> in one of two ways, depending on what kind of path you have:
+</p>
+
+<ul>
+<li>
+If you're using <code>NavigationPath</code> to store the active path of your <code>NavigationStack</code>, SwiftUI provides two helpers to make saving and loading your paths easier.
+
+<li>
+If you're using a homogenous array – e.g. <code>[Int]</code> or <code>[String]</code> – then you don't need those helpers, and you can load or save your data freely.
+
+</ul>
+<p>
+The techniques are very similar, so I'll cover them both here.
+</p>
+
+<p>
+Both rely on storing your path outside your view, so that all the loading and saving of path data happens invisibly – an external class just takes care of it automatically. To be more precise, every time our path data changes – whether that's an array of integers or strings, or a <code>NavigationPath</code> object – we need to save the new path so it's preserved for the future, and we'll also load that data back from disk when the class is initialized.
+</p>
+
+<p>
+Here's how that class would look when our path data is stored as an array of integers:
+</p>
+
+<pre swift>
+@Observable
+class PathStore {
+    var path: [Int] {
+        didSet {
+            save()
+        }
+    }
+
+    private let savePath = URL.documentsDirectory.appending(path: "SavedPath")
+
+    init() {
+        if let data = try? Data(contentsOf: savePath) {
+            if let decoded = try? JSONDecoder().decode([Int].self, from: data) {
+                path = decoded
+                return
+            }
+        }
+
+        // Still here? Start with an empty path.
+        path = []
+    }
+
+    func save() {
+        do {
+            let data = try JSONEncoder().encode(path)
+            try data.write(to: savePath)
+        } catch {
+            print("Failed to save navigation data")
+        }
+    }
+}
+</pre>
+
+<p>
+If you're using <code>NavigationPath</code>, you need only four small changes.
+</p>
+
+<p>
+First, the <code>path</code> property needs to have the type <code>NavigationPath</code> rather than <code>[Int]</code>:
+</p>
+
+<pre swift>
+var path: NavigationPath {
+    didSet {
+        save()
+    }
+}
+</pre>
+
+<p>
+Second, when we decode our JSON in the initializer we need to decode to a specific type, then use the decoded data to create a new <code>NavigationPath</code>:
+</p>
+
+<pre swift>
+if let decoded = try? JSONDecoder().decode(NavigationPath.CodableRepresentation.self, from: data) {
+    path = NavigationPath(decoded)
+    return
+}
+</pre>
+
+<p>
+Third, if decoding fails we should assign a new, empty <code>NavigationPath</code> instance to the <code>path</code> property at the end of the initializer:
+</p>
+
+<pre swift>
+path = NavigationPath()
+</pre>
+
+<p>
+And finally, the <code>save()</code> method needs to write the <code>Codable</code> representation of our navigation path. This is where things diverge just a little more from using a simple array, because <code>NavigationPath</code> <em>doesn't</em> require that its data types conform to <code>Codable</code> – it only needs <code>Hashable</code> conformance. As a result, Swift can't verify at compile time that there is a valid <code>Codable</code> representation of the navigation path, so we need to request it and see what comes back.
+</p>
+
+<p>
+That means adding a check at the start of the <code>save()</code> method, which attempts to retrieve the <code>Codable</code> navigation path and bails out immediately if we get nothing back:
+</p>
+
+<pre swift>
+guard let representation = path.codable else { return }
+</pre>
+
+<p>
+That will either return the data ready to be encoded to JSON, or return nil if at least one object in the path cannot be encoded.
+</p>
+
+<p>
+Finally, we convert that <code>Codable</code> representation to JSON instead of the original Int array:
+</p>
+
+<pre swift>
+let data = try JSONEncoder().encode(representation)
+</pre>
+
+<p>
+Here's how the complete class looks:
+</p>
+
+<pre swift>
+@Observable
+class PathStore {
+    var path: NavigationPath {
+        didSet {
+            save()
+        }
+    }
+
+    private let savePath = URL.documentsDirectory.appending(path: "SavedPath")
+
+    init() {
+        if let data = try? Data(contentsOf: savePath) {
+            if let decoded = try? JSONDecoder().decode(NavigationPath.CodableRepresentation.self, from: data) {
+                path = NavigationPath(decoded)
+                return
+            }
+        }
+
+        // Still here? Start with an empty path.
+        path = NavigationPath()
+    }
+
+    func save() {
+        guard let representation = path.codable else { return }
+
+        do {
+            let data = try JSONEncoder().encode(representation)
+            try data.write(to: savePath)
+        } catch {
+            print("Failed to save navigation data")
+        }
+    }
+}
+</pre>
+
+<p>
+Now you can go ahead and write your SwiftUI code as normal, making sure to bind the path of your <code>NavigationStack</code> to the <code>path</code> property of a <code>PathStore</code> instance. For example, this lets you show views with random integers attached – you can push as many views as you like, then quit and relaunch the app to get it exactly back as you left it:
+</p>
+
+<pre swift>
+struct DetailView: View {
+    var number: Int
+
+    var body: some View {
+        NavigationLink("Go to Random Number", value: Int.random(in: 1...1000))
+            .navigationTitle("Number: \(number)")
+    }
+}
+
+struct ContentView: View {
+    @State private var pathStore = PathStore()
+
+    var body: some View {
+        NavigationStack(path: $pathStore.path) {
+            DetailView(number: 0)
+                .navigationDestination(for: Int.self) { i in
+                    DetailView(number: i)
+                }
+        }
+    }
+}
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
