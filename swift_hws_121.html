@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_121</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_120.html">Hacking With Swift - 120 - The problem with a simple NavigationLink</a>
+
+</ul>
+<div id="Hacking With Swift - 121 - Handling navigation the smart way with navigationDestination()"><h1 id="Hacking With Swift - 121 - Handling navigation the smart way with navigationDestination()" class="header"><a href="#Hacking With Swift - 121 - Handling navigation the smart way with navigationDestination()">Hacking With Swift - 121 - Handling navigation the smart way with navigationDestination()</a></h1></div>
+
+<p>
+In the simplest form of SwiftUI navigation, we provide both a label and a destination view in one single <code>NavigationLink</code>, like this:
+</p>
+
+<pre swift>
+NavigationStack {
+    NavigationLink("Tap Me") {
+        Text("Detail View")
+    }
+}
+</pre>
+
+<p>
+But for more advanced navigation, it's better to separate the destination from the value. This allows SwiftUI to load the destination only when it's needed.
+</p>
+
+<p>
+Doing this takes two steps:
+</p>
+
+<ul>
+<li>
+We attach a value to the <code>NavigationLink</code>. This value can be anything you want – a string, an integer, a custom struct instance, or whatever. However, there is one requirement: whatever type you use must conform to a protocol called <code>Hashable</code>.
+
+<li>
+Attaching a <code>navigationDestination()</code> modifier inside the navigation stack, telling it what to do when it receives your data.
+
+</ul>
+<p>
+Both of those are new, but to begin with you can ignore the <code>Hashable</code> requirement because most of Swift's built-in types already conform to <code>Hashable</code>. For example, <code>Int</code>, <code>String</code>, <code>Date</code>, <code>URL</code>, arrays, and dictionaries already conform to <code>Hashable</code>, so you don't need to worry about them.
+</p>
+
+<p>
+So, let's look at the <code>navigationDestination()</code> modifier first, then circle back to look at <code>Hashable</code> in more detail.
+</p>
+
+<p>
+First, we could make a <code>List</code> of 100 numbers, with each one being attached to a navigation link as its presentation value – we're telling SwiftUI we want to navigate to a number. Here's how that looks:
+</p>
+
+<pre swift>
+NavigationStack {
+    List(0..&lt;100) { i in
+        NavigationLink("Select \(i)", value: i)
+    }
+}
+</pre>
+
+<p>
+Now, that code isn't quite enough. Yes, we've told SwiftUI we want to navigate to 0 when "Select 0" is tapped, but we haven't said how to show that data. Should it be some text, a <code>VStack</code> with some pictures, a custom SwiftUI view, or something else entirely?
+</p>
+
+<p>
+This is where the <code>navigationDestination()</code> modifier comes in: we can tell it "when you're asked to navigate to an integer, here's what you should do…"
+</p>
+
+<p>
+Modify your code to this:
+</p>
+
+<pre swift>
+NavigationStack {
+    List(0..&lt;100) { i in
+        NavigationLink("Select \(i)", value: i)
+    }
+    .navigationDestination(for: Int.self) { selection in
+        Text("You selected \(selection)")
+    }
+}
+</pre>
+
+<p>
+So, when SwiftUI attempts to navigation to any <code>Int</code> value, it gives us that value in the <code>selection</code> constant, and we need to return the correct SwiftUI view to show it.
+</p>
+
+<p>
+<span id="Hacking With Swift - 121 - Handling navigation the smart way with navigationDestination()-Tip"></span><strong id="Tip">Tip</strong>: If you have several different types of data to navigate to them, just add several <code>navigationDestination()</code> modifiers. In effect you're saying, "do this when you want to navigate to an integer, but do that when you want to navigate to a string."
+</p>
+
+<p>
+That works great for lots of data, such as navigating to strings, integers, and UUIDs. But for more complex data such as custom structs, we need to use <em>hashing</em>.
+</p>
+
+<p>
+Hashing is a computer science term that is the process of converting some data into a smaller representation in a consistent way. It's commonly used when downloading data: if you imagine downloading a movie on your Apple TV, that movie might be 10GB or so, but how can you be sure every single piece of data got downloaded successfully?
+</p>
+
+<p>
+With hashing, we can convert that 10GB movie into a short string – maybe 40 characters in total – that uniquely identifies it. The hash function needs to be consistent, which means if we hash the movie locally and compare it to the hash on the server, they should always be the same, and comparing two 40-character strings is much easier than comparing two 10GB files!
+</p>
+
+<p>
+Obviously there's no way to <em>unhash</em> data, because you can't convert just 40 characters back into a 10GB movie. But that's okay: the main thing is that the hash value for each piece of data ought to be unique, and also consistent so that we get the same hash value for the movie every time.
+</p>
+
+<p>
+Swift uses <code>Hashable</code> a lot internally. For example, when you use a <code>Set</code> rather than an array, everything you put in there must conform to the <code>Hashable</code> protocol. This is what makes sets so fast compared to arrays: when you say "does the set contain this particular object?" Swift will compute the hash of your object, then search for that in the set rather than trying to compare every property against every object.
+</p>
+
+<p>
+If all this sounds complicated, remember that most of Swift's built-in types already conform to <code>Hashable</code>. And if you make a custom struct with properties that all conform to <code>Hashable</code>, you can make the whole struct conform to <code>Hashable</code> with one tiny change.
+</p>
+
+<p>
+As an example, this struct contains a UUID, a string, and an integer:
+</p>
+
+<pre swift>
+struct Student {
+    var id = UUID()
+    var name: String
+    var age: Int
+}
+</pre>
+
+<p>
+If we want to make that struct conform to Hashable, we just add the protocol like this:
+</p>
+
+<pre swift>
+struct Student: Hashable {
+    var id = UUID()
+    var name: String
+    var age: Int
+}
+</pre>
+
+<p>
+Now that our <code>Student</code> struct conforms to <code>Hashable</code> it can be used with both <code>NavigationLink</code> and <code>navigationDestination()</code> just like integers or strings
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
