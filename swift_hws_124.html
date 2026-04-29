@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_124</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_123.html">Hacking With Swift - 123 - Navigating to different data types using NavigationPath</a>
+
+</ul>
+<div id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically"><h1 id="Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically" class="header"><a href="#Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically">Hacking With Swift - 124 - How to make a NavigationStack return to its root view programmatically</a></h1></div>
+
+<p>
+It's common to be several levels deep in a <code>NavigationStack</code>, then to decide you want to return to the beginning. For example, perhaps your user is placing an order, and has worked their way through screens showing their basket, asking for shipping details, asking for payment details, then confirming the order, but when they are done you want to go back to the very start – back to the root view of your <code>NavigationStack</code>.
+</p>
+
+<p>
+To demonstrate this, we can create a little sandbox that can push to new views endlessly by generating new random numbers each time.
+</p>
+
+<p>
+First, here's our <code>DetailView</code> that shows its current number as its title, and has a button that pushes to a new random number whenever it's pressed:
+</p>
+
+<pre swift>
+struct DetailView: View {
+    var number: Int
+
+    var body: some View {
+        NavigationLink("Go to Random Number", value: Int.random(in: 1...1000))
+            .navigationTitle("Number: \(number)")
+    }
+}
+</pre>
+
+<p>
+And now we can present that from our <code>ContentView</code>, starting with an initial value of 0 but navigating to a new <code>DetailView</code> every time a new integer is shown:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var path = [Int]()
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            DetailView(number: 0)
+                .navigationDestination(for: Int.self) { i in
+                    DetailView(number: i)
+                }
+        }
+    }
+}
+</pre>
+
+<p>
+When you run that back you'll see you can keep pushing your way through views endlessly – you can go 20, 50, or even 500 views deep if you like.
+</p>
+
+<p>
+Now, if you're 10 views deep in there and decide you want to return home you have two options:
+</p>
+
+<ul>
+<li>
+If you're using a simple array for your path, like we're doing in the code above, you can call <code>removeAll()</code> on that array to remove everything in your path, going back to the root view.
+
+<li>
+If you're using <code>NavigationPath</code> for your path, you can set it to a new, empty instance of <code>NavigationPath</code>, like this: <code>path = NavigationPath()</code>.
+
+</ul>
+<p>
+However, there's a bigger problem: how you can do that from the subview, when you don't have access to the original <code>path</code> property?
+</p>
+
+<p>
+Here you have two options: either store your path in an external class that uses <code>@Observable</code>, or bring in a new property wrapper called <code>@Binding</code>. I've already demonstrated <code>@Observable</code> previously, so let's focus on <code>@Binding</code> here.
+</p>
+
+<p>
+You've seen how <code>@State</code> lets us create some storage inside our view, so we can modify values while our app is running. The <code>@Binding</code> property wrapper lets us pass an <code>@State</code> property into another view and modify it from there – we can share an <code>@State</code> property in several places, and changing it in one place will change it everywhere.
+</p>
+
+<p>
+In our current code, that means adding a new property to <code>DetailView</code> to get access to the navigation path array:
+</p>
+
+<pre swift>
+@Binding var path: [Int]
+</pre>
+
+<p>
+And now we need to pass that in from both places in <code>ContentView</code> where <code>DetailView</code> is used, like this:
+</p>
+
+<pre swift>
+DetailView(number: 0, path: $path)
+    .navigationDestination(for: Int.self) { i in
+        DetailView(number: i, path: $path)
+    }
+</pre>
+
+<p>
+As you can see, we're passing in <code>＄path</code> because we want to pass the binding in – we want <code>DetailView</code> to be able to read and write the path.
+</p>
+
+<p>
+And now we can add a toolbar to <code>DetailView</code> to manipulate the path array:
+</p>
+
+<pre swift>
+.toolbar {
+    Button("Home") {
+        path.removeAll()
+    }
+}
+</pre>
+
+<p>
+And if you're using <code>NavigationPath</code> you'd use this:
+</p>
+
+<pre swift>
+.toolbar {
+    Button("Home") {
+        path = NavigationPath()
+    }
+}
+</pre>
+
+<p>
+Sharing a binding like this is common – it's exactly how <code>TextField</code>, <code>Stepper</code>, and other controls work. In fact, we'll look at <code>@Binding</code> again in project 11 when we create our own custom component, because it's really helpful.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
