@@ -102,6 +102,194 @@ This is genuinely a useful app to build, particularly if it were specialized tow
 As it is, this challenge is only a small app, but I hope it at least makes you think. Good luck!
 </p>
 
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge"><h2 id="AI Breakdown of Challenge" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge">AI Breakdown of Challenge</a></h2></div>
+
+<p>
+This is a fantastic challenge because it forces you to combine <span id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Data Persistence"></span><strong id="Data Persistence">Data Persistence</strong> (Saving), <span id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Observation"></span><strong id="Observation">Observation</strong> (Updating), and <span id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Navigation"></span><strong id="Navigation">Navigation</strong> into one cohesive flow.
+</p>
+
+<p>
+Think of this app as a "Digital Tally Counter." You have a list of things you want to track, and every time you do them, you tap a button to "level up" that activity.
+</p>
+
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-1. The Architecture (The Blueprint)"><h3 id="1. The Architecture (The Blueprint)" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-1. The Architecture (The Blueprint)">1. The Architecture (The Blueprint)</a></h3></div>
+
+<p>
+Before coding, let’s visualize how the data flows. Since multiple screens need to see and change the same list of activities, we use a <span id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-1. The Architecture (The Blueprint)-Single Source of Truth"></span><strong id="Single Source of Truth">Single Source of Truth</strong>.
+</p>
+
+<ul>
+<li>
+The Data Model (<code>Activity</code>): A simple struct representing one habit (Title, Description, Count).
+
+<li>
+The Data Controller (<code>Habits</code>): A class marked <code>@Observable</code> that holds the array and handles saving to <code>UserDefaults</code>.
+
+<li>
+The Main View: A <code>List</code> showing all habits with a <code>+</code> button to open a <code>sheet</code>.
+
+<li>
+The Add View: A simple form to name a new habit.
+
+<li>
+The Detail View: A screen to see the description and the "Increment" button.
+
+</ul>
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-2. Step 1: The Data Model"><h3 id="2. Step 1: The Data Model" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-2. Step 1: The Data Model">2. Step 1: The Data Model</a></h3></div>
+
+<p>
+We need our <code>Activity</code> to be <code>Identifiable</code> (for the List), <code>Codable</code> (for saving), and <code>Equatable</code> (so we can find it in the array to update it).
+</p>
+
+<pre swift>
+struct Activity: Identifiable, Codable, Equatable {
+    var id = UUID()
+    let title: String
+    let description: String
+    var completionCount: Int
+}
+</pre>
+
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-3. Step 2: The Observable Storage"><h3 id="3. Step 2: The Observable Storage" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-3. Step 2: The Observable Storage">3. Step 2: The Observable Storage</a></h3></div>
+
+<p>
+This class is the "Brain" of your app. It loads data when it starts and saves data every time the array changes.
+</p>
+
+<pre swift>
+@Observable
+class Habits {
+    var activities = [Activity]() {
+        didSet {
+            if let encoded = try? JSONEncoder().encode(activities) {
+                UserDefaults.standard.set(encoded, forKey: "Activities")
+            }
+        }
+    }
+
+    init() {
+        if let savedItems = UserDefaults.standard.data(forKey: "Activities") {
+            if let decodedItems = try? JSONDecoder().decode([Activity].self, from: savedItems) {
+                activities = decodedItems
+                return
+            }
+        }
+        activities = []
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-4. Step 3: The Detail View (The &quot;Tough&quot; Part)"><h3 id="4. Step 3: The Detail View (The &quot;Tough&quot; Part)" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-4. Step 3: The Detail View (The &quot;Tough&quot; Part)">4. Step 3: The Detail View (The "Tough" Part)</a></h3></div>
+
+<p>
+Paul Hudson’s hint is key here: since structs are <span id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-4. Step 3: The Detail View (The &quot;Tough&quot; Part)-values"></span><strong id="values">values</strong>, you can't just change the count of the activity passed in. You have to find that activity in the main <code>Habits</code> class and replace it.
+</p>
+
+<pre swift>
+struct ActivityDetailView: View {
+    var habits: Habits
+    var activity: Activity
+
+    var body: some View {
+        List {
+            Section("Description") {
+                Text(activity.description)
+            }
+
+            Section("Progress") {
+                Text("Completed \(activity.completionCount) times")
+                
+                Button("Mark Completed") {
+                    var newActivity = activity
+                    newActivity.completionCount += 1
+                    
+                    // Find the old one and swap it for the new one
+                    if let index = habits.activities.firstIndex(of: activity) {
+                        habits.activities[index] = newActivity
+                    }
+                }
+            }
+        }
+        .navigationTitle(activity.title)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-5. Step 4: Putting it all together in ContentView"><h3 id="5. Step 4: Putting it all together in ContentView" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-5. Step 4: Putting it all together in ContentView">5. Step 4: Putting it all together in ContentView</a></h3></div>
+
+<p>
+This is where your <code>NavigationStack</code> lives. Note that for this challenge, we will pass the Habits object into the subviews so they can all talk to the same data.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var habits = Habits()
+    @State private var showingAddActivity = false
+
+    var body: some View {
+        NavigationStack {
+            List(habits.activities) { activity in
+                NavigationLink {
+                    ActivityDetailView(habits: habits, activity: activity)
+                } label: {
+                    HStack {
+                        Text(activity.title)
+                        Spacer()
+                        Text("\(activity.completionCount)")
+                            .font(.caption.bold())
+                            .padding(5)
+                            .background(.blue.opacity(0.2))
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            .navigationTitle("HabitTracker")
+            .toolbar {
+                Button("Add Activity", systemImage: "plus") {
+                    showingAddActivity = true
+                }
+            }
+            .sheet(isPresented: $showingAddActivity) {
+                AddActivityView(habits: habits)
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Why this works:"><h3 id="Why this works:" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Why this works:">Why this works:</a></h3></div>
+
+<ul>
+<li>
+UserDefaults: Every time you click "Mark Completed," the <code>didSet</code> in your <code>Habits</code> class triggers, turning your array into JSON and saving it.
+
+<li>
+Observation: Because <code>Habits</code> is <code>@Observable</code>, the moment you swap the old activity for the new one in the array, the <code>ContentView</code> and <code>DetailView</code> automatically refresh to show the new number.
+
+<li>
+The "Swap" Logic: By using <code>firstIndex(of:)</code>, you ensure that even if the list is long, you are updating the correct habit.
+
+</ul>
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Your Git Milestone Strategy"><h3 id="Your Git Milestone Strategy" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Your Git Milestone Strategy">Your Git Milestone Strategy</a></h3></div>
+
+<p>
+Since this is a brand new project, I recommend this flow:
+</p>
+
+<ul>
+<li>
+Commit 1: "Initial data structures (Activity and Habits class)."
+
+<li>
+Commit 2: "Basic List and Add View."
+
+<li>
+Commit 3: "Detail view with increment logic."
+
+<li>
+Tag: <code>v1.0-challenge-complete</code>
+
+</ul>
 <p>
 <hr>
 <br>
