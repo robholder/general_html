@@ -758,7 +758,7 @@ Instead of telling the link exactly which View to go to, you tell the link: <spa
 <div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 1: Conforming to Hashable"><h3 id="Step 1: Conforming to Hashable" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 1: Conforming to Hashable">Step 1: Conforming to Hashable</a></h3></div>
 
 <p>
-To use <code>value</code>:, the data you pass must be <code>Hashable</code> so SwiftUI can uniquely identify it in the navigation history.
+To use <code>value:</code>, the data you pass must be <code>Hashable</code> so SwiftUI can uniquely identify it in the navigation history.
 </p>
 
 <ul>
@@ -768,6 +768,14 @@ Go to <code>Mission.swift</code> and <code>Astronaut.swift</code>.
 <li>
 Update the struct definitions: <code>struct Mission: Codable, Identifiable, Hashable</code>.
 
+<ul>
+<li>
+Make sure any structs inside Mission and Astronaut structs are also updated with <code>Hashable</code>.
+
+<li>
+Typical error if not is: <code>Type 'Mission' does not conform to protocol 'Equatable'</code>
+
+</ul>
 <li>
 <em>(Note: Since these structs only contain basic types like Strings and Ints, Swift will provide the conformance automatically once you add the word.)</em>
 
@@ -855,6 +863,157 @@ Do your work.
 
 <li>
 If you break the navigation and get frustrated, you can just git switch main to get back to your working app and try again!
+
+</ul>
+<div id="More details on achieving the goal"><h1 id="More details on achieving the goal" class="header"><a href="#More details on achieving the goal">More details on achieving the goal</a></h1></div>
+
+<div id="More details on achieving the goal-QUESTION"><h2 id="QUESTION" class="header"><a href="#More details on achieving the goal-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Can you show me how to achieve the <code>NavigationLink(value:)</code> system on this <code>ListLayout.swift</code>?
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ListLayout: View {
+    let astronauts: [String: Astronaut]
+    let missions: [Mission]
+    
+    var body: some View {
+        List(missions) { mission in
+            NavigationLink {
+                MissionView(mission: mission, astronauts: astronauts)
+            } label: {
+                HStack {
+                    Image(mission.image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 50, height: 50)
+                        .padding(.trailing, 5)
+                    
+                    VStack(alignment: .leading) {
+                        Text(mission.displayName)
+                            .font(.headline)
+                        Text(mission.formattedLaunchDate)
+                            .font(.caption)
+                    }
+                }
+            }
+            .listRowBackground(Color.darkBackground) // Keep it dark
+        }
+        .listStyle(.plain)
+    }
+}
+
+#Preview {
+    let missions: [Mission] = Bundle.main.decode("missions.json")
+    let astronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    
+    ListLayout(astronauts: astronauts, missions: missions)
+        .preferredColorScheme(.dark)
+}
+</pre>
+
+<div id="More details on achieving the goal-ANSWER"><h2 id="ANSWER" class="header"><a href="#More details on achieving the goal-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Since you've already tackled the <code>Hashable</code> conformance for your Mission struct, the code change here is actually quite satisfying. You're going to strip out the "destination" logic and replace it with a simple data "value."
+</p>
+
+<p>
+Here is the updated <code>ListLayout.swift</code>:
+</p>
+
+<pre swift>
+struct ListLayout: View {
+    let astronauts: [String: Astronaut]
+    let missions: [Mission]
+    
+    var body: some View {
+        List(missions) { mission in
+            // 1. Change to the value-based NavigationLink
+            // We no longer mention 'MissionView' here at all.
+            NavigationLink(value: mission) { 
+                HStack {
+                    Image(mission.image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 50, height: 50)
+                        .padding(.trailing, 5)
+                    
+                    VStack(alignment: .leading) {
+                        Text(mission.displayName)
+                            .font(.headline)
+                        Text(mission.formattedLaunchDate)
+                            .font(.caption)
+                    }
+                }
+            }
+            .listRowBackground(Color.darkBackground)
+        }
+        .listStyle(.plain)
+        // 2. IMPORTANT: The destination logic moves to the NavigationStack in ContentView!
+    }
+}
+</pre>
+
+<div id="More details on achieving the goal-ANSWER-Why this looks &quot;Broken&quot; at first"><h3 id="Why this looks &quot;Broken&quot; at first" class="header"><a href="#More details on achieving the goal-ANSWER-Why this looks &quot;Broken&quot; at first">Why this looks "Broken" at first</a></h3></div>
+
+<p>
+If you run this code right now, <span id="More details on achieving the goal-ANSWER-Why this looks &quot;Broken&quot; at first-nothing will happen"></span><strong id="nothing will happen">nothing will happen</strong> when you tap a row. It will highlight, but it won't navigate.
+</p>
+
+<p>
+This is because <code>ListLayout</code> is now just shouting: "Hey, someone clicked Mission 11!" into the void. You need a listener.
+</p>
+
+<div id="More details on achieving the goal-ANSWER-The &quot;Listener&quot; in ContentView"><h3 id="The &quot;Listener&quot; in ContentView" class="header"><a href="#More details on achieving the goal-ANSWER-The &quot;Listener&quot; in ContentView">The "Listener" in ContentView</a></h3></div>
+
+<p>
+Go back to your <code>ContentView.swift</code> and add the <code>.navigationDestination</code> modifier to your <code>NavigationStack</code> (or the Group inside it).
+</p>
+
+<pre swift>
+NavigationStack {
+    Group {
+        if showingGrid {
+            GridLayout(astronauts: astronauts, missions: missions)
+        } else {
+            ListLayout(astronauts: astronauts, missions: missions)
+        }
+    }
+    // ADD THIS HERE:
+    .navigationDestination(for: Mission.self) { mission in
+        MissionView(mission: mission, astronauts: astronauts)
+    }
+    .navigationTitle("Moonshot")
+    // ... other modifiers
+}
+</pre>
+
+<div id="More details on achieving the goal-ANSWER-Why this is a win for your project:"><h3 id="Why this is a win for your project:" class="header"><a href="#More details on achieving the goal-ANSWER-Why this is a win for your project:">Why this is a win for your project:</a></h3></div>
+
+<ul>
+<li>
+The "Astronaut" Problem: In your original <code>ListLayout</code>, you had to pass the <code>astronauts</code> dictionary into the view just so you could pass it again into the <code>MissionView</code>.
+
+<li>
+Decoupling: Now, <code>ListLayout</code> doesn't need to know that <code>MissionView</code> requires an astronauts dictionary. It just passes the mission, and <code>ContentView</code> (the boss) decides how to build the next screen.
+
+</ul>
+<div id="More details on achieving the goal-ANSWER-The &quot;Value&quot; System Mental Model"><h3 id="The &quot;Value&quot; System Mental Model" class="header"><a href="#More details on achieving the goal-ANSWER-The &quot;Value&quot; System Mental Model">The "Value" System Mental Model</a></h3></div>
+
+<p>
+To help with the challenge logic, think of the new navigation system like a <span id="More details on achieving the goal-ANSWER-The &quot;Value&quot; System Mental Model-Restaurant Order"></span><strong id="Restaurant Order">Restaurant Order</strong>:
+</p>
+
+<ul>
+<li>
+The Link (<code>NavigationLink(value:)</code>): This is the <span id="More details on achieving the goal-ANSWER-The &quot;Value&quot; System Mental Model-Waiter"></span><strong id="Waiter">Waiter</strong>. They don't cook the food (the View); they just write down the order (the Data/Mission) and take it to the kitchen.
+
+<li>
+The Stack (<code>.navigationDestination</code>): This is the <span id="More details on achieving the goal-ANSWER-The &quot;Value&quot; System Mental Model-Kitchen"></span><strong id="Kitchen">Kitchen</strong>. It stays in one place and waits for orders to arrive. When it sees an order for "Mission," it knows exactly which recipe (<code>MissionView</code>) to cook.
 
 </ul>
 <p>
