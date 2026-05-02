@@ -187,6 +187,256 @@ Transition: <code>AddView</code> slides in from the right.
 Completion: Your "Save" button in <code>AddView</code> calls <code>dismiss()</code>, which pops the view off the stack and returns the user to the list.
 
 </ul>
+<div id="Challenge 1: iExpense with NavigationLink-In Context"><h3 id="In Context" class="header"><a href="#Challenge 1: iExpense with NavigationLink-In Context">In Context</a></h3></div>
+
+<div id="Challenge 1: iExpense with NavigationLink-iExpense - NavigationLink version"><h3 id="iExpense - NavigationLink version" class="header"><a href="#Challenge 1: iExpense with NavigationLink-iExpense - NavigationLink version">iExpense - NavigationLink version</a></h3></div>
+
+<div id="Challenge 1: iExpense with NavigationLink-iExpense - NavigationLink version-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#Challenge 1: iExpense with NavigationLink-iExpense - NavigationLink version-AddView.swift">AddView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct AddView: View {
+    // MARK: - ENVIRONMENT &amp; STATE
+    
+    // @Environment: Accesses system-wide values.
+    // Here, we grab the "dismiss" action, which allows the view to close itself.
+    @Environment(\.dismiss) var dismiss
+    
+    // @State: Local "Single Source of Truth" for the form fields.
+    // These hold the data temporarily until the user hits "Save."
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    // Add NavigationStack title variable for user editing
+    //@State private var expenseTitle: String
+    //@State private var expenseItem =  "Expense item"
+    
+    // Data source for our Picker.
+    let types = ["Business", "Personal"]
+    
+    // MARK: - EXTERNAL DATA
+    
+    // This receives the 'Expenses' class instance from ContentView.
+    // Because it is a class (Reference Type), adding an item here
+    // updates the same list seen in ContentView automatically.
+    var expenses: Expenses
+    
+    // MARK: - USER INTERFACE
+    var body: some View {
+        NavigationStack {
+            // Form: A specialized container that automatically styles rows
+            // to look like standard iOS settings or input screens.
+            Form {
+                // $name: The '$' creates a "Two-Way Binding."
+                // 1. The TextField shows what's in the variable.
+                // 2. Typing in the field updates the variable instantly.
+                TextField("Expense item", text: $name)
+                
+                // Picker: Linking the 'selection' to our 'type' state.
+                Picker("Type", selection: $type) {
+                    // \.self: Tells SwiftUI to use the String itself as the unique ID.
+                    ForEach(types, id: \.self) {
+                        Text($0) // '$0' is shorthand for "the current string in the loop"
+                    }
+                }
+                
+                // TextField for numbers: Uses 'value' and 'format' instead of 'text'.
+                TextField("Amount", value: $amount, format: .currency(code: "USD"))
+                    .keyboardType(.decimalPad) // Forces the numeric keypad with a decimal point
+            }
+            .navigationTitle("Add new expense")
+            
+            // MARK: - ACTIONS
+            // Set up ToolbarItems - Cancel &amp; Save
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        // 1. Package the local @State into a new ExpenseItem struct.
+                        let item = ExpenseItem(name: name, type: type, amount: amount)
+                        
+                        // 2. Append the new item to the shared Expenses class.
+                        expenses.items.append(item)
+                        
+                        // 3. Dismiss the view.
+                        // This triggers the 'isPresented' binding in ContentView to become false.
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .topBarLeading){
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    
+                }
+            }
+            // HIDE BACK BUTTON
+            .navigationBarBackButtonHidden(true)
+        }
+    }
+}
+
+// MARK: - PREVIEW
+#Preview {
+    // The Preview needs a "dummy" version of Expenses to render correctly.
+    AddView(expenses: Expenses())
+}
+</pre>
+
+<div id="Challenge 1: iExpense with NavigationLink-iExpense - NavigationLink version-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Challenge 1: iExpense with NavigationLink-iExpense - NavigationLink version-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+// MARK: - DATA MODEL
+// Structs are "Value Types." Use them to define the shape of your data.
+struct ExpenseItem: Identifiable, Codable {
+    // Identifiable: Lets the List know which item is which using a unique ID.
+    // Codable: Allows this data to be converted to JSON for saving (encoding/decoding).
+    
+    var id = UUID() // Generates a unique "Universally Unique Identifier."
+    let name: String
+    let type: String
+    let amount: Double
+}
+
+// MARK: - DATA STORAGE (THE "BRAIN")
+// @Observable: A macro that tells SwiftUI to watch this class for changes.
+// Classes are "Reference Types." Use them to share data across different views.
+@Observable
+class Expenses {
+    // The "Source of Truth" array.
+    var items = [ExpenseItem]() {
+        // didSet is a "Property Observer." It runs every time the array changes.
+        didSet {
+            // Convert the array into JSON data (encoding).
+            if let encoded = try? JSONEncoder().encode(items) {
+                // Save that JSON to the phone's permanent storage (UserDefaults).
+                UserDefaults.standard.set(encoded, forKey: "Items")
+            }
+        }
+    }
+    
+    // The initializer runs when the app first creates this object.
+    init() {
+        // Check if there is data saved under the key "Items."
+        if let savedItems = UserDefaults.standard.data(forKey: "Items") {
+            // Try to convert the JSON data back into an array of ExpenseItems (decoding).
+            if let decodedItems = try? JSONDecoder().decode([ExpenseItem].self, from: savedItems) {
+                items = decodedItems
+                return
+            }
+        }
+    }
+}
+
+// MARK: - COMPONENT VIEW (A REUSABLE ROW)
+// Extracting logic into a sub-view keeps the main layout clean.
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    // Computed Property: Logic that returns a specific type (Color).
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary      // Standard text color
+        case ..&lt;100: return .green      // Mid-range
+        default: return .red            // High expense
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary) // Faded grey look
+            }
+            
+            Spacer() // Pushes the following content to the far right
+            
+            // Format the Double as a currency based on the user's phone settings.
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor) // Applies our custom switch-case color
+        }
+    }
+}
+
+// MARK: - MAIN INTERFACE
+struct ContentView: View {
+    // @State: Tells SwiftUI that this view "owns" this data.
+    // If 'expenses' changes, the view will re-draw.
+    @State private var expenses = Expenses()
+    
+    // CONVERT TO NAVIGATIONLINK - DELETE THIS SHEET BASED VAR:
+    // Controls whether the AddView sheet is currently visible.
+    //@State private var showingAddExpense = false
+    
+    // Filtered Computed Properties:
+    // These create "virtual lists" based on the master 'items' array.
+    var personalExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Personal" }
+    }
+    var businessExpenses: [ExpenseItem] {
+        expenses.items.filter { $0.type == "Business" }
+    }
+    
+    var body: some View {
+        // NavigationStack: Provides the header area and manages view transitions.
+        NavigationStack {
+            // List: Provides the scrolling, grouped look and swipe actions.
+            List {
+                // Section: Groups rows with a header.
+                Section("Personal") {
+                    ForEach(personalExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        // Pass the offsets and the specific filtered list.
+                        removeItems(at: offsets, in: personalExpenses)
+                    }
+                }
+                
+                Section("Business") {
+                    ForEach(businessExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: businessExpenses)
+                    }
+                }
+            }
+            .navigationTitle("iExpense") // Sets the text in the NavigationStack
+            .toolbar {
+                NavigationLink {
+                    AddView(expenses: expenses)
+                } label: {
+                    Label("Add Expense", systemImage: "plus")
+                }
+            }
+        }
+    }
+    
+    // FUNCTION: Handles item deletion across sections.
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            // We find the ID of the filtered item within the MASTER array.
+            if let index = expenses.items.firstIndex(where: { $0.id == item.id }) {
+                expenses.items.remove(at: index)
+            }
+        }
+    }
+}
+
+// MARK: - PREVIEW
+#Preview {
+    ContentView()
+}
+</pre>
+
 <div id="Challenge 2: User Editable NavigationStack Title"><h1 id="Challenge 2: User Editable NavigationStack Title" class="header"><a href="#Challenge 2: User Editable NavigationStack Title">Challenge 2: User Editable NavigationStack Title</a></h1></div>
 
 <div id="Challenge 2: User Editable NavigationStack Title-AI Insights"><h2 id="AI Insights" class="header"><a href="#Challenge 2: User Editable NavigationStack Title-AI Insights">AI Insights</a></h2></div>
