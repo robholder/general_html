@@ -731,10 +731,132 @@ If you want to make it really clear that the title is editable, some developers 
 @State private var name = "New Expense"
 </pre>
 
+<div id="Challenge 3: Moonshot"><h1 id="Challenge 3: Moonshot" class="header"><a href="#Challenge 3: Moonshot">Challenge 3: Moonshot</a></h1></div>
+
 <p>
-How does the layout look once you switch to .large and remove that extra NavigationStack?
+This challenge marks a major shift from the "old" way of navigating in SwiftUI to the modern, data-driven <code>NavigationStack</code>.
 </p>
 
+<p>
+In the original Moonshot project, you likely used the "simple" <code>NavigationLink</code>:
+</p>
+<ul>
+<li>
+<code>NavigationLink(destination: MissionView(mission: mission)) { ... }</code>
+
+</ul>
+<p>
+Paul wants you to switch to the <span id="Challenge 3: Moonshot-decoupled"></span><strong id="decoupled">decoupled</strong> version. You don't have to convert every single view in your app, but you do need to convert the main path: <span id="Challenge 3: Moonshot-ContentView → MissionView"></span><strong id="ContentView → MissionView">ContentView → MissionView</strong>.
+</p>
+
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?"><h2 id="What is the &quot;NavigationLink(value:)&quot; System?" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?">What is the "NavigationLink(value:)" System?</a></h2></div>
+
+<p>
+Instead of telling the link exactly which View to go to, you tell the link: <span id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-&quot;Here is a piece of data. If the user taps this, just remember this data.&quot;"></span><strong id="&quot;Here is a piece of data. If the user taps this, just remember this data.&quot;">"Here is a piece of data. If the user taps this, just remember this data."</strong> Then, elsewhere in the code, you tell the <code>NavigationStack</code>: <span id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-&quot;If you ever receive a Mission object, show a MissionView.&quot;"></span><strong id="&quot;If you ever receive a Mission object, show a MissionView.&quot;">"If you ever receive a Mission object, show a MissionView."</strong>
+</p>
+
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 1: Conforming to Hashable"><h3 id="Step 1: Conforming to Hashable" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 1: Conforming to Hashable">Step 1: Conforming to Hashable</a></h3></div>
+
+<p>
+To use <code>value</code>:, the data you pass must be <code>Hashable</code> so SwiftUI can uniquely identify it in the navigation history.
+</p>
+
+<ul>
+<li>
+Go to <code>Mission.swift</code> and <code>Astronaut.swift</code>.
+
+<li>
+Update the struct definitions: <code>struct Mission: Codable, Identifiable, Hashable</code>.
+
+<li>
+<em>(Note: Since these structs only contain basic types like Strings and Ints, Swift will provide the conformance automatically once you add the word.)</em>
+
+</ul>
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 2: Updating the Links"><h3 id="Step 2: Updating the Links" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 2: Updating the Links">Step 2: Updating the Links</a></h3></div>
+
+<p>
+In your <code>GridLayout</code> or <code>ListLayout</code>, find where you created the <code>NavigationLink</code>.
+</p>
+
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 2: Updating the Links-Old way:"><h4 id="Old way:" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 2: Updating the Links-Old way:">Old way:</a></h4></div>
+
+<pre swift>
+NavigationLink(destination: MissionView(mission: mission, astronauts: astronauts)) {
+    // Label code...
+}
+</pre>
+
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 2: Updating the Links-New way:"><h4 id="New way:" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 2: Updating the Links-New way:">New way:</a></h4></div>
+
+<pre swift>
+NavigationLink(value: mission) {
+    // Label code...
+}
+</pre>
+
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 3: Using navigationDestination()"><h3 id="Step 3: Using navigationDestination()" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Step 3: Using navigationDestination()">Step 3: Using navigationDestination()</a></h3></div>
+
+<p>
+This is where the magic happens. In <code>ContentView</code>, inside the <code>NavigationStack</code> (usually attached to the <code>Group</code> or <code>List</code>), you add a "listener":
+</p>
+
+<pre swift>
+.navigationDestination(for: Mission.self) { mission in
+    MissionView(mission: mission, astronauts: astronauts)
+}
+</pre>
+
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Why is Paul making you do this?"><h3 id="Why is Paul making you do this?" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Why is Paul making you do this?">Why is Paul making you do this?</a></h3></div>
+
+<p>
+It feels like more work for the same result, right? But there are three huge benefits to this "Modern" approach:
+</p>
+
+<ul>
+<li>
+Deep Linking: It makes it much easier to programmatically jump to a specific mission (e.g., from a search result or a notification).
+
+<li>
+Performance: <code>MissionView</code> is now only created the moment the user taps the link. In the old way, SwiftUI sometimes initialized the destination views before they were even needed.
+
+<li>
+Clean Code: Your <code>GridLayout</code> no longer needs to know how to build a <code>MissionView</code>. It just says "I have a mission," and the <code>NavigationStack</code> handles the rest.
+
+</ul>
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Do I need to do this for Astronauts too?"><h3 id="Do I need to do this for Astronauts too?" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-Do I need to do this for Astronauts too?">Do I need to do this for Astronauts too?</a></h3></div>
+
+<p>
+Yes! If you have a link inside <code>MissionView</code> that goes to <code>AstronautView</code>, you should:
+</p>
+
+<ul>
+<li>
+Make Astronaut conform to <code>Hashable</code>.
+
+<li>
+Change the link to <code>NavigationLink(value: astronaut)</code>.
+
+<li>
+Add a second <code>.navigationDestination(for: Astronaut.self)</code> to your <code>NavigationStack</code>.
+
+</ul>
+<div id="Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-A Git Strategy for this Challenge"><h3 id="A Git Strategy for this Challenge" class="header"><a href="#Challenge 3: Moonshot-What is the &quot;NavigationLink(value:)&quot; System?-A Git Strategy for this Challenge">A Git Strategy for this Challenge</a></h3></div>
+
+<p>
+Since this refactor touches several files, this is the perfect time to use a Branch:
+</p>
+
+<ul>
+<li>
+<code>git switch -c refactor-navigation</code>
+
+<li>
+Do your work.
+
+<li>
+If you break the navigation and get frustrated, you can just git switch main to get back to your working app and try again!
+
+</ul>
 <p>
 <hr>
 <br>
