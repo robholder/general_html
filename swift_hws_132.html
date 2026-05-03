@@ -257,6 +257,68 @@ struct ContentView: View {
 }
 </pre>
 
+<p>
+In SwiftUI, when you use a .sheet, you usually create a separate View file to keep your code organized.
+</p>
+
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Creating the AddActivityView"><h3 id="Creating the AddActivityView" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Creating the AddActivityView">Creating the AddActivityView</a></h3></div>
+
+<p>
+Create a new SwiftUI View file named <code>AddActivityView.swift</code> and use this code. This view needs access to your <code>habits</code> object so it can append the new activity to the array.
+</p>
+
+<pre swift>
+struct AddActivityView: View {
+    // This allows us to close the sheet when the user clicks 'Save'
+    @Environment(\.dismiss) var dismiss
+    
+    // We pass the habits in so we can add to the list
+    var habits: Habits
+
+    @State private var title = ""
+    @State private var description = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Title", text: $title)
+                TextField("Description", text: $description)
+            }
+            .navigationTitle("Add New Activity")
+            .toolbar {
+                Button("Save") {
+                    // 1. Create the new activity
+                    let item = Activity(title: title, description: description, completionCount: 0)
+                    
+                    // 2. Add it to our central list
+                    habits.activities.append(item)
+                    
+                    // 3. Close the sheet
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-How the Data Flows (The Big Picture)"><h3 id="How the Data Flows (The Big Picture)" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-How the Data Flows (The Big Picture)">How the Data Flows (The Big Picture)</a></h3></div>
+
+<p>
+To understand why the error happened and how this fix works, look at how the data moves between your three main files:
+</p>
+
+<ul>
+<li>
+Habits (The Brain): The <code>@Observable</code> class lives in <code>ContentView</code>. Because it’s a class (a reference type), when you pass it into <code>AddActivityView</code>, both views are looking at the exact same memory address.
+
+<li>
+AddActivityView (The Input): When you click "Save," it appends a new <code>Activity</code> to <code>habits.activities</code>.
+
+<li>
+Automatic Refresh: Because the list in <code>ContentView</code> is watching that <code>habits</code> object, it notices the array changed and instantly redraws the list with your new habit.
+
+</ul>
 <div id="Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Why this works:"><h3 id="Why this works:" class="header"><a href="#Hacking With Swift - 132 - Next: Challenge-AI Breakdown of Challenge-Why this works:">Why this works:</a></h3></div>
 
 <ul>
@@ -290,6 +352,247 @@ Commit 3: "Detail view with increment logic."
 Tag: <code>v1.0-challenge-complete</code>
 
 </ul>
+<div id="Further Clarification"><h1 id="Further Clarification" class="header"><a href="#Further Clarification">Further Clarification</a></h1></div>
+
+<div id="Further Clarification-QUESTION"><h2 id="QUESTION" class="header"><a href="#Further Clarification-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Things like <code>AddActivityView(habits: habits)</code> confuse me - what is 'habits' one, and 'habits' two for example.
+</p>
+
+<div id="Further Clarification-ANSWER"><h2 id="ANSWER" class="header"><a href="#Further Clarification-ANSWER">ANSWER</a></h2></div>
+
+<p>
+That <code>AddActivityView(habits: habits)</code> syntax is a very common source of confusion!
+</p>
+
+<p>
+Think of it like a <span id="Further Clarification-ANSWER-label"></span><strong id="label">label</strong> on a box.
+</p>
+
+<ul>
+<li>
+The first <code>habits:</code> is the label on the box inside <code>AddActivityView</code> (the parameter name).
+
+<li>
+The second <code>habits</code> is the actual object you are physically handing over from <code>ContentView</code> to put into that box.
+
+</ul>
+<p>
+It's essentially saying: <em>"Hey AddActivityView, take my actual <span id="Further Clarification-ANSWER-habits"></span><strong id="habits">habits</strong> object and put it into your internal variable that you also call <span id="Further Clarification-ANSWER-habits"></span><strong id="habits">habits</strong>."</em>
+</p>
+
+<div id="Further Clarification-ANSWER-Key Summary of the Variable Confusion"><h3 id="Key Summary of the Variable Confusion" class="header"><a href="#Further Clarification-ANSWER-Key Summary of the Variable Confusion">Key Summary of the Variable Confusion</a></h3></div>
+
+<p>
+When you see <code>ActivityDetailView(habits: habits, activity: activity)</code>:
+</p>
+
+<ul>
+<li>
+<code>habits:</code> — The <span id="Further Clarification-ANSWER-Key Summary of the Variable Confusion-name of the parameter"></span><strong id="name of the parameter">name of the parameter</strong> defined inside the DetailView struct.
+
+<li>
+<code>habits</code> — The <span id="Further Clarification-ANSWER-Key Summary of the Variable Confusion-actual variable"></span><strong id="actual variable">actual variable</strong> defined at the top of ContentView using <code>@State</code>.
+
+</ul>
+<p>
+Think of it like a relay race: <code>ContentView</code> is holding the baton (the data) and it hands it to <code>ActivityDetailView</code>. The label on the hand says "Here is the <code>habits</code> baton, put it in your <code>habits</code> hand."
+</p>
+
+<div id="Annotated Code"><h1 id="Annotated Code" class="header"><a href="#Annotated Code">Annotated Code</a></h1></div>
+
+<div id="Annotated Code-1. Habits.swift (The Brain)"><h2 id="1. Habits.swift (The Brain)" class="header"><a href="#Annotated Code-1. Habits.swift (The Brain)">1. Habits.swift (The Brain)</a></h2></div>
+
+<p>
+This class manages the data. It doesn't need a preview because it isn't a View, but it's the "Source of Truth" for everything else.
+</p>
+
+<pre swift>
+@Observable
+class Habits {
+    // The master list. Whenever it changes (didSet), it saves to the phone's storage.
+    var activities = [Activity]() {
+        didSet {
+            if let encoded = try? JSONEncoder().encode(activities) {
+                UserDefaults.standard.set(encoded, forKey: "Activities")
+            }
+        }
+    }
+    
+    init() {
+        // When the app starts, try to load existing data from UserDefaults.
+        if let savedItems = UserDefaults.standard.data(forKey: "Activities") {
+            if let decodedItems = try? JSONDecoder().decode([Activity].self, from: savedItems) {
+                activities = decodedItems
+                return
+            }
+        }
+        // If no data exists, start with an empty list.
+        activities = []
+    }
+}
+</pre>
+
+<div id="Annotated Code-2. AddActivityView.swift (The Input)"><h2 id="2. AddActivityView.swift (The Input)" class="header"><a href="#Annotated Code-2. AddActivityView.swift (The Input)">2. AddActivityView.swift (The Input)</a></h2></div>
+
+<p>
+This view needs an empty Habits object in its preview so Xcode knows how to render the form.
+</p>
+
+<pre swift>
+struct AddActivityView: View {
+    @Environment(\.dismiss) var dismiss // A system command to close this sheet
+    var habits: Habits // The "storage box" we received from ContentView
+    
+    @State private var title = "" // Local text for the Title box
+    @State private var description = "" // Local text for the Description box
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Title", text: $title)
+                TextField("Description", text: $description)
+            }
+            .navigationTitle("Add New Activity")
+            .toolbar {
+                Button("Save") {
+                    // Create a new activity using the local @State text
+                    let item = Activity(title: title, description: description, completionCount: 0)
+                    
+                    // Add that new activity to the master list we were handed
+                    habits.activities.append(item)
+                    
+                    // Tell the system to slide this sheet away
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    // We provide a "dummy" Habits object so the preview can function
+    AddActivityView(habits: Habits())
+}
+</pre>
+
+<div id="Annotated Code-3. ActivityDetailView.swift (The Tracker)"><h2 id="3. ActivityDetailView.swift (The Tracker)" class="header"><a href="#Annotated Code-3. ActivityDetailView.swift (The Tracker)">3. ActivityDetailView.swift (The Tracker)</a></h2></div>
+
+<p>
+This one is tricky for a preview because it needs both the habits list and a specific activity to display.
+</p>
+
+<pre swift>
+struct ActivityDetailView: View {
+    var habits: Habits // The master list (needed so we can swap data)
+    var activity: Activity // The specific activity the user tapped on
+    
+    var body: some View {
+        List {
+            Section("Description") {
+                Text(activity.description)
+            }
+            
+            Section("Progress") {
+                Text("Completed \(activity.completionCount) times")
+                
+                Button("Mark Completed") {
+                    // Create a copy of the activity so we can change the count
+                    var newActivity = activity
+                    newActivity.completionCount += 1
+                    
+                    // Look through the master list to find where the old version is
+                    if let index = habits.activities.firstIndex(of: activity) {
+                        // Swap the old one for our new version with the higher count
+                        habits.activities[index] = newActivity
+                    }
+                }
+            }
+        }
+        .navigationTitle(activity.title)
+    }
+}
+
+#Preview {
+    // 1. Create a fake habit to show
+    let example = Activity(title: "Test Habit", description: "This is a test", completionCount: 5)
+    
+    // 2. Pass it into the view
+    // Note: 'habits' gets a fresh Habits object, 'activity' gets our example above
+    return ActivityDetailView(habits: Habits(), activity: example)
+}
+</pre>
+
+<div id="Annotated Code-4. ContentView.swift (The Home Screen)"><h2 id="4. ContentView.swift (The Home Screen)" class="header"><a href="#Annotated Code-4. ContentView.swift (The Home Screen)">4. ContentView.swift (The Home Screen)</a></h2></div>
+
+<p>
+This is your main dashboard. It connects everything together.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    // Create the master "Brain" instance here. It stays alive as long as the app is open.
+    @State private var habits = Habits()
+    
+    // Controls whether the 'Add' sheet is currently visible
+    @State private var showingAddActivity = false
+    
+    var body: some View {
+        NavigationStack {
+            List(habits.activities) { activity in
+                // When tapped, go to Detail. We pass the master 'habits' AND this specific 'activity'
+                NavigationLink {
+                    ActivityDetailView(habits: habits, activity: activity)
+                } label: {
+                    HStack {
+                        Text(activity.title)
+                        Spacer()
+                        Text("\(activity.completionCount)")
+                            .font(.caption.bold())
+                            .padding(5)
+                            .background(.blue.opacity(0.2))
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            .navigationTitle("HabitTracker")
+            .toolbar {
+                Button("Add Activity", systemImage: "plus") {
+                    showingAddActivity = true // Triggers the sheet
+                }
+            }
+            .sheet(isPresented: $showingAddActivity) {
+                // Pass our 'habits' instance into the sheet so it can add new items
+                AddActivityView(habits: habits)
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Annotated Code-5. Activity Struct"><h2 id="5. Activity Struct" class="header"><a href="#Annotated Code-5. Activity Struct">5. Activity Struct</a></h2></div>
+
+<p>
+Self explanatory: Struct to store Activity data:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct Activity: Identifiable, Codable, Equatable {
+    var id  = UUID()
+    let title: String
+    let description: String
+    var completionCount: Int
+}
+</pre>
+
+
 <p>
 <hr>
 <br>
