@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_135</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_134.html">Hacking With Swift - 134 - Cupcake Corner: Introduction</a>
+
+</ul>
+<div id="Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI"><h1 id="Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI" class="header"><a href="#Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI">Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI</a></h1></div>
+
+<p>
+iOS gives us built-in tools for sending and receiving data from the internet, and if we combine it with <code>Codable</code> support then it’s possible to convert Swift objects to JSON for sending, then receive back JSON to be converted back to Swift objects. Even better, when the request completes we can immediately assign its data to properties in SwiftUI views, causing our user interface to update.
+</p>
+
+<p>
+To demonstrate this we can load some example music JSON data from Apple’s iTunes API, and show it all in a SwiftUI <code>List</code>. Apple’s data includes lots of information, but we’re going to whittle it down to just two types: a <code>Result</code> will store a track ID, its name, and the album it belongs to, and a <code>Response</code> will store an array of results.
+</p>
+
+<p>
+So, start with this code:
+</p>
+
+<pre swift>
+struct Response: Codable {
+    var results: [Result]
+}
+
+struct Result: Codable {
+    var trackId: Int
+    var trackName: String
+    var collectionName: String
+}
+</pre>
+
+<p>
+We can now write a simple <code>ContentView</code> that shows an array of results:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var results = [Result]()
+
+    var body: some View {
+        List(results, id: \.trackId) { item in
+            VStack(alignment: .leading) {
+                Text(item.trackName)
+                    .font(.headline)
+                Text(item.collectionName)
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+That won’t show anything at first, because the <code>results</code> array is empty. This is where our networking call comes in: we’re going to ask the iTunes API to send us a list of all the songs by Taylor Swift, then use <code>JSONDecoder</code> to convert those results into an array of <code>Result</code> instances.
+</p>
+
+<p>
+However, doing this means you need to meet two important Swift keywords: <code>async</code> and <code>await</code>. You see, any iPhone capable of running SwiftUI can perform billions of operations every second - it’s so fast that it completes most work before we even realized it started it. On the flip side, networking - downloading data from the internet - might take several hundreds milliseconds or more to come, which is extremely slow for a computer that’s used to doing literally a billion other things in that time.
+</p>
+
+<p>
+Rather than forcing our entire progress to stop while the networking happens, Swift gives us the ability to say “this work will take some time, so please wait for it to complete while the rest of the app carries on running as usual.”
+</p>
+
+<p>
+This functionality - this ability to leave some code running while our main app code carries on working - is called an <code>asynchronous</code> function. A synchronous function is one that runs fully before returning a value as needed, but an asynchronous function is one that is able to go to sleep for a while, so that it can wait for some other work to complete before continuing. In our case, that means going to sleep while our networking code happens, so that the rest of our app doesn’t freeze up for several seconds.
+</p>
+
+<p>
+To make this easier to understand, let’s write it in a few stages. First, here’s the basic method stub - please add this to the <code>ContentView</code> struct:
+</p>
+
+<pre swift>
+func loadData() async {
+
+}
+</pre>
+
+<p>
+Notice the new <code>async</code> keyword in there - we’re telling Swift this function might want to go to sleep in order to complete its work.
+</p>
+
+<p>
+We want that to be run as soon as our <code>List</code> is shown, but we can’t just use <code>onAppear()</code> here because that doesn’t know how to handle sleeping functions - it expects its function to be synchronous.
+</p>
+
+<p>
+SwiftUI provides a different modifier for these kinds of tasks, giving it a particularly easy to remember name: <code>task()</code>. This can call functions that might go to sleep for a while; all Swift asks us to do is mark those functions with a second keyword, <code>await</code>, so we’re explicitly acknowledging that a sleep might happen.
+</p>
+
+<p>
+Add this modifier to the <code>List</code> now:
+</p>
+
+<pre swift>
+.task {
+    await loadData()
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI-Tip"></span><strong id="Tip">Tip</strong>: Think of <code>await</code> as being like <code>try</code> - we’re saying we understand a sleep might happen, in the same way <code>try</code> says we acknowledge an error might be thrown.
+</p>
+
+<p>
+Inside <code>loadData()</code> we have three steps we need to complete:
+</p>
+
+<ul>
+<li>
+Creating the URL we want to read.
+
+<li>
+Fetching the data for that URL.
+
+<li>
+Decoding the result of that data into a <code>Response</code> struct.
+
+</ul>
+<p>
+We’ll add those step by step, starting with the URL. This needs to have a precise format: “itunes.apple.com” followed by a series of parameters - you can find the full set of parameters if you do a web search for “iTunes Search API”. In our case we’ll be using the search term “Taylor Swift” and the entity “song”, so add this to <code>loadData()</code> now:
+</p>
+
+<pre swift>
+guard let url = URL(string: "https://itunes.apple.com/search?term=taylor+swift&amp;entity=song") else {
+    print("Invalid URL")
+    return
+}
+</pre>
+
+<p>
+Step 2 is to fetch the data from that URL, which is where our sleep is likely to happen. I say “likely” because it might not - iOS will do a little caching of data, so if the URL is fetched twice back to back then the data will get sent back immediately rather than triggering a sleep.
+</p>
+
+<p>
+Regardless, a sleep is possible here, and every time a sleep is possible we need to use the <code>await</code> keyword with the code we want to run. Just as importantly, an error might also be thrown here - maybe the user isn’t currently connected to the internet, for example.
+</p>
+
+<p>
+So, we need to use both <code>try</code> <em>and</em> <code>await</code> at the same time. Please add this code directly after the previous code:
+</p>
+
+<pre swift>
+do {
+    let (data, _) = try await URLSession.shared.data(from: url)
+
+    // more code to come
+} catch {
+    print("Invalid data")
+}
+</pre>
+
+<p>
+That introduced three important things, so let’s break it down:
+</p>
+
+<ul>
+<li>
+Our work is being done by the <code>data(from:)</code> method, which takes a URL and returns the <code>Data</code> object at that URL. This method belongs to the <code>URLSession</code> class, which you can create and configure by hand if you want, but you can also use a shared instance that comes with sensible defaults.
+
+<li>
+The return value from <code>data(from:)</code> is a tuple containing the data at the URL and some metadata describing how the request went. We don’t use the metadata, but we do want the URL’s data, hence the underscore - we create a new local constant for the data, and toss the metadata away.
+
+<li>
+When using both <code>try</code> and <code>await</code> at the same time, we must write <code>try await</code> - using <code>await try</code> is not allowed. There’s no special reason for this, but they had to pick one so they went with the one that reads more naturally.
+
+</ul>
+<p>
+So, if our download succeeds our <code>data</code> constant will be set to whatever data was sent back from the URL, but if it fails for any reason our code prints “Invalid data” and does nothing else.
+</p>
+
+<p>
+The last part of this method is to convert the <code>Data</code> object into a <code>Response</code> object using <code>JSONDecoder</code>, then assign the array inside to our <code>results</code> property. This is exactly what we’ve used before, so this shouldn’t be a surprise - add this last code in place of the <code>// more code to come</code> comment now:
+</p>
+
+<pre swift>
+if let decodedResponse = try? JSONDecoder().decode(Response.self, from: data) {
+    results = decodedResponse.results
+}
+</pre>
+
+<p>
+If you run the code now you should see a list of Taylor Swift songs appear after a short pause - it really isn’t a lot of code given how well the end result works.
+</p>
+
+<p>
+All this only handles <em>downloading</em> data. Later on in this project we’re going to look at how to adopt a slightly different approach so you can send <code>Codable</code> data, but that’s enough for now.
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
