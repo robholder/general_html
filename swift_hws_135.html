@@ -63,12 +63,15 @@ We can now write a simple <code>ContentView</code> that shows an array of result
 
 <pre swift>
 struct ContentView: View {
-    @State private var results = [Result]()
+    //@State private var results = [Result]()
+    @State private var foundTracks = [Result]() 
 
     var body: some View {
-        List(results, id: \.trackId) { item in
+        //List(results, id: \.trackId) { item in
+        List(foundTracks, id: \.trackId) { track in
             VStack(alignment: .leading) {
-                Text(item.trackName)
+                //Text(item.trackName)
+                Text(track.trackName)
                     .font(.headline)
                 Text(item.collectionName)
             }
@@ -76,6 +79,76 @@ struct ContentView: View {
     }
 }
 </pre>
+
+<p>
+I renamed <code>results</code> here, as using the same name for two different contexts is making the code unintuitive. I renamed <code>item</code> to <code>track</code> to keep the context more explanatory.
+</p>
+
+<p>
+Here is a quick cheat sheet for what can change.
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Component
+</th>
+<th>
+Can I rename it?
+</th>
+<th>
+Rule
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+@State var foundTracks
+</td>
+<td>
+YES
+</td>
+<td>
+This is your private variable. Call it whatever you like!
+</td>
+</tr>
+<tr>
+<td>
+struct Result property names
+</td>
+<td>
+NO (mostly)
+</td>
+<td>
+trackName must match the JSON key exactly (unless you use CodingKeys).
+</td>
+</tr>
+<tr>
+<td>
+struct Response property names
+</td>
+<td>
+NO (mostly)
+</td>
+<td>
+results must match the JSON key exactly (unless you use CodingKeys).
+</td>
+</tr>
+<tr>
+<td>
+{ track in ... }
+</td>
+<td>
+YES
+</td>
+<td>
+This is just a nickname for "the current item in the loop."
+</td>
+</tr>
+</tbody>
+</table>
 
 <div id="Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI-AI Interlude"><h2 id="AI Interlude" class="header"><a href="#Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI-AI Interlude">AI Interlude</a></h2></div>
 
@@ -321,6 +394,82 @@ If you run the code now you should see a list of Taylor Swift songs appear after
 
 <p>
 All this only handles <em>downloading</em> data. Later on in this project we’re going to look at how to adopt a slightly different approach so you can send <code>Codable</code> data, but that’s enough for now.
+</p>
+
+<div id="async and await-AI Addition"><h2 id="AI Addition" class="header"><a href="#async and await-AI Addition">AI Addition</a></h2></div>
+
+<p>
+I found the reuse of the variable name 'results' quite confusing, so I changed variables that I'm able to distinguish what <em>has</em> to be named <code>results</code> to match the data from iTunes, and the internal variables.
+</p>
+
+<div id="async and await-AI Addition-The Visual Flow"><h3 id="The Visual Flow" class="header"><a href="#async and await-AI Addition-The Visual Flow">The Visual Flow</a></h3></div>
+
+<p>
+If you rename everything for maximum clarity, the "journey" of a piece of data (like a song title) looks like this:
+</p>
+
+<ul>
+<li>
+The Internet: Sends a JSON "shipping box" labeled <code>results</code>.
+
+<li>
+The Response Struct: Acts as the "receiving dock." It must use the name <code>results</code> to accept the delivery.
+
+<li>
+The Handshake: You manually move the items from the <code>Response</code> dock into your private <code>foundTracks</code> storage.
+
+</ul>
+<p>
+The View: The <code>List</code> watches the <code>foundTracks</code> storage. The moment it sees a new song arrive, it automatically draws a row.
+</p>
+
+<div id="async and await-AI Addition-The &quot;Clean&quot; Code Example"><h3 id="The &quot;Clean&quot; Code Example" class="header"><a href="#async and await-AI Addition-The &quot;Clean&quot; Code Example">The "Clean" Code Example</a></h3></div>
+
+<p>
+Here is how your <code>ContentView</code> looks when you’ve stripped away the naming confusion. Notice how much more like "English" it reads:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    // Clear name: This is what the user sees on their screen
+    @State private var foundTracks = [Result]()
+    
+    var body: some View {
+        // The List is powered by our local tracks array
+        List(foundTracks, id: \.trackId) { track in
+            VStack(alignment: .leading) {
+                // 'track' is a specific, descriptive name for the current row
+                Text(track.trackName)
+                    .font(.headline)
+                Text(track.collectionName)
+            }
+        }
+        .task {
+            // When the view appears, run the fetch
+            await fetchMusic()
+        }
+    }
+    
+    func fetchMusic() async {
+        // ... networking code ...
+        
+        // Final Step: Transfer data from the 'shipping box' to our 'storage'
+        // self.foundTracks = decodedResponse.results
+    }
+}
+</pre>
+
+<div id="async and await-AI Addition-Why &quot;item&quot; and &quot;results&quot; are so common in tutorials"><h3 id="Why &quot;item&quot; and &quot;results&quot; are so common in tutorials" class="header"><a href="#async and await-AI Addition-Why &quot;item&quot; and &quot;results&quot; are so common in tutorials">Why "item" and "results" are so common in tutorials</a></h3></div>
+
+<p>
+Tutorials often use generic names like <code>results</code> and <code>item</code> because they want the code to be "reusable." If they used <code>foundTracks</code>, the code looks like it's only for music. By using <code>results</code>, they hope you can copy-paste it into a weather app or a stock market app.
+</p>
+
+<p>
+But for <span id="async and await-AI Addition-Why &quot;item&quot; and &quot;results&quot; are so common in tutorials-learning"></span><strong id="learning">learning</strong>, that generic naming is a trap! Using specific names like <code>foundTracks</code> or <code>habitList</code> makes the logic "sticky" in your brain.
+</p>
+
+<p>
 <hr>
 <br>
 </p>
