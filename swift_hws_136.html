@@ -133,9 +133,36 @@ AsyncImage(url: URL(string: "https://hws.dev/img/logo.png")) { image in
 A resizable image and <code>Color.red</code> both automatically take up all available space, which means the <code>frame()</code> modifier actually works now.
 </p>
 
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        //AsyncImage(url: URL(string: "https://hws.dev/img/logo.png"), scale: 3)
+        AsyncImage(url: URL(string: "https://hws.dev/img/logo.png")) { image in
+            image
+                .resizable()
+                .scaledToFit()
+        } placeholder: {
+            Color.red
+        }
+        .frame(width: 200, height: 200)
+    }
+
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 The placeholder view can be whatever you want. For example, if you replace <code>Color.red</code> with <code>ProgressView()</code> - just that - then you’ll get a little spinner activity indicator instead of a solid color.
 </p>
+
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-Complete Control"><h2 id="Complete Control" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-Complete Control">Complete Control</a></h2></div>
 
 <p>
 If you want <em>complete</em> control over your remote image, there’s a third way of creating <code>AsyncImage</code> that tells us whether the image was loaded, hit an error, or hasn’t finished yet. This is particularly useful for times when you want to show a dedicated view when the download fails - if the URL doesn’t exist, or the user was offline, etc.
@@ -163,6 +190,135 @@ AsyncImage(url: URL(string: "https://hws.dev/img/bad.png")) { phase in
 <p>
 So, that will show our image if it can, an error message if the download failed for any reason, or a spinning activity indicator while the download is still in progress.
 </p>
+
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter"><h2 id="The `phase` Parameter" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter">The <code>phase</code> Parameter</a></h2></div>
+
+<p>
+The word <code>phase</code> is just a <span id="Hacking With Swift - 136 - Loading an image from a remote server-The <code>phase</code> Parameter-local parameter"></span><strong id="local parameter">local parameter</strong> name (a "nickname") that you choose. It represents the current state of the image download.
+</p>
+
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-Why it's flexible"><h4 id="Why it's flexible" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-Why it's flexible">Why it's flexible</a></h4></div>
+
+<p>
+When you write <code>{ phase in ... }</code>, you are telling SwiftUI: "As the image download progresses, give me the current status and let me refer to it as 'phase' inside these brackets."
+</p>
+
+<p>
+You could just as easily write:
+</p>
+
+<ul>
+<li>
+<code>{ status in ... }</code>
+
+<li>
+<code>{ result in ... }</code>
+
+<li>
+<code>{ currentImageState in ... }</code>
+
+</ul>
+<p>
+As long as you change the word after the <code>.</code> to match (e.g., <code>status.image</code> instead of <code>phase.image</code>), the code will work exactly the same.
+</p>
+
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-What &quot;Phase&quot; actually represents"><h4 id="What &quot;Phase&quot; actually represents" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-What &quot;Phase&quot; actually represents">What "Phase" actually represents</a></h4></div>
+
+<p>
+Even though the name is up to you, the <span id="Hacking With Swift - 136 - Loading an image from a remote server-The <code>phase</code> Parameter-What &quot;Phase&quot; actually represents-type"></span><strong id="type">type</strong> of data being passed in is fixed. It is an <code>AsyncImagePhase</code> enum.
+</p>
+
+<p>
+Think of it like a three-position switch that SwiftUI flips as it works:
+</p>
+
+<ul>
+<li>
+Empty: "I haven't started or I'm still working." (This is why your <code>else</code> shows a <code>ProgressView</code>).
+
+<li>
+Success: "I got the image! Here it is." (This is where <code>phase.image</code> becomes real).
+
+<li>
+Failure: "Something went wrong (no internet, 404 error)." (This is where <code>phase.error</code> is filled).
+
+</ul>
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-Why &quot;Phase&quot; is the standard convention"><h4 id="Why &quot;Phase&quot; is the standard convention" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-Why &quot;Phase&quot; is the standard convention">Why "Phase" is the standard convention</a></h4></div>
+
+<p>
+Most tutorials and documentation use the word <code>phase</code> because it accurately describes a process that moves through stages (Loading → Success/Failure). Using the "standard" name helps other developers understand your code quickly, but the compiler doesn't care if you call it <code>p</code> or <code>bananas</code>.
+</p>
+
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-Consistency Check"><h4 id="Consistency Check" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-Consistency Check">Consistency Check</a></h4></div>
+
+<p>
+If you were to change it, it would look like this:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/logo.png")) { status in // Renamed here
+    if let image = status.image { // Must match here
+        image
+            .resizable()
+            .scaledToFit()
+    } else if status.error != nil { // And here
+        Text("Error")
+    } else {
+        ProgressView()
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-A Final Tip on AsyncImagePhase"><h3 id="A Final Tip on AsyncImagePhase" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-A Final Tip on AsyncImagePhase">A Final Tip on AsyncImagePhase</a></h3></div>
+
+<p>
+Since you are experimenting, you might find it interesting to see exactly what is inside that phase variable. Because it is an <span id="Hacking With Swift - 136 - Loading an image from a remote server-The <code>phase</code> Parameter-A Final Tip on AsyncImagePhase-Enum"></span><strong id="Enum">Enum</strong>, it follows a specific structure that Swift uses to track different "modes" of an object.
+</p>
+
+<p>
+When you use:
+</p>
+
+<ul>
+<li>
+<code>phase.image</code>: You are asking, "Are you in the <code>.success</code> mode?"
+
+<li>
+<code>phase.error</code>: You are asking, "Are you in the <code>.failure</code> mode?"
+
+<li>
+<code>ProgressView()</code>: You are assuming, "You must be in the <code>.empty</code> mode."
+
+</ul>
+<div id="Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server-The `phase` Parameter-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        //AsyncImage(url: URL(string: "https://hws.dev/img/logo.png"), scale: 3)
+        AsyncImage(url: URL(string: "https://hws.dev/img/logo.png")) { phase in
+            if let image = phase.image {
+                image
+                    .resizable()
+                    .scaledToFit()
+            } else if phase.error != nil {
+                Text("There was an error loading the image.")
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(width: 200, height: 200)
+    }
+
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 
 <p>
 <hr>
