@@ -327,7 +327,15 @@ Decoding the result of that data into a <code>Response</code> struct.
 
 </ul>
 <p>
-We’ll add those step by step, starting with the URL. This needs to have a precise format: “itunes.apple.com” followed by a series of parameters - you can find the full set of parameters if you do a web search for “iTunes Search API”. In our case we’ll be using the search term “Taylor Swift” and the entity “song”, so add this to <code>loadData()</code> now:
+We’ll add those step by step, starting with the URL.
+</p>
+
+<p>
+<span id="async &amp; await-await Keyword-Step 1"></span><strong id="Step 1">Step 1</strong> is to set the URL. This needs to have a precise format: “itunes.apple.com” followed by a series of parameters.
+</p>
+
+<p>
+You can find the full set of parameters if you do a web search for “iTunes Search API”. In our case we’ll be using the search term “Taylor Swift” and the entity “song”, so add this to <code>loadData()</code> now:
 </p>
 
 <pre swift>
@@ -338,7 +346,11 @@ guard let url = URL(string: "https://itunes.apple.com/search?term=taylor+swift&a
 </pre>
 
 <p>
-Step 2 is to fetch the data from that URL, which is where our sleep is likely to happen. I say “likely” because it might not - iOS will do a little caching of data, so if the URL is fetched twice back-to-back then the data will get sent back immediately rather than triggering a sleep.
+<span id="async &amp; await-await Keyword-Step 2"></span><strong id="Step 2">Step 2</strong> is to fetch the data from that URL, which is where our 'sleep' is likely to happen.
+</p>
+
+<p>
+I say “likely” because it might not. iOS will do a little caching of data, so if the URL is fetched twice back-to-back then the data will get sent back immediately rather than triggering a sleep.
 </p>
 
 <p>
@@ -472,6 +484,73 @@ Tutorials often use generic names like <code>results</code> and <code>item</code
 <p>
 But for <span id="async &amp; await-AI Addition-Why &quot;item&quot; and &quot;results&quot; are so common in tutorials-learning"></span><strong id="learning">learning</strong>, that generic naming is a trap! Using specific names like <code>foundTracks</code> or <code>habitList</code> makes the logic "sticky" in your brain.
 </p>
+
+<div id="async &amp; await-AI Addition-In Context"><h3 id="In Context" class="header"><a href="#async &amp; await-AI Addition-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+// Individual data struct
+struct Result: Codable {
+    var trackId: Int
+    var trackName: String
+    var collectionName: String
+}
+
+// Array of 'Result' objects
+struct Response: Codable {
+    var results: [Result]
+}
+
+
+struct ContentView: View {
+    // Set up an array of Result objects
+    //@State private var results = [Result]()
+    @State private var foundTracks = [Result]()
+    
+    var body: some View {
+        // This doesn't need a ForEach loop for the results array
+        //List(results, id: \.trackId) { item in
+        List(foundTracks, id: \.trackId) { track in
+            VStack(alignment: .leading) {
+                Text(track.trackName)
+                    .font(.headline)
+                Text(track.collectionName)
+            }
+        }
+        .task {
+            await fetchMusic()
+        }
+        
+    }
+    
+    //func loadData() async {
+    func fetchMusic() async {
+        // 1. Check the URL
+        guard let url = URL(string: "https://itunes.apple.com/search?term=taylor+swift&amp;entity=song") else {
+            print("Invalid URL")
+            return
+        }
+        
+        do {
+            // 2. Fetch the data
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            // 3. Decode the data
+            if let decodedResponse = try? JSONDecoder().decode(Response.self, from: data) {
+                // 4. Update the UI
+                foundTracks = decodedResponse.results
+            }
+        } catch {
+            print("Invalid data")
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <hr>
