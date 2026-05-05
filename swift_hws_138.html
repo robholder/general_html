@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_138</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_137.html">Hacking With Swift - 137 - Validating and disabling forms</a>
+
+</ul>
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class"><h1 id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class">Hacking With Swift - 138 - Adding Codable conformance to an @Observable class</a></h1></div>
+
+<p>
+Today we’re going to be covering two more technique before diving into building the user interface for our app.
+</p>
+
+<p>
+Although the fundamentals of today’s work will be familiar to you, there’s still scope for new things as you’ll see. This will become particularly common as we continue to push SwiftUI’s boundaries - everything is easy when your app is easy, but as we venture more into larger apps you’ll find we need to spend more time getting the details right.
+</p>
+
+<p>
+But that’s okay. As American tire magnate Harvey Firestone once said, “success is the sum of details.” I hope you can look at Apple’s iOS apps and be inspired by them: their UI is often uncomplicated, but they put a ton of work into getting the details right so the whole experience feels great.
+</p>
+
+<p>
+When the user launches <em>your</em> app on their $1000 iPhone, it takes up the full screen. You owe it to them, and to yourself, to make sure you’ve done your best to get things working as smoothly as possible. If Apple can do it, so can we!
+</p>
+
+<p>
+Today you have three topics to work through, in which you’ll learn about haptic effects, encoding <code>@Observable</code> classes, and more.
+</p>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-Adding Codable Conformance To An @Observable Class"><h2 id="Adding Codable Conformance To An @Observable Class" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-Adding Codable Conformance To An @Observable Class">Adding Codable Conformance To An @Observable Class</a></h2></div>
+
+<p>
+If all the properties of a type already conform to <code>Codable</code>, then the type itself can conform to <code>Codable</code> with no extra work - Swift will synthesize the code required to archive and unarchive your type as needed. However, things are a little trickier when working with classes that use the <code>@Observable</code> macro because of the way Swift rewrites our code.
+</p>
+
+<p>
+To see the problem in action, we could make a simple observable class that has a single property called <code>name</code>, like this:
+</p>
+
+<pre swift>
+@Observable
+class User: Codable {
+    var name = "Taylor"
+}
+</pre>
+
+<p>
+Now we could write a little SwiftUI code that encodes an instance of our class when a button is pressed, and prints out the resulting text:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        Button("Encode Taylor", action: encodeTaylor)
+    }
+
+    func encodeTaylor() {
+        let data = try! JSONEncoder().encode(User())
+        let str = String(decoding: data, as: UTF8.self)
+        print(str)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown"><h2 id="AI Breakdown" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown">AI Breakdown</a></h2></div>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-1. The Default Property Value"><h3 id="1. The Default Property Value" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-1. The Default Property Value">1. The Default Property Value</a></h3></div>
+
+<p>
+Because name is initialized with "Taylor" inside the class definition, every time you call <code>User()</code>, a new instance is created with that specific default value. Unless you manually change it (e.g., <code>let user = User(); user.name = "Jordan"</code>), it will always start as "Taylor".
+</p>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-2. The Encoding and Decoding Process"><h3 id="2. The Encoding and Decoding Process" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-2. The Encoding and Decoding Process">2. The Encoding and Decoding Process</a></h3></div>
+
+<p>
+This is where the terminology gets a little specific. Let's break down a description of the <code>encodeTaylor</code> function:
+</p>
+
+<ul>
+<li>
+Encoding: <code>JSONEncoder().encode(User())</code> takes the Swift object and turns it into binary <span id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-2. The Encoding and Decoding Process-Data"></span><strong id="Data">Data</strong> (specifically JSON format).
+
+<li>
+The "String" Step:
+
+<ul>
+<li>
+In Swift, <code>String(decoding:as:)</code> is <em>not</em> part of the <code>JSONEncoder</code>. It is a standard <span id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-2. The Encoding and Decoding Process-String initializer"></span><strong id="String initializer">String initializer</strong>.
+
+<li>
+It doesn't "decode" the JSON back into a User object; it simply translates the raw binary bytes into human-readable text so you can print it.
+
+</ul>
+</ul>
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro"><h3 id="3. A Small Catch: The @Observable Macro" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro">3. A Small Catch: The @Observable Macro</a></h3></div>
+
+<p>
+There is a "gotcha" hidden in this code so far. When you use the <code>@Observable</code> macro (introduced in iOS 17), Swift adds hidden properties to your class to track changes.
+</p>
+
+<p>
+Because your class is marked as <code>Codable</code>, the compiler tries to synthesize (auto-generate) the encoding logic. However, the <code>@Observable</code> macro can sometimes interfere with this synthesis.
+</p>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-What you will see in the console:"><h4 id="What you will see in the console:" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-What you will see in the console:">What you will see in the console:</a></h4></div>
+
+<p>
+If the synthesis works correctly, your printed string will look like this:
+</p>
+<ul>
+<li>
+<code>{"name":"Taylor"}</code>
+
+</ul>
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-What to watch out for:"><h4 id="What to watch out for:" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-What to watch out for:">What to watch out for:</a></h4></div>
+
+<p>
+If you ever find that your JSON contains strange keys like <code>_name</code> or <code>＄__lazy_storage</code>, it’s because the encoder is seeing the "hidden" variables created by the <code>@Observable</code> macro. To fix that, you would typically define an <code>enum CodingKeys</code> to tell Swift exactly which properties to include.
+</p>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-Summary Table"><h4 id="Summary Table" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-Summary Table">Summary Table</a></h4></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Step
+</th>
+<th>
+Action
+</th>
+<th>
+Result Type
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>User()</code>
+</td>
+<td>
+Initialization
+</td>
+<td>
+<code>User</code> (Object)
+</td>
+</tr>
+<tr>
+<td>
+<code>JSONEncoder().encode(...)</code>
+</td>
+<td>
+Encoding
+</td>
+<td>
+<code>Data</code> (Binary)
+</td>
+</tr>
+<tr>
+<td>
+<code>String(decoding: data, as: UTF8.self)</code>
+</td>
+<td>
+Type Conversion
+</td>
+<td>
+<code>String</code> (Text)
+</td>
+</tr>
+</tbody>
+</table>
+
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-3. A Small Catch: The @Observable Macro-Back to the tutorial">Back to the tutorial</a></h4></div>
+
+<p>
+What you'll see is unexpected: <code>{"_name":"Taylor","_$observationRegistrar":{}}</code>.
+</p>
+
+<p>
+Our <code>name</code> property is now <code>_name</code>, there's also an observation registrar instance in the JSON.
+</p>
+
+<p>
+Remember, the <code>@Observable</code> macro is quietly rewriting our class so that it can be monitored by SwiftUI, and here that rewriting is leaking - we can see it happening, which might cause all sorts of problems. If you're trying to send a "name" value to a server, it might have no idea what to do with <code>_name</code>, for example.
+</p>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-The Fix"><h3 id="The Fix" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-The Fix">The Fix</a></h3></div>
+
+<p>
+To fix this we need to tell Swift exactly how it should encode and decode our data. This is done by nesting an enum inside our class called <code>CodingKeys</code>, and making it have a <code>String</code> raw value and a conformance to the <code>CodingKey</code> protocol. Yes, that's a bit confusing - the enum is called <code>CodingKeys</code> and the protocol is <code>CodingKey</code>, but it does matter.
+</p>
+
+<p>
+Inside the enum you need to write one case for each property you want to save, along with a raw value containing the name you want to give it. In our case, that means saying that <code>_name</code> - the underlying storage for our <code>name</code> property - should be written out as the string "name", without an underscore:
+</p>
+
+<pre swift>
+@Observable
+class User: Codable {
+    enum CodingKeys: String, CodingKey {
+        case _name = "name"
+    }
+
+    var name = "Taylor"
+}
+</pre>
+
+<p>
+And that's it! If you try the code again, you'll see the <code>name</code> property is named correctly, and there's also no more observation registrar in the mix - the result is much cleaner.
+</p>
+
+<p>
+This coding key mapping works both ways: when <code>Codable</code> sees <code>name</code> in some JSON, it will automatically be saved in the <code>_name</code> property.
+</p>
+
+<div id="Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 138 - Adding Codable conformance to an @Observable class-AI Breakdown-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+@Observable
+class User: Codable {
+    enum CodingKeys: String, CodingKey {
+        case _name = "name"
+    }
+    
+    var name = "Taylor"
+}
+
+struct ContentView: View {
+    var body: some View {
+        Button("Encode Taylor", action: encodeTaylor)
+    }
+    
+    func encodeTaylor() {
+        let data = try! JSONEncoder().encode(User())
+        let str = String(decoding: data, as: UTF8.self)
+        print(str)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
