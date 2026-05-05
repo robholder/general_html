@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_136</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_135.html">Hacking With Swift - 135 - Sending and receiving Codable data with URLSession and SwiftUI</a>
+
+</ul>
+<div id="Hacking With Swift - 136 - Loading an image from a remote server"><h1 id="Hacking With Swift - 136 - Loading an image from a remote server" class="header"><a href="#Hacking With Swift - 136 - Loading an image from a remote server">Hacking With Swift - 136 - Loading an image from a remote server</a></h1></div>
+
+<p>
+SwiftUI’s <code>Image</code> view works great with images in your app bundle, but if you want to load a remote image from the internet you need to use <code>AsyncImage</code> instead. These are created using an image URL rather than a simple asset name or Xcode-generated constant, but SwiftUI takes care of all the rest for us - it downloads the image, caches the download, and displays it automatically.
+</p>
+
+<p>
+So, the simplest image we can create looks like this:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/logo.png"))
+</pre>
+
+<p>
+I created that picture to be 1200 pixels high, but when it displays you’ll see it’s much bigger. This gets straight to one of the fundamental complexities of using <code>AsyncImage</code>: SwiftUI knows nothing about the image until our code is run and the image is downloaded, and so it isn’t able to size it appropriately ahead of time.
+</p>
+
+<p>
+If I were to include that 1200px image in my project, I’d actually name it <code>logo@3x.png</code>, then also add an 800px image that was <code>logo@2x.png</code>. SwiftUI would then take care of loading the correct image for us, and making sure it appeared nice and sharp, and at the correct size too. As it is, SwiftUI loads that image as if it were designed to be shown at 1200 pixels high - it will be much bigger than our screen, and will look a bit blurry too.
+</p>
+
+<p>
+To fix this, we can tell SwiftUI ahead of time that we’re trying to load a 3x scale image, like this:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/logo.png"), scale: 3)
+</pre>
+
+<p>
+When you run the code now you’ll see the resulting image is a much more reasonable size.
+</p>
+
+<p>
+And if you wanted to give it a <em>precise</em> size? Well, then you might start by trying this:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/logo.png"))
+    .frame(width: 200, height: 200)
+</pre>
+<pre><code>
+</code></pre>
+<p>
+That won’t work, but perhaps that won’t even surprise you because it wouldn’t work with a regular <code>Image</code> either. So you might try to make it resizable, like this:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/logo.png"))
+    .resizable()
+    .frame(width: 200, height: 200)
+</pre>
+
+<p>
+...except that won’t work either, and in fact it’s worse because now our code won’t even compile. You see, the modifiers we’re applying here don’t apply directly to the image that SwiftUI downloads - they can’t, because SwiftUI can’t know how to apply them until it has actually fetched the image data.
+</p>
+
+<p>
+Instead, we’re applying modifiers to a wrapper around the image, which is the <code>AsyncImage</code> view. That will ultimately contain our finished image, but it will also contain a <em>placeholder</em> that gets used while the image is loading. You can actually see the placeholder just briefly when your app runs - that 200 x 200 gray square is it, and it will automatically go away once loading finishes.
+</p>
+
+<p>
+To adjust our image, you need to use a more advanced form of <code>AsyncImage</code> that passes us the final image view once it’s ready, which we can then customize as needed. As a bonus, this also gives us a second closure to customize the placeholder as needed.
+</p>
+
+<p>
+For example, we could make the finished image view be both resizable and scaled to fit, and use <code>Color.red</code> as the placeholder so it’s more obvious while you’re learning.
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/logo.png")) { image in
+    image
+        .resizable()
+        .scaledToFit()
+} placeholder: {
+    Color.red
+}
+.frame(width: 200, height: 200)
+</pre>
+
+<p>
+A resizable image and <code>Color.red</code> both automatically take up all available space, which means the <code>frame()</code> modifier actually works now.
+</p>
+
+<p>
+The placeholder view can be whatever you want. For example, if you replace <code>Color.red</code> with <code>ProgressView()</code> - just that - then you’ll get a little spinner activity indicator instead of a solid color.
+</p>
+
+<p>
+If you want <em>complete</em> control over your remote image, there’s a third way of creating <code>AsyncImage</code> that tells us whether the image was loaded, hit an error, or hasn’t finished yet. This is particularly useful for times when you want to show a dedicated view when the download fails - if the URL doesn’t exist, or the user was offline, etc.
+</p>
+
+<p>
+Here’s how that looks:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/bad.png")) { phase in
+    if let image = phase.image {
+        image
+            .resizable()
+            .scaledToFit()
+    } else if phase.error != nil {
+        Text("There was an error loading the image.")
+    } else {
+        ProgressView()
+    }
+}
+.frame(width: 200, height: 200)
+</pre>
+
+<p>
+So, that will show our image if it can, an error message if the download failed for any reason, or a spinning activity indicator while the download is still in progress.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
