@@ -711,6 +711,77 @@ However, using the manual <code>await MainActor.run</code> block as I showed abo
 <code>foundTracks</code>: Your "Local Warehouse" where you store the cargo to show the customers.
 
 </ul>
+<div id="async &amp; await-More AI Insights-In Context"><h3 id="In Context" class="header"><a href="#async &amp; await-More AI Insights-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+// Individual data struct
+struct Result: Codable {
+    var trackId: Int
+    var trackName: String
+    var collectionName: String
+}
+
+// Array of 'Result' objects
+struct Response: Codable {
+    var results: [Result]
+}
+
+
+struct ContentView: View {
+    // Set up an array of Result objects
+    //@State private var results = [Result]()
+    @State private var foundTracks = [Result]()
+    
+    var body: some View {
+        // This doesn't need a ForEach loop for the results array
+        //List(results, id: \.trackId) { item in
+        List(foundTracks, id: \.trackId) { track in
+            VStack(alignment: .leading) {
+                Text(track.trackName)
+                    .font(.headline)
+                Text(track.collectionName)
+            }
+        }
+        .task {
+            await fetchMusic()
+        }
+        
+    }
+    
+    //func loadData() async {
+    func fetchMusic() async {
+        // 1. Check the URL
+        guard let url = URL(string: "https://itunes.apple.com/search?term=jethro+tull&amp;entity=song&amp;limit=200") else {
+            print("Invalid URL")
+            return
+        }
+        
+        do {
+            // 2. Fetch the data
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            // 3. Decode the data
+            if let decodedResponse = try? JSONDecoder().decode(Response.self, from: data) {
+                // 4. Update the UI
+                // AI addition: jump to the foreground
+                await MainActor.run {
+                    foundTracks = decodedResponse.results
+                }
+            }
+        } catch {
+            print("Invalid data")
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 <p>
 <hr>
 <br>
