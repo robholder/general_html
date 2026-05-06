@@ -81,6 +81,8 @@ struct CheckoutView: View {
 }
 </pre>
 
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-AddressView"><h3 id="AddressView" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-AddressView">AddressView</a></h3></div>
+
 <p>
 Again, we’ll come back to that later, but first let’s implement <code>AddressView</code>. Like I said, this needs to have a form with four text fields bound to four properties from our <code>Order</code> object, plus a <code>NavigationLink</code> passing control off to our check out view.
 </p>
@@ -151,12 +153,36 @@ Go ahead and run the app again, because I want you to see why all this matters. 
 What you should see is that all the data you entered stays saved no matter what screen you’re on. Yes, this is the natural side effect of using a class for our data, but it’s an instant feature in our app without having to do any work - if we had used local state, then any address details we had entered would disappear if we moved back to the original view.
 </p>
 
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-Validation"><h3 id="Validation" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-Validation">Validation</a></h3></div>
+
 <p>
-Now that <code>AddressView</code> works, it’s time to stop the user progressing to the checkout unless some condition is satisfied. What condition? Well, that’s down to us to decide. Although we <em>could</em> write length checks for each of our four text fields, this often trips people up - some names are only four or five letters, so if you try to add length validation you might accidentally exclude people.
+Now that <code>AddressView</code> works, it’s time to stop the user progressing to the checkout unless some condition is satisfied.
 </p>
 
 <p>
-So, instead we’re just going to check that the <code>name</code>, <code>streetAddress</code>, <code>city</code>, and <code>zip</code> properties of our order aren’t empty. I prefer adding this kind of complex check inside my data, which means you need to add a new computed property to <code>Order</code> like this one:
+What condition? Well, that’s down to us to decide. Although we <em>could</em> write string-length checks for each of our four text fields, this often trips people up - some names are only four or five letters, so if you try to add length validation you might accidentally exclude people.
+</p>
+
+<p>
+So, instead we’re just going to check that the
+</p>
+<ul>
+<li>
+<code>name</code>
+
+<li>
+<code>streetAddress</code>
+
+<li>
+<code>city</code>
+
+<li>
+<code>zip</code>
+
+</ul>
+ 
+<p>
+...properties of our order aren’t empty. I prefer adding this kind of complex check inside my data, which means you need to add a new computed property to <code>Order</code> like this one:
 </p>
 
 <pre swift>
@@ -201,6 +227,157 @@ Section {
 <p>
 Now if you run the app you’ll see that all four address fields must contain at least one character in order to continue. Even better, SwiftUI automatically grays out the button when the condition isn’t true, giving the user really clear feedback when it is and isn’t interactive.
 </p>
+
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-CupcakeCorner.swift"><h4 id="CupcakeCorner.swift" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-CupcakeCorner.swift">CupcakeCorner.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct CupcakeCornerApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-Order.swift"><h4 id="Order.swift" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-Order.swift">Order.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+@Observable
+class Order {
+    static let types = ["Vanilla", "Strawberry", "Chocolate", "Rainbow"]
+    
+    var type = 0
+    var quantity = 3
+    var extraFrosting = false
+    var addSprinkles = false
+    var name = ""
+    var streetAddress = ""
+    var city = ""
+    var zip = ""
+    
+    var specialRequestEnabled = false {
+        didSet {
+            if specialRequestEnabled == false {
+                extraFrosting = false
+                addSprinkles = false
+            }
+        }
+    }
+    var hasValidAddress: Bool {
+        if name.isEmpty || streetAddress.isEmpty || city.isEmpty || zip.isEmpty {
+            return false
+        }
+        return true
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-AddressView.swift"><h4 id="AddressView.swift" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-AddressView.swift">AddressView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct AddressView: View {
+    @Bindable var order: Order
+    
+    var body: some View {
+        Form {
+            Section {
+                TextField("Name", text: $order.name)
+                TextField("Street", text: $order.streetAddress)
+                TextField("City", text: $order.city)
+                TextField("Zip", text: $order.zip)
+                
+            }
+            
+            Section {
+                NavigationLink("Check out") {
+                    CheckoutView(order: order)
+                }
+            }
+            .disabled(order.hasValidAddress == false)
+        }
+        .navigationTitle("Delivery details")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+#Preview {
+    AddressView(order: Order())
+}
+</pre>
+
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-CheckoutView.swift"><h4 id="CheckoutView.swift" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-CheckoutView.swift">CheckoutView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct CheckoutView: View {
+    var order: Order
+    
+    var body: some View {
+        Text("Hello, World!")
+    }
+}
+
+#Preview {
+    CheckoutView(order: Order())
+}
+</pre>
+
+<div id="Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 141 - Checking for a valid address-Checking For A Valid Address-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @State private var order = Order()
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Select your cake type", selection: $order.type) {
+                        ForEach(Order.types.indices, id: \.self) {
+                            Text(Order.types[$0])
+                        }
+                    }
+                    Stepper("Number of cakes: \(order.quantity)", value: $order.quantity, in: 3...20)
+                }
+                Section {
+                    Toggle("Any special requests?", isOn: $order.specialRequestEnabled.animation())
+                    
+                    if order.specialRequestEnabled {
+                        Toggle("Add extra frosting", isOn: $order.extraFrosting)
+                        Toggle("Add extra sprinkles", isOn: $order.addSprinkles)
+                    }
+                }
+                Section {
+                    NavigationLink("Delivery details") {
+                        AddressView(order: order)
+                    }
+                }
+            }
+            .navigationTitle("Cupcake Corner")
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 
 <p>
 <hr>
