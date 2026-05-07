@@ -31,6 +31,117 @@
 </ul>
 <div id="Hacking With Swift - 142 - Preparing for checkout"><h1 id="Hacking With Swift - 142 - Preparing for checkout" class="header"><a href="#Hacking With Swift - 142 - Preparing for checkout">Hacking With Swift - 142 - Preparing for checkout</a></h1></div>
 
+<p>
+The final screen in our app is <code>CheckoutView</code>, and it’s really a tale of two halves: the first half is the basic user interface, which should provide little real challenge for you; but the second half is all new: we need to encode our <code>Order</code> class to JSON, send it over the internet, and get a response.
+</p>
+
+<p>
+We’re going to look at the whole encoding and transferring chunk of work soon enough, but first let’s tackle the easy part: giving <code>CheckoutView</code> a user interface. More specifically, we’re going to create a <code>ScrollView</code> with an image, the total price of their order, and a Place Order button to kick off the networking.
+</p>
+
+<p>
+For the image, I’ve uploaded a cupcake image to my server that we’ll load remotely with <code>AsyncImage</code> - we <em>could</em> store it in the app, but having a remote image means we can dynamically switch it out for seasonal alternatives and promotions.
+</p>
+
+<p>
+As for the order cost, we don’t actually have any pricing for our cupcakes in our data, so we can just invent one - it’s not like we’re actually going to be charging people here. The pricing we’re going to use is as follows:
+</p>
+
+<ul>
+<li>
+There’s a base cost of $2 per cupcake.
+
+<li>
+We’ll add a little to the cost for more complicated cakes.
+
+<li>
+Extra frosting will cost $1 per cake.
+
+<li>
+Adding sprinkles will be another 50 cents per cake.
+
+</ul>
+<p>
+We can wrap all that logic up in a new computed property for Order, like this:
+</p>
+
+<pre swift>
+var cost: Decimal {
+    // $2 per cake
+    var cost = Decimal(quantity) * 2
+
+    // complicated cakes cost more
+    cost += Decimal(type) / 2
+
+    // $1/cake for extra frosting
+    if extraFrosting {
+        cost += Decimal(quantity)
+    }
+
+    // $0.50/cake for sprinkles
+    if addSprinkles {
+        cost += Decimal(quantity) / 2
+    }
+
+    return cost
+}
+</pre>
+
+<p>
+The actual view itself is straightforward: we’ll use a <code>VStack</code> inside a vertical <code>ScrollView</code>, then our image, the cost text, and button to place the order.
+</p>
+
+<p>
+We’ll be filling in the button’s action in a minute, but first let’s get the basic layout done - replace the existing <code>body</code> of <code>CheckoutView</code> with this:
+</p>
+
+<pre swift>
+ScrollView {
+    VStack {
+        AsyncImage(url: URL(string: "https://hws.dev/img/cupcakes@3x.jpg"), scale: 3) { image in
+                image
+                    .resizable()
+                    .scaledToFit()
+        } placeholder: {
+            ProgressView()
+        }
+        .frame(height: 233)
+
+        Text("Your total is \(order.cost, format: .currency(code: "USD"))")
+            .font(.title)
+
+        Button("Place Order", action: { })
+            .padding()
+    }
+}
+.navigationTitle("Check out")
+.navigationBarTitleDisplayMode(.inline)
+</pre>
+
+<p>
+That should all be old news for you by now, but before we're done with this screen I want to show you a small but useful SwiftUI modifier we can add here: <code>scrollBounceBehavior()</code>.
+</p>
+
+<p>
+Using scroll views is a great way to make sure your layouts work great no matter what Dynamic Type size the user has enabled, but it creates a small annoyance: when your views fit just fine on a single screen, they still bounce a little when the user moves up and down on them.
+</p>
+
+<p>
+The <code>scrollBounceBehavior()</code> modifier helps us disable that bounce when there is nothing to scroll. Add this below <code>navigationBarTitleDisplayMode()</code>:
+</p>
+
+<pre swift>
+.scrollBounceBehavior(.basedOnSize)
+</pre>
+
+<p>
+With that in place we'll get nice scroll bouncing when we have actually scrolling content, otherwise the scroll view acts like it isn't even there.
+</p>
+
+<p>
+With that last tweak out of the way, it's time to finish up this project by tackling the tricky part: networking!
+</p>
+
 
 <p>
 <hr>
