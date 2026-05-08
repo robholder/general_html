@@ -246,11 +246,56 @@ NOTE: The code above probably won't work. It seems reqres.in is no longer workin
 </tr>
 </table>
 
-<div id="Hacking With Swift - 143 - Sending and receiving orders over the internet-AI Additions-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Hacking With Swift - 143 - Sending and receiving orders over the internet-AI Additions-Back to the tutorial">Back to the tutorial</a></h4></div>
+<p>
+Since the goal of Cupcake Corner is simply to send a JSON object and get that exact same JSON object back to confirm the "order," you can easily swap the URL to a different "echo" service.
+</p>
+
+<div id="Hacking With Swift - 143 - Sending and receiving orders over the internet-AI Additions-The &quot;Pro&quot; Way (Using httpbin.org)"><h3 id="The &quot;Pro&quot; Way (Using httpbin.org)" class="header"><a href="#Hacking With Swift - 143 - Sending and receiving orders over the internet-AI Additions-The &quot;Pro&quot; Way (Using httpbin.org)">The "Pro" Way (Using httpbin.org)</a></h3></div>
+
+<p>
+If you want to see your actual data come back, <code>httpbin.org</code> is better, but because it nests your data, you’d need to create a small "Wrapper" struct to decode it.
+</p>
+
+<p>
+Update the URL:
+</p>
+
+<pre swift>
+let url = URL(string: "https://httpbin.org/post")!
+</pre>
+
+<p>
+Add a helper struct (at the bottom of your file - outside of the View struct) to catch the response:
+</p>
+
+<pre swift>
+struct HttpBinResponse: Codable {
+   var json: Order // httpbin puts your sent data inside a "json" key
+}
+</pre>
+
+<p>
+Update your <code>placeOrder</code> decoding logic:
+</p>
+
+<pre swift>
+let (data, _) = try await URLSession.shared.upload(for: request, from: encoded)
+
+// Decode the wrapper, then pull the order out
+let decodedResponse = try JSONDecoder().decode(HttpBinResponse.self, from: data)
+let decodedOrder = decodedResponse.json
+
+confirmationMessage = "Your order for \(decodedOrder.quantity)x \(Order.types[decodedOrder.type].lowercased()) cupcakes is on its way!"
+showingConfirmation = true
+</pre>
+
+<div id="Hacking With Swift - 143 - Sending and receiving orders over the internet-AI Additions-The &quot;Pro&quot; Way (Using httpbin.org)-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Hacking With Swift - 143 - Sending and receiving orders over the internet-AI Additions-The &quot;Pro&quot; Way (Using httpbin.org)-Back to the tutorial">Back to the tutorial</a></h4></div>
 
 <p>
 We're not quite done, though, because right now our networking has a small but invisible problem. To see what it is I want to introduce you to a tiny bit of debugging with Xcode: we're going to pause our app, so we can inspect a particular value.
 </p>
+
+<div id="Hacking With Swift - 143 - Sending and receiving orders over the internet-Breakpoint"><h2 id="Breakpoint" class="header"><a href="#Hacking With Swift - 143 - Sending and receiving orders over the internet-Breakpoint">Breakpoint</a></h2></div>
 
 <p>
 First, click on the line number next to the <code>let url = URL...</code> line. A blue arrow should appear there, which is Xcode's way of saying we've placed a breakpoint there. This tells Xcode to pause execution when that line is reached, so we can poke around in all our data.
@@ -295,7 +340,7 @@ enum CodingKeys: String, CodingKey {
 </pre>
 
 <p>
-If you run the code again you should find you can run the <span id="Hacking With Swift - 143 - Sending and receiving orders over the internet-AI Additions-Back to the tutorial-p"></span><strong id="p">p</strong> command again by pressing the up cursor key and return, and this time the data being sent and received is much cleaner.
+If you run the code again you should find you can run the <span id="Hacking With Swift - 143 - Sending and receiving orders over the internet-Breakpoint-p"></span><strong id="p">p</strong> command again by pressing the up cursor key and return, and this time the data being sent and received is much cleaner.
 </p>
 
 <p>
