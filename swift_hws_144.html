@@ -418,7 +418,7 @@ Change the hardcoded <code>"Thank you!"</code> to your new variable:
 <div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-Why this is better than two separate alerts"><h4 id="Why this is better than two separate alerts" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-Why this is better than two separate alerts">Why this is better than two separate alerts</a></h4></div>
 
 <p>
-You <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-Why this is better than two separate alerts-could"></span><strong id="could">could</strong> create two different <code>.alert</code> modifiers (one for success, one for error), but that gets messy quickly. By using variables for both the title and the message, your code follows the <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-Why this is better than two separate alerts-Single Source of Truth"></span><strong id="Single Source of Truth">Single Source of Truth</strong> principle—a core concept in SwiftUI.
+You <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-Why this is better than two separate alerts-could"></span><strong id="could">could</strong> create two different <code>.alert</code> modifiers (one for success, one for error), but that gets messy quickly. By using variables for both the title and the message, your code follows the <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-Why this is better than two separate alerts-Single Source of Truth"></span><strong id="Single Source of Truth">Single Source of Truth</strong> principle-a core concept in SwiftUI.
 </p>
 
 <div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-A Quick &quot;Pro&quot; Tip for the Challenge"><h4 id="A Quick &quot;Pro&quot; Tip for the Challenge" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-AI Insights-A Quick &quot;Pro&quot; Tip for the Challenge">A Quick "Pro" Tip for the Challenge</a></h4></div>
@@ -534,6 +534,344 @@ struct HttpBinResponse: Codable {
 }
 </pre>
 
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3"><h2 id="Challenge 3" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3">Challenge 3</a></h2></div>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight"><h3 id="AI Insight" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight">AI Insight</a></h3></div>
+
+<p>
+This is definitely the "final boss" of Project 10. The reason it's tricky is that you're trying to sync a <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-Class"></span><strong id="Class">Class</strong> (which is a reference type) with <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-UserDefaults"></span><strong id="UserDefaults">UserDefaults</strong> (which is a data store), while keeping <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-Codable"></span><strong id="Codable">Codable</strong> (which expects specific keys) happy.
+</p>
+
+<p>
+Even thought the data is collected there, this functionality should not live in <code>AddressView.swift</code>.
+</p>
+
+<p>
+In SwiftUI, views should be "dumb" - they just display data. The logic for saving and loading should live inside your <code>Order</code> <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-class"></span><strong id="class">class</strong>.
+</p>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-The &quot;Middle Ground&quot; Strategy"><h4 id="The &quot;Middle Ground&quot; Strategy" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-The &quot;Middle Ground&quot; Strategy">The "Middle Ground" Strategy</a></h4></div>
+
+<p>
+The conflict Paul Hudson mentions is this:
+</p>
+
+<p>
+If you use <code>@Published</code> or <code>@Observable</code> properties, and then try to add <code>get</code> and <code>set</code> blocks to them to talk to <code>UserDefaults</code>, Swift’s automatic <code>Codable</code> synthesis breaks.
+</p>
+
+<p>
+The best "middle ground" is to use <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-The &quot;Middle Ground&quot; Strategy-Property Observers"></span><strong id="Property Observers">Property Observers</strong> (<code>didSet</code>). This allows you to keep the class simple and Codable, while triggering a "save" every time a value changes.
+</p>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-Step 1: Create a &quot;Load&quot; Initializer"><h4 id="Step 1: Create a &quot;Load&quot; Initializer" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-Step 1: Create a &quot;Load&quot; Initializer">Step 1: Create a "Load" Initializer</a></h4></div>
+
+<p>
+In your <code>Order</code> class, you need to check <code>UserDefaults</code> when the app starts.
+</p>
+
+<pre swift>
+@Observable
+class Order: Codable {
+    // 1. Define your keys to avoid typos
+    enum CodingKeys: String, CodingKey {
+        case _name = "name"
+        case _streetAddress = "streetAddress"
+        case _city = "city"
+        case _zip = "zip"
+        // Add your other properties here (type, quantity, etc.)
+    }
+
+    var name: String {
+        didSet { UserDefaults.standard.set(name, forKey: "name") }
+    }
+    var streetAddress: String {
+        didSet { UserDefaults.standard.set(streetAddress, forKey: "streetAddress") }
+    }
+    var city: String {
+        didSet { UserDefaults.standard.set(city, forKey: "city") }
+    }
+    var zip: String {
+        didSet { UserDefaults.standard.set(zip, forKey: "zip") }
+    }
+
+    init() {
+        // 2. Load existing data or use empty defaults
+        self.name = UserDefaults.standard.string(forKey: "name") ?? ""
+        self.streetAddress = UserDefaults.standard.string(forKey: "streetAddress") ?? ""
+        self.city = UserDefaults.standard.string(forKey: "city") ?? ""
+        self.zip = UserDefaults.standard.string(forKey: "zip") ?? ""
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-Why this works:"><h4 id="Why this works:" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-AI Insight-Why this works:">Why this works:</a></h4></div>
+
+<ul>
+<li>
+The <code>View</code> is happy: <code>AddressView</code> doesn't change at all. It just binds to <code>order.name</code> like it always did.
+
+<li>
+<code>UserDefaults</code> is happy: Every time the user types a character, the <code>didSet</code> triggers and saves the newest version to disk.
+
+<li>
+<code>Codable</code> is happy: Since you aren't using complex custom getters/setters, Swift can still encode and decode the class easily for your <code>placeOrder()</code> network call.
+
+</ul>
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-In Context - Challenge 3a"><h3 id="In Context - Challenge 3a" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-In Context - Challenge 3a">In Context - Challenge 3a</a></h3></div>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-In Context - Challenge 3a-Order.swift"><h4 id="Order.swift" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-In Context - Challenge 3a-Order.swift">Order.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+@Observable
+class Order: Codable {
+    static let types = ["Vanilla", "Strawberry", "Chocolate", "Rainbow"]
+    
+    var type = 0
+    var quantity = 3
+    var extraFrosting = false
+    var addSprinkles = false
+    
+//    var name = ""
+//    var streetAddress = ""
+//    var city = ""
+//    var zip = ""
+    
+    enum CodingKeys: String, CodingKey {
+        case _type = "type"
+        case _quantity = "quantity"
+        case _specialRequestEnabled = "specialRequestEnabled"
+        case _extraFrosting = "extraFrosting"
+        case _addSprinkles = "addSprinkles"
+        
+        case _name = "name"
+        case _city = "city"
+        case _streetAddress = "streetAddress"
+        case _zip = "zip"
+    }
+    
+    var name: String {
+        didSet { UserDefaults.standard.set(name, forKey: "name") }
+    }
+    var streetAddress: String {
+        didSet { UserDefaults.standard.set(streetAddress, forKey: "streetAddress") }
+    }
+    var city: String {
+        didSet { UserDefaults.standard.set(city, forKey: "city") }
+    }
+    var zip: String {
+        didSet { UserDefaults.standard.set(zip, forKey: "zip") }
+    }
+    
+    init() {
+        // 2. Load existing data or use empty defaults
+        self.name = UserDefaults.standard.string(forKey: "name") ?? ""
+        self.streetAddress = UserDefaults.standard.string(forKey: "streetAddress") ?? ""
+        self.city = UserDefaults.standard.string(forKey: "city") ?? ""
+        self.zip = UserDefaults.standard.string(forKey: "zip") ?? ""
+    }
+    
+    var specialRequestEnabled = false {
+        didSet {
+            if specialRequestEnabled == false {
+                extraFrosting = false
+                addSprinkles = false
+            }
+        }
+    }
+    
+    var hasValidAddress: Bool {
+        if name.isReallyEmpty || streetAddress.isReallyEmpty || city.isReallyEmpty || zip.isReallyEmpty {
+            return false
+        }
+        return true
+    }
+    
+    var cost: Decimal {
+        // $2 per cake
+        var cost = Decimal(quantity) * 2
+        
+        // complicated cakes cost more
+        cost += Decimal(type) / 2
+        
+        // $1/cake for extra frosting
+        if extraFrosting {
+            cost += Decimal(quantity)
+        }
+        
+        // $0.50/cake for sprinkles
+        if addSprinkles {
+            cost += Decimal(quantity) / 2
+        }
+        
+        return cost
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-In Context - Challenge 3a-Order.swift-The Advanced &quot;Middle Ground&quot;: A Wrapper"><h5 id="The Advanced &quot;Middle Ground&quot;: A Wrapper" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-In Context - Challenge 3a-Order.swift-The Advanced &quot;Middle Ground&quot;: A Wrapper">The Advanced "Middle Ground": A Wrapper</a></h5></div>
+
+<p>
+If you have a lot of properties, the <code>didSet</code> approach gets repetitive. A more "engineered" solution is to create a separate struct just for the address:
+</p>
+
+<pre swift>
+struct Address: Codable {
+    var name = ""
+    var street = ""
+    var city = ""
+    var zip = ""
+}
+</pre>
+
+<p>
+Then, in your <code>Order</code> class, you save the <span id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 3-In Context - Challenge 3a-Order.swift-The Advanced &quot;Middle Ground&quot;: A Wrapper-entire struct"></span><strong id="entire struct">entire struct</strong> as a single piece of Data in <code>UserDefaults</code> whenever any part of it changes.
+</p>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct"><h2 id="How to Include the Address Struct" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct">How to Include the Address Struct</a></h2></div>
+
+<p>
+The <code>Address</code> struct idea is actually a very elegant "middle ground." It allows you to group all the data you want to persist into one container, making it much easier to save and load from <code>UserDefaults</code> in one go.
+</p>
+
+<p>
+However, it does change how your <code>CodingKeys</code> and your <code>AddressView</code> bindings work. Here is how you can refactor the <code>Order</code> class to make this work.
+</p>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-1. The Address Struct"><h4 id="1. The Address Struct" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-1. The Address Struct">1. The Address Struct</a></h4></div>
+
+<p>
+First, define a simple struct at the top of your file (outside the class). Since it's a struct, it gets <code>Codable</code> for free.
+</p>
+
+<pre swift>
+struct Address: Codable {
+    var name = ""
+    var streetAddress = ""
+    var city = ""
+    var zip = ""
+}
+</pre>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-2. Updating the Order Class"><h4 id="2. Updating the Order Class" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-2. Updating the Order Class">2. Updating the Order Class</a></h4></div>
+
+<p>
+You will replace the four individual string variables with one <code>address</code> property. To solve the challenge, we use <code>didSet</code> on that property to save it to <code>UserDefaults</code> whenever any part of the address changes.
+</p>
+
+<pre swift>
+@Observable
+class Order: Codable {
+    static let types = ["Vanilla", "Strawberry", "Chocolate", "Rainbow"]
+    
+    var type = 0
+    var quantity = 3
+    var extraFrosting = false
+    var addSprinkles = false
+    var specialRequestEnabled = false {
+        didSet {
+            if specialRequestEnabled == false {
+                extraFrosting = false
+                addSprinkles = false
+            }
+        }
+    }
+
+    // GROUPED ADDRESS PROPERTY
+    var address: Address {
+        didSet {
+            if let encoded = try? JSONEncoder().encode(address) {
+                UserDefaults.standard.set(encoded, forKey: "SavedAddress")
+            }
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        // Properties used by the @Observable macro start with an underscore internally
+        case _type = "type"
+        case _quantity = "quantity"
+        case _extraFrosting = "extraFrosting"
+        case _addSprinkles = "addSprinkles"
+        case _specialRequestEnabled = "specialRequestEnabled"
+        case _address = "address" 
+    }
+
+    init() {
+        // Load from UserDefaults if available, otherwise use a blank Address
+        if let savedData = UserDefaults.standard.data(forKey: "SavedAddress") {
+            if let decoded = try? JSONDecoder().decode(Address.self, from: savedData) {
+                self.address = decoded
+                return
+            }
+        }
+        self.address = Address()
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-3. Impact on AddressView"><h4 id="3. Impact on AddressView" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-3. Impact on AddressView">3. Impact on AddressView</a></h4></div>
+
+<p>
+Because you moved the properties into a struct, your <code>TextField</code> bindings in <code>AddressView.swift</code> need to drill down one level deeper:
+</p>
+
+<pre swift>
+Section {
+    TextField("Name", text: $order.address.name)
+    TextField("Street", text: $order.address.streetAddress)
+    TextField("City", text: $order.address.city)
+    TextField("Zip", text: $order.address.zip)
+}
+</pre>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-How this solves the &quot;Middle Ground&quot;"><h4 id="How this solves the &quot;Middle Ground&quot;" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-How this solves the &quot;Middle Ground&quot;">How this solves the "Middle Ground"</a></h4></div>
+
+<ul>
+<li>
+Codable Support: By using <code>_address = "address"</code> in your <code>CodingKeys</code>, the JSON sent to the server will look like this: <code>{"type": 0, "address": {"name": "...", ...}}</code>.
+
+<ul>
+<li>
+Note: If your server (like <code>reqres.in</code>) expects a "flat" JSON (no nested address object), you would need to write a custom <code>encode(to:)</code> method. But for most modern APIs, nesting is preferred!
+
+</ul>
+<li>
+UserDefaults: Since <code>Address</code> is a single struct, you only need one key in <code>UserDefaults</code> instead of four.
+
+<li>
+Validation: You’ll need to update your <code>hasValidAddress</code> property to look at <code>address.name</code>, etc.
+
+</ul>
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-A Note on the &quot;Flat JSON&quot; issue"><h4 id="A Note on the &quot;Flat JSON&quot; issue" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-A Note on the &quot;Flat JSON&quot; issue">A Note on the "Flat JSON" issue</a></h4></div>
+
+<p>
+If you find that your server call fails because it doesn't want the address inside a sub-folder (nested), you have two choices:
+</p>
+
+<ul>
+<li>
+Stick to individual variables: Keep your current <code>name</code>, <code>streetAddress</code>, etc., but add a <code>didSet</code> to each one individually that saves to its own <code>UserDefaults</code> key.
+
+<li>
+Custom Encoding: Keep the struct for cleanliness, but tell <code>Order</code> how to "flatten" it when sending to the web.
+
+</ul>
+<p>
+The individual variables with <code>didSet</code> is arguably the "simplest" middle ground because it keeps your JSON structure exactly as it was before.
+</p>
+
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-Troubleshooting the &quot;Codable&quot; issue"><h4 id="Troubleshooting the &quot;Codable&quot; issue" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-How to Include the Address Struct-Troubleshooting the &quot;Codable&quot; issue">Troubleshooting the "Codable" issue</a></h4></div>
+
+<p>
+If you use the new <code>@Observable</code> macro (introduced in iOS 17), remember that it adds an underscore to your variable names behind the scenes (e.g., <code>_name</code>). When you use <code>JSONEncoder</code>, your JSON keys will have those underscores.
+</p>
+
+<p>
+To fix that and make the <code>reqres.in</code> or <code>httpbin</code> server happy, you must include the <code>enum CodingKeys</code> shown in Step 1 to map the underscored names back to clean ones.
+</p>
 
 <p>
 <hr>
@@ -546,7 +884,7 @@ struct HttpBinResponse: Codable {
 </p>
 
 <p>
-<a href="index.html">index</a>
+[index]]
 </p>
 
     </div>
