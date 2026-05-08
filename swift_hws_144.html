@@ -96,6 +96,11 @@ Our address fields are currently considered valid if they contain anything, even
 <li>
 If our call to <code>placeOrder()</code> fails - for example if there is no internet connection - show an informative alert for the user. To test this, try commenting out the <code>request.httpMethod = "POST"</code> line in your code, which should force the request to fail.
 
+<ul>
+<li>
+<a href="swift_hws_144.html#In Context - Challenge 2">Challenge 2</a>
+
+</ul>
 <li>
 For a more challenging task, try updating the <code>Order</code> class so it saves data such as the user's delivery address to <code>UserDefaults</code>. This takes a little thinking, because <code>@AppStorage</code> won't work here, and you'll find getters and setters cause problems with <code>Codable</code> support. Can you find a middle ground?
 
@@ -440,6 +445,96 @@ When you comment out <code>request.httpMethod = "POST"</code>, <code>URLSession<
  The <code>catch</code> block will trigger with a "The Internet connection appears to be offline" error automatically!
 
 </ol>
+<div id="Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-In Context - Challenge 2"><h3 id="In Context - Challenge 2" class="header"><a href="#Hacking With Swift - 144 - CupcakeCorner: Wrap up-Challenge 2-In Context - Challenge 2">In Context - Challenge 2</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct CheckoutView: View {
+    var order: Order
+    
+    @State private var confirmationMessage: String = ""
+    @State private var showingConfirmation: Bool = false
+    @State private var alertTitle: String = ""
+    
+    var body: some View {
+        ScrollView {
+            VStack {
+                AsyncImage(url: URL(string: "https://hws.dev/img/cupcakes@3x.jpg"), scale: 3) { image in
+                    image
+                        .resizable()
+                        .scaledToFit()
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(height: 233)
+                
+                Text("Your total is \(order.cost, format: .currency(code: "UDS"))")
+                    .font(.title)
+                // This won't work
+                //Button("Place Order", action: placeOrder)
+                // This is better; use 'Task'
+                Button("Place Order") {
+                    Task {
+                        await placeOrder()
+                    }
+                }
+                .padding()
+            }
+        }
+        .navigationTitle("Check out")
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollBounceBehavior(.basedOnSize)
+        .alert(alertTitle, isPresented: $showingConfirmation) {
+            Button("OK") {}
+        } message: {
+            Text(confirmationMessage)
+        }
+    }
+    
+    func placeOrder() async {
+        guard let encoded = try? JSONEncoder().encode(order) else {
+            print("Failed to encode order")
+            return
+        }
+        // New URL link (different to Paul Hudson's tutorial
+        let url = URL(string: "https://httpbin.org/post")!
+        
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Comment out the next line to test alert (or turn off wifi/internet on Mac)
+        request.httpMethod = "POST"
+        
+        do {
+            let (data, _) = try await URLSession.shared.upload(for: request, from:encoded)
+            
+            // Decode the wrapper, then pull the order out
+            let decodedResponse = try JSONDecoder().decode(HttpBinResponse.self, from: data)
+            let decodedOrder = decodedResponse.json
+            
+            alertTitle = "Thank you!"
+            confirmationMessage = "Your order for \(decodedOrder.quantity)x \(Order.types[decodedOrder.type].lowercased()) cupcakes is on its way!"
+            showingConfirmation = true
+        } catch {
+            print("Checkout failed: \(error.localizedDescription)")
+            alertTitle = "Oops!"
+            confirmationMessage = "Your order could't be placed."
+            showingConfirmation = true
+        }
+    }
+}
+
+// Aditional struct to support the alternative URL to Paul Hudson's URL
+struct HttpBinResponse: Codable {
+    var json: Order // httpbin puts your sent data inside a "json" key
+}
+
+#Preview {
+    CheckoutView(order: Order())
+}
+</pre>
+
+
 <p>
 <hr>
 <br>
