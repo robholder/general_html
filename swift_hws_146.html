@@ -47,6 +47,14 @@ var body: some View {
 }
 </pre>
 
+<table>
+<tr>
+<td>
+NOTE: 'isOn' is a parameter of the 'Toggle' struct in this example - but later it's declared as a variable for use in another 'struct' object ('Button') that doesn't have an in-built parameter of the name 'isOn'.
+</td>
+</tr>
+</table>
+
 <p>
 So, the toggle needs to change our Boolean when the user interacts with it, but how does it remember what value it should change?
 </p>
@@ -333,6 +341,113 @@ Use <code>@Binding</code>.
 By using <code>@Binding</code>, you keep your <code>PushButton</code> generic. You could put ten of those buttons in a list, each tied to a different <code>@State</code> variable, and they would all work perfectly without ever bumping into each other.
 </p>
 
+<p>
+If a view doesn't need to change the data, using a simple let property tells SwiftUI (and other developers) that this view is "read-only."
+</p>
+
+<p>
+Here is how you would structure that. Notice how <code>SummaryView</code> doesn't use <code>@Binding</code> or the $ sign.
+</p>
+
+<div id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-A Quick &quot;Rule of Thumb&quot;-The Code Example"><h4 id="The Code Example" class="header"><a href="#Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-A Quick &quot;Rule of Thumb&quot;-The Code Example">The Code Example</a></h4></div>
+
+<pre swift>
+struct SummaryView: View {
+    // READ-ONLY: No @Binding needed.
+    // This view just receives a value and displays it.
+    let isActive: Bool 
+
+    var body: some View {
+        VStack {
+            Text("Current Status")
+                .font(.caption)
+            Text(isActive ? "ACTIVE" : "INACTIVE")
+                .bold()
+                .foregroundStyle(isActive ? .green : .gray)
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct ContentView: View {
+    @State private var rememberMe: Bool = false // THE SOURCE OF TRUTH
+    
+    var body: some View {
+        VStack(spacing: 30) {
+            // 1. THE CONTROLLER (Two-way connection)
+            // Uses $ because it needs to CHANGE the value.
+            PushButton(title: "Toggle System", isOn: $rememberMe)
+            
+            // 2. THE OBSERVER (Read-only)
+            // No $ needed. We just pass the current value of rememberMe.
+            SummaryView(isActive: rememberMe)
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-A Quick &quot;Rule of Thumb&quot;-Why use let instead of @Binding?"><h4 id="Why use let instead of @Binding?" class="header"><a href="#Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-A Quick &quot;Rule of Thumb&quot;-Why use let instead of @Binding?">Why use let instead of @Binding?</a></h4></div>
+
+<table>
+<tr>
+<td>
+Feature
+</td>
+<td>
+<code>let status: Bool (Read-Only)</code>
+</td>
+<td>
+<code>@Binding var status: Bool (Two-Way)</code>
+</td>
+</tr>
+<tr>
+<td>
+Data Flow
+</td>
+<td>
+Parent → Child (One way)
+</td>
+<td>
+Parent ↔ Child (Both ways)
+</td>
+</tr>
+<tr>
+<td>
+Syntax
+</td>
+<td>
+<code>SummaryView(status: rememberMe)</code>
+</td>
+<td>
+<code>PushButton(isOn: $rememberMe)</code>
+</td>
+</tr>
+<tr>
+<td>
+Capability
+</td>
+<td>
+Can only display or use the value.
+</td>
+<td>
+Can change the value in the Parent.
+</td>
+</tr>
+<tr>
+<td>
+Intent
+</td>
+<td>
+Clear signal: "I won't touch your data."
+</td>
+<td>
+Clear signal: "I am a controller for this data."
+</td>
+</tr>
+</table>
+
 <table>
 <tr>
 <td>
@@ -348,6 +463,7 @@ import SwiftUI
 
 struct PushButton: View {
     let title: String
+    // I'd prefer 'isActive' as a variable name here; not to confuse with isOn of the PushButton parameter, 'isOn'
     //@State var isOn: Bool
     @Binding var isOn: Bool
 
@@ -359,6 +475,7 @@ struct PushButton: View {
             isOn.toggle()
         }
         .padding()
+        // I'd prefer 'isActive' as a variable name here; not to confuse with isOn of the PushButton parameter, 'isOn'
         .background(LinearGradient(colors: isOn ? onColors : offColors, startPoint: .top, endPoint: .bottom))
         .foregroundStyle(.white)
         .clipShape(.capsule)
@@ -371,6 +488,7 @@ struct ContentView: View {
     
     var body: some View {
         VStack {
+            // 'isOn' is a parameter here, not a variable
             PushButton(title: "Remember Me", isOn: $rememberMe)
             Text(rememberMe ? "On" : "Off")
         }
