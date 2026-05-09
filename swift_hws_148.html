@@ -32,6 +32,261 @@
 <div id="Hacking With Swift - 148 - Introduction to SwiftData and SwiftUI"><h1 id="Hacking With Swift - 148 - Introduction to SwiftData and SwiftUI" class="header"><a href="#Hacking With Swift - 148 - Introduction to SwiftData and SwiftUI">Hacking With Swift - 148 - Introduction to SwiftData and SwiftUI</a></h1></div>
 
 <p>
+SwiftUI is a powerful, modern framework for building great apps on all of Apple's platforms, and SwiftData is a powerful, modern framework for storing, querying, and filtering data. Wouldn't it be nice if they just fitted together somehow?
+</p>
+
+<p>
+Well, not only do they work together brilliantly, but they take such little code that you'll barely believe the results – you can create remarkable things in just a few minutes.
+</p>
+
+<p>
+First, the basics: SwiftData is an object graph and persistence framework, which is a fancy way of saying it lets us define objects and properties of those objects, then lets us read and write them from permanent storage.
+</p>
+
+<p>
+On the surface this sounds like using <code>Codable</code> and <code>UserDefaults</code>, but it’s much more advanced than that: SwiftData is capable of sorting and filtering of our data, and can work with much larger data – there’s effectively no limit to how much data it can store. Even better, SwiftData implements all sorts of more advanced functionality for when you really need to lean on it: iCloud syncing, lazy loading of data, undo and redo, and much more.
+</p>
+
+<p>
+In this project we’re going to be using only a small amount of SwiftData’s power, but that will expand soon enough – I just want to give you a taste of it at first.
+</p>
+
+<p>
+When you created your Xcode project I asked you to not enable SwiftData support, because although it gets some of the boring set up code out of the way it also adds a whole bunch of extra example code that is just pointless and just needs to be deleted.
+</p>
+
+<p>
+So, instead you’re going to learn how to set up SwiftData by hand. It takes three steps, starting with us defining the data we want to use in our app.
+</p>
+
+<p>
+Previously we described data by creating a Swift file called something like Student.swift, then giving it this code:
+</p>
+
+<pre swift>
+@Observable
+class Student {
+    var id: UUID
+    var name: String
+
+    init(id: UUID, name: String) {
+        self.id = id
+        self.name = name
+    }
+}
+</pre>
+
+<p>
+We can turn that into a SwiftData object – something that it can save in its database, sync with iCloud, search, sort, and more – by making two very small changes.
+</p>
+
+<p>
+First we need to add another import at the top of the file:
+</p>
+
+<pre swift>
+import SwiftData
+</pre>
+
+<p>
+That tells Swift we want to bring in all the functionality from SwiftData.
+</p>
+
+<p>
+And now we want to change this:
+</p>
+
+<pre swift>
+@Observable
+class Student {
+</pre>
+
+<p>
+To this:
+</p>
+
+<pre swift>
+@Model
+class Student {
+</pre>
+
+<p>
+...and that's it. That's literally all it takes to give SwiftData all the information it needs to load and save students. It can also now query them, delete them, link them with other objects, and more.
+</p>
+
+<p>
+This class is called a SwiftData <em>model</em>: it defines some kind of data we want to work with in our apps. Behind the scenes, <code>@Model</code> builds on top of the same observation system that <code>@Observable</code> uses, which means it works really well with SwiftUI.
+</p>
+
+<p>
+Now that we've defined the data we want to work with, we can proceed to the second step of setting up SwiftData: writing a little Swift code to load that model. This code will tell SwiftData to prepare some storage for us on the iPhone, which is where it will read and write <code>Student</code> objects.
+</p>
+
+<p>
+This work is best done in the <code>App</code> struct. Every project has one of these, including all the projects we've made so far, and it acts as the launch pad for the whole app we're running.
+</p>
+
+<p>
+As this project is called Bookworm, our <code>App</code> struct will be inside the file BookwormApp.swift. It should look like this:
+</p>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct BookwormApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<p>
+You can see it looks a bit like our regular view code: we still have an <code>import SwiftUI</code>, we still use a struct to create a custom type, and there's our <code>ContentView</code> right there. The rest is new, and really we care about two parts:
+</p>
+
+<ul>
+<li>
+The <code>@main</code> line tells Swift this is what launches our app. Internally this is what bootstraps the whole program when the user launches our app from the iOS Home Screen.
+
+<li>
+The <code>WindowGroup</code> part tells SwiftUI that our app can be displayed in many windows. This doesn't do much on iPhone, but on iPad and macOS it becomes a lot more important.
+
+</ul>
+<p>
+This is where we need to tell SwiftData to setup all its storage for us to use, which again takes two very small changes.
+</p>
+
+<p>
+First, we need to add <code>import SwiftData</code> next to <code>import SwiftUI</code>. I'm a big fan of sorting my imports alphabetically, but it's not required.
+</p>
+
+<p>
+Second, we need to add a modifier to the <code>WindowGroup</code> so that SwiftData is available everywhere in our app:
+</p>
+
+<pre swift>
+.modelContainer(for: Student.self)    
+</pre>
+
+<p>
+A <em>model container</em> is SwiftData's name for where it stores its data. The first time your app runs this means SwiftData has to create the underlying database file, but in future runs it will load the database it made previously.
+</p>
+
+<p>
+At this point you've seen how to create data models using <code>@Model</code>, and you've seen how to create a model container using the <code>modelContainer()</code> modifier. The third part of the puzzle is called the <em>model context</em>, which is effectively the “live” version of your data – when you load objects and change them, those changes only exist in memory until they are saved. So, the job of the model context is to let us work with all our data in memory, which is much faster than constantly reading and writing data to disk.
+</p>
+
+<p>
+Every SwiftData app needs a model context to work with, and we've already created ours – it's created automatically when we use the <code>modelContainer()</code> modifier. SwiftData automatically creates one model context for us, called the main context, and stores it in SwiftUI's environment,
+</p>
+
+<p>
+That completes all our SwiftData configuration, so now it's time for the fun part: reading data, and writing it too.
+</p>
+
+<p>
+Retrieving information from SwiftData is done using a <em>query</em> – we describe what we want, how it should sorted, and whether any filters should be used, and SwiftData sends back all the matching data. We need to make sure that this query stays up to date over time, so that as students are created or removed our UI stays synchronized.
+</p>
+
+<p>
+SwiftUI has a solution for this, and – you guessed it – it’s another property wrapper. This time it’s called <code>@Query</code> and it's available as soon as you add <code>import SwiftData</code> to a file.
+</p>
+
+<p>
+So, add an import for SwiftData at the top of <code>ContentView.swift</code>, then add this property to the <code>ContentView</code> struct:
+</p>
+
+<pre swift>
+@Query var students: [Student]
+</pre>
+
+<p>
+That looks like a regular <code>Student</code> array, but just adding <code>@Query</code> to the start is enough to make SwiftData loads students from its model container – it automatically finds the main context that was placed into the environment, and queries the container through there. We haven't specified which students to load, or how to sort the results, so we'll just get all of them.
+</p>
+
+<p>
+From there, we can start using <code>students</code> like a regular Swift array – put this code into your view body:
+</p>
+
+<pre swift>
+NavigationStack {
+    List(students) { student in
+        Text(student.name)
+    }
+    .navigationTitle("Classroom")
+}
+</pre>
+
+<p>
+You can run the code if you want to, but there isn’t really much point – the list will be empty because we haven’t added any data yet, so our database is empty. To fix that we’re going to create a button below our list that adds a new random student every time it’s tapped, but first we need a new property to access the model context that was created earlier.
+</p>
+
+<p>
+Add this property to <code>ContentView</code> now:
+</p>
+
+<pre swift>
+@Environment(\.modelContext) var modelContext
+</pre>
+
+<p>
+With that in place, the next step is add a button that generates random students and saves them in the model context. To help the students stand out, we’ll assign random names by creating <code>firstNames</code> and <code>lastNames</code> arrays, then using <code>randomElement()</code> to pick one of each.
+</p>
+
+<p>
+Start by adding this toolbar to the your <code>List</code>:
+</p>
+
+<pre swift>
+.toolbar {
+    Button("Add") {
+        let firstNames = ["Ginny", "Harry", "Hermione", "Luna", "Ron"]
+        let lastNames = ["Granger", "Lovegood", "Potter", "Weasley"]
+
+        let chosenFirstName = firstNames.randomElement()!
+        let chosenLastName = lastNames.randomElement()!
+
+        // more code to come
+    }
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 148 - Introduction to SwiftData and SwiftUI-Note"></span><strong id="Note">Note</strong>: Inevitably there are people that will complain about me force unwrapping those calls to <code>randomElement()</code>, but we literally just hand-created the arrays to have values – it will always succeed. If you desperately hate force unwraps, perhaps replace them with nil coalescing and default values.
+</p>
+
+<p>
+Now for the interesting part: we’re going to create a <code>Student</code> object. Add this in place of the <code>// more code to come</code> comment:
+</p>
+
+<pre swift>
+let student = Student(id: UUID(), name: "\(chosenFirstName) \(chosenLastName)")
+</pre>
+
+<p>
+Finally we need to ask our model context to add that student, which means it will be saved. Add this final line to the button’s action:
+</p>
+
+<pre swift>
+modelContext.insert(student)
+</pre>
+
+<p>
+At last, you should now be able to run the app and try it out – click the Add button a few times to generate some random students, and you should see them slide somewhere into our list. Even better, if you relaunch the app you’ll find your students are still there, because SwiftData automatically saved them.
+</p>
+
+<p>
+Now, you might think this was an awful lot of learning for not a lot of result, but you now know what models, model containers, and model contexts are, and you've seen how to insert and query data. We’ll be looking at SwiftData more later on in this project, as well in the future, but for now you’ve come far.
+</p>
+
+<p>
+This was the last part of the overview for this project, so please go ahead and reset your project ready for the real work to begin. That means resetting <code>ContentView.swift</code>, <code>BookwormApp.swift</code>, and also deleting <code>Student.swift</code>.
+</p>
+
+<p>
 <hr>
 <br>
 </p>
