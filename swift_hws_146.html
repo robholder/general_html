@@ -76,7 +76,11 @@ On the other hand, <code>@Binding</code> is used when you have a simple, value t
 </p>
 
 <p>
-This behavior makes <code>@Binding</code> extremely important for whenever you want to create a custom user interface component. At their core, UI components are just SwiftUI views like everything else, but <code>@Binding</code> is what sets them apart: while they might have their local <code>@State</code> properties, they also expose <code>@Binding</code> properties that let them interface directly with other views.
+This behavior makes <code>@Binding</code> extremely important for whenever you want to create a custom user interface component.
+</p>
+
+<p>
+At their core, UI components are just SwiftUI views like everything else, but <code>@Binding</code> is what sets them apart: while they might have their local <code>@State</code> properties, they also expose <code>@Binding</code> properties that let them interface directly with other views.
 </p>
 
 <p>
@@ -168,6 +172,131 @@ Now run the code again, and you’ll find that everything works as expected: tog
 <p>
 This is the power of <code>@Binding</code>: as far as the button is concerned it’s just toggling a Boolean - it has no idea that something else is monitoring that Boolean and acting upon changes.
 </p>
+
+<div id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights"><h2 id="AI Insights" class="header"><a href="#Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights">AI Insights</a></h2></div>
+
+<p>
+It is easy to get lost in the "ping-pong" effect of <code>@Binding</code>. To understand what <code>isOn</code> is doing, you have to look at it as a <span id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-two-way bridge"></span><strong id="two-way bridge">two-way bridge</strong> rather than just a local variable.
+</p>
+
+<p>
+In this specific code, <code>isOn</code> isn't just controlling the colors; it is acting as a remote control for the data sitting inside <code>ContentView</code>.
+</p>
+
+<div id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-1. What is being controlled?"><h3 id="1. What is being controlled?" class="header"><a href="#Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-1. What is being controlled?">1. What is being controlled?</a></h3></div>
+
+<p>
+Technically, <code>isOn</code> is controlling the State of the Parent.
+</p>
+
+<ul>
+<li>
+In <code>PushButton</code>, when you tap the button, <code>isOn.toggle()</code> fires.
+
+<li>
+Because of the <code>@Binding</code> keyword, this doesn't just change the button's internal look. It reaches back up to <code>ContentView</code> and flips the value of <code>rememberMe</code>.
+
+<li>
+The Result: The <code>Text(rememberMe ? "On" : "Off")</code> label inside <code>ContentView</code> updates instantly.
+
+</ul>
+<div id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-2. Tracking the &quot;Life&quot; of the Variable"><h3 id="2. Tracking the &quot;Life&quot; of the Variable" class="header"><a href="#Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-2. Tracking the &quot;Life&quot; of the Variable">2. Tracking the "Life" of the Variable</a></h3></div>
+
+<p>
+Here is the play-by-play of what happens when you tap that button:
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Step
+</th>
+<th>
+Action
+</th>
+<th>
+Logic
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+1. The Source
+</td>
+<td>
+<code>ContentView</code> owns the data.
+</td>
+<td>
+<code>@State private var rememberMe = false</code>
+</td>
+</tr>
+<tr>
+<td>
+2. The Hand-off
+</td>
+<td>
+<code>ContentView</code> passes a reference.
+</td>
+<td>
+<code>PushButton(..., isOn: \(rememberMe)</code> (The \) means "pass the connection, not just the value").
+</td>
+</tr>
+<tr>
+<td>
+3. The Interaction
+</td>
+<td>
+User taps the <code>PushButton</code>.
+</td>
+<td>
+<code>isOn.toggle()</code> is called.
+</td>
+</tr>
+<tr>
+<td>
+4. The Sync
+</td>
+<td>
+The Magic Moment.
+</td>
+<td>
+Because it’s a <code>@Binding</code>, <code>rememberMe</code> in the parent becomes true.
+</td>
+</tr>
+<tr>
+<td>
+5. The Re-render
+</td>
+<td>
+SwiftUI sees the change.
+</td>
+<td>
+Both the <code>PushButton</code> (colors) and the <code>Text (label)</code> redraw to reflect the new truth.
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-3. Is that all it does?"><h3 id="3. Is that all it does?" class="header"><a href="#Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-3. Is that all it does?">3. Is that all it does?</a></h3></div>
+
+<p>
+In this specific snippet, yes—it toggles the <span id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-3. Is that all it does?-visual style"></span><strong id="visual style">visual style</strong> (gradient and shadow) and the <span id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-3. Is that all it does?-parent's text label"></span><strong id="parent's text label">parent's text label</strong>.
+</p>
+
+<p>
+However, the "Big Picture" reason Paul Hudson uses this example is to demonstrate <span id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-3. Is that all it does?-Source of Truth"></span><strong id="Source of Truth">Source of Truth</strong>. Without <code>@Binding</code>, you would have two different Booleans: one inside the button and one in the main view. They would quickly get out of sync (e.g., the button looks "On" but the app thinks "Remember Me" is "Off").
+</p>
+
+<p>
+<span id="Hacking With Swift - 146 - Creating a custom component with @Binding-AI Insights-3. Is that all it does?-Key Takeaway"></span><strong id="Key Takeaway">Key Takeaway</strong>: <code>@Binding</code> ensures that the <code>PushButton</code> doesn't "own" any data; it just "borrows" it. It allows a reusable component to change the state of whatever screen it happens to be sitting in.
+</p>
+
+<p>
+It helps to think of <code>@Binding</code> as a "remote control" for the <code>@State</code> variable in the parent view.
+</p>
+
 
 <p>
 <hr>
