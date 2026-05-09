@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_146</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_145.html">Hacking With Swift - 145 - Bookworm: Introduction</a>
+
+</ul>
+<div id="Hacking With Swift - 146 - Creating a custom component with @Binding"><h1 id="Hacking With Swift - 146 - Creating a custom component with @Binding" class="header"><a href="#Hacking With Swift - 146 - Creating a custom component with @Binding">Hacking With Swift - 146 - Creating a custom component with @Binding</a></h1></div>
+
+<p>
+You’ve already seen how SwiftUI’s <code>@State</code> property wrapper lets us work with local value types, and how <code>@Bindable</code> lets us make bindings to properties inside observable classes. Well, there’s a third option with a rather confusing name: <code>@Binding</code>. This lets us share a simple <code>@State</code> property of one view with another, so they both point to the same integer, string, Boolean, and so on.
+</p>
+
+<p>
+Think about it: when we create a toggle switch we send in some sort of Boolean property that can be changed, like this:
+</p>
+
+<pre swift>
+@State private var rememberMe = false
+
+var body: some View {
+    Toggle("Remember Me", isOn: $rememberMe)
+}
+</pre>
+
+<p>
+So, the toggle needs to change our Boolean when the user interacts with it, but how does it remember what value it should change?
+</p>
+
+<p>
+That’s where <code>@Binding</code> comes in: it lets us store a single mutable value in a view that actually points to some other value from elsewhere. In the case of <code>Toggle</code>, the switch changes its own local binding to a Boolean, but behind the scenes that’s actually manipulating the <code>@State</code> property in our view - they are both reading and writing the same Boolean.
+</p>
+
+<p>
+*The difference between <code>@Bindable</code> and <code>@Binding</code> will be awfully confusing at first, but it will sink eventually.*
+</p>
+
+<p>
+To be clear, <code>@Bindable</code> is used when you're accessing a shared class that uses the <code>@Observable</code> macro: You create it using <code>@State</code> in one view, so you have bindings available there, but you use <code>@Bindable</code> when sharing it with other views so SwiftUI can create bindings there too.
+</p>
+
+<p>
+On the other hand, <code>@Binding</code> is used when you have a simple, value type piece of data rather than a separate class. For example, you have an <code>@State</code> property that stores a Boolean, a <code>Double</code>, an array of strings, etc, and you want to pass that around. That doesn't use the <code>@Observable</code> macro, so we can't use <code>@Bindable</code>. Instead, we use <code>@Binding</code>, so we can share that Boolean or integer in several places.
+</p>
+
+<p>
+This behavior makes <code>@Binding</code> extremely important for whenever you want to create a custom user interface component. At their core, UI components are just SwiftUI views like everything else, but <code>@Binding</code> is what sets them apart: while they might have their local <code>@State</code> properties, they also expose <code>@Binding</code> properties that let them interface directly with other views.
+</p>
+
+<p>
+To demonstrate this, we’re going to look at the code it takes to create a custom button that stays down when pressed. Our basic implementation will all be stuff you’ve seen before: a button with some padding, a linear gradient for the background, a <code>Capsule</code> clip shape, and so on - add this to <code>ContentView.swift</code> now:
+</p>
+
+<pre swift>
+struct PushButton: View {
+    let title: String
+    @State var isOn: Bool
+
+    var onColors = [Color.red, Color.yellow]
+    var offColors = [Color(white: 0.6), Color(white: 0.4)]
+
+    var body: some View {
+        Button(title) {
+            isOn.toggle()
+        }
+        .padding()
+        .background(LinearGradient(colors: isOn ? onColors : offColors, startPoint: .top, endPoint: .bottom))
+        .foregroundStyle(.white)
+        .clipShape(.capsule)
+        .shadow(radius: isOn ? 0 : 5)
+    }
+}
+</pre>
+
+<p>
+The only vaguely exciting thing in there is that I used properties for the two gradient colors so they can be customized by whatever creates the button.
+</p>
+
+<p>
+We can now create one of those buttons as part of our main user interface, like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var rememberMe = false
+
+    var body: some View {
+        VStack {
+            PushButton(title: "Remember Me", isOn: rememberMe)
+            Text(rememberMe ? "On" : "Off")
+        }
+    }
+}
+</pre>
+
+<p>
+That has a text view below the button so we can track the state of the button - try running your code and see how it works.
+</p>
+
+<p>
+What you’ll find is that tapping the button does indeed affect the way it appears, but our text view doesn’t reflect that change - it always says “Off”. Clearly something is changing because the button’s appearance changes when it’s pressed, but that change isn’t being reflected in <code>ContentView</code>.
+</p>
+
+<p>
+What’s happening here is that we’ve defined a one-way flow of data: <code>ContentView</code> has its <code>rememberMe</code> Boolean, which gets used to create a <code>PushButton</code> - the button has an initial value provided by <code>ContentView</code>. However, once the button was created it takes over control of the value: it toggles the <code>isOn</code> property between true or false internally to the button, but doesn’t pass that change back on to <code>ContentView</code>.
+</p>
+
+<p>
+This is a problem, because we now have two sources of truth: <code>ContentView</code> is storing one value, and <code>PushButton</code> another. Fortunately, this is where <code>@Binding</code> comes in: it allows us to create a two-way connection between <code>PushButton</code> and whatever is using it, so that when one value changes the other does too.
+</p>
+
+<p>
+To switch over to <code>@Binding</code> we need to make just two changes. First, in <code>PushButton</code> change its <code>isOn</code> property to this:
+</p>
+
+<pre swift>
+@Binding var isOn: Bool
+</pre>
+
+<p>
+And second, in <code>ContentView</code> change the way we create the button to this:
+</p>
+
+<pre swift>
+PushButton(title: "Remember Me", isOn: $rememberMe)
+</pre>
+
+<p>
+That adds a dollar sign before <code>rememberMe</code> - we’re passing in the binding itself, not the Boolean inside it.
+</p>
+
+<p>
+Now run the code again, and you’ll find that everything works as expected: toggling the button now correctly updates the text view as well.
+</p>
+
+<p>
+This is the power of <code>@Binding</code>: as far as the button is concerned it’s just toggling a Boolean - it has no idea that something else is monitoring that Boolean and acting upon changes.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
