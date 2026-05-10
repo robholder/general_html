@@ -57,6 +57,209 @@ I like it partly because it re-enforces the view that designing good data struct
 Today you have three topics to work through, in which you’ll apply your new-found SwiftData skills with <code>List</code>, <code>@Binding</code>, and more.
 </p>
 
+<div id="Hacking With Swift - 149 - Creating books with SwiftData-Creating books with SwiftData"><h2 id="Creating books with SwiftData" class="header"><a href="#Hacking With Swift - 149 - Creating books with SwiftData-Creating books with SwiftData">Creating books with SwiftData</a></h2></div>
+
+<p>
+Our first task in this project will be to design a SwitData model for our books, then creating a new view to add books to the database.
+</p>
+
+<p>
+First, the model: create a new file called Book.swift, add an import for SwiftData, then give it this code:
+</p>
+
+<pre swift>
+@Model
+class Book {
+    var title: String
+    var author: String
+    var genre: String
+    var review: String
+    var rating: Int
+}
+</pre>
+
+<p>
+That class needs an initializer to provide values for all its properties, but here's a tip: if you just start typing "in" inside the class, Xcode should autocomplete the whole initializer for you.
+</p>
+
+<p>
+That class is enough to store the title of the book, the name of whoever wrote the book, a genre, a brief overview of what the user thought of the book, and also the user’s numerical rating for it.
+</p>
+
+<p>
+Now that we have our data model, we can ask SwiftData to create a model container for it. This means opening BookwormApp.swift, adding <code>import SwiftData</code> to the top of the file, then adding this modifier to the <code>WindowGroup</code>:
+</p>
+
+<pre swift>
+.modelContainer(for: Book.self)
+</pre>
+
+<p>
+Our next step is to write a form that can create new entries. This will combine so many of the skills you’ve learned so far: <code>Form</code>, <code>@State</code>, <code>@Environment</code>, <code>TextField</code>, <code>TextEditor</code>, <code>Picker</code>, <code>sheet()</code>, and more, plus all your new SwiftData knowledge.
+</p>
+
+<p>
+Start by creating a new SwiftUI view called “AddBookView”. In terms of properties, we need an environment property to get access to our model context:
+</p>
+
+<pre swift>
+@Environment(\.modelContext) var modelContext
+</pre>
+
+<p>
+As this form is going to store all the data required to make up a book, we need <code>@State</code> properties for each of the book’s values. So, add these properties next:
+</p>
+
+<pre swift>
+@State private var title = ""
+@State private var author = ""
+@State private var rating = 3
+@State private var genre = "Fantasy"
+@State private var review = ""
+</pre>
+
+<p>
+Finally, we need one more property to store all possible genre options, so we can make a picker using <code>ForEach</code>. Add this last property to <code>AddBookView</code> now:
+</p>
+
+<pre swift>
+let genres = ["Fantasy", "Horror", "Kids", "Mystery", "Poetry", "Romance", "Thriller"]
+</pre>
+
+<p>
+We can now take a first pass at the form itself - we’ll improve it soon, but this is enough for now. Replace the current <code>body</code> with this:
+</p>
+
+<pre swift>
+NavigationStack {
+    Form {
+        Section {
+            TextField("Name of book", text: $title)
+            TextField("Author's name", text: $author)
+
+            Picker("Genre", selection: $genre) {
+                ForEach(genres, id: \.self) {
+                    Text($0)
+                }
+            }
+        }
+
+        Section("Write a review") {                
+            TextEditor(text: $review)
+
+            Picker("Rating", selection: $rating) {
+                ForEach(0..&lt;6) {
+                    Text(String($0))
+                }
+            }                
+        }
+
+        Section {
+            Button("Save") {
+                // add the book
+            }
+        }
+    }
+    .navigationTitle("Add Book")
+}
+</pre>
+
+<p>
+When it comes to filling in the button’s action, we’re going to create an instance of the <code>Book</code> class using all the values from our form, then insert the object into the model context.
+</p>
+
+<p>
+Add this code in place of the <code>// add the book</code> comment:
+</p>
+
+<pre swift>
+let newBook = Book(title: title, author: author, genre: genre, review: review, rating: rating)
+modelContext.insert(newBook)
+</pre>
+
+<p>
+That completes the form for now, but we still need a way to show and hide it when books are being added.
+</p>
+
+<p>
+Showing <code>AddBookView</code> involves returning to <code>ContentView.swift</code> and following the usual steps for a sheet:
+</p>
+
+<ul>
+<li>
+Adding an <code>@State</code> property to track whether the sheet is showing.
+
+<li>
+Add some sort of button - in the toolbar, in this case - to toggle that property.
+
+<li>
+A <code>sheet()</code> modifier that shows <code>AddBookView</code> when the property becomes true.
+
+</ul>
+<p>
+Enough talk - let’s start writing some more code. Please start by adding an import for SwiftData to <code>ContentView.swift</code>, then add these properties to the <code>ContentView</code> struct:
+</p>
+
+<pre swift>
+@Environment(\.modelContext) var modelContext
+@Query var books: [Book]
+
+@State private var showingAddScreen = false
+</pre>
+
+<p>
+That gives us a model context we can use later on to delete books, a query reading all the books we have (so we can test everything worked), and a Boolean that tracks whether the add screen is showing or not.
+</p>
+
+<p>
+For the <code>ContentView</code> body, we’re going to use a navigation stack so we can add a title plus a button in its top-right corner, but otherwise it will just hold some text showing how many items we have in the <code>books</code> array - just so we can be sure everything is working. Remember, this is where we need to add our <code>sheet()</code> modifier to show an <code>AddBookView</code> as needed.
+</p>
+
+<p>
+Replace the existing <code>body</code> property of <code>ContentView</code> with this:
+</p>
+
+<pre swift>
+NavigationStack {
+   Text("Count: \(books.count)")
+       .navigationTitle("Bookworm")
+       .toolbar {
+           ToolbarItem(placement: .topBarTrailing) {
+               Button("Add Book", systemImage: "plus") {
+                   showingAddScreen.toggle()
+               }
+           }
+       }
+       .sheet(isPresented: $showingAddScreen) {
+           AddBookView()
+       }
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 149 - Creating books with SwiftData-Creating books with SwiftData-Tip"></span><strong id="Tip">Tip</strong>: That explicitly specifies a trailing placement for the button so that we can add a second button later.
+</p>
+
+<p>
+Bear with me - we’re almost done! We’ve now designed our SwiftData model, created a form to add data, then updated <code>ContentView</code> so that it can present the form when needed. The final step is to make the form dismiss itself when the user adds a book.
+</p>
+
+<p>
+We’ve done this before, so hopefully you know the drill. We need to start by adding another environment property to <code>AddBookView</code> to be able to dismiss the current view:
+</p>
+
+<pre swift>
+@Environment(\.dismiss) var dismiss
+</pre>
+
+<p>
+Finally, add a call to <code>dismiss()</code> to the end of your Save button’s action closure.
+</p>
+
+<p>
+You should be able to run the app now and add an example book just fine. When <code>AddBookView</code> slides away the count label should update itself to 1.
+</p>
+
 <p>
 <hr>
 <br>
