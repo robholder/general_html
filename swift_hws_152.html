@@ -155,6 +155,93 @@ Replace your current preview code with this:
 Yes, creating the <code>Book</code> instance doesn't actually mention the model container or configuration anywhere, but it does matter: trying to create a SwiftData model object without a container around is likely to make your code crash.
 </p>
 
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight"><h3 id="AI Insight" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight">AI Insight</a></h3></div>
+
+<p>
+This block of code is a clever bit of "manual labor" to simulate a database environment for your Preview. Since SwiftData usually relies on the app actually running to save data to your phone's disk, the Preview needs a "fake" setup to show you what a <code>Book</code> looks like.
+</p>
+
+<p>
+Here is the step-by-step breakdown of why this works:
+</p>
+
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-1. The do-catch block"><h4 id="1. The do-catch block" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-1. The do-catch block">1. The do-catch block</a></h4></div>
+
+<p>
+Creating a SwiftData container can technically fail (e.g., if the device is out of storage or the model is corrupt). Swift requires you to handle that possibility.
+</p>
+
+<ul>
+<li>
+The <code>do</code> side: Tries to set up the database.
+
+<li>
+The <code>catch</code> side: If it fails, instead of crashing the Preview, it just returns a simple <code>Text</code> view showing the error message.
+
+</ul>
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-2. isStoredInMemoryOnly: true"><h4 id="2. isStoredInMemoryOnly: true" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-2. isStoredInMemoryOnly: true">2. isStoredInMemoryOnly: true</a></h4></div>
+
+<p>
+This is the most important line for a Preview.
+</p>
+
+<ul>
+<li>
+Normally: SwiftData saves books to a permanent file on the disk (SQLite).
+
+<li>
+In Preview: We don't want to clutter the disk or persist "Test Books" forever. This configuration tells SwiftData to keep the "database" entirely in the computer's RAM. As soon as you stop the Preview, the data evaporates.
+
+</ul>
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-3. The ModelContainer and example"><h4 id="3. The ModelContainer and example" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-3. The ModelContainer and example">3. The ModelContainer and example</a></h4></div>
+
+<ul>
+<li>
+<code>container</code>: This is the "manager" of your database. You tell it which models it needs to know about (<code>for: Book.self</code>).
+
+<li>
+<code>example</code>: You are manually creating one single <code>Book</code> object. This is your "dummy data" so the <code>DetailView</code> has something to display. Without this, the <code>DetailView</code> would be empty because the "In Memory" database starts totally blank.
+
+</ul>
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-4. The .modelContainer(container) modifier"><h4 id="4. The .modelContainer(container) modifier" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-4. The .modelContainer(container) modifier">4. The .modelContainer(container) modifier</a></h4></div>
+
+<p>
+This is the "hand-off." Even though you created a container, the <code>DetailView</code> and its child views don't know it exists until you "inject" it into the environment using this modifier. This ensures that if <code>DetailView</code> had any <code>@Query</code> or <code>@Environment(\.modelContext)</code> logic, it would look at your <span id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-4. The .modelContainer(container) modifier-temporary in-memory database"></span><strong id="temporary in-memory database">temporary in-memory database</strong> instead of the real one.
+</p>
+
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-A Visual of the Architecture"><h4 id="A Visual of the Architecture" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-A Visual of the Architecture">A Visual of the Architecture</a></h4></div>
+
+<p>
+Essentially, you are building a "Mini-App" inside your Preview:
+</p>
+
+<ul>
+<li>
+Build the Warehouse (<code>ModelContainer</code>)
+
+<li>
+Stock one item on the shelf (<code>example</code>)
+
+<li>
+Open the Storefront (<code>DetailView</code>)
+
+<li>
+Connect the Warehouse to the Storefront (<code>.modelContainer(container)</code>)
+
+</ul>
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-Why can't we just use DetailView(book: Book(...))?"><h4 id="Why can't we just use DetailView(book: Book(...))?" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-Why can't we just use DetailView(book: Book(...))?">Why can't we just use DetailView(book: Book(...))?</a></h4></div>
+
+<p>
+You might wonder why we need the container at all if we are just passing in a single <code>book</code>.
+In SwiftData, <span id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-Why can't we just use DetailView(book: Book(...))?-every Model object must belong to a Container."></span><strong id="every Model object must belong to a Container.">every Model object must belong to a Container.</strong> If you try to show a <code>@Model</code> class in a view without a container being present in the background, SwiftUI will often crash or behave unpredictably because the <code>Book</code> object feels "homeless"-it has no database context to back it up.
+</p>
+
+<p>
+<span id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-Why can't we just use DetailView(book: Book(...))?-Pro-Tip"></span><strong id="Pro-Tip">Pro-Tip</strong>: If you find yourself writing this <code>do-catch</code> block in every file, many developers create a <code>PreviewContainer</code> struct in a separate file to reuse this setup and keep their code clean!
+</p>
+
+<div id="Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Hacking With Swift - 152 - Showing book details-The Preview-AI Insight-Back to the tutorial">Back to the tutorial</a></h4></div>
+
 <div id="Hacking With Swift - 152 - Showing book details-Designing The View"><h2 id="Designing The View" class="header"><a href="#Hacking With Swift - 152 - Showing book details-Designing The View">Designing The View</a></h2></div>
 
 <p>
@@ -234,6 +321,145 @@ That completes <code>DetailView</code>, so we can head back to <code>ContentView
 <p>
 Now run the app again, because you should be able to tap any of the books you’ve entered to show them in our new detail view.
 </p>
+
+<div id="Hacking With Swift - 152 - Showing book details-Content View Link-AI Note on placement:"><h3 id="AI Note on placement:" class="header"><a href="#Hacking With Swift - 152 - Showing book details-Content View Link-AI Note on placement:">AI Note on placement:</a></h3></div>
+
+<p>
+In SwiftUI, modifiers that handle <span id="Hacking With Swift - 152 - Showing book details-Content View Link-AI Note on placement:-logic or navigation"></span><strong id="logic or navigation">logic or navigation</strong> (like <code>.sheet</code>, <code>.alert</code>, and <code>.navigationDestination</code>) almost always work best when attached to the outer container (the List or <code>ScrollView</code>) rather than the individual items inside a loop.
+</p>
+
+<p>
+Think of it like a restaurant:
+</p>
+
+<ul>
+<li>
+The <code>NavigationLink</code> is the customer placing an order (the data).
+
+<li>
+The <code>NavigationStack</code> is the building.
+
+<li>
+The <code>.navigationDestination</code> is the kitchen.
+
+</ul>
+<p>
+If you put the kitchen inside the individual chairs (<code>ForEach</code>), the waiter gets confused. If you put the kitchen in the building itself, the order knows exactly where to go!
+</p>
+
+<div id="Hacking With Swift - 152 - Showing book details-Content View Link-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 152 - Showing book details-Content View Link-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 152 - Showing book details-Content View Link-In Context-DetailView.swift"><h4 id="DetailView.swift" class="header"><a href="#Hacking With Swift - 152 - Showing book details-Content View Link-In Context-DetailView.swift">DetailView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct DetailView: View {
+    
+    let book: Book
+    
+    var body: some View {
+        ScrollView {
+            ZStack(alignment: .bottomTrailing) {
+                Image(book.genre)
+                    .resizable()
+                    .scaledToFit()
+                
+                Text(book.genre.uppercased())
+                    .font(.caption)
+                    .fontWeight(.black)
+                    .padding(8)
+                    .foregroundStyle(.white)
+                    .background(.black.opacity(0.75))
+                    .clipShape(.capsule)
+                    .offset(x: -5, y: -5)
+            
+            }
+            Text(book.author)
+                .font(.title)
+                .foregroundStyle(.secondary)
+            Text(book.review)
+                .padding()
+            
+            RatingView(rating: .constant(book.rating))
+                .font(.largeTitle)
+        }
+        .navigationTitle(book.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollBounceBehavior(.basedOnSize)
+    }
+}
+
+#Preview {
+    do {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let example = Book(title: "Test Book", author: "Test Author", genre: "Fantasy", review: "Great book...", rating: 4)
+        
+        return DetailView(book:example)
+            .modelContainer(container)
+    } catch {
+        return Text("Failed to create preview: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 152 - Showing book details-Content View Link-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 152 - Showing book details-Content View Link-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query var books: [Book]
+    
+    @State private var showingAddScreen = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(books) { book in
+                    NavigationLink(value: book) {
+                        HStack {
+                            EmojiRatingView(rating: book.rating)
+                                .font(.largeTitle)
+                            
+                            VStack(alignment: .leading) {
+                                Text(book.title)
+                                    .font(.headline)
+                                Text(book.author)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Bookworm")
+            // Navigation link to the DetailView
+            .navigationDestination(for: Book.self) { book in
+                DetailView(book: book)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add Book", systemImage: "plus") {
+                        showingAddScreen.toggle()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddScreen) {
+                AddBookView()
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <hr>
