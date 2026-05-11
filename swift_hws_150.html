@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_150</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_149.html">Hacking With Swift - 149 - Creating books with SwiftData</a>
+
+</ul>
+<div id="Hacking With Swift - 150 - Adding a custom star rating component"><h1 id="Hacking With Swift - 150 - Adding a custom star rating component" class="header"><a href="#Hacking With Swift - 150 - Adding a custom star rating component">Hacking With Swift - 150 - Adding a custom star rating component</a></h1></div>
+
+<p>
+SwiftUI makes it really easy to create custom UI components, because they are effectively just views that have some sort of <code>@Binding</code> exposed for us to read.
+</p>
+
+<p>
+To demonstrate this, we’re going to build a star rating view that lets the user enter scores between 1 and 5 by tapping images. Although we could just make this view simple enough to work for our exact use case, it’s often better to add some flexibility where appropriate so it can be used elsewhere too. Here, that means we’re going to make six customizable properties:
+</p>
+
+<ul>
+<li>
+What label should be placed before the rating (default: an empty string)
+
+<li>
+The maximum integer rating (default: 5)
+
+<li>
+The off and on images, which dictate the images to use when the star is highlighted or not (default: <code>nil</code> for the off image, and a filled star for the on image; if we find <code>nil</code> in the off image we’ll use the on image there too)
+
+<li>
+The off and on colors, which dictate the colors to use when the star is highlighted or not (default: gray for off, yellow for on)
+
+</ul>
+<p>
+We also need one extra property to store an <code>@Binding</code> integer, so we can report back the user’s selection to whatever is using the star rating.
+</p>
+
+<p>
+So, create a new SwiftUI view called “RatingView”, and start by giving it these properties:
+</p>
+
+<pre swift>
+@Binding var rating: Int
+
+var label = ""
+
+var maximumRating = 5
+
+var offImage: Image?
+var onImage = Image(systemName: "star.fill")
+
+var offColor = Color.gray
+var onColor = Color.yellow
+</pre>
+
+<p>
+Before we fill in the <code>body</code> property, please try building the code - you should find that it fails, because our <code>#Preview</code> code doesn’t pass in a binding to use for <code>rating</code>.
+</p>
+
+<p>
+SwiftUI has a specific and simple solution for this called <em>constant bindings</em>. These are bindings that have fixed values, which on the one hand means they can’t be changed in the UI, but also means we can create them trivially - they are perfect for previews.
+</p>
+
+<p>
+So, replace the existing preview code with this:
+</p>
+
+<pre swift>
+#Preview {
+    RatingView(rating: .constant(4))
+}
+</pre>
+
+<p>
+Now let’s turn to the <code>body</code> property. This is going to be a <code>HStack</code> containing any label that was provided, plus as many stars as have been requested - although, of course, they can choose any image they want, so it might not be a star at all.
+</p>
+
+<p>
+The logic for choosing which image to show is pretty simple, but it’s perfect for carving off into its own method to reduce the complexity of our code. The logic is this:
+</p>
+
+<ul>
+<li>
+If the number that was passed in is greater than the current rating, return the off image if it was set, otherwise return the on image.
+
+<li>
+If the number that was passed in is equal to or less than the current rating, return the on image.
+
+</ul>
+<p>
+We can encapsulate that in a single method, so add this to <code>RatingView</code> now:
+</p>
+
+<pre swift>
+func image(for number: Int) -&gt; Image {
+    if number &gt; rating {
+        offImage ?? onImage
+    } else {
+        onImage
+    }
+}
+</pre>
+
+<p>
+And now implementing the <code>body</code> property is surprisingly easy: if the label has any text use it, then use <code>ForEach</code> to count from 1 to the maximum rating plus 1 and call <code>image(for:)</code> repeatedly. We’ll also apply a foreground color depending on the rating, and wrap each star inside a button that adjusts the rating.
+</p>
+
+<p>
+Replace your existing <code>body</code> property with this:
+</p>
+
+<pre swift>
+HStack {
+    if label.isEmpty == false {
+        Text(label)
+    }
+
+    ForEach(1..&lt;maximumRating + 1, id: \.self) { number in
+        Button {
+            rating = number
+        } label: {
+            image(for: number)
+                .foregroundStyle(number &gt; rating ? offColor : onColor)
+        }
+    }
+}
+</pre>
+
+<p>
+That completes our rating view already, so to put it into action go back to <code>AddBookView</code> and replace the second section with this:
+</p>
+
+<pre swift>
+Section("Write a review") {
+    TextEditor(text: $review)
+    RatingView(rating: $rating)
+}
+</pre>
+
+<p>
+Our default values are sensible, so it looks great out of the box - go ahead and try it now!
+</p>
+
+<p>
+Chances are you'll see things don't quite work right: no matter which star rating you press, it will select 5 stars!
+</p>
+
+<p>
+I've seen this problem hit countless hundreds of people, no matter how much experience they have. The problem is that when we have rows inside a form or a list, SwiftUI likes to assume the rows themselves are tappable. This makes selection easier for users, because they can tap anywhere in a row to trigger the button inside it.
+</p>
+
+<p>
+In our case we have <em>multiple</em> buttons, so SwiftUI is tapping them all in order - <code>rating</code> gets set to 1, then 2, then 3, 4, and 5, which is why it ends up at 5 no matter what.
+</p>
+
+<p>
+We can disable the whole "tap the row to trigger its buttons" behavior with an extra modifier attached to the whole <code>HStack</code>:
+</p>
+
+<pre swift>
+.buttonStyle(.plain)
+</pre>
+
+<p>
+That makes SwiftUI treat each button individually, so everything works as planned. And the result is much nicer to use: there’s no need to tap into a detail view with a picker here, because star ratings are more natural and more common.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
