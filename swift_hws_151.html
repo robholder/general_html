@@ -51,10 +51,14 @@ Text("Count: \(books.count)")
 To bring this screen to life, we’re going to replace that text view with a <code>List</code> showing all the books that have been added, along with their rating and author.
 </p>
 
-<div id="Hacking With Swift - 151 - Building a list with @Query-List"><h2 id="List" class="header"><a href="#Hacking With Swift - 151 - Building a list with @Query-List">List</a></h2></div>
+<div id="Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView"><h2 id="EmojiRatingView" class="header"><a href="#Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView">EmojiRatingView</a></h2></div>
 
 <p>
-We <em>could</em> just use the same star rating view here that we made earlier, but it’s much more fun to try something else. Whereas the <code>RatingView</code> control can be used in any kind of project, we can make a new <code>EmojiRatingView</code> that displays a rating specific to this project. All it will do is show one of five different emoji depending on the rating, and it’s a great example of how straightforward view composition is in SwiftUI - it’s so easy to just pull out a small part of your views in this way.
+We <em>could</em> just use the same star rating view here that we made earlier, but it’s much more fun to try something else.
+</p>
+
+<p>
+Whereas the <code>RatingView</code> control can be used in any kind of project, we can make a new <code>EmojiRatingView</code> that displays a rating specific to this project. All it will do is show one of five different emoji depending on the rating, and it’s a great example of how straightforward view composition is in SwiftUI - it’s so easy to just pull out a small part of your views in this way.
 </p>
 
 <p>
@@ -87,11 +91,15 @@ struct EmojiRatingView: View {
 </pre>
 
 <p>
-<span id="Hacking With Swift - 151 - Building a list with @Query-List-Tip"></span><strong id="Tip">Tip</strong>: I used numbers in my text because emoji can cause havoc with e-readers, but you should replace those with whatever emoji you think represent the various ratings.
+<span id="Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-Tip"></span><strong id="Tip">Tip</strong>: I used numbers in my text because emoji can cause havoc with e-readers, but you should replace those with whatever emoji you think represent the various ratings.
 </p>
 
 <p>
-Now we can return to <code>ContentView</code> and do a first pass of its UI. This will replace the existing text view with a list and a <code>ForEach</code> over <code>books</code>. We don’t need to provide an identifier for the <code>ForEach</code> because all SwiftData models conform to <code>Identifiable</code> automatically.
+Now we can return to <code>ContentView</code> and do a first pass of its UI. This will replace the existing text view with a list and a <code>ForEach</code> over <code>books</code>.
+</p>
+
+<p>
+We don’t need to provide an identifier for the <code>ForEach</code> because all SwiftData models conform to <code>Identifiable</code> automatically.
 </p>
 
 <p>
@@ -119,11 +127,105 @@ List {
 </pre>
 
 <p>
-<span id="Hacking With Swift - 151 - Building a list with @Query-List-Tip"></span><strong id="Tip">Tip</strong>: Make sure you leave the earlier modifiers in place - <code>navigationTitle()</code>, etc.
+<span id="Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-Tip"></span><strong id="Tip">Tip</strong>: Make sure you leave the earlier modifiers in place - <code>navigationTitle()</code>, etc.
 </p>
 
 <p>
 Navigation won't quite work because we haven't added <code>navigationDestination()</code> just yet, but that's okay - we’ll come back to this screen soon enough. First let’s build the detail view…
+</p>
+
+<table>
+<tr>
+<td>
+NOTE: Run in full simulator to see correctly. (Not canvas.)
+</td>
+</tr>
+</table>
+
+<div id="Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-In Context-EmojiRatingView.swift"><h4 id="EmojiRatingView.swift" class="header"><a href="#Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-In Context-EmojiRatingView.swift">EmojiRatingView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct EmojiRatingView: View {
+    let rating: Int
+    
+    var body: some View {
+        switch rating {
+        case 1:
+            Text("1")
+        case 2:
+            Text("2")
+        case 3:
+            Text("3")
+        case 4:
+            Text("4")
+        default:
+            Text("5")
+        }
+    }
+}
+
+#Preview {
+    EmojiRatingView(rating: 3)
+}
+</pre>
+
+<div id="Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 151 - Building a list with @Query-EmojiRatingView-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query var books: [Book]
+    
+    @State private var showingAddScreen = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(books) { book in
+                    NavigationLink(value: book) {
+                        HStack {
+                            EmojiRatingView(rating: book.rating)
+                                .font(.largeTitle)
+                            
+                            VStack(alignment: .leading) {
+                                Text(book.title)
+                                    .font(.headline)
+                                Text(book.author)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Bookworm")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add Book", systemImage: "plus") {
+                        showingAddScreen.toggle()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddScreen) {
+                AddBookView()
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
 <hr>
 <br>
 </p>
