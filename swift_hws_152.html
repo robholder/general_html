@@ -31,6 +31,171 @@
 </ul>
 <div id="Hacking With Swift - 152 - Showing book details"><h1 id="Hacking With Swift - 152 - Showing book details" class="header"><a href="#Hacking With Swift - 152 - Showing book details">Hacking With Swift - 152 - Showing book details</a></h1></div>
 
+<p>
+As we finish our app today, I hope you’re able to stop and realize just how much SwiftUI you already know. For example, to build the detail screen for our app will leverage SwiftData, <code>VStack</code> and <code>ZStack</code>, clip shapes, spacers, and more - things you should now be more than comfortable with, which shows how far you have come.
+</p>
+
+<p>
+Still, there are always new things to learn, which today will include how to delete SwiftData objects, how to sort queries using <code>SortDescriptor</code>, and how to add custom buttons to alerts. As the American philosopher Vernon Howard said:
+</p>
+
+<p>
+<blockquote>
+"Always walk through life as if you have something new to learn, and you will"
+</blockquote>
+</p>
+
+<p>
+I drop in these small extra things into projects to keep you on your toes, but going over the old stuff is often just as important!
+</p>
+
+<p>
+Today you have three topics to work through, in which you’ll upgrade your app to support sorting, deleting, and more.
+</p>
+
+<div id="Hacking With Swift - 152 - Showing book details-Showing Book Details"><h2 id="Showing Book Details" class="header"><a href="#Hacking With Swift - 152 - Showing book details-Showing Book Details">Showing Book Details</a></h2></div>
+
+<p>
+When the user taps a book in <code>ContentView</code> we’re going to present a detail view with some more information - the genre of the book, their brief review, and more. We’re also going to reuse our new <code>RatingView</code>, and even customize it so you can see just how flexible SwiftUI is.
+</p>
+
+<p>
+To make this screen more interesting, we’re going to add some artwork that represents each category in our app. I’ve picked out some artwork already from Unsplash, and placed it into the project11-files folder for this book - if you haven’t downloaded them, please do so now and then drag them into your asset catalog.
+</p>
+
+<p>
+Unsplash has a license that allows us to use pictures commercially or non-commercially, with or without attribution, although attribution is appreciated. The pictures I’ve added are by Ryan Wallace, Eugene Triguba, Jamie Street, Alvaro Serrano, Joao Silas, David Dilbert, and Casey Horner - you can get the originals from:
+</p>
+<ul>
+<li>
+<a href="https://unsplash.com">ExternalLink: unsplash.com</a>
+
+</ul>
+<p>
+...if you want.
+</p>
+
+<p>
+Next, create a new SwiftUI view called “DetailView”, then give it an import for SwiftData. This new view only needs one property, which is the book it should show, so please add that now:
+</p>
+
+<pre swift>
+let book: Book
+</pre>
+
+<p>
+Even just having that property is enough to break the preview code at the bottom of DetailView.swift. Previously this was easy to fix because we just sent in an example object, but with SwiftData involved things are messier: creating a new book also means having a view context to create it inside.
+</p>
+
+<p>
+This is the first thing that's actually tricky in SwiftData; we need to get things exactly right in order for it to work:
+</p>
+
+<ul>
+<li>
+In order to create a sample <code>Book</code> object, we must first create a model context.
+
+<li>
+That model context comes from creating a model container.
+
+<li>
+If we create a model container, we <em>don't</em> want it to actually store anything, so we can create a custom configuration that tells SwiftData to store its information in memory only. That means everything is temporary.
+
+</ul>
+<p>
+I know that sounds a lot, but in practice it's only a few lines of code - we need to make our model container by hand, and do so using a new type called <code>ModelConfiguration</code> that lets us request temporary in-memory storage. Once we have that, we can create a <code>Book</code> object as normal, then send it into <code>DetailView</code> along with the model container itself.
+</p>
+
+<p>
+Replace your current preview code with this:
+</p>
+
+<pre swift>
+#Preview {
+    do {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let example = Book(title: "Test Book", author: "Test Author", genre: "Fantasy", review: "This was a great book; I really enjoyed it.", rating: 4)
+
+        return DetailView(book: example)
+            .modelContainer(container)
+    } catch {
+        return Text("Failed to create preview: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<p>
+Yes, creating the <code>Book</code> instance doesn't actually mention the model container or configuration anywhere, but it does matter: trying to create a SwiftData model object without a container around is likely to make your code crash.
+</p>
+
+<p>
+With that done we can turn our attention to more interesting problems, namely designing the view itself. To start with, we’re going to place the category image and genre inside a <code>ZStack</code>, so we can put one on top of the other nicely. I’ve picked out some styling that I think looks good, but you’re welcome to experiment with the styling all you want - the only thing I’d recommend you definitely keep is the <code>ScrollView</code>, which ensures our review will fit fully onto the screen no matter how long it is, what device the user has, or whether they have adjusted their font sizes or not.
+</p>
+
+<p>
+Replace the current <code>body</code> property with this:
+</p>
+
+<pre swift>
+ScrollView {
+    ZStack(alignment: .bottomTrailing) {
+        Image(book.genre)
+            .resizable()
+            .scaledToFit()
+
+        Text(book.genre.uppercased())
+            .font(.caption)
+            .fontWeight(.black)
+            .padding(8)
+            .foregroundStyle(.white)
+            .background(.black.opacity(0.75))
+            .clipShape(.capsule)
+            .offset(x: -5, y: -5)
+    }
+}
+.navigationTitle(book.title)
+.navigationBarTitleDisplayMode(.inline)
+.scrollBounceBehavior(.basedOnSize)
+</pre>
+
+<p>
+That places the genre name in the bottom-right corner of the <code>ZStack</code>, with a background color, bold font, and a little padding to help it stand out.
+</p>
+
+<p>
+Below that <code>ZStack</code> we’re going to add the author, review, and rating. We don’t want users to be able to adjust the rating here, so instead we can use another constant binding to turn this into a simple read-only view. Even better, because we used SF Symbols to create the rating image, we can scale them up seamlessly with a simple <code>font()</code> modifier, to make better use of all the space we have.
+</p>
+
+<p>
+So, add these views directly below the previous <code>ZStack</code>:
+</p>
+
+<pre swift>
+Text(book.author)
+    .font(.title)
+    .foregroundStyle(.secondary)
+
+Text(book.review)
+    .padding()
+
+RatingView(rating: .constant(book.rating))
+    .font(.largeTitle)
+</pre>
+
+<p>
+That completes <code>DetailView</code>, so we can head back to <code>ContentView.swift</code> to add a navigation destination to the List view:
+</p>
+
+<pre swift>
+.navigationDestination(for: Book.self) { book in
+    DetailView(book: book)
+}
+</pre>
+
+<p>
+Now run the app again, because you should be able to tap any of the books you’ve entered to show them in our new detail view.
+</p>
 
 <p>
 <hr>
