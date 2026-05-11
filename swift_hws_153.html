@@ -31,6 +31,72 @@
 </ul>
 <div id="Hacking With Swift - 153 - Sorting SwiftData queries using SortDescriptor"><h1 id="Hacking With Swift - 153 - Sorting SwiftData queries using SortDescriptor" class="header"><a href="#Hacking With Swift - 153 - Sorting SwiftData queries using SortDescriptor">Hacking With Swift - 153 - Sorting SwiftData queries using SortDescriptor</a></h1></div>
 
+<p>
+When you use <code>@Query</code> to pull objects out of SwiftData, you get to specify how you want the data to be sorted - should it be alphabetically by one of the fields? Or numerically with the highest numbers first? Regardless of what you choose, it's always a good idea to choose <em>something</em> so your users have a predictable experience.
+</p>
+
+<p>
+In this project we have various fields that might be useful for sorting purposes: the title of the book, the author, or the rating are all sensible and would be good choices, but we don't have to rely on just one - you can specify multiple, so that you might ask for highest-rated books first, then use their names for a tiebreaker.
+</p>
+
+<p>
+Query sorting can be done in two ways: a simple option that allows just one sort field, and a more advanced version that allows an array of a new type called <code>SortDescriptor</code>.
+</p>
+
+<p>
+Using the simple version, we might ask for our books to be provided in alphabetical order based on their title:
+</p>
+
+<pre swift>
+@Query(sort: \Book.title) var books: [Book]
+</pre>
+
+<p>
+Or we could ask for them to be sorted by rating, highest to lowest:
+</p>
+
+<pre swift>
+@Query(sort: \Book.rating, order: .reverse) var books: [Book]
+</pre>
+
+<p>
+That works well when you want just one single field, but generally I'd say it's a better idea to have a backup field too - to say "sort by rating, then by title" adds an extra level of predictability to your app, which is always a good thing.
+</p>
+
+<p>
+This is done using the <code>SortDescriptor</code> type, which we can create them from either one or two values: the property we want to sort on, and optionally whether it should be reversed or not. For example, we can alphabetically sort on the title property like this:
+</p>
+
+<pre swift>
+@Query(sort: [SortDescriptor(\Book.title)]) var books: [Book]
+</pre>
+
+<p>
+Like the simpler approach to sorting, sorting results using <code>SortDescriptor</code> is done in ascending order by default, meaning alphabetical order for text, but if you wanted to reverse the sort order you’d use this instead:
+</p>
+
+<pre swift>
+@Query(sort: [SortDescriptor(\Book.title, order: .reverse)]) var books: [Book]
+</pre>
+
+<p>
+You can specify more than one sort descriptor, and they will be applied in the order you provide them. For example, if the user added the book “Forever” by Pete Hamill, then added “Forever” by Judy Blume - an entirely different book that just happens to have the same title - then specifying a second sort field is helpful.
+</p>
+
+<p>
+So, we might ask for book title to be sorted ascending first, followed by book author ascending second, like this:
+</p>
+
+<pre swift>
+@Query(sort: [
+    SortDescriptor(\Book.title),
+    SortDescriptor(\Book.author)
+]) var books: [Book]
+</pre>
+
+<p>
+Having a second or even third sort field has little to no performance impact unless you have lots of data with similar values. With our books data, for example, almost every book will have a unique title, so having a secondary sort field is more or less irrelevant in terms of performance.
+</p>
 
 <p>
 <hr>
