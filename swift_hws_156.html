@@ -271,6 +271,95 @@ struct AddBookView: View {
 }
 </pre>
 
+<div id="Challenge 2 - Color Based On Rating"><h1 id="Challenge 2 - Color Based On Rating" class="header"><a href="#Challenge 2 - Color Based On Rating">Challenge 2 - Color Based On Rating</a></h1></div>
+
+<p>
+Added Ternary conditional:
+</p>
+
+<pre swift>
+Text(book.title)
+    .font(.headline)
+    .foregroundStyle(book.rating &lt; 2 ? .red : .primary)
+</pre>
+
+<div id="Challenge 2 - Color Based On Rating-In Context"><h3 id="In Context" class="header"><a href="#Challenge 2 - Color Based On Rating-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: [
+        SortDescriptor(\Book.title),
+        SortDescriptor(\Book.author)
+    ]) var books: [Book]
+    
+    @State private var showingAddScreen = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(books) { book in
+                    NavigationLink(value: book) {
+                        HStack {
+                            EmojiRatingView(rating: book.rating)
+                                .font(.largeTitle)
+                            
+                            VStack(alignment: .leading) {
+                                Text(book.title)
+                                    .font(.headline)
+                                    // Color book title red if bad rating
+                                    .foregroundStyle(book.rating &lt; 2 ? .red : .primary)
+                                Text(book.author)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                // Add delete functinoality (call func)
+                .onDelete(perform: deleteBooks)
+            }
+            .navigationTitle("Bookworm")
+            .navigationDestination(for: Book.self) { book in
+                DetailView(book: book)
+            }
+            .toolbar {
+                // Add an edit button for the book list
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add Book", systemImage: "plus") {
+                        showingAddScreen.toggle()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddScreen) {
+                AddBookView()
+            }
+        }
+    }
+    
+    func deleteBooks(at offsets: IndexSet) {
+        for offset in offsets {
+            // find this book in our query
+            let book = books[offset]
+            
+            // delete it from the context
+            modelContext.delete(book)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 <hr>
 <br>
