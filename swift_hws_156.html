@@ -110,6 +110,9 @@ Modify <code>ContentView</code> so that books rated as 1 star are highlighted so
 <li>
 Add a new “date” attribute to the Book class, assigning <code>Date.now</code> to it so it gets the current date and time, then format that nicely somewhere in <code>DetailView</code>.
 
+<li>
+CHALLENGE 4 - My own challenge - add facility to edit existing books.
+
 </ul>
 <div id="Challenge 1"><h1 id="Challenge 1" class="header"><a href="#Challenge 1">Challenge 1</a></h1></div>
 
@@ -633,6 +636,201 @@ VStack(alignment: .leading) {
         .foregroundStyle(.secondary)
 }
 </pre>
+
+<div id="Challenge 4"><h1 id="Challenge 4" class="header"><a href="#Challenge 4">Challenge 4</a></h1></div>
+
+<div id="Challenge 4-Ai Insight - Add Option To Edit Existing Book"><h2 id="Ai Insight - Add Option To Edit Existing Book" class="header"><a href="#Challenge 4-Ai Insight - Add Option To Edit Existing Book">Ai Insight - Add Option To Edit Existing Book</a></h2></div>
+
+<p>
+This is a perfect evolution of your app. In SwiftUI, the most common way to handle "Editing" is to reuse your <code>AddBookView</code> but pass it an <span id="Challenge 4-Ai Insight - Add Option To Edit Existing Book-existing book"></span><strong id="existing book">existing book</strong> to fill in the fields, rather than starting with empty strings.
+</p>
+
+<p>
+However, there is a small architectural catch: <code>AddBookView</code> is currently designed to insert a new book. To make it an "Edit View," we need to tweak it slightly so it knows whether it's creating something new or updating something old.
+</p>
+
+<div id="Challenge 4-1. Update AddBookView to handle Editing"><h2 id="1. Update AddBookView to handle Editing" class="header"><a href="#Challenge 4-1. Update AddBookView to handle Editing">1. Update AddBookView to handle Editing</a></h2></div>
+
+<p>
+We need to tell the view: "If I give you a book, use its data. If I don't, start fresh."
+</p>
+
+<pre swift>
+struct AddBookView: View {
+    @Environment(\.modelContext) var modelContext
+    @Environment(\.dismiss) var dismiss
+    
+    // 1. Add an optional book property
+    var bookToEdit: Book? 
+
+    @State private var title = ""
+    @State private var author = ""
+    @State private var rating = 3
+    @State private var genre = "Fantasy"
+    @State private var review = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // ... your existing textfields/pickers ...
+            }
+            .navigationTitle(bookToEdit == nil ? "Add Book" : "Edit Book")
+            .toolbar {
+                Button("Save") {
+                    if let book = bookToEdit {
+                        // 2. Update existing book
+                        book.title = title
+                        book.author = author
+                        book.genre = genre
+                        book.review = review
+                        book.rating = rating
+                    } else {
+                        // 3. Create new book (your existing logic)
+                        let newBook = Book(title: title, author: author, genre: genre, review: review, rating: rating)
+                        modelContext.insert(newBook)
+                    }
+                    dismiss()
+                }
+                .disabled(isBookValid)
+            }
+            // 4. Fill the fields if we are editing
+            .onAppear {
+                if let book = bookToEdit {
+                    title = book.title
+                    author = book.author
+                    rating = book.rating
+                    genre = book.genre
+                    review = book.review
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Challenge 4-2. Add the Edit Button to DetailView"><h2 id="2. Add the Edit Button to DetailView" class="header"><a href="#Challenge 4-2. Add the Edit Button to DetailView">2. Add the Edit Button to DetailView</a></h2></div>
+
+<p>
+Now, in your <code>DetailView</code>, you need a state variable to show the sheet and a button to trigger it.
+</p>
+
+<pre swift>
+struct DetailView: View {
+    let book: Book
+    @State private var showingEditSheet = false // Toggle for the sheet
+
+    var body: some View {
+        ScrollView {
+            // ... your existing layout ...
+        }
+        .toolbar {
+            // Add the Edit button next to the Trash button
+            Button("Edit") {
+                showingEditSheet = true
+            }
+            
+            Button("Delete this book", systemImage: "trash") {
+                showingDeleteAlert = true
+            }
+        }
+        // Show the AddBookView as an editor
+        .sheet(isPresented: $showingEditSheet) {
+            AddBookView(bookToEdit: book)
+        }
+    }
+}
+</pre>
+
+<div id="Challenge 4-2. Add the Edit Button to DetailView-Why this works"><h3 id="Why this works" class="header"><a href="#Challenge 4-2. Add the Edit Button to DetailView-Why this works">Why this works</a></h3></div>
+
+<ul>
+<li>
+The Sheet: By passing <code>bookToEdit: book</code>, the <code>AddBookView</code> initializes its <code>@State</code> properties with the existing book's data inside <code>.onAppear</code>.
+
+<li>
+SwiftData Magic: Because <code>Book</code> is a class marked with <code>@Model</code>, when you change <code>book.title = title</code>, SwiftData <span id="Challenge 4-2. Add the Edit Button to DetailView-Why this works-automatically watches for that change"></span><strong id="automatically watches for that change">automatically watches for that change</strong> and saves it to the database. You don't even need to call a "save" or "update" function on the context; simply modifying the properties of the object is enough!
+
+</ul>
+<div id="Challenge 4-2. Add the Edit Button to DetailView-One Little Polish Tip"><h3 id="One Little Polish Tip" class="header"><a href="#Challenge 4-2. Add the Edit Button to DetailView-One Little Polish Tip">One Little Polish Tip</a></h3></div>
+
+<p>
+In your <code>AddBookView</code>'s <code>isBookValid</code> logic, remember that it currently checks if the fields are <span id="Challenge 4-2. Add the Edit Button to DetailView-One Little Polish Tip-empty"></span><strong id="empty">empty</strong> to <em>disable</em> the button.
+</p>
+
+<p>
+If you want to be extra fancy, you could change the button text based on the mode:
+</p>
+
+<pre swift>
+Button(bookToEdit == nil ? "Add" : "Update") { ... }
+</pre>
+
+<div id="Challenge 4-2. Add the Edit Button to DetailView-One Little Polish Tip-Where to place:"><h4 id="Where to place:" class="header"><a href="#Challenge 4-2. Add the Edit Button to DetailView-One Little Polish Tip-Where to place:">Where to place:</a></h4></div>
+
+<p>
+You'll want to swap out the static <code>"Save"</code> string for the ternary operator inside the <code>Button</code> label. You can also apply this same logic to the <code>.navigationTitle</code> so the top of the screen says "Edit Book" when appropriate.
+</p>
+
+<p>
+Here is where those changes go:
+</p>
+
+<pre swift>
+// ... inside body -&gt; NavigationStack -&gt; Form
+Section {
+    // Check if bookToEdit is nil to decide the button text
+    Button(bookToEdit == nil ? "Save Book" : "Update Details") {
+        if let book = bookToEdit {
+            book.title = title
+            book.author = author
+            book.genre = genre
+            book.review = review
+            book.rating = rating
+        } else {
+            let newBook = Book(title: title, author: author, genre: genre, review: review, rating: rating)
+            modelContext.insert(newBook)
+        }
+        dismiss()
+    }
+    .disabled(isBookValid)
+}
+
+// ... then further down, change the Navigation Title too:
+.navigationTitle(bookToEdit == nil ? "Add Book" : "Edit Book")
+.navigationBarTitleDisplayMode(.inline)
+</pre>
+
+<div id="Challenge 4-2. Add the Edit Button to DetailView-Two Small Refinements"><h3 id="Two Small Refinements" class="header"><a href="#Challenge 4-2. Add the Edit Button to DetailView-Two Small Refinements">Two Small Refinements</a></h3></div>
+
+<ul>
+<li>
+The <code>.onAppear</code> Placement: In your current code, you have <code>.onAppear</code> attached to a <code>Section</code>. While that works, it’s safer to attach it to the <code>Form</code> or the <code>NavigationStack</code>. If a Section is off-screen (scrolled away), sometimes <code>.onAppear</code> behaves inconsistently.
+
+<li>
+<code>NavigationStack</code>: If you are calling <code>AddBookView</code> from a <code>.sheet</code> in your <code>DetailView</code>, the <code>DetailView</code> is likely already inside a <code>NavigationStack</code>. If you include another <code>NavigationStack</code> inside the sheet, you’ll end up with "Double Nav Bars" (two large titles stacked on top of each other).
+
+</ul>
+<p>
+<span id="Challenge 4-2. Add the Edit Button to DetailView-Two Small Refinements-The fix"></span><strong id="The fix">The fix</strong>: Usually, you remove the <code>NavigationStack</code> from <code>AddBookView</code> and just keep the <code>Form</code>. Then, wrap the call inside the <code>.sheet</code> in the <code>DetailView</code> with a <code>NavigationStack</code> instead.
+</p>
+
+<div id="Challenge 4-2. Add the Edit Button to DetailView-Final Check on DetailView"><h3 id="Final Check on DetailView" class="header"><a href="#Challenge 4-2. Add the Edit Button to DetailView-Final Check on DetailView">Final Check on DetailView</a></h3></div>
+
+<p>
+When you trigger this from your <code>DetailView</code>, ensure it looks like this:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingEditSheet) {
+    NavigationStack {
+        AddBookView(bookToEdit: book)
+    }
+}
+</pre>
+
+<p>
+This way, <code>AddBookView</code> stays lightweight and flexible—it works as a standalone "Add" screen or a "Pop-up" edit screen!
+</p>
 
 <p>
 <hr>
