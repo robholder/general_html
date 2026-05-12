@@ -362,6 +362,22 @@ struct ContentView: View {
 
 <div id="Challenge 3 - Add Date (Now)"><h1 id="Challenge 3 - Add Date (Now)" class="header"><a href="#Challenge 3 - Add Date (Now)">Challenge 3 - Add Date (Now)</a></h1></div>
 
+<div id="Challenge 3 - Add Date (Now)-QUESTION"><h2 id="QUESTION" class="header"><a href="#Challenge 3 - Add Date (Now)-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I want to return a string representation of the Date in this function. How do I do that?
+</p>
+
+<pre swift>
+func getDate() -&gt; Date {
+    let dateNow = Date.now
+        
+    return dateNow
+}
+</pre>
+
+<div id="Challenge 3 - Add Date (Now)-ANSWER"><h2 id="ANSWER" class="header"><a href="#Challenge 3 - Add Date (Now)-ANSWER">ANSWER</a></h2></div>
+
 <p>
 Here is how you would write that function to return a nicely formatted string:
 </p>
@@ -375,7 +391,7 @@ func getDate() -&gt; String {
 }
 </pre>
 
-<div id="Challenge 3 - Add Date (Now)-Breaking Down the Formatting Options"><h3 id="Breaking Down the Formatting Options" class="header"><a href="#Challenge 3 - Add Date (Now)-Breaking Down the Formatting Options">Breaking Down the Formatting Options</a></h3></div>
+<div id="Challenge 3 - Add Date (Now)-ANSWER-Breaking Down the Formatting Options"><h3 id="Breaking Down the Formatting Options" class="header"><a href="#Challenge 3 - Add Date (Now)-ANSWER-Breaking Down the Formatting Options">Breaking Down the Formatting Options</a></h3></div>
 
 <p>
 Swift provides a few "presets" that are much easier than manual math. If you want specific control like you mentioned (day, month, year), you use the dateTime configuration:
@@ -401,11 +417,13 @@ For "10/12/2026":
 <li>
 For custom control (your original idea):
 
+<ul>
 <li>
 <code>Date.now.formatted(.dateTime.day().month().year())</code>
 
 </ul>
-<div id="Challenge 3 - Add Date (Now)-Use it in your View"><h3 id="Use it in your View" class="header"><a href="#Challenge 3 - Add Date (Now)-Use it in your View">Use it in your View</a></h3></div>
+</ul>
+<div id="Challenge 3 - Add Date (Now)-ANSWER-Use it in your View"><h3 id="Use it in your View" class="header"><a href="#Challenge 3 - Add Date (Now)-ANSWER-Use it in your View">Use it in your View</a></h3></div>
 
 <p>
 Since you are likely using this in a SwiftUI Text view, you don't actually need a function at all! SwiftUI can format dates directly inside a string interpolation:
@@ -429,6 +447,91 @@ Add <code>var dateAdded: Date = Date.now</code> to your <code>@Model</code> clas
 In your <code>DetailView</code>, use the <code>.formatted()</code> logic above to show the user when they finished the book.
 
 </ul>
+<p>
+While it’s tempting to save the date as a String (because that's how we want to see it), you almost always want to save it as a Date object in your @Model.
+</p>
+
+<div id="Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it."><h2 id="Here is why, and how to coordinate it." class="header"><a href="#Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.">Here is why, and how to coordinate it.</a></h2></div>
+
+<div id="Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-1. The &quot;Why&quot;: Data vs. Presentation"><h3 id="1. The &quot;Why&quot;: Data vs. Presentation" class="header"><a href="#Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-1. The &quot;Why&quot;: Data vs. Presentation">1. The "Why": Data vs. Presentation</a></h3></div>
+
+<p>
+Think of a <code>Date</code> object as the "truth" and a <code>String</code> as just one "translation" of that truth.
+</p>
+
+<ul>
+<li>
+Sorting: If you save dates as Strings (like "January 5" and "December 1"), a database will sort them alphabetically. "December" comes before "January," which is a mess! If you save them as <code>Date</code>, SwiftData knows exactly which one happened first in time.
+
+<li>
+Localization: A user in the US sees <code>10/12/26</code> (Oct 12), while a user in the UK sees <code>12/10/26</code> (Dec 10). If you save a String, you force one format on everyone. If you save a Date, the iPhone automatically translates it to the user's preferred local format.
+
+<li>
+Math: If you want to show "Added 3 days ago," you can do math with <code>Date</code> objects. You can't do math with the word "Monday."
+
+</ul>
+<div id="Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-2. How to coordinate the property"><h3 id="2. How to coordinate the property" class="header"><a href="#Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-2. How to coordinate the property">2. How to coordinate the property</a></h3></div>
+
+<p>
+You should store the "Raw Data" in the Model and do the "Formatting" in the View.
+</p>
+
+<div id="Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-2. How to coordinate the property-Step A: Update the Model"><h4 id="Step A: Update the Model" class="header"><a href="#Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-2. How to coordinate the property-Step A: Update the Model">Step A: Update the Model</a></h4></div>
+
+<p>
+Add a <code>Date</code> property to your <code>Book</code> class. Give it a default value of <code>Date.now</code> so it automatically stamps the book the moment it's created.
+</p>
+
+<pre swift>
+@Model
+class Book {
+    var title: String
+    var author: String
+    var dateAdded: Date // Store the 'Truth'
+    
+    init(title: String, author: String, dateAdded: Date = .now) {
+        self.title = title
+        self.author = author
+        self.dateAdded = dateAdded
+    }
+}
+</pre>
+
+<div id="Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-2. How to coordinate the property-Step B: Use it in the View"><h4 id="Step B: Use it in the View" class="header"><a href="#Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-2. How to coordinate the property-Step B: Use it in the View">Step B: Use it in the View</a></h4></div>
+
+<p>
+When you want to display the date in your <code>DetailView</code>, that is when you convert it to a String using the <code>.formatted()</code> method we discussed.
+</p>
+
+<pre swift>
+Section("Book Details") {
+    Text("Added on \(book.dateAdded.formatted(date: .long, time: .omitted))")
+}
+</pre>
+
+<div id="Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-The Architecture Workflow"><h3 id="The Architecture Workflow" class="header"><a href="#Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-The Architecture Workflow">The Architecture Workflow</a></h3></div>
+
+<p>
+This is the "Golden Rule" of handling dates in apps:
+</p>
+
+<ul>
+<li>
+Storage: Always <code>Date</code>.
+
+<li>
+Logic/Sorting: Always <code>Date</code>.
+
+<li>
+Display: Convert to <code>String</code> at the very last second in the <code>body</code> of your SwiftUI view.
+
+</ul>
+<div id="Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-The Architecture Workflow-A Wittier Perspective"><h4 id="A Wittier Perspective" class="header"><a href="#Challenge 3 - Add Date (Now)-Here is why, and how to coordinate it.-The Architecture Workflow-A Wittier Perspective">A Wittier Perspective</a></h4></div>
+
+<p>
+Storing a date as a String is like taking a photo of a clock and saving the photo. You know what time it was then, but the photo can’t tell you how many seconds have passed since, and it’s hard to compare two photos to see which was taken first. Storing the <code>Date</code> object is like having the actual clock—it’s much more useful!
+</p>
+
 <p>
 <hr>
 <br>
