@@ -78,8 +78,172 @@ ToolbarItem(placement: .topBarLeading) {
 </pre>
 
 <p>
-That completes <code>ContentView</code>, so try running the app – you should be able to add and delete books freely now, and can delete by using swipe to delete or using the edit button.
+That completes <code>ContentView</code>, so try running the app - you should be able to add and delete books freely now, and can delete by using swipe to delete or using the edit button.
 </p>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights"><h2 id="AI Insights" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights">AI Insights</a></h2></div>
+
+<p>
+The <code>deleteBooks</code> function is the "cleanup crew" for the <code>List</code>. To understand it, we have to look at how SwiftUI handles the user's physical gesture of swiping to delete.
+</p>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-1. What is at offsets?"><h3 id="1. What is at offsets?" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-1. What is at offsets?">1. What is at offsets?</a></h3></div>
+
+<p>
+In Swift, <code>at</code> is an <span id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-1. What is at offsets?-argument label"></span><strong id="argument label">argument label</strong>. It makes the code read like a sentence when you call the function elsewhere.
+</p>
+
+<ul>
+<li>
+Inside the function, you use the name <code>offsets</code>.
+
+<li>
+Outside the function, you would call it like this: <code>deleteBooks(at: someIndexSet)</code>.
+
+</ul>
+<p>
+The word <span id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-1. What is at offsets?-offset"></span><strong id="offset">offset</strong> is just a programmer's way of saying "position" or "distance from the start." If you have a list of 5 books, the first book is at offset 0, the second is at offset 1, and so on.
+</p>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-2. What is an IndexSet?"><h3 id="2. What is an IndexSet?" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-2. What is an IndexSet?">2. What is an IndexSet?</a></h3></div>
+
+<p>
+An <code>IndexSet</code> is like a <span id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-2. What is an IndexSet?-collection of bookmarks"></span><strong id="collection of bookmarks">collection of bookmarks</strong>.
+</p>
+
+<p>
+Imagine you have a stack of 10 books. If I tell you, "Go pick up books 1, 3, and 5," those three numbers (1, 3, 5) together form an <code>IndexSet</code>.
+</p>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-2. What is an IndexSet?-Why not just a single number?"><h4 id="Why not just a single number?" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-2. What is an IndexSet?-Why not just a single number?">Why not just a single number?</a></h4></div>
+
+<p>
+SwiftUI allows for "multi-select" deletion. Even if you only swipe one row, SwiftUI sends that single position inside an <code>IndexSet</code> container just in case there are more.
+</p>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-3. Walking through the Code"><h3 id="3. Walking through the Code" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-3. Walking through the Code">3. Walking through the Code</a></h3></div>
+
+<p>
+Let’s trace what happens when you swipe to delete the 3rd item in your list:
+</p>
+
+<pre swift>
+func deleteBooks(at offsets: IndexSet) {
+    // 1. The loop begins. 'offsets' contains the number [2] 
+    // (remember, we count from 0, so the 3rd item is index 2).
+    for offset in offsets {
+        
+        // 2. We use that '2' to look into our 'books' array.
+        // It's like saying: "Hey array, give me the book sitting at chair #2."
+        let book = books[offset]
+
+        // 3. Now that we have the specific 'Book' object in our hand,
+        // we tell the ModelContext to remove it from the database.
+        modelContext.delete(book)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-4. The &quot;Magic&quot; Connection"><h3 id="4. The &quot;Magic&quot; Connection" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-4. The &quot;Magic&quot; Connection">4. The "Magic" Connection</a></h3></div>
+
+<p>
+You might be wondering: <em>How does this function actually get triggered?</em>
+</p>
+
+<p>
+Usually, you connect it to your <code>ForEach</code> in the <code>ContentView</code> like this:
+</p>
+
+<pre swift>
+ForEach(books) { book in
+    // row content
+}
+.onDelete(perform: deleteBooks)
+</pre>
+
+<p>
+When you swipe a row, the <code>.onDelete</code> modifier automatically calculates exactly which row you swiped and passes that position into your <code>deleteBooks</code> function as an <code>IndexSet</code>.
+</p>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-4. The &quot;Magic&quot; Connection-The &quot;Wait, what about saving?&quot; Catch"><h4 id="The &quot;Wait, what about saving?&quot; Catch" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-4. The &quot;Magic&quot; Connection-The &quot;Wait, what about saving?&quot; Catch">The "Wait, what about saving?" Catch</a></h4></div>
+
+<p>
+In your current code, you tell the <code>modelContext</code> to delete the book. Depending on how your app is set up, SwiftData might "autosave" that change immediately, or you might need to call <code>try? modelContext.save()</code> if you want to be absolutely sure it's gone from the disk.
+</p>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 154 - Deleting from a SwiftData query-AI Insights-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query var books: [Book]
+    
+    @State private var showingAddScreen = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(books) { book in
+                    NavigationLink(value: book) {
+                        HStack {
+                            EmojiRatingView(rating: book.rating)
+                                .font(.largeTitle)
+                            
+                            VStack(alignment: .leading) {
+                                Text(book.title)
+                                    .font(.headline)
+                                Text(book.author)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                // Add delete functinoality (call func)
+                .onDelete(perform: deleteBooks)
+            }
+            .navigationTitle("Bookworm")
+            .navigationDestination(for: Book.self) { book in
+                DetailView(book: book)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add Book", systemImage: "plus") {
+                        showingAddScreen.toggle()
+                    }
+                }
+                // Add an edit button for the book list
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
+            }
+            .sheet(isPresented: $showingAddScreen) {
+                AddBookView()
+            }
+        }
+    }
+    
+    func deleteBooks(at offsets: IndexSet) {
+        for offset in offsets {
+            // find this book in our query
+            let book = books[offset]
+            
+            // delete it from the context
+            modelContext.delete(book)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 
 <p>
 <hr>
