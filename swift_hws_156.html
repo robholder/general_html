@@ -94,7 +94,7 @@ Anyone can sit through a tutorial, but it takes actual work to remember what was
 <a href="https://www.hackingwithswift.com/review/ios-swiftui/bookworm">ExternalLink: Click here to review what you learned in this project.</a>
 
 </ul>
-<div id="Hacking With Swift - 156 - Bookworm: Wrap up-Bookworm: Wrap up-Challenge"><h3 id="Challenge" class="header"><a href="#Hacking With Swift - 156 - Bookworm: Wrap up-Bookworm: Wrap up-Challenge">Challenge</a></h3></div>
+<div id="Hacking With Swift - 156 - Bookworm: Wrap up-Challenges"><h2 id="Challenges" class="header"><a href="#Hacking With Swift - 156 - Bookworm: Wrap up-Challenges">Challenges</a></h2></div>
 
 <p>
 One of the best ways to learn is to write your own code as often as possible, so here are three ways you should try extending this app to make sure you fully understand what’s going on.
@@ -111,6 +111,166 @@ Modify <code>ContentView</code> so that books rated as 1 star are highlighted so
 Add a new “date” attribute to the Book class, assigning <code>Date.now</code> to it so it gets the current date and time, then format that nicely somewhere in <code>DetailView</code>.
 
 </ul>
+<div id="Challenge 1"><h1 id="Challenge 1" class="header"><a href="#Challenge 1">Challenge 1</a></h1></div>
+
+<p>
+I tried to mimic the <span id="Challenge 1-CupcakeCorner"></span><strong id="CupcakeCorner">CupcakeCorner</strong> project solution to block the save button if fields are empty. I added a <code>hasValidEntries</code> in the <code>Book.swift</code> data.
+</p>
+
+<div id="Challenge 1-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Challenge 1-Ai Insight">Ai Insight</a></h2></div>
+
+<div id="Challenge 1-Ai Insight-The Problem"><h3 id="The Problem" class="header"><a href="#Challenge 1-Ai Insight-The Problem">The Problem</a></h3></div>
+
+<p>
+Your <code>hasValidEntries</code> property lives inside the <code>Book</code> class. To check that property, you would first have to create a <code>newBook</code> instance. But you don't want to create the book until the user presses "Save"—which is exactly what you're trying to disable!
+</p>
+
+<p>
+In SwiftUI, if the data lives in the View's <code>@State</code>, the validation logic should generally live there too.
+</p>
+
+<div id="Challenge 1-Ai Insight-The Problem-Strategy 1: The Computed Property (Recommended)"><h4 id="Strategy 1: The Computed Property (Recommended)" class="header"><a href="#Challenge 1-Ai Insight-The Problem-Strategy 1: The Computed Property (Recommended)">Strategy 1: The Computed Property (Recommended)</a></h4></div>
+
+<p>
+The cleanest way to do this is to add a computed property directly to your <code>AddBookView</code>. This property will look at your <code>@State</code> variables and decide if the form is ready.
+</p>
+
+<p>
+Add this inside your AddBookView (before the body):
+</p>
+
+<pre swift>
+var isFormInvalid: Bool {
+    title.trimmingCharacters(in: .whitespaces).isEmpty || 
+    author.trimmingCharacters(in: .whitespaces).isEmpty || 
+    review.trimmingCharacters(in: .whitespaces).isEmpty
+}
+</pre>
+
+<p>
+Then, simply attach the <code>.disabled()</code> modifier to your button:
+</p>
+
+<pre swift>
+Button("Save") {
+    let newBook = Book(title: title, author: author, genre: genre, review: review, rating: rating)
+    modelContext.insert(newBook)
+    dismiss()
+}
+.disabled(isFormInvalid) // Here is the magic
+</pre>
+
+<div id="Challenge 1-Ai Insight-The Problem-Strategy 2: The &quot;Validation&quot; Logic in the Model"><h4 id="Strategy 2: The &quot;Validation&quot; Logic in the Model" class="header"><a href="#Challenge 1-Ai Insight-The Problem-Strategy 2: The &quot;Validation&quot; Logic in the Model">Strategy 2: The "Validation" Logic in the Model</a></h4></div>
+
+<p>
+If you <em>really</em> want to keep the validation logic inside the <code>Book</code> class (perhaps because you want to use it in multiple places), you can make it a <span id="Challenge 1-Ai Insight-The Problem-Strategy 2: The &quot;Validation&quot; Logic in the Model-static function"></span><strong id="static function">static function</strong>. This allows you to call it without needing an actual book instance first.
+</p>
+
+<p>
+In your Book class:
+</p>
+
+<pre swift>
+static func validate(title: String, author: String, review: String) -&gt; Bool {
+    if title.trimmingCharacters(in: .whitespaces).isEmpty || 
+       author.trimmingCharacters(in: .whitespaces).isEmpty || 
+       review.trimmingCharacters(in: .whitespaces).isEmpty {
+        return false
+    }
+    return true
+}
+</pre>
+
+<p>
+In your View:
+</p>
+
+<pre swift>
+.disabled(Book.validate(title: title, author: author, review: review) == false)
+</pre>
+
+<p>
+Which one should you use?
+</p>
+
+<div id="Challenge 1-Ai Insight-The Problem-Go with Strategy 1."><h4 id="Go with Strategy 1." class="header"><a href="#Challenge 1-Ai Insight-The Problem-Go with Strategy 1.">Go with Strategy 1.</a></h4></div>
+
+<p>
+Since <code>AddBookView</code> "owns" the temporary strings (title, author, etc.) before they become a permanent book, it's the View's job to decide if its own text fields are satisfactory.
+</p>
+
+<p>
+<span id="Challenge 1-Ai Insight-The Problem-Go with Strategy 1.-One quick tip"></span><strong id="One quick tip">One quick tip</strong>: Notice I added <code>.trimmingCharacters(in: .whitespaces)</code>. This prevents users from "cheating" your validation by just typing a single space!
+</p>
+
+<div id="Challenge 1-Ai Insight-In Context"><h3 id="In Context" class="header"><a href="#Challenge 1-Ai Insight-In Context">In Context</a></h3></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+struct AddBookView: View {
+    @Environment(\.modelContext) var modelContext
+    @Environment(\.dismiss) var dismiss
+    
+    let genres = ["Fantasy", "Horror", "Kids", "Mystery", "Poetry", "Romance", "Thriller"]
+    
+    @State private var title = ""
+    @State private var author = ""
+    @State private var rating = 3
+    @State private var genre = "Fantasy"
+    @State private var review = ""
+    
+    // Computed property
+    var isBookValid: Bool {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        review.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                
+                Section {
+                    TextField("Name of book", text: $title)
+                    TextField("Author's name", text: $author)
+                    
+                    Picker("Genre", selection: $genre) {
+                        ForEach(genres, id: \.self) {
+                            Text($0)
+                        }
+                    }
+                }
+                
+                Section("Write a review") {
+                    TextEditor(text: $review)
+                    RatingView(rating: $rating)
+                }
+                
+                Section {
+                    Button("Save") {
+                        // add the book
+                        let newBook = Book(title: title, author: author, genre: genre, review: review, rating: rating)
+                        modelContext.insert(newBook)
+                        dismiss()
+                    }
+                    // Check if fields are completed
+                    .disabled(isBookValid)
+                    
+                }
+            }
+            .navigationTitle("Add Book")
+        }
+    }
+}
+
+#Preview {
+    AddBookView()
+}
+</pre>
+
 <p>
 <hr>
 <br>
