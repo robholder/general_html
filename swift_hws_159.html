@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_159</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_158.html">Hacking With Swift - 158 - Editing SwiftData model objects</a>
+
+</ul>
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate"><h1 id="Hacking With Swift - 159 - Filtering @Query using Predicate" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate">Hacking With Swift - 159 - Filtering @Query using Predicate</a></h1></div>
+
+<p>
+You've already seen how <code>@Query</code> can be used to sort SwiftData objects in a particular order, but it can also be used to filter that data using a <em>predicate</em> - a series of tests that get applied to your data, to decide what to return.
+</p>
+
+<p>
+The syntax for this is a little odd at first, mostly because this is actually another macro behind the scenes - Swift converts our predicate code into a series of rules it can apply to the underlying database that stores all of SwiftData's objects.
+</p>
+
+<p>
+Let's start with something simple, using the same <code>User</code> model we used previously:
+</p>
+
+<pre swift>
+@Model
+class User {
+    var name: String
+    var city: String
+    var joinDate: Date
+
+    init(name: String, city: String, joinDate: Date) {
+        self.name = name
+        self.city = city
+        self.joinDate = joinDate
+    }
+}
+</pre>
+
+<p>
+Now we can add a couple of properties to <code>ContentView</code> that can show all the users we have:
+</p>
+
+<pre swift>
+@Environment(\.modelContext) var modelContext
+@Query(sort: \User.name) var users: [User]
+</pre>
+
+<p>
+And finally, we can show all those users in a list, and we'll also add a button to add some sample data easily:
+</p>
+
+<pre swift>
+NavigationStack {
+    List(users) { user in
+        Text(user.name)
+    }
+    .navigationTitle("Users")
+    .toolbar {
+        Button("Add Samples", systemImage: "plus") {
+            let first = User(name: "Ed Sheeran", city: "London", joinDate: .now.addingTimeInterval(86400 * -10))
+            let second = User(name: "Rosa Diaz", city: "New York", joinDate: .now.addingTimeInterval(86400 * -5))
+            let third = User(name: "Roy Kent", city: "London", joinDate: .now.addingTimeInterval(86400 * 5))
+            let fourth = User(name: "Johnny English", city: "London", joinDate: .now.addingTimeInterval(86400 * 10))
+
+            modelContext.insert(first)
+            modelContext.insert(second)
+            modelContext.insert(third)
+            modelContext.insert(fourth)
+        }
+    }
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 159 - Filtering @Query using Predicate-Tip"></span><strong id="Tip">Tip</strong>: Those join dates represent some number of days in the past or future, which gives us some interesting data to work with.
+</p>
+
+<p>
+When working with sample data like this, it's helpful to be able to delete existing data before adding the sample data. To do that, add the following code before the <code>let first =</code> line:
+</p>
+
+<pre swift>
+try? modelContext.delete(model: User.self)
+</pre>
+
+<p>
+That tells SwiftData to tell all existing model objects of the type <code>User</code>, which means the database is clear before we add the sample users.
+</p>
+
+<p>
+To finish our little sample app, we just need to make sure the <code>App</code> struct uses the <code>modelContainer()</code> modifier to set up SwiftData correctly:
+</p>
+
+<pre swift>
+WindowGroup {
+    ContentView()
+}
+.modelContainer(for: User.self)
+</pre>
+
+<p>
+Now go ahead and run the app, then press the <code>+</code> button to insert four users.
+</p>
+
+<p>
+You can see they appear in alphabetical order, because that's what we asked for in our <code>@Query</code> property.
+</p>
+
+<p>
+Now let's try filtering that data, so that we only show users whose name contains a capital R. To do this we pass a <code>filter</code> parameter into <code>@Query</code>, like this:
+</p>
+
+<pre swift>
+@Query(filter: #Predicate&lt;User&gt; { user in
+    user.name.contains("R")
+}, sort: \User.name) var users: [User]
+</pre>
+
+<p>
+Let's break that down:
+</p>
+
+<ul>
+<li>
+The filter starts with <code>#Predicate&lt;User&gt;</code>, which means we're writing a predicate (a fancy word for a test we're going to apply).
+
+<li>
+That predicate gives us a single user instance to check. In practice that will be called once for each user loaded by SwiftData, and we need to return true if that user should be included in the results.
+
+<li>
+Our test checks whether the user's name contains the capital letter R. If it does, the user will be included in the results, otherwise they won't.
+
+</ul>
+<p>
+So, when you run the code now you'll see that both Rosa and Roy appear in our list, but Ed and Johnny are left off because their names don't contain a capital R. The <code>contains()</code> method is case-sensitive: it considers capital R and lowercase R to be difference, which is why it didn't find the "r" in "Ed Sheeran".
+</p>
+
+<p>
+That works great for a simple test of predicates, but it's very rare users actually care about capital letters - they usually just want to write a few letters, and look for that match anywhere in the results, ignoring case.
+</p>
+
+<p>
+For this purpose, iOS gives us a separate method <code>localizedStandardContains()</code>. This also takes a string to search for, except it automatically ignores letter case, so it's a much better option when you're trying to filter by user text.
+</p>
+
+<p>
+Here's how it looks:
+</p>
+
+<pre swift>
+@Query(filter: #Predicate&lt;User&gt; { user in
+    user.name.localizedStandardContains("R")
+}, sort: \User.name) var users: [User]
+</pre>
+
+<p>
+In our little test data that means we'll see three out of the four users, because those three have a letter "r" somewhere in their name.
+</p>
+
+<p>
+Now let's go a step further: let's upgrade our filter so that it matches people who have an "R" in their name and who live in London:
+</p>
+
+<pre swift>
+@Query(filter: #Predicate&lt;User&gt; { user in
+    user.name.localizedStandardContains("R") &amp;&amp;
+    user.city == "London"
+}, sort: \User.name) var users: [User]
+</pre>
+
+<p>
+That uses Swift's "logical and" operator, which means both sides of the condition must be true in order for the whole condition to be true - the user's name must contain an "R" <em>and</em> they must live in London.
+</p>
+
+<p>
+If we only had the first check for the letter R, then Ed, Rosa, and Roy would match. If we only had the second check for living in London, then Ed, Roy, and Johnny would match. Putting <em>both</em> together means that only Ed and Roy match, because they are the only two with an R somewhere in their name who also live in London.
+</p>
+
+<p>
+You can add more and more checks like this, but using <code>&amp;&amp;</code> gets a bit confusing. Fortunately, these predicates support a limited subset of Swift expressions that make reading a little easier.
+</p>
+
+<p>
+For example, we could rewrite our current predicate to this:
+</p>
+
+<pre swift>
+@Query(filter: #Predicate&lt;User&gt; { user in
+    if user.name.localizedStandardContains("R") {
+        if user.city == "London" {
+            return true
+        } else {
+            return false
+        }
+    } else {
+        return false
+    }
+}, sort: \User.name) var users: [User]
+</pre>
+
+<p>
+Now, you might be thinking that's a little verbose - that could remove both <code>else</code> blocks and just end with <code>return true</code>, because if the user actually matched the predicate the <code>return true</code> would already have been hit.
+</p>
+
+<p>
+Here's how that would look:
+</p>
+
+<pre swift>
+@Query(filter: #Predicate&lt;User&gt; { user in
+    if user.name.localizedStandardContains("R") {
+        if user.city == "London" {
+            return true
+        }
+    }
+
+    return false
+}, sort: \User.name) var users: [User]
+</pre>
+
+<p>
+Sadly that code isn't actually valid, because even though it looks like we're executing pure Swift code it's important you remember that doesn't actually happen - the <code>#Predicate</code> macro actually rewrites our code to be a series of tests it can apply on the database, which doesn't use Swift internally.
+</p>
+
+<p>
+To see what's happening internally, press undo a few times to get the original version with two <code>else</code> blocks. Now right-click on <code>#Predicate</code> and select Expand Macro, and you'll see a huge amount of code appears. Remember, this is the actual code that gets built and run - it's what our <code>#Predicate</code> gets converted into.
+</p>
+
+<p>
+So, that's just a little of how <code>#Predicate</code> works, and why some predicates you might try just don't quite work how you expect - this stuff looks easy, but it's really complex behind the scenes!
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
