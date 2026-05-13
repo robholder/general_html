@@ -475,6 +475,218 @@ And that works! In fact, it's pretty much the same approach Apple's own Notes ap
 As you can see, editing with SwiftData objects is no different from editing regular <code>@Observable</code> classes - just with the added bonus that all our data is loaded and saved neatly!
 </p>
 
+<div id="Where to add the Property Wrapper-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Where to add the Property Wrapper-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+This is a classic "Model-View-Controller" setup in SwiftUI. You're essentially building a live window into your database.
+</p>
+
+<p>
+Let’s break down those two specific lines, because they represent the two different types of "State" in your app: <span id="Where to add the Property Wrapper-Ai Insight-Persistent Data"></span><strong id="Persistent Data">Persistent Data</strong> (the database) and <span id="Where to add the Property Wrapper-Ai Insight-Navigation State"></span><strong id="Navigation State">Navigation State</strong> (where the user is currently looking).
+</p>
+
+<div id="Where to add the Property Wrapper-Ai Insight-1. The @Query Line"><h3 id="1. The @Query Line" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-1. The @Query Line">1. The @Query Line</a></h3></div>
+
+<pre swift>
+@Query(sort: \User.name) var users: [User]
+</pre>
+
+<p>
+<code>@Query</code> is that database command turned into a "live" variable.
+</p>
+
+<ul>
+<li>
+The "Magic" Link: This doesn't just fetch the users once; it creates a permanent connection to your database file.
+
+<li>
+Automatic UI Updates: If you add a user elsewhere in the app (or even on another thread), SwiftData notices the change in the database and tells this users array to update. Because it's a <code>@Query</code>, the <code>List</code> in your UI will automatically animate in the new name.
+
+<li>
+The Sorting: <code>\User.name</code> is a <span id="Where to add the Property Wrapper-Ai Insight-1. The @Query Line-KeyPath"></span><strong id="KeyPath">KeyPath</strong>. It tells SwiftData: "Look at the User class, find the name property, and use that as the alphabetizing rule."
+
+</ul>
+<div id="Where to add the Property Wrapper-Ai Insight-2. The @State Line (The Navigation Path)"><h3 id="2. The @State Line (The Navigation Path)" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-2. The @State Line (The Navigation Path)">2. The @State Line (The Navigation Path)</a></h3></div>
+
+<pre swift>
+@State private var path = [User]()
+</pre>
+
+<p>
+This is not about your database; it’s about the user's journey through the app.
+</p>
+
+<ul>
+<li>
+Programmatic Navigation: Normally, a <code>NavigationLink</code> handles the "tap to go to next screen" logic automatically. However, by creating a <code>path</code> variable and binding it to the <code>NavigationStack(path: $path)</code>, you are taking manual control of the steering wheel.
+
+<li>
+The "History Stack": Think of this array as a literal stack of cards.
+
+<ul>
+<li>
+If the array is empty <code>[]</code>, you are on the main screen.
+
+<li>
+If you put a <code>User</code> object into that array, SwiftUI sees it and immediately slides the <code>EditUserView</code> onto the screen.
+
+</ul>
+</ul>
+<div id="Where to add the Property Wrapper-Ai Insight-3. Putting them together: The &quot;Add User&quot; Button"><h3 id="3. Putting them together: The &quot;Add User&quot; Button" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-3. Putting them together: The &quot;Add User&quot; Button">3. Putting them together: The "Add User" Button</a></h3></div>
+
+<p>
+This is where the real genius of your code happens. Look at what the button does:
+</p>
+
+<pre swift>
+Button("Add User") {
+    let user = User(name: "", city: "", joinDate: .now) // 1. Create a blank object
+    modelContext.insert(user)                          // 2. Save it to the database
+    path = [user]                                      // 3. Teleport the user to the edit screen
+}
+</pre>
+
+<ul>
+<li>
+Creation: You create a "blank" user.
+
+<li>
+Persistence: You tell the <code>modelContext</code> (the scratchpad) to save it. Because of the <code>@Query</code> we discussed, a blank row would actually appear in your list in the background!
+
+<li>
+The "Teleport": By setting <code>path = [user]</code>, you are manually telling the <code>NavigationStack</code>: <em>"Hey, act as if the user just tapped on this specific person."</em>
+
+</ul>
+<p>
+SwiftUI looks at <code>.navigationDestination(for: User.self)</code> and says, "Oh, you just added a <code>User</code> to the path? I know how to show that: I'll open <code>EditUserView</code> for that specific user."
+</p>
+
+<div id="Where to add the Property Wrapper-Ai Insight-3. Putting them together: The &quot;Add User&quot; Button-Summary"><h4 id="Summary" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-3. Putting them together: The &quot;Add User&quot; Button-Summary">Summary</a></h4></div>
+
+<ul>
+<li>
+<code>@Query</code> keeps your UI in sync with the <span id="Where to add the Property Wrapper-Ai Insight-3. Putting them together: The &quot;Add User&quot; Button-Summary-Database"></span><strong id="Database">Database</strong>.
+
+<li>
+<code>@State path</code> keeps your UI in sync with the <span id="Where to add the Property Wrapper-Ai Insight-3. Putting them together: The &quot;Add User&quot; Button-Summary-User's position"></span><strong id="User's position">User's position</strong> in the app.
+
+</ul>
+<p>
+By combining them, you've created a "Fast Entry" system: the user clicks "+", and they are instantly transported to the edit screen for a record that was just created.
+</p>
+
+<div id="Where to add the Property Wrapper-Ai Insight-In Context"><h3 id="In Context" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-In Context">In Context</a></h3></div>
+
+<div id="Where to add the Property Wrapper-Ai Insight-In Context-SwiftDataProjectApp.swift"><h4 id="SwiftDataProjectApp.swift" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-In Context-SwiftDataProjectApp.swift">SwiftDataProjectApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@main
+struct SwiftDataProjectApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        .modelContainer(for: User.self)
+    }
+}
+</pre>
+
+<div id="Where to add the Property Wrapper-Ai Insight-In Context-User.swift"><h4 id="User.swift" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-In Context-User.swift">User.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@Model
+class User {
+    var name: String
+    var city: String
+    var joinDate: Date
+    
+    init(name: String, city: String, joinDate: Date) {
+        self.name = name
+        self.city = city
+        self.joinDate = joinDate
+    }
+}
+</pre>
+
+<div id="Where to add the Property Wrapper-Ai Insight-In Context-EditUserView.swift"><h4 id="EditUserView.swift" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-In Context-EditUserView.swift">EditUserView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct EditUserView: View {
+    var user: User
+    
+    var body: some View {
+        @Bindable var user = user
+        Form {
+            TextField("Name", text: $user.name)
+            TextField("City", text: $user.city)
+            DatePicker("Join Date", selection: $user.joinDate)
+        }
+        .navigationTitle("Edit User")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+#Preview {
+    do {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: User.self, configurations: config)
+        let user = User(name: "Taylor Swift", city: "Nashville", joinDate: .now)
+        return EditUserView(user: user)
+            .modelContainer(container)
+    } catch {
+        return Text("Failed to create container: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<div id="Where to add the Property Wrapper-Ai Insight-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Where to add the Property Wrapper-Ai Insight-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ContentView: View {
+    
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \User.name) var users: [User]
+    @State private var path = [User]()
+    
+    var body: some View {
+        NavigationStack(path: $path) {
+            List(users) { user in
+                NavigationLink(value: user) {
+                    Text(user.name)
+                }
+            }
+            .navigationTitle("Users")
+            .navigationDestination(for: User.self) { user in
+                EditUserView(user: user)
+            }
+            .toolbar {
+                Button("Add User", systemImage: "plus") {
+                    let user = User(name: "", city: "", joinDate: .now)
+                    modelContext.insert(user)
+                    path = [user]
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 <hr>
 <br>
