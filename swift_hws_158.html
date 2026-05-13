@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_158</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_157.html">Hacking With Swift - 157 - SwiftData: Introduction</a>
+
+</ul>
+<div id="Hacking With Swift - 158 - Editing SwiftData model objects"><h1 id="Hacking With Swift - 158 - Editing SwiftData model objects" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects">Hacking With Swift - 158 - Editing SwiftData model objects</a></h1></div>
+
+<p>
+SwiftData's model objects are powered by the same observation system that makes <code>@Observable</code> classes work, which means changes to your model objects are automatically picked up by SwiftUI so that our data and our user interface stay in sync.
+</p>
+
+<p>
+This support extends to the <code>@Bindable</code> property wrapper we looked at previously, which means we get delightfully straightforward object editing.
+</p>
+
+<p>
+To demonstrate this, we could create a simple <code>User</code> class with a handful of properties.
+</p>
+
+<p>
+Create a new file called User.swift, add an import at the top for SwiftData, then give it this code:
+</p>
+
+<pre swift>
+@Model
+class User {
+    var name: String
+    var city: String
+    var joinDate: Date
+
+    init(name: String, city: String, joinDate: Date) {
+        self.name = name
+        self.city = city
+        self.joinDate = joinDate
+    }
+}
+</pre>
+
+<p>
+Now we can create a model container and model context for that by adding another <code>import SwiftData</code> in the <code>App</code> struct file then using <code>modelContainer()</code> like this:
+</p>
+
+<pre swift>
+WindowGroup {
+    ContentView()
+}
+.modelContainer(for: User.self)
+</pre>
+
+<p>
+When it comes to editing <code>User</code> objects, we would create a new view called something like <code>EditUserView</code>, then use the <code>@Bindable</code> property wrapper to create bindings for it. So, something like this:
+</p>
+
+<pre swift>
+struct EditUserView: View {
+    @Bindable var user: User
+
+    var body: some View {
+        Form {
+            TextField("Name", text: $user.name)
+            TextField("City", text: $user.city)
+            DatePicker("Join Date", selection: $user.joinDate)
+        }
+        .navigationTitle("Edit User")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+</pre>
+
+<p>
+That's <em>identical</em> to how we used a regular <code>@Observable</code> class, and yet SwiftData still takes care of automatically writing out all our changes to permanent storage – it's completely transparent to us.
+</p>
+
+<p>
+<span id="Hacking With Swift - 158 - Editing SwiftData model objects-Important"></span><strong id="Important">Important</strong>: If you want to use Xcode's previews with this, you need to pass a sample object in, which in turn means creating a custom configuration and container. First add an import for SwiftData, then change your preview to this:
+</p>
+
+<pre swift>
+#Preview {
+    do {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: User.self, configurations: config)
+        let user = User(name: "Taylor Swift", city: "Nashville", joinDate: .now)
+        return EditUserView(user: user)
+            .modelContainer(container)
+    } catch {
+        return Text("Failed to create container: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<p>
+We could make a really simple user editing app out of this by adding a new user when a button is pressed, then using programmatic navigation to take the app straight to the new user for editing.
+</p>
+
+<p>
+Let's build this step by step. First, open ContentView.swift and an import for SwiftData, then add properties to get access to the model context, load all our <code>User</code> objects, then store a path we can bind to a <code>NavigationStack</code>:
+</p>
+
+<pre swift>
+@Environment(\.modelContext) var modelContext
+@Query(sort: \User.name) var users: [User]
+@State private var path = [User]()
+</pre>
+
+<p>
+Replace the default <code>body</code> property with this:
+</p>
+
+<pre swift>
+NavigationStack(path: $path) {
+    List(users) { user in
+        NavigationLink(value: user) {
+            Text(user.name)
+        }
+    }
+    .navigationTitle("Users")
+    .navigationDestination(for: User.self) { user in
+        EditUserView(user: user)
+    }
+}
+</pre>
+
+<p>
+And now we just need a way to add users. If you think about it, adding and editing are very similar, so the easiest thing to do here is to create a new <code>User</code> object with empty properties, insert it into the model context, then immediately navigate to that by adjusting the <code>path</code> property.
+</p>
+
+<p>
+Add this extra modifier below the two navigation modifiers:
+</p>
+
+<pre swift>
+.toolbar {
+    Button("Add User", systemImage: "plus") {
+        let user = User(name: "", city: "", joinDate: .now)
+        modelContext.insert(user)
+        path = [user]
+    }
+}
+</pre>
+
+<p>
+And that works! In fact, it's pretty much the same approach Apple's own Notes app takes, although they add the extra step of automatically deleting the note if you exit the editing view without actually adding any text.
+</p>
+
+<p>
+As you can see, editing with SwiftData objects is no different from editing regular <code>@Observable</code> classes – just with the added bonus that all our data is loaded and saved neatly!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
