@@ -195,6 +195,14 @@ In the past, we used <code>@StateObject</code> or <code>@ObservedObject</code>, 
 You typically use <code>@Bindable</code> inside a view when you've passed an object in, but you need to edit its properties.
 </p>
 
+<table>
+<tr>
+<td>
+NOTE: See notes on this 'Property' version and the 'Inline' version below.
+</td>
+</tr>
+</table>
+
 <pre swift>
 struct EditUserView: View {
     // You receive the model object here
@@ -262,10 +270,137 @@ Before <code>@Bindable</code>, we often had to use <code>@State</code> to hold t
 It’s essentially the "glue" that lets your <code>@Model</code> classes talk to your SwiftUI <code>TextFields</code>.
 </p>
 
-<div id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer-Back to the tutorial">Back to the tutorial</a></h4></div>
+<div id="Where to add the Property Wrapper"><h1 id="Where to add the Property Wrapper" class="header"><a href="#Where to add the Property Wrapper">Where to add the Property Wrapper</a></h1></div>
+
+<div id="Where to add the Property Wrapper-QUESTION"><h2 id="QUESTION" class="header"><a href="#Where to add the Property Wrapper-QUESTION">QUESTION</a></h2></div>
 
 <p>
-<span id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer-Back to the tutorial-Important"></span><strong id="Important">Important</strong>: If you want to use Xcode's previews with this, you need to pass a sample object in, which in turn means creating a custom configuration and container. First add an import for SwiftData, then change your preview to this:
+What's the difference between:
+</p>
+<pre swift>
+// Inline version
+
+struct EditUserView: View {
+    // You receive the model object here
+    var user: User
+
+    var body: some View {
+        // You wrap it in @Bindable to get access to $ syntax
+        @Bindable var user = user
+        Form {
+            TextField("Name", text: $user.name) // Two-way binding!
+        }
+    }
+}
+</pre>
+
+<p>
+..and:
+</p>
+
+<pre swift>
+// Property version
+
+struct EditUserView: View {
+    // You receive the model object here
+    @Bindable var user: User
+
+    var body: some View {
+        Form {
+            TextField("Name", text: $user.name) // Two-way binding!
+        }
+    }
+}
+</pre>
+
+<div id="Where to add the Property Wrapper-ANSWER"><h2 id="ANSWER" class="header"><a href="#Where to add the Property Wrapper-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a classic "six of one, half a dozen of the other" situation. Both versions achieve the exact same result: they create a two-way binding so your <code>TextField</code> can update the <code>User</code> model.
+</p>
+
+<p>
+However, they differ in <span id="Where to add the Property Wrapper-ANSWER-where"></span><strong id="where">where</strong> the "binding power" is created and how the view is initialized.
+</p>
+
+<div id="Where to add the Property Wrapper-ANSWER-1. The &quot;Inline&quot; Version (Inside body)"><h3 id="1. The &quot;Inline&quot; Version (Inside body)" class="header"><a href="#Where to add the Property Wrapper-ANSWER-1. The &quot;Inline&quot; Version (Inside body)">1. The "Inline" Version (Inside body)</a></h3></div>
+
+<pre swift>
+struct EditUserView: View {
+    var user: User 
+
+    var body: some View {
+        @Bindable var user = user
+        // ...
+    }
+}
+</pre>
+
+<ul>
+<li>
+How it works: You receive a plain <code>User</code> object. Inside the <code>body</code> property, you "wrap" it in <code>@Bindable</code> right before you use it.
+
+<li>
+The Benefit: It keeps the struct’s initializer very simple. From the outside, you just pass in a <code>User</code>.
+
+<li>
+The Use Case: This is perfect when you receive an object from a <code>@Query</code> or a list and you only need it to be bindable for a specific part of the UI.
+
+</ul>
+<div id="Where to add the Property Wrapper-ANSWER-2. The &quot;Property&quot; Version (At the top)"><h3 id="2. The &quot;Property&quot; Version (At the top)" class="header"><a href="#Where to add the Property Wrapper-ANSWER-2. The &quot;Property&quot; Version (At the top)">2. The "Property" Version (At the top)</a></h3></div>
+
+<pre swift>
+struct EditUserView: View {
+    @Bindable var user: User 
+
+    var body: some View {
+        // ...
+    }
+}
+</pre>
+
+<ul>
+<li>
+How it works: You declare the property itself as <code>@Bindable</code>.
+
+<li>
+The Benefit: It’s cleaner and more concise. You don't have to redeclare the variable inside the <code>body</code>.
+
+<li>
+The Catch: This version is slightly more "opinionated" about how the view is created. Because the property is <code>@Bindable</code>, the view expects to be linked to an observable object from the moment it's born.
+
+</ul>
+<div id="Where to add the Property Wrapper-ANSWER-Which one should you use?"><h3 id="Which one should you use?" class="header"><a href="#Where to add the Property Wrapper-ANSWER-Which one should you use?">Which one should you use?</a></h3></div>
+
+<p>
+<span id="Where to add the Property Wrapper-ANSWER-Which one should you use?-Apple officially recommends the &quot;Inline&quot; version (Version 1)"></span><strong id="Apple officially recommends the &quot;Inline&quot; version (Version 1)">Apple officially recommends the "Inline" version (Version 1)</strong> in many of their newer tutorials.
+</p>
+
+<div id="Where to add the Property Wrapper-ANSWER-Which one should you use?-Here is why:"><h4 id="Here is why:" class="header"><a href="#Where to add the Property Wrapper-ANSWER-Which one should you use?-Here is why:">Here is why:</a></h4></div>
+
+<p>
+When you put <code>@Bindable</code> at the top level of the struct (Version 2), it can sometimes make the <span id="Where to add the Property Wrapper-ANSWER-Which one should you use?-Here is why:-Preview"></span><strong id="Preview">Preview</strong> and the <span id="Where to add the Property Wrapper-ANSWER-Which one should you use?-Here is why:-Initializer"></span><strong id="Initializer">Initializer</strong> a bit more finicky. By using the inline version, you are saying: <em>"I am receiving a User object. I am choosing to treat it as a bindable source specifically within this body."</em>
+</p>
+
+<div id="Where to add the Property Wrapper-ANSWER-Which one should you use?-The subtle technical difference:"><h4 id="The subtle technical difference:" class="header"><a href="#Where to add the Property Wrapper-ANSWER-Which one should you use?-The subtle technical difference:">The subtle technical difference:</a></h4></div>
+
+<ul>
+<li>
+Version 1 uses <code>@Bindable</code> as a Local Variable.
+
+<li>
+Version 2 uses <code>@Bindable</code> as a <span id="Where to add the Property Wrapper-ANSWER-Which one should you use?-The subtle technical difference:-Property Wrapper"></span><strong id="Property Wrapper">Property Wrapper</strong> for a stored property.
+
+</ul>
+<p>
+<span id="Where to add the Property Wrapper-ANSWER-Which one should you use?-The subtle technical difference:-The Verdict"></span><strong id="The Verdict">The Verdict</strong>: Stick with <span id="Where to add the Property Wrapper-ANSWER-Which one should you use?-The subtle technical difference:-Version 1"></span><strong id="Version 1">Version 1</strong> (the inline version). It’s more flexible, it’s what Paul Hudson typically uses in the later parts of <em>100 Days of SwiftUI</em>, and it avoids some rare but annoying initialization errors that can pop up with Version 2.
+</p>
+
+
+<div id="Where to add the Property Wrapper-ANSWER-Which one should you use?-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Where to add the Property Wrapper-ANSWER-Which one should you use?-Back to the tutorial">Back to the tutorial</a></h4></div>
+
+<p>
+<span id="Where to add the Property Wrapper-ANSWER-Which one should you use?-Back to the tutorial-Important"></span><strong id="Important">Important</strong>: If you want to use Xcode's previews with this, you need to pass a sample object in, which in turn means creating a custom configuration and container. First add an import for SwiftData, then change your preview to this:
 </p>
 
 <pre swift>
