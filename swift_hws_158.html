@@ -165,8 +165,107 @@ struct EditUserView: View {
 That's <em>identical</em> to how we used a regular <code>@Observable</code> class, and yet SwiftData still takes care of automatically writing out all our changes to permanent storage - it's completely transparent to us.
 </p>
 
+<div id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight">Ai Insight</a></h2></div>
+
 <p>
-<span id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-The Summary Analogy-Back to tutorial-Important"></span><strong id="Important">Important</strong>: If you want to use Xcode's previews with this, you need to pass a sample object in, which in turn means creating a custom configuration and container. First add an import for SwiftData, then change your preview to this:
+<code>@Bindable</code> is the bridge that allows you to create <span id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-two-way bindings"></span><strong id="two-way bindings">two-way bindings</strong> (like <code>$user.name</code>) for properties on classes that use <code>@Observable</code> or <code>@Model</code>.
+</p>
+
+<p>
+Here is the breakdown of why it exists and how it works:
+</p>
+
+<div id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-The &quot;Missing Link&quot;"><h3 id="The &quot;Missing Link&quot;" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-The &quot;Missing Link&quot;">The "Missing Link"</a></h3></div>
+
+<p>
+In the past, we used <code>@StateObject</code> or <code>@ObservedObject</code>, which provided bindings automatically. With the new <code>@Observable</code> and <code>@Model</code> systems, the objects are much simpler, but they don't automatically provide a way to "bind" a specific property to a UI element (like a <code>TextField</code> or Toggle).
+</p>
+
+<ul>
+<li>
+<code>@Observable</code> / <code>@Model</code> makes the class "visible" so the UI updates when data changes.
+
+<li>
+<code>@Bindable</code> creates the "pathway" for the UI to write data back into that class.
+
+</ul>
+<div id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-How to use it"><h3 id="How to use it" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-How to use it">How to use it</a></h3></div>
+
+<p>
+You typically use <code>@Bindable</code> inside a view when you've passed an object in, but you need to edit its properties.
+</p>
+
+<pre swift>
+struct EditUserView: View {
+    // You receive the model object here
+    var user: User 
+
+    var body: some View {
+        // You wrap it in @Bindable to get access to $ syntax
+        @Bindable var user = user
+        
+        Form {
+            TextField("Name", text: $user.name) // Two-way binding!
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Key Differences to Remember"><h3 id="Key Differences to Remember" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Key Differences to Remember">Key Differences to Remember</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Tool
+</th>
+<th>
+Purpose
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>@State</code>
+</td>
+<td>
+Used for simple local properties (Strings, Ints) or to <span id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Key Differences to Remember-initialize"></span><strong id="initialize">initialize</strong> an <code>@Observable</code> object for the first time.
+</td>
+</tr>
+<tr>
+<td>
+<code>@Bindable</code>
+</td>
+<td>
+Used to create bindings to an <span id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Key Differences to Remember-existing"></span><strong id="existing">existing</strong> object that was passed into the view.
+</td>
+</tr>
+<tr>
+<td>
+<code>@Query</code>
+</td>
+<td>
+Used specifically with <code>@Model</code> to fetch data from SwiftData.
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer"><h3 id="Why this is safer" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer">Why this is safer</a></h3></div>
+
+<p>
+Before <code>@Bindable</code>, we often had to use <code>@State</code> to hold temporary copies of data and then manually save them back to the class. Now, <code>@Bindable</code> lets you edit the class property directly. Because it is a <code>@Model</code> class, those changes are often picked up by the <span id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer-Model Context"></span><strong id="Model Context">Model Context</strong> immediately, keeping your database in sync with your typing.
+</p>
+
+<p>
+It’s essentially the "glue" that lets your <code>@Model</code> classes talk to your SwiftUI <code>TextFields</code>.
+</p>
+
+<div id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer-Back to the tutorial">Back to the tutorial</a></h4></div>
+
+<p>
+<span id="Hacking With Swift - 158 - Editing SwiftData model objects-Ai Insight-Why this is safer-Back to the tutorial-Important"></span><strong id="Important">Important</strong>: If you want to use Xcode's previews with this, you need to pass a sample object in, which in turn means creating a custom configuration and container. First add an import for SwiftData, then change your preview to this:
 </p>
 
 <pre swift>
