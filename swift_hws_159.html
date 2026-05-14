@@ -43,6 +43,10 @@ The syntax for this is a little odd at first, mostly because this is actually an
 Let's start with something simple, using the same <code>User</code> model we used previously:
 </p>
 
+<p>
+Existing <code>User.swift</code>:
+</p>
+
 <pre swift>
 @Model
 class User {
@@ -97,6 +101,86 @@ NavigationStack {
 <span id="Hacking With Swift - 159 - Filtering @Query using Predicate-Tip"></span><strong id="Tip">Tip</strong>: Those join dates represent some number of days in the past or future, which gives us some interesting data to work with.
 </p>
 
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+This is another technique to add data, by using an array for efficiency and cleaner more readable code:
+</p>
+
+<pre swift>
+Button("Add Sample", systemImage: "plus") {
+    // 1. Delete everything currently in the context
+    try? modelContext.delete(model: User.self)
+    
+    // 2. Create the samples
+    let samples = [
+        User(name: "Ed Sheeran", city: "London", joinDate: .now.addingTimeInterval(86400 * -10)),
+        User(name: "Rosa Diaz", city: "New York", joinDate: .now.addingTimeInterval(86400 * -5)),
+        User(name: "Roy Kent", city: "London", joinDate: .now.addingTimeInterval(86400 * 5)),
+        User(name: "Jonny English", city: "London", joinDate: .now.addingTimeInterval(86400 * 10))
+    ]
+    
+    // 3. Insert them
+    for user in samples {
+        modelContext.insert(user)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Why this approach is &quot;Swiftier&quot;"><h4 id="Why this approach is &quot;Swiftier&quot;" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Why this approach is &quot;Swiftier&quot;">Why this approach is "Swiftier"</a></h4></div>
+
+<p>
+By using <code>for user in samples { modelContext.insert(user) }</code>, you're utilizing what’s called <span id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Why this approach is &quot;Swiftier&quot;-Declarative Programming"></span><strong id="Declarative Programming">Declarative Programming</strong>. You’re not just throwing commands at the computer; you’re defining a clear set of data and then defining a clear action to take on that data.
+</p>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-A Quick Efficiency Tip"><h4 id="A Quick Efficiency Tip" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-A Quick Efficiency Tip">A Quick Efficiency Tip</a></h4></div>
+
+<p>
+Now that you’ve mastered the "Clear and Seed" approach, keep this in mind as your app grows:
+</p>
+
+<ul>
+<li>
+Small Data (like 4 users): Deleting and re-inserting is perfectly fine and near-instant.
+
+<li>
+Large Data (hundreds of users): If you ever find your app "stuttering" when you click that button, you can wrap your loop in a <code>modelContext.autosaveEnabled = false</code> block and then save manually at the end. This tells SwiftData to "hold its breath" and do all the work in one single transaction rather than four separate ones.
+
+</ul>
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Example"><h4 id="Example" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Example">Example</a></h4></div>
+
+<pre swift>
+Button("Add Sample", systemImage: "plus") {
+    // 1. Tell the context to stop saving automatically for a moment
+    modelContext.autosaveEnabled = false
+    
+    // 2. Delete everything currently in the context
+    try? modelContext.delete(model: User.self)
+    
+    // 3. Create the samples
+    let samples = [
+        User(name: "Ed Sheeran", city: "London", joinDate: .now.addingTimeInterval(86400 * -10)),
+        User(name: "Rosa Diaz", city: "New York", joinDate: .now.addingTimeInterval(86400 * -5)),
+        User(name: "Roy Kent", city: "London", joinDate: .now.addingTimeInterval(86400 * 5)),
+        User(name: "Jonny English", city: "London", joinDate: .now.addingTimeInterval(86400 * 10))
+    ]
+    
+    // 4. Insert them into the "scratchpad" (context)
+    for user in samples {
+        modelContext.insert(user)
+    }
+    
+    // 5. Manually commit all changes to the database at once
+    try? modelContext.save()
+    
+    // 6. Turn autosave back on for the rest of the app
+    modelContext.autosaveEnabled = true
+}
+</pre>
+
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Back to tutorial"><h4 id="Back to tutorial" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Back to tutorial">Back to tutorial</a></h4></div>
+
 <p>
 When working with sample data like this, it's helpful to be able to delete existing data before adding the sample data. To do that, add the following code before the <code>let first =</code> line:
 </p>
@@ -108,6 +192,22 @@ try? modelContext.delete(model: User.self)
 <p>
 That tells SwiftData to tell all existing model objects of the type <code>User</code>, which means the database is clear before we add the sample users.
 </p>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+The deleting code above is a bit flaky. It works with the Ai suggestion of using the array to build the users data, but fails on the original tutorial block. If you get a timing issue where the old stuff is re-saved with the new (effectively doubling up the users), this is a more robust looping technique:
+</p>
+
+<pre swift>
+    // Manually fetch all existing users and delete them one by one
+    // This is often more "reliable" for immediate UI refreshes
+    let existingUsers = users // This uses your @Query's current data
+    for user in existingUsers {
+        modelContext.delete(user)
+</pre>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Back to tutorial"><h4 id="Back to tutorial" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Ai Insight-Back to tutorial">Back to tutorial</a></h4></div>
 
 <p>
 To finish our little sample app, we just need to make sure the <code>App</code> struct uses the <code>modelContainer()</code> modifier to set up SwiftData correctly:
@@ -127,6 +227,8 @@ Now go ahead and run the app, then press the <code>+</code> button to insert fou
 <p>
 You can see they appear in alphabetical order, because that's what we asked for in our <code>@Query</code> property.
 </p>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Predicate Filter"><h2 id="Predicate Filter" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Predicate Filter">Predicate Filter</a></h2></div>
 
 <p>
 Now let's try filtering that data, so that we only show users whose name contains a capital R. To do this we pass a <code>filter</code> parameter into <code>@Query</code>, like this:
@@ -197,6 +299,8 @@ That uses Swift's "logical and" operator, which means both sides of the conditio
 <p>
 If we only had the first check for the letter R, then Ed, Rosa, and Roy would match. If we only had the second check for living in London, then Ed, Roy, and Johnny would match. Putting <em>both</em> together means that only Ed and Roy match, because they are the only two with an R somewhere in their name who also live in London.
 </p>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Using Nested Conditions and Potential Predicate Macro Issues"><h2 id="Using Nested Conditions and Potential Predicate Macro Issues" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Using Nested Conditions and Potential Predicate Macro Issues">Using Nested Conditions and Potential Predicate Macro Issues</a></h2></div>
 
 <p>
 You can add more and more checks like this, but using <code>&amp;&amp;</code> gets a bit confusing. Fortunately, these predicates support a limited subset of Swift expressions that make reading a little easier.
