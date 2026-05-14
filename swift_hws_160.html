@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_160</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_159.html">Hacking With Swift - 159 - Filtering @Query using Predicate</a>
+
+</ul>
+<div id="Hacking With Swift - 160 - Dynamically sorting and filtering @Query with SwiftUI"><h1 id="Hacking With Swift - 160 - Dynamically sorting and filtering @Query with SwiftUI" class="header"><a href="#Hacking With Swift - 160 - Dynamically sorting and filtering @Query with SwiftUI">Hacking With Swift - 160 - Dynamically sorting and filtering @Query with SwiftUI</a></h1></div>
+
+<p>
+Now that you've seen a little of how SwiftData's <code>#Predicate</code> works, the next question you're likely to have is "how can I make it work with user input?" The answer is… it's complicated. I'll show you how it's done, and also how the same technique can be used to dynamically adjust sorting, but it's going to take you a little while to remember how it's done – hopefully Apple can improve this in the future!
+</p>
+
+<p>
+If we build on the previous SwiftData code we looked at, each user object had a different <code>joinDate</code> property, some in the past and some in the future. We also had a <code>List</code> showing the results of a query:
+</p>
+
+<pre swift>
+List(users) { user in
+    Text(user.name)
+}
+</pre>
+
+<p>
+What we're going to do is move that list out into a separate view – a view specifically for running the SwiftData query and showing its results, then make it optionally show all users or only users who are joining in the future.
+</p>
+
+<p>
+So, create a new SwiftUI view call <code>UsersView</code>, give it a SwiftData import, then move the <code>List</code> code there without moving any of its modifier – just the code shown above.
+</p>
+
+<p>
+Now that we're displaying SwiftData results in <code>UsersView</code>, we need to add an <code>@Query</code> property there. This should not use a sort order or predicate – at least not yet. So, add this property there:
+</p>
+
+<pre swift>
+@Query var users: [User]
+</pre>
+
+<p>
+And once you add a <code>modelContainer()</code> modifier to the preview, your <code>UsersView.swift</code> code should look like this:
+</p>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct UsersView: View {
+    @Query var users: [User]
+
+    var body: some View {
+        List(users) { user in
+            Text(user.name)
+        }
+    }
+}
+
+#Preview {
+    UsersView()
+        .modelContainer(for: User.self)
+}
+</pre>
+
+<p>
+Before we're done with this view, we need a way to customize the query that gets run. As things stand, just using <code>@Query var users: [User]</code> means SwiftData will load all the users with no filter or sort order, but really we want to customize one or both of those from <code>ContentView</code> – we want to pass in some data.
+</p>
+
+<p>
+This is best done by passing a value into the view using an initializer, then using that to create the query. As I said earlier, our goal is to either show all users, or just show users who are joining in the future. So, we'll accomplish that by passing in a minimum join date, and ensuring that all users join at least after that date.
+</p>
+
+<p>
+Add this initializer to <code>UsersView</code> now:
+</p>
+
+<pre swift>
+init(minimumJoinDate: Date) {
+    _users = Query(filter: #Predicate&lt;User&gt; { user in
+        user.joinDate &gt;= minimumJoinDate
+    }, sort: \User.name)
+}
+</pre>
+
+<p>
+That's <em>mostly</em> code you're used to, but notice that there's an underscore before <code>users</code>. That's intentional: we aren't trying to change the User array, we're trying to change the SwiftData query that produces the array. The underscore is Swift's way of getting access to that query, which means we're creating the query from whatever date gets passed in.
+</p>
+
+<p>
+At this point we're done with <code>UsersView</code>, so now back in <code>ContentView</code> we need to delete the existing <code>@Query</code> property and replace it with code to toggle some kind of Boolean, and pass its current value into <code>UsersView</code>.
+</p>
+
+<p>
+First, add this new <code>@State</code> property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var showingUpcomingOnly = false
+</pre>
+
+<p>
+And now replace the <code>List</code> code in <code>ContentView</code> – again, not including its modifiers – with this:
+</p>
+
+<pre swift>
+UsersView(minimumJoinDate: showingUpcomingOnly ? .now : .distantPast)
+</pre>
+
+<p>
+That passes one of two dates into <code>UsersView</code>: when our Boolean property is true we pass in <code>.now</code> so that we only show users who will join after the current time, otherwise we pass in <code>.distantPast</code>, which is at least 2000 years in the past – unless our users include some Roman emperors, they will all have join dates well after this and so all users will be shown.
+</p>
+
+<p>
+All that remains now is to add a way to toggle that Boolean inside <code>ContentView</code> – add this to the <code>ContentView</code> toolbar:
+</p>
+
+<pre swift>
+Button(showingUpcomingOnly ? "Show Everyone" : "Show Upcoming") {
+    showingUpcomingOnly.toggle()
+}
+</pre>
+
+<p>
+That changes the button's label so that it always reflect what happens when it's next pressed.
+</p>
+
+<p>
+That completes all the work, so if you run the app now you'll see you can change the list of users dynamically.
+</p>
+
+<p>
+Yes, it's quite a bit of work, but as you can see it works brilliantly and you can apply the same technique to other kinds of filtering too.
+</p>
+
+<p>
+This same approach works equally well with sorting data: we can control an array of sort descriptors in <code>ContentView</code>, then pass them into the initializer of <code>UsersView</code> to have them adjust the query.
+</p>
+
+<p>
+First, we need to upgrade the <code>UsersView</code> initializer so that it accepts some kind of sort descriptor for our <code>User</code> class. This uses Swift's generics again: the <code>SortDescriptor</code> type needs to know what it's sorting, so we need to specify <code>User</code> inside angle brackets.
+</p>
+
+<p>
+Modify the <code>UsersView</code> initializer to this:
+</p>
+
+<pre swift>
+init(minimumJoinDate: Date, sortOrder: [SortDescriptor&lt;User&gt;]) {
+    _users = Query(filter: #Predicate&lt;User&gt; { user in
+        user.joinDate &gt;= minimumJoinDate
+    }, sort: sortOrder)
+}
+</pre>
+
+<p>
+You'll also need to update your preview code to pass in a sample sort order, so that your code compiles properly:
+</p>
+
+<pre swift>
+UsersView(minimumJoinDate: .now, sortOrder: [SortDescriptor(\User.name)])
+    .modelContainer(for: User.self)
+</pre>
+
+<p>
+Back in <code>ContentView</code> we another new property to store the current sort order. We'll make this use name then join date, which seems like a sensible default:
+</p>
+
+<pre swift>
+@State private var sortOrder = [
+    SortDescriptor(\User.name),
+    SortDescriptor(\User.joinDate),
+]
+</pre>
+
+<p>
+We can then pass that into <code>UsersView</code> just like we did with the join date:
+</p>
+
+<pre swift>
+UsersView(minimumJoinDate: showingUpcomingOnly ? .now : .distantPast, sortOrder: sortOrder)
+</pre>
+
+<p>
+And finally we need a way to adjust that array dynamically. One option is to use a <code>Picker</code> showing two options: Sort by Name, and Sort by Join Date. That in itself isn't tricky, but how do we attach a <code>SortDescriptor</code> array to each option?
+</p>
+
+<p>
+The answer lies in a useful modifier called <code>tag()</code>, which lets us attach specific values of our choosing to each picker option. Here that means we can literally make the tag of each option its own <code>SortDescriptor</code> array, and SwiftUI will assign that tag to the <code>sortOrder</code> property automatically.
+</p>
+
+<p>
+Try adding this to the toolbar:
+</p>
+
+<pre swift>
+Picker("Sort", selection: $sortOrder) {
+    Text("Sort by Name")
+        .tag([
+            SortDescriptor(\User.name),
+            SortDescriptor(\User.joinDate),
+        ])
+
+    Text("Sort by Join Date")
+        .tag([
+            SortDescriptor(\User.joinDate),
+            SortDescriptor(\User.name)
+        ])
+}
+</pre>
+
+<p>
+When you run the app now, chances are you won't see what you expected. Depending on which device you're using, rather than showing "Sort" as a menu with options inside, you'll either see:
+</p>
+
+<ul>
+<li>
+Three dots in a circle, and pressing that reveals the options.
+
+<li>
+"Sort by Name" shown directly in the navigation bar, and tapping that lets you change to Join Date.
+
+</ul>
+<p>
+Both options aren't great, but I want to use this chance to introduce another useful SwiftUI view called <code>Menu</code>. This lets you create menus in the navigation bar, and you can place buttons, pickers, and more inside there.
+</p>
+
+<p>
+In this case, if we wrap our current <code>Picker</code> code with a <code>Menu</code>, we'll get a much better result. Try this:
+</p>
+
+<pre swift>
+Menu("Sort", systemImage: "arrow.up.arrow.down") {
+    // current picker code
+}
+</pre>
+
+<p>
+Try it again and you'll see it's much better, and more important both our dynamic filtering and sorting now work great!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
