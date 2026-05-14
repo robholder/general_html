@@ -307,7 +307,7 @@ You can add more and more checks like this, but using <code>&amp;&amp;</code> ge
 </p>
 
 <p>
-For example, we could rewrite our current predicate to this:
+For example, we could rewrite our current predicate to this (note the <code>else</code> for each of the <code>if</code> conditionals):
 </p>
 
 <pre swift>
@@ -333,6 +333,7 @@ Here's how that would look:
 </p>
 
 <pre swift>
+// THIS WILL NOT WORK
 @Query(filter: #Predicate&lt;User&gt; { user in
     if user.name.localizedStandardContains("R") {
         if user.city == "London" {
@@ -354,6 +355,67 @@ To see what's happening internally, press undo a few times to get the original v
 
 <p>
 So, that's just a little of how <code>#Predicate</code> works, and why some predicates you might try just don't quite work how you expect - this stuff looks easy, but it's really complex behind the scenes!
+</p>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Using Nested Conditions and Potential Predicate Macro Issues-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Using Nested Conditions and Potential Predicate Macro Issues-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 159 - Filtering @Query using Predicate-Using Nested Conditions and Potential Predicate Macro Issues-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 159 - Filtering @Query using Predicate-Using Nested Conditions and Potential Predicate Macro Issues-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ContentView: View {
+    
+    @Environment(\.modelContext) var modelContext
+    //@Query(sort: \User.name) var users: [User]
+    @Query(filter: #Predicate&lt;User&gt; { user in
+        if user.name.localizedStandardContains("R") {
+            if user.city == "London" {
+                return true
+            } else {
+                return false
+            }
+        } else {
+            return false
+        }
+    }, sort: \User.name) var users: [User]
+
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                    Text(user.name)
+            }
+            .navigationTitle("Users")
+            .toolbar {
+                Button("Add Sample", systemImage: "plus") {
+                    // 1. Delete everything currently in the context
+                    try? modelContext.delete(model: User.self)
+                    
+                    // 2. Create the samples
+                    let samples = [
+                        User(name: "Ed Sheeran", city: "London", joinDate: .now.addingTimeInterval(86400 * -10)),
+                        User(name: "Rosa Diaz", city: "New York", joinDate: .now.addingTimeInterval(86400 * -5)),
+                        User(name: "Roy Kent", city: "London", joinDate: .now.addingTimeInterval(86400 * 5)),
+                        User(name: "Jonny English", city: "London", joinDate: .now.addingTimeInterval(86400 * 10))
+                    ]
+                    
+                    // 3. Insert them
+                    for user in samples {
+                        modelContext.insert(user)
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
 <hr>
 <br>
 </p>
