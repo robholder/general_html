@@ -313,7 +313,7 @@ There is <em>one</em> small catch, though, and it's worth covering before we mov
 The answer is that all their jobs remain intact - they <em>don't</em> get deleted. This is a smart move from SwiftData, because you don't get any surprise data loss.
 </p>
 
-<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship"><h2 id="@Relationship" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship">@Relationship</a></h2></div>
+<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)"><h2 id="@Relationship(deleteRule: .cascade)" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)">@Relationship(deleteRule: .cascade)</a></h2></div>
 
 <p>
 If you specifically <em>want</em> all a user's job objects to be deleted at the same time, we need to tell SwiftData that. This is done using an <code>@Relationship</code> macro, providing it with a delete rule that describes how <code>Job</code> objects should be handled when their owning <code>User</code> is deleted.
@@ -338,6 +338,183 @@ So, change the <code>jobs</code> property in <code>User</code> to this:
 <p>
 And now we're being explicit, which means we don't leave any hidden <code>Job</code> objects around when deleting a user - much better!
 </p>
+
+<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-SwiftDataProjectApp.swift"><h4 id="SwiftDataProjectApp.swift" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-SwiftDataProjectApp.swift">SwiftDataProjectApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@main
+struct SwiftDataProjectApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // This links to User, and automatically links to Jobs
+        .modelContainer(for: User.self)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-Job.swift"><h4 id="Job.swift" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-Job.swift">Job.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+class Job {
+    var name: String
+    var priority: Int
+    // Here's the Optional referring DIRECTLY to the User model/class
+    var ownder: User?
+    
+    // Initializer: Assigning 'nil' to User?
+    init(name: String, priority: Int, owner: User? = nil) {
+        self.name = name
+        self.priority = priority
+        self.ownder = owner
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-User.swift"><h4 id="User.swift" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-User.swift">User.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import Foundation
+
+@Model
+class User {
+    var name: String
+    var city: String
+    var joinDate: Date
+    var jobs = [Job]()
+    
+    init(name: String, city: String, joinDate: Date) {
+        self.name = name
+        self.city = city
+        self.joinDate = joinDate
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-UsersView.swift"><h4 id="UsersView.swift" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-UsersView.swift">UsersView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct UsersView: View {
+    //Add sample data
+    @Environment(\.modelContext) var modelContext
+    @Query var users: [User]
+    
+    var body: some View {
+        List(users) { user in
+            HStack {
+                Text(user.name)
+                Spacer()
+                // Show number of jobs for each user
+                Text(String(user.jobs.count))
+                    .fontWeight(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.blue)
+                    .foregroundStyle(.white)
+                    .clipShape(.capsule)
+            }
+        }
+        // Add our sample data (Piper Chapman) on launch
+        .onAppear(perform: addSample)
+    }
+    init(minimumJoinDate: Date, sortOrder: [SortDescriptor&lt;User&gt;]) {
+        _users = Query(filter: #Predicate&lt;User&gt; { user in
+            user.joinDate &gt;= minimumJoinDate
+        }, sort: sortOrder)
+    }
+    func addSample() {
+        let user1 = User(name: "Piper Chapman", city: "New York", joinDate: .now)
+        let job1 = Job(name: "Organize sock drawer", priority: 3)
+        let job2 = Job(name: "Make plans with Alex", priority: 4)
+        
+        modelContext.insert(user1)
+        
+        user1.jobs.append(job1)
+        user1.jobs.append(job2)
+    }
+}
+
+#Preview {
+    UsersView(minimumJoinDate: .now, sortOrder: [SortDescriptor(\User.name)])
+        .modelContainer(for: User.self)
+}
+</pre>
+
+<div id="Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query-@Relationship(deleteRule: .cascade)-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ContentView: View {
+    
+    @Environment(\.modelContext) var modelContext
+    @State private var showingUpcomingOnly = false
+    @State private var sortOrder = [
+        SortDescriptor(\User.name),
+        SortDescriptor(\User.joinDate)
+    ]
+    
+
+    var body: some View {
+        NavigationStack {
+            UsersView(minimumJoinDate: showingUpcomingOnly ? .now : .distantPast, sortOrder: sortOrder)
+                .navigationTitle("Users")
+                .toolbar {
+                    Button("Add Sample", systemImage: "plus") {
+                        try? modelContext.save()
+                        try? modelContext.delete(model: User.self)
+
+                        let first = User(name: "Ed Sheeran", city: "London", joinDate: .now.addingTimeInterval(86400 * -10))
+                        let second = User(name: "Rosa Diaz", city: "New York", joinDate: .now.addingTimeInterval(86400 * -5))
+                        let third = User(name: "Roy Kent", city: "London", joinDate: .now.addingTimeInterval(86400 * 5))
+                        let fourth = User(name: "Jonny English", city: "London", joinDate: .now.addingTimeInterval(86400 * 10))
+                        
+                        modelContext.insert(first)
+                        modelContext.insert(second)
+                        modelContext.insert(third)
+                        modelContext.insert(fourth)
+                    }
+                    Button(showingUpcomingOnly ? "Show Everyone" : "Show Upcoming") {
+                        showingUpcomingOnly.toggle()
+                    }
+                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                        Picker("Sort", selection: $sortOrder) {
+                            Text("Sort by Name")
+                                .tag([
+                                    SortDescriptor(\User.name),
+                                    SortDescriptor(\User.joinDate),
+                                ])
+                            Text("Sort by Join Date")
+                                .tag([
+                                    SortDescriptor(\User.joinDate),
+                                    SortDescriptor(\User.name)
+                                ])
+                        }
+                    }
+                }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <hr>
