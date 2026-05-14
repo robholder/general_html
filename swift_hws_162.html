@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_162</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_161.html">Hacking With Swift - 161 - Relationships with SwiftData, SwiftUI and @Query</a>
+
+</ul>
+<div id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit"><h1 id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit" class="header"><a href="#Hacking With Swift - 162 - Syncing SwiftData with CloudKit">Hacking With Swift - 162 - Syncing SwiftData with CloudKit</a></h1></div>
+
+<p>
+SwiftData can sync all your user's data with iCloud, and best of all it often takes absolutely no code.
+</p>
+
+<div id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-Active Apple Developer Account"><h2 id="Active Apple Developer Account" class="header"><a href="#Hacking With Swift - 162 - Syncing SwiftData with CloudKit-Active Apple Developer Account">Active Apple Developer Account</a></h2></div>
+
+<p>
+Before you start, there's an important warning: syncing data to iCloud requires an active Apple developer account. If you don't have one, the following will not work.
+</p>
+
+<p>
+Still here? Okay, in order to sync data from local SwiftData storage up to iCloud, you need to enable the iCloud capability for your app. We haven't customized our app capabilities before, so this step is new.
+</p>
+
+<p>
+First, click the "SwiftDataTest" app icon at the top of your project navigator. This should be directly above the SwiftDataTest group.
+</p>
+
+<p>
+Second, select "SwiftDataTest" under the "TARGETS" list. You should see a bunch of tabs appear: General, Signing &amp; Capabilities, Resource Tags, Info, and more. We want Signing &amp; Capabilities, so please select that now.
+</p>
+
+<p>
+Third, press "+ CAPABILITY" and select iCloud, which should make iCloud appear in the list of active capabilities – you'll see three services are possible, a "CloudKit Console" button, and more.
+</p>
+
+<p>
+Fourth, check the box marked CloudKit, which is what allows our app to store SwiftData information in iCloud. You'll also need to press the + button to add a new CloudKit container, which configures where the data is actually stored in iCloud. You should use your app's bundle ID prefix with "iCloud." here, for example iCloud.com.hackingwithswift.swiftdatatest.
+</p>
+
+<p>
+Fifth, press "+ CAPABILITY" again, then add the Background Modes capability. This has a whole bunch of configuration options, but you only need to check the "Remote Notifications" box – that allows the app to be notified when data changes in iCloud, so it can be synchronized locally.
+</p>
+
+<p>
+And that's it – your app is all set to use iCloud for synchronizing SwiftData.
+</p>
+
+<p>
+<em>Perhaps</em>.
+</p>
+
+<p>
+You see, SwiftData with iCloud has a requirement that local SwiftData does not: all properties must be optional or have default values, and all relationship must be optional. The first of those is a small annoyance, but the second is a much bigger annoyance – it can be quite disruptive for your code.
+</p>
+
+<p>
+However, they are requirements and not merely suggestions. So, in the case of <code>Job</code> we'd need to adjust its properties to this:
+</p>
+
+<pre swift>
+var name: String = "None"
+var priority: Int = 1
+var owner: User?
+</pre>
+
+<p>
+And for User, we'd need to use this:
+</p>
+
+<pre swift>
+var name: String = "Anonymous"
+var city: String = "Unknown"
+var joinDate: Date = Date.now
+@Relationship(deleteRule: .cascade) var jobs: [Job]? = [Job]()
+</pre>
+
+<p>
+<span id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-Active Apple Developer Account-Important"></span><strong id="Important">Important</strong>: If you don't make these changes, iCloud will simply not work. If you look through Xcode's log – and CloudKit loves to write to Xcode's log – and scroll near the very top, SwiftData should try to warn you when any properties have stopped iCloud syncing from working correctly.
+</p>
+
+<p>
+Once you've adjusted your models, you now need to change any code to handle the optionality correctly. For example, adding jobs to a user might use optional chaining like this:
+</p>
+
+<pre swift>
+user1.jobs?.append(job1)
+user1.jobs?.append(job2)
+</pre>
+
+<p>
+And reading the count of a user's jobs might use optional chaining and nil coalescing, like this:
+</p>
+
+<pre swift>
+Text(String(user.jobs?.count ?? 0))
+</pre>
+
+<p>
+I'm not a particularly big fan of scattering that kind of code everywhere around a project, so if I'm using jobs regularly I'd much rather create a read-only computed property called <code>unwrappedJobs</code> or similar – something that either returns <code>jobs</code> if it has a value, or an empty array otherwise, like this:
+</p>
+
+<pre swift>
+var unwrappedJobs: [Job] {
+    jobs ?? []
+}
+</pre>
+
+<p>
+It's a small thing, but it does help smooth over the rest of your code, and making it read-only prevents you trying to change a missing array by accident.
+</p>
+
+<p>
+<span id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-Active Apple Developer Account-Important"></span><strong id="Important">Important</strong>: Although the simulator is created at testing local SwiftData applications, it's pretty terrible at testing iCloud – you might find your data isn't synchronized correctly, quickly, or even at all. Please use a real device to avoid problems!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
