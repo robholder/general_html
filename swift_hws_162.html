@@ -182,6 +182,120 @@ It's a small thing, but it does help smooth over the rest of your code, and maki
 <span id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-Important"></span><strong id="Important">Important</strong>: Although the simulator is great at testing local SwiftData applications, it's pretty terrible at testing iCloud. You might find your data isn't synchronized correctly, quickly, or even at all. Please use a real device to avoid problems!
 </p>
 
+<div id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context-Job.swift"><h4 id="Job.swift" class="header"><a href="#Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context-Job.swift">Job.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+class Job {
+    // These need default assignments for compatibilty with iCloud storage:
+    //var name: String
+    var name: String = "None"
+    //var priority: Int
+    var priority: Int = 1
+    // Here's the Optional referring DIRECTLY to the User model/class
+    // (It's already fine with iCloud - it's an optional)
+    var ownder: User?
+    
+    // Initializer: Assigning 'nil' to User?
+    init(name: String, priority: Int, owner: User? = nil) {
+        self.name = name
+        self.priority = priority
+        self.ownder = owner
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context-User.swift"><h4 id="User.swift" class="header"><a href="#Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context-User.swift">User.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import Foundation
+
+@Model
+class User {
+    // We need default assignments for iCloud compatibility
+    var name: String = "Anonymous"
+    var city: String = "Unknown"
+    var joinDate: Date = Date.now
+    // We have to make jobs an optional
+    @Relationship(deleteRule: .cascade) var jobs: [Job]? = [Job]()
+    
+    // For iCloud compatibility
+    var unwrappedJobs: [Job] {
+        jobs ?? []
+    }
+    
+    init(name: String, city: String, joinDate: Date) {
+        self.name = name
+        self.city = city
+        self.joinDate = joinDate
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context-UsersView.swift"><h4 id="UsersView.swift" class="header"><a href="#Hacking With Swift - 162 - Syncing SwiftData with CloudKit-iCloud Requirements-In Context-UsersView.swift">UsersView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct UsersView: View {
+    //Add sample data
+    @Environment(\.modelContext) var modelContext
+    @Query var users: [User]
+    
+    var body: some View {
+        List(users) { user in
+            HStack {
+                Text(user.name)
+                Spacer()
+                // Show number of jobs for each user
+                // Make optional for iCloud
+                // this...
+                //Text(String(user.jobs?.count ?? 0))
+                // or, using the computed property in User...
+                Text(String(user.unwrappedJobs.count))
+                    .fontWeight(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.blue)
+                    .foregroundStyle(.white)
+                    .clipShape(.capsule)
+            }
+        }
+        // Add our sample data (Piper Chapman) on launch
+        .onAppear(perform: addSample)
+    }
+    init(minimumJoinDate: Date, sortOrder: [SortDescriptor&lt;User&gt;]) {
+        _users = Query(filter: #Predicate&lt;User&gt; { user in
+            user.joinDate &gt;= minimumJoinDate
+        }, sort: sortOrder)
+    }
+    func addSample() {
+        let user1 = User(name: "Piper Chapman", city: "New York", joinDate: .now)
+        let job1 = Job(name: "Organize sock drawer", priority: 3)
+        let job2 = Job(name: "Make plans with Alex", priority: 4)
+        
+        modelContext.insert(user1)
+        
+        // For iCloud optionals conformance, we need optionals
+        user1.jobs?.append(job1)
+        user1.jobs?.append(job2)
+    }
+}
+
+#Preview {
+    UsersView(minimumJoinDate: .now, sortOrder: [SortDescriptor(\User.name)])
+        .modelContainer(for: User.self)
+}
+</pre>
+
+
 <p>
 <hr>
 <br>
