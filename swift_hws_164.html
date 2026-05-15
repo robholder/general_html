@@ -198,13 +198,69 @@ More Performant: Instead of loading a massive JSON blob of all expenses into mem
 Cleaner: You traded complex data cycle management for declarative macros (<code>@Model</code>, <code>@Query</code>).
 
 </ul>
-<div id="What Challenge 1 involved-In Context"><h3 id="In Context" class="header"><a href="#What Challenge 1 involved-In Context">In Context</a></h3></div>
+<div id="What Challenge 1 involved-More on modelContext"><h2 id="More on modelContext" class="header"><a href="#What Challenge 1 involved-More on modelContext">More on modelContext</a></h2></div>
 
-<div id="What Challenge 1 involved-In Context-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#What Challenge 1 involved-In Context-AddView.swift">AddView.swift</a></h4></div>
+<p>
+The environment's <code>modelContext</code> exists specifically because you attached the <code>.modelContainer</code> modifier at the root of your app.
+</p>
+
+<p>
+Here is exactly how those two pieces connect behind the scenes.
+</p>
+
+<div id="What Challenge 1 involved-More on modelContext-The Core Concept: The &quot;Bucket&quot; Metaphor"><h3 id="The Core Concept: The &quot;Bucket&quot; Metaphor" class="header"><a href="#What Challenge 1 involved-More on modelContext-The Core Concept: The &quot;Bucket&quot; Metaphor">The Core Concept: The "Bucket" Metaphor</a></h3></div>
+
+<p>
+Think of the SwiftUI <span id="What Challenge 1 involved-More on modelContext-The Core Concept: The &quot;Bucket&quot; Metaphor-Environment"></span><strong id="Environment">Environment</strong> as a massive, invisible bucket that hovers over your entire application. Any view in your app can reach up into this bucket and pull out tools it needs.
+</p>
+
+<p>
+When you add <code>.modelContainer(for: ExpenseItem.self)</code> to your root <code>WindowGroup</code>, SwiftData automatically creates two things for you:
+</p>
+
+<ul>
+<li>
+The Model Container (The Database): The actual SQLite database on the device's hard drive.
+
+<li>
+The Model Context (The Data Manager): A smart workspace that reads, inserts, and deletes data in memory before saving it back to the database.
+
+</ul>
+<p>
+The <code>.modelContainer</code> modifier takes that <span id="What Challenge 1 involved-More on modelContext-The Core Concept: The &quot;Bucket&quot; Metaphor-Model Context"></span><strong id="Model Context">Model Context</strong> and tosses it right into the SwiftUI Environment bucket.
+</p>
+
+<div id="What Challenge 1 involved-More on modelContext-Tracking the Flow"><h3 id="Tracking the Flow" class="header"><a href="#What Challenge 1 involved-More on modelContext-Tracking the Flow">Tracking the Flow</a></h3></div>
+
+<p>
+Because it's in the environment bucket at the very top of your app, it cascades down to every single subview automatically.
+</p>
+
+<pre text>
+iExpensesApp (Root)
+   │ 
+   ├──&gt; .modelContainer(...)  ──&gt; [Places modelContext into the Environment]
+   │
+   ├──&gt; ContentView()             
+   │       │
+   │       └──&gt; [Pulls modelContext out using @Environment]
+   │
+   └──&gt; AddView()
+           │
+           └──&gt; [Pulls modelContext out using @Environment]
+</pre>
+
+<p>
+When you write <code>@Environment(\.modelContext) var modelContext</code> inside <code>AddView</code> or <code>ContentView</code>, you are telling SwiftUI: <em>"Hey, look inside the environment bucket, find the SwiftData context that our App struct put in there, and let me use it."</em>
+</p>
+
+<div id="What Challenge 1 involved-More on modelContext-In Context"><h3 id="In Context" class="header"><a href="#What Challenge 1 involved-More on modelContext-In Context">In Context</a></h3></div>
 
 <p>
 Open page so that it's very wide on the screen (to reveal comparison of code):
 </p>
+
+<div id="What Challenge 1 involved-More on modelContext-In Context-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#What Challenge 1 involved-More on modelContext-In Context-AddView.swift">AddView.swift</a></h4></div>
 
 <pre swift>
 import SwiftUI                                                                                  import SwiftUI                                                                         
@@ -265,7 +321,7 @@ struct AddView: View {                                                          
 }                                                                                               }                                                                                      
 </pre>
 
-<div id="What Challenge 1 involved-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#What Challenge 1 involved-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+<div id="What Challenge 1 involved-More on modelContext-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#What Challenge 1 involved-More on modelContext-In Context-ContentView.swift">ContentView.swift</a></h4></div>
 
 <pre swift>
 import SwiftUI                                                                                           import SwiftUI                                                                               
@@ -396,7 +452,7 @@ struct ContentView: View {                                                      
 }                                                                                                        }                                                                                            
 </pre>
 
-<div id="What Challenge 1 involved-In Context-iExpenseApp.swift"><h4 id="iExpenseApp.swift" class="header"><a href="#What Challenge 1 involved-In Context-iExpenseApp.swift">iExpenseApp.swift</a></h4></div>
+<div id="What Challenge 1 involved-More on modelContext-In Context-iExpenseApp.swift"><h4 id="iExpenseApp.swift" class="header"><a href="#What Challenge 1 involved-More on modelContext-In Context-iExpenseApp.swift">iExpenseApp.swift</a></h4></div>
 
 <pre swift>
 import SwiftUI                      import SwiftUI                                                          
