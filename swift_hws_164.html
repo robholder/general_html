@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_164</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_163.html">Hacking With Swift - 163 - SwiftData: Wrap up</a>
+
+</ul>
+<div id="Hacking With Swift - 164 - Challenge 1 Comparison"><h1 id="Hacking With Swift - 164 - Challenge 1 Comparison" class="header"><a href="#Hacking With Swift - 164 - Challenge 1 Comparison">Hacking With Swift - 164 - Challenge 1 Comparison</a></h1></div>
+
+<div id="What Challenge 1 involved"><h1 id="What Challenge 1 involved" class="header"><a href="#What Challenge 1 involved">What Challenge 1 involved</a></h1></div>
+
+<p>
+The transition you've just made is a classic modernization step in iOS development. You went from <span id="What Challenge 1 involved-manually managing a file-based cache (UserDefaults) to using a declarative, schema-driven database engine (SwiftData)."></span><strong id="manually managing a file-based cache (UserDefaults) to using a declarative, schema-driven database engine (SwiftData).">manually managing a file-based cache (UserDefaults) to using a declarative, schema-driven database engine (SwiftData).</strong>
+</p>
+
+<p>
+Because SwiftData integrates natively with SwiftUI's architecture, you ended up deleting a massive amount of "boilerplate" management code.
+</p>
+
+<p>
+Here is the structural breakdown of exactly what changed and why.
+</p>
+
+<div id="What Challenge 1 involved-1. Data Model: From Plain Data to Database Managed"><h3 id="1. Data Model: From Plain Data to Database Managed" class="header"><a href="#What Challenge 1 involved-1. Data Model: From Plain Data to Database Managed">1. Data Model: From Plain Data to Database Managed</a></h3></div>
+
+<p>
+In your original approach, <code>ExpenseItem</code> was a lightweight structure. Because <code>UserDefaults</code> doesn't natively understand custom objects, you had to conform it to <code>Codable</code> to manually serialize it into JSON. You also had to manually generate a <code>UUID()</code>.
+</p>
+
+<div id="What Challenge 1 involved-1. Data Model: From Plain Data to Database Managed-The Core Shift:"><h4 id="The Core Shift:" class="header"><a href="#What Challenge 1 involved-1. Data Model: From Plain Data to Database Managed-The Core Shift:">The Core Shift:</a></h4></div>
+
+<pre text>
+Old: struct ExpenseItem: Identifiable, Codable { ... }
+New: @Model class ExpenseItem { ... }
+</pre>
+
+<ul>
+<li>
+The <code>@Model</code> <span id="What Challenge 1 involved-1. Data Model: From Plain Data to Database Managed-The Core Shift:-macro"></span><strong id="macro">macro</strong> turns your simple Swift class into a persistent database schema. <code>SwiftData</code> now implicitly manages the database identity, tracking, and columns for you.
+
+<li>
+Why <code>Identifiable</code> and <code>Codable</code> vanished: <code>@Model</code> automatically conforms your class to <code>Identifiable</code> under the hood. It also handles database migrations natively, completely eliminating the need for <code>Codable</code> JSON serialization.
+
+</ul>
+<div id="What Challenge 1 involved-2. Architecture: Deleting the Middleware"><h3 id="2. Architecture: Deleting the Middleware" class="header"><a href="#What Challenge 1 involved-2. Architecture: Deleting the Middleware">2. Architecture: Deleting the Middleware</a></h3></div>
+
+<p>
+The most dramatic change in your codebase is the complete disappearance of the <code>@Observable class Expenses</code>.
+</p>
+
+<p>
+In your old architecture, you had to build a custom "middleman" class to watch over your data. It had a dirty flag (<code>didSet</code>) that triggered a manual re-write to disk every single time an item was added or deleted.
+</p>
+
+<pre text>
+               OLD METHOD (Manual Pipeline)
+[Data Object] ──&gt; [JSON Encoder] ──&gt; [UserDefaults Storage]
+
+               NEW METHOD (Direct Pipeline)
+[Data Object] ──────────────────────&gt; [@Model Context Engine]
+</pre>
+
+<p>
+<code>SwiftData</code> completely removes the need for this manager. Instead of writing custom encoding/decoding loops, you initialize the entire infrastructure with a single line at the root of your application (<code>iExpensesApp.swift</code>):
+</p>
+
+<pre swift>
+.modelContainer(for: ExpenseItem.self)
+</pre>
+
+<p>
+This sets up the SQLite persistent store in the background for your entire app ecosystem.
+</p>
+
+<div id="What Challenge 1 involved-3. Reading Data: From Static State to Live Query"><h3 id="3. Reading Data: From Static State to Live Query" class="header"><a href="#What Challenge 1 involved-3. Reading Data: From Static State to Live Query">3. Reading Data: From Static State to Live Query</a></h3></div>
+
+<p>
+Because the data manager class was removed, the way <code>ContentView</code> reads data changed entirely.
+</p>
+
+<ul>
+<li>
+Old: <code>@State private var expenses = Expenses()</code>
+
+<ul>
+<li>
+This loaded the data exactly once during initialization. If data changed somewhere else, you had to manually handle sync alerts.
+
+</ul>
+<li>
+New: <code>@Query var items: [ExpenseItem]</code>
+
+<ul>
+<li>
+This is the real magic of <code>SwiftData</code>. The <code>@Query</code> macro asks the database container for all <code>ExpenseItem</code> objects. Crucially, it sets up a <span id="What Challenge 1 involved-3. Reading Data: From Static State to Live Query-live database listener"></span><strong id="live database listener">live database listener</strong>. If an item is added or deleted anywhere in the app, the UI automatically updates without your intervention.
+
+</ul>
+</ul>
+<div id="What Challenge 1 involved-4. Writing and Deleting: Interacting with the Context"><h3 id="4. Writing and Deleting: Interacting with the Context" class="header"><a href="#What Challenge 1 involved-4. Writing and Deleting: Interacting with the Context">4. Writing and Deleting: Interacting with the Context</a></h3></div>
+
+<p>
+Instead of appending or removing elements inside a standard Swift array, you now execute mutations through the database context (<code>@Environment(\.modelContext)</code>), which behaves like a staging area for data changes.
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Action
+</th>
+<th>
+Old (UserDefaults Array)
+</th>
+<th>
+New (SwiftData Context)
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Pass Reference
+</td>
+<td>
+<code>AddView(expenses: expenses)</code>
+</td>
+<td>
+<em>None required (Context is global)</em>
+</td>
+</tr>
+<tr>
+<td>
+Insert Data
+</td>
+<td>
+<code>expenses.items.append(item)</code>
+</td>
+<td>
+<code>modelContext.insert(item)</code>
+</td>
+</tr>
+<tr>
+<td>
+Delete Data
+</td>
+<td>
+Loop array → find match → <code>.remove(at:)</code>
+</td>
+<td>
+<code>modelContext.delete(item)</code>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Notice how parsing logic shrank inside <code>removeItems</code>. You no longer have to locate the matching index across different filtered arrays; you simply hand the exact object to <code>modelContext.delete(item)</code>, and <code>SwiftData</code> finds it in the database and cleans it up instantly.
+</p>
+
+<div id="What Challenge 1 involved-4. Writing and Deleting: Interacting with the Context-Summary of Benefits"><h4 id="Summary of Benefits" class="header"><a href="#What Challenge 1 involved-4. Writing and Deleting: Interacting with the Context-Summary of Benefits">Summary of Benefits</a></h4></div>
+
+<p>
+By shifting to <code>SwiftData</code>, your code became:
+</p>
+
+<ul>
+<li>
+More Thread-Safe: Database transactions handle concurrent reads/writes safely.
+
+<li>
+More Performant: Instead of loading a massive JSON blob of all expenses into memory at boot time, SwiftData efficiently fetches only what it needs.
+
+<li>
+Cleaner: You traded complex data cycle management for declarative macros (<code>@Model</code>, <code>@Query</code>).
+
+</ul>
+<div id="What Challenge 1 involved-In Context"><h3 id="In Context" class="header"><a href="#What Challenge 1 involved-In Context">In Context</a></h3></div>
+
+<div id="What Challenge 1 involved-In Context-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#What Challenge 1 involved-In Context-AddView.swift">AddView.swift</a></h4></div>
+
+<p>
+Open page so that it's very wide on the screen (to reveal comparison of code):
+</p>
+
+<pre swift>
+//                                                                                              //                                                                                               
+//  AddView.swift                                                                               //  AddView.swift                                                                                
+//  iExpenses                                                                                   //  iExpenses                                                                                    
+//                                                                                              //                                                                                               
+//  Created by Robert Holder on 4/21/26.                                                        //  Created by Robert Holder on 4/21/26.                                                         
+//                                                                                              //                                                                                               
+                                                                                                                                                                                                 
+import SwiftUI                                                                                  // Remember to import SwiftData                                                                  
+                                                                                                import SwiftData                                                                                 
+struct AddView: View {                                                                          import SwiftUI                                                                                   
+                                                                                                                                                                                                 
+    @Environment(\.dismiss) var dismiss                                                         struct AddView: View {                                                                           
+                                                                                                                                                                                                 
+    @State private var name = ""                                                                    @Environment(\.dismiss) var dismiss                                                          
+    @State private var type = "Personal"                                                            @Environment(\.modelContext) var modelContext // Added for SwiftData                         
+    @State private var amount = 0.0                                                                                                                                                              
+                                                                                                    @State private var name = ""                                                                 
+    let types = ["Business", "Personal"]                                                            @State private var type = "Personal"                                                         
+                                                                                                    @State private var amount = 0.0                                                              
+                                                                                                                                                                                                 
+    var expenses: Expenses                                                                          let types = ["Business", "Personal"]                                                         
+                                                                                                                                                                                                 
+    var body: some View {                                                                           var body: some View {                                                                        
+        NavigationStack {                                                                               NavigationStack {                                                                        
+            Form {                                                                                          Form {                                                                               
+                TextField("Expense item", text: $name)                                                          TextField("Expense item", text: $name)                                           
+                                                                                                                                                                                                 
+                Picker("Type", selection: $type) {                                                              Picker("Type", selection: $type) {                                               
+                    ForEach(types, id: \.self) {                                                                    ForEach(types, id: \.self) {                                                 
+                        Text($0) // '$0' is shorthand for "the current string in the loop"                              Text($0) // '$0' is shorthand for "the current string in the loop"       
+                    }                                                                                               }                                                                            
+                }                                                                                               }                                                                                
+                                                                                                                                                                                                 
+                TextField("Amount", value: $amount, format: .currency(code: "USD"))                             TextField("Amount", value: $amount, format: .currency(code: "USD"))              
+                    .keyboardType(.decimalPad) // Forces the numeric keypad with a decimal point                    .keyboardType(.decimalPad) // Forces the numeric keypad with a decimal point 
+            }                                                                                               }                                                                                    
+            .navigationTitle("Add new expense")                                                             .navigationTitle("Add new expense")                                                  
+                                                                                                                                                                                                 
+            .toolbar {                                                                                      .toolbar {                                                                           
+                ToolbarItem(placement: .topBarTrailing) {                                                       ToolbarItem(placement: .topBarTrailing) {                                        
+                    Button("Save") {                                                                                Button("Save") {                                                             
+                        let item = ExpenseItem(name: name, type: type, amount: amount)                                  let item = ExpenseItem(name: name, type: type, amount: amount)           
+                                                                                                                        modelContext.insert(item) // Save to SwiftData database                  
+                        expenses.items.append(item)                                                                     dismiss()                                                                
+                                                                                                                    }                                                                            
+                        dismiss()                                                                               }                                                                                
+                    }                                                                                           ToolbarItem(placement: .topBarLeading){                                          
+                }                                                                                                   Button("Cancel") {                                                           
+                ToolbarItem(placement: .topBarLeading){                                                                 dismiss()                                                                
+                    Button("Cancel") {                                                                              }                                                                            
+                        dismiss()                                                                                                                                                                
+                    }                                                                                           }                                                                                
+                                                                                                            }                                                                                    
+                }                                                                                           .navigationBarBackButtonHidden(true)                                                 
+            }                                                                                           }                                                                                        
+            .navigationBarBackButtonHidden(true)                                                    }                                                                                            
+        }                                                                                       }                                                                                                
+    }                                                                                                                                                                                            
+}                                                                                               #Preview {                                                                                       
+                                                                                                    AddView()                                                                                    
+#Preview {                                                                                      }                                                                                                
+    AddView(expenses: Expenses())
+}
+</pre>
+
+<div id="What Challenge 1 involved-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#What Challenge 1 involved-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+//                                                                                                         //                                                                                                   
+//  ContentView.swift                                                                                      //  ContentView.swift                                                                                
+//  iExpenses                                                                                              //  iExpenses                                                                                        
+//                                                                                                         //                                                                                                   
+//  Created by Robert Holder on 4/20/26.                                                                   //  Created by Robert Holder on 4/20/26.                                                             
+                                                                                                           // Remember to import SwiftData                                                                      
+import SwiftUI                                                                                             import SwiftData                                                                                     
+                                                                                                           import SwiftUI                                                                                       
+struct ExpenseItem: Identifiable, Codable {                                                                                                                                                                     
+                                                                                                           // Convert struct to @Model class: remove protocols                                                  
+    var id = UUID() // Generates a unique "Universally Unique Identifier."                                 @Model                                                                                               
+    let name: String                                                                                       class ExpenseItem {                                                                                  
+    let type: String                                                                                                                                                                                            
+    let amount: Double                                                                                         var name: String                                                                                 
+}                                                                                                              var type: String                                                                                 
+                                                                                                               var amount: Double                                                                               
+@Observable                                                                                                                                                                                                     
+class Expenses {                                                                                               init(name: String, type: String, amount: Double) {                                               
+    var items = [ExpenseItem]() {                                                                                  self.name = name                                                                             
+        didSet {                                                                                                   self.type = type                                                                             
+            if let encoded = try? JSONEncoder().encode(items) {                                                    self.amount = amount                                                                         
+                UserDefaults.standard.set(encoded, forKey: "Items")                                            }                                                                                                
+            }                                                                                              }                                                                                                    
+        }                                                                                                                                                                                                       
+    }                                                                                                      // Deleted Expenses from here                                                                        
+                                                                                                           // GONE!                                                                                             
+    init() {                                                                                                                                                                                                    
+        if let savedItems = UserDefaults.standard.data(forKey: "Items") {                                  struct ExpenseRow: View {                                                                            
+            if let decodedItems = try? JSONDecoder().decode([ExpenseItem].self, from: savedItems) {            let item: ExpenseItem                                                                            
+                items = decodedItems                                                                                                                                                                            
+                return                                                                                         var amountColor: Color {                                                                         
+            }                                                                                                      switch item.amount {                                                                         
+        }                                                                                                          case ..&lt;10: return .primary      // Standard text color                                      
+    }                                                                                                              case ..&lt;100: return .green      // Mid-range                                                 
+}                                                                                                                  default: return .red            // High expense                                              
+                                                                                                                   }                                                                                            
+struct ExpenseRow: View {                                                                                      }                                                                                                
+    let item: ExpenseItem                                                                                                                                                                                       
+                                                                                                               var body: some View {                                                                            
+    var amountColor: Color {                                                                                       HStack {                                                                                     
+        switch item.amount {                                                                                           VStack(alignment: .leading) {                                                            
+        case ..&lt;10: return .primary      // Standard text color                                                            Text(item.name)                                                                      
+        case ..&lt;100: return .green      // Mid-range                                                                           .font(.headline)                                                                 
+        default: return .red            // High expense                                                                    Text(item.type)                                                                      
+        }                                                                                                                      .font(.subheadline)                                                              
+    }                                                                                                                          .foregroundStyle(.secondary) // Faded grey look                                  
+                                                                                                                       }                                                                                        
+    var body: some View {                                                                                                                                                                                       
+        HStack {                                                                                                       Spacer() // Pushes the following content to the far right                                
+            VStack(alignment: .leading) {                                                                                                                                                                       
+                Text(item.name)                                                                                        Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD")) 
+                    .font(.headline)                                                                                       .foregroundStyle(amountColor) // Applies our custom switch-case color                
+                Text(item.type)                                                                                    }                                                                                            
+                    .font(.subheadline)                                                                        }                                                                                                
+                    .foregroundStyle(.secondary) // Faded grey look                                        }                                                                                                    
+            }                                                                                                                                                                                                   
+                                                                                                           struct ContentView: View {                                                                           
+            Spacer() // Pushes the following content to the far right                                          @Environment(\.modelContext) var modelContext // the hand that moves data                        
+                                                                                                               @Query var items: [ExpenseItem] // The live stream of data from the SwiftData database           
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))                                                                                                            
+                .foregroundStyle(amountColor) // Applies our custom switch-case color                          // Computed properties the same - just remove the Expenses containter (which we deleted)         
+        }                                                                                                      var personalExpenses: [ExpenseItem] {                                                            
+    }                                                                                                              items.filter { $0.type == "Personal" }                                                       
+}                                                                                                              }                                                                                                
+                                                                                                               var businessExpenses: [ExpenseItem] {                                                            
+struct ContentView: View {                                                                                         items.filter { $0.type == "Business" }                                                       
+    @State private var expenses = Expenses()                                                                   }                                                                                                
+                                                                                                                                                                                                                
+                                                                                                               var body: some View {                                                                            
+    var personalExpenses: [ExpenseItem] {                                                                          NavigationStack {                                                                            
+        expenses.items.filter { $0.type == "Personal" }                                                                List {                                                                                   
+    }                                                                                                                      Section("Personal") {                                                                
+    var businessExpenses: [ExpenseItem] {                                                                                      ForEach(personalExpenses) { item in                                              
+        expenses.items.filter { $0.type == "Business" }                                                                            ExpenseRow(item: item)                                                       
+    }                                                                                                                          }                                                                                
+                                                                                                                               .onDelete { offsets in                                                           
+    var body: some View {                                                                                                          removeItems(at: offsets, in: personalExpenses)                               
+        NavigationStack {                                                                                                      }                                                                                
+            List {                                                                                                         }                                                                                    
+                Section("Personal") {                                                                                                                                                                           
+                    ForEach(personalExpenses) { item in                                                                    Section("Business") {                                                                
+                        ExpenseRow(item: item)                                                                                 ForEach(businessExpenses) { item in                                              
+                    }                                                                                                              ExpenseRow(item: item)                                                       
+                    .onDelete { offsets in                                                                                     }                                                                                
+                        removeItems(at: offsets, in: personalExpenses)                                                         .onDelete { offsets in                                                           
+                    }                                                                                                              removeItems(at: offsets, in: businessExpenses)                               
+                }                                                                                                              }                                                                                
+                                                                                                                           }                                                                                    
+                Section("Business") {                                                                                  }                                                                                        
+                    ForEach(businessExpenses) { item in                                                                .navigationTitle("iExpense") // Sets the text in the NavigationStack                     
+                        ExpenseRow(item: item)                                                                         .toolbar {                                                                               
+                    }                                                                                                      NavigationLink {                                                                     
+                    .onDelete { offsets in                                                                                     AddView() // remove 'Expenses' reference                                         
+                        removeItems(at: offsets, in: businessExpenses)                                                     } label: {                                                                           
+                    }                                                                                                          Label("Add Expense", systemImage: "plus")                                        
+                }                                                                                                          }                                                                                    
+            }                                                                                                          }                                                                                        
+            .navigationTitle("iExpense") // Sets the text in the NavigationStack                                   }                                                                                            
+            .toolbar {                                                                                         }                                                                                                
+                NavigationLink {                                                                                                                                                                                
+                    AddView(expenses: expenses)                                                                func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {                               
+                } label: {                                                                                         for offset in offsets {                                                                      
+                    Label("Add Expense", systemImage: "plus")                                                          let item = source[offset]                                                                
+                }                                                                                                      modelContext.delete(item) // Just tell the SwiftData context to delete it                
+            }                                                                                                      }                                                                                            
+        }                                                                                                      }                                                                                                
+    }                                                                                                      }                                                                                                    
+                                                                                                                                                                                                                
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {                                     #Preview {                                                                                           
+        for offset in offsets {                                                                                ContentView()                                                                                    
+            let item = source[offset]                                                                      }                                                                                                    
+            if let index = expenses.items.firstIndex(where: { $0.id == item.id }) {                                                                                                                             
+                expenses.items.remove(at: index)
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="What Challenge 1 involved-In Context-iExpenseApp.swift"><h4 id="iExpenseApp.swift" class="header"><a href="#What Challenge 1 involved-In Context-iExpenseApp.swift">iExpenseApp.swift</a></h4></div>
+
+<pre swift>
+//                                          //                                                                       
+//  iExpensesApp.swift                      //  iExpensesApp.swift                                                   
+//  iExpenses                               //  iExpenses                                                            
+//                                          //                                                                       
+//  Created by Robert Holder on 4/20/26.    //  Created by Robert Holder on 4/20/26.                                 
+//                                          //                                                                       
+                                                                                                                     
+import SwiftUI                              // Remember to import SwiftData                                          
+                                            import SwiftData                                                         
+@main                                       import SwiftUI                                                           
+struct iExpensesApp: App {                                                                                           
+    var body: some Scene {                  @main                                                                    
+        WindowGroup {                       struct iExpensesApp: App {                                               
+            ContentView()                       var body: some Scene {                                               
+        }                                           WindowGroup {                                                    
+    }                                                   ContentView()                                                
+}                                                   }                                                                
+                                                    .modelContainer(for: ExpenseItem.self) // Link the database here 
+                                                }                                                                    
+                                            }                                                                        
+</pre>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
