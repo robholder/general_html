@@ -128,7 +128,11 @@ As you can see, I'm flailing about a bit. I should be able to understand the ste
 <div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
 
 <p>
-You are actually on the exact right track! Don't let the "flailing" feeling get to you - migrating from UserDefaults to SwiftData is mostly about deleting old, "manual" code and letting SwiftData handle the heavy lifting.
+You are actually on the exact right track! Don't let the "flailing" feeling get to you
+</p>
+
+<p>
+Migrating from <code>UserDefaults</code> to <code>SwiftData</code> is mostly about deleting old, "manual" code and letting <code>SwiftData</code> handle the heavy lifting.
 </p>
 
 <p>
@@ -142,7 +146,7 @@ Here is your step-by-step roadmap to victory:
 <div id="Ai Insight-ANSWER-1. Transform the Model"><h3 id="1. Transform the Model" class="header"><a href="#Ai Insight-ANSWER-1. Transform the Model">1. Transform the Model</a></h3></div>
 
 <p>
-You don't need a separate Expenses class anymore. Instead, we turn <code>ExpenseItem</code> into a SwiftData Model.
+You don't need a separate Expenses class anymore. Instead, we turn <code>ExpenseItem</code> into a <code>SwiftData</code> Model.
 </p>
 
 <div id="Ai Insight-ANSWER-1. Transform the Model-Delete the Expenses class entirely."><h4 id="Delete the Expenses class entirely." class="header"><a href="#Ai Insight-ANSWER-1. Transform the Model-Delete the Expenses class entirely.">Delete the Expenses class entirely.</a></h4></div>
@@ -152,7 +156,7 @@ Change <code>ExpenseItem</code> to a class and add <code>@Model</code>.
 </p>
 
 <p>
-You no longer need <code>Codable</code> (SwiftData handles that) or <code>Identifiable</code> (SwiftData adds a persistent ID automatically).
+You no longer need <code>Codable</code> (<code>SwiftData</code> handles that) or <code>Identifiable</code> (<code>SwiftData</code> adds a persistent ID automatically).
 </p>
 
 <pre swift>
@@ -295,6 +299,197 @@ The "Hand": We added <code>@Environment(\.modelContext)</code> to both views. Th
 <p>
 You mentioned <code>@Bindable</code>. You would only use that if you were passing an existing <code>ExpenseItem</code> into a subview to edit its properties directly (like a "Details" screen). For creating a new item from <code>@State</code> strings and doubles, you don't need it!
 </p>
+
+<div id="Ai Insight-ANSWER-In Context - Challenge 1"><h3 id="In Context - Challenge 1" class="header"><a href="#Ai Insight-ANSWER-In Context - Challenge 1">In Context - Challenge 1</a></h3></div>
+
+<div id="Ai Insight-ANSWER-In Context - Challenge 1-iExpenseApp.swift"><h4 id="iExpenseApp.swift" class="header"><a href="#Ai Insight-ANSWER-In Context - Challenge 1-iExpenseApp.swift">iExpenseApp.swift</a></h4></div>
+
+<pre swift>
+// Remember to import SwiftData
+import SwiftData
+import SwiftUI
+
+@main
+struct iExpensesApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        .modelContainer(for: ExpenseItem.self) // Link the database here
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-In Context - Challenge 1-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#Ai Insight-ANSWER-In Context - Challenge 1-AddView.swift">AddView.swift</a></h4></div>
+
+<pre swift>
+// Remember to import SwiftData
+import SwiftData
+import SwiftUI
+
+struct AddView: View {
+    
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) var modelContext // Added for SwiftData
+    
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    let types = ["Business", "Personal"]
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Expense item", text: $name)
+                
+                Picker("Type", selection: $type) {
+                    ForEach(types, id: \.self) {
+                        Text($0) // '$0' is shorthand for "the current string in the loop"
+                    }
+                }
+                
+                TextField("Amount", value: $amount, format: .currency(code: "USD"))
+                    .keyboardType(.decimalPad) // Forces the numeric keypad with a decimal point
+            }
+            .navigationTitle("Add new expense")
+            
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        let item = ExpenseItem(name: name, type: type, amount: amount)
+                        modelContext.insert(item) // Save to SwiftData database
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .topBarLeading){
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    
+                }
+            }
+            .navigationBarBackButtonHidden(true)
+        }
+    }
+}
+
+#Preview {
+    AddView()
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-In Context - Challenge 1-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Ai Insight-ANSWER-In Context - Challenge 1-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+// Remember to import SwiftData
+import SwiftData
+import SwiftUI
+
+// Convert struct to @Model class: remove protocols
+@Model
+class ExpenseItem {
+    
+    var name: String
+    var type: String
+    var amount: Double
+    
+    init(name: String, type: String, amount: Double) {
+        self.name = name
+        self.type = type
+        self.amount = amount
+    }
+}
+
+// Deleted Expenses from here
+// GONE!
+
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary      // Standard text color
+        case ..&lt;100: return .green      // Mid-range
+        default: return .red            // High expense
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary) // Faded grey look
+            }
+            
+            Spacer() // Pushes the following content to the far right
+            
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor) // Applies our custom switch-case color
+        }
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext // the hand that moves data
+    @Query var items: [ExpenseItem] // The live stream of data from the SwiftData database
+    
+    // Computed properties the same - just remove the Expenses containter (which we deleted)
+    var personalExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Personal" }
+    }
+    var businessExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Business" }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Personal") {
+                    ForEach(personalExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: personalExpenses)
+                    }
+                }
+                
+                Section("Business") {
+                    ForEach(businessExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: businessExpenses)
+                    }
+                }
+            }
+            .navigationTitle("iExpense") // Sets the text in the NavigationStack
+            .toolbar {
+                NavigationLink {
+                    AddView() // remove 'Expenses' reference
+                } label: {
+                    Label("Add Expense", systemImage: "plus")
+                }
+            }
+        }
+    }
+    
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            modelContext.delete(item) // Just tell the SwiftData context to delete it
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 
 <p>
 <hr>
