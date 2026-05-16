@@ -342,6 +342,7 @@ struct User: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.firstName = try container.decode(String.self, forKey: .firstName)
         self.lastName = try container.decode(String.self, forKey: .lastName)
+        // This next line needs to be changed
         self.age = try container.decode(Int.self, forKey: .age)
     }
 
@@ -349,6 +350,7 @@ struct User: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.firstName, forKey: .firstName)
         try container.encode(self.lastName, forKey: .lastName)
+        // This next line needs to be changed
         try container.encode(self.age, forKey: .age)
     }
 }
@@ -493,7 +495,8 @@ struct User: Codable {
         try container.encode(self.firstName, forKey: .firstName)
         try container.encode(self.lastName, forKey: .lastName)
         try container.encode(String(self.age), forKey: .age)
-    }}
+    }
+}
 </pre>
 
 <p>
@@ -604,12 +607,103 @@ decoder.allowsJSON5 = true // If parsing standard JSON5 specs
 <em>(Note: Since pure native foundation JSONDecoder doesn't have an explicit loose-type mapping toggle for standard types, your manual solution in version 2 remains the most foolproof and production-stable approach for handling poorly-typed JSON APIs!)</em>
 </p>
 
+<div id="Why Must ALL Keys Appear in a Codable Struct?"><h1 id="Why Must ALL Keys Appear in a Codable Struct?" class="header"><a href="#Why Must ALL Keys Appear in a Codable Struct?">Why Must ALL Keys Appear in a Codable Struct?</a></h1></div>
+
+<p>
+As in:
+</p>
+
+<pre swift>
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first"
+        case lastName = "last"
+        case age
+    }
+</pre>
+
+<div id="Why Must ALL Keys Appear in a Codable Struct?-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Why Must ALL Keys Appear in a Codable Struct?-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+You have spotted another great quirk of the <code>Codable</code> system.
+</p>
+
+<p>
+The short answer is: You must list <code>case age</code> because the compiler uses that enum as an absolute checklist of properties it is allowed to decode or encode. If a property isn't listed as a case in <code>CodingKeys</code>, it effectively doesn't exist to the <code>JSONDecoder</code>.
+</p>
+
+<p>
+Here is the breakdown of why it has no assignment, and why it's still mandatory.
+</p>
+
+<div id="Why Must ALL Keys Appear in a Codable Struct?-Ai Insight-1. Why is it not assigned a string literal?"><h3 id="1. Why is it not assigned a string literal?" class="header"><a href="#Why Must ALL Keys Appear in a Codable Struct?-Ai Insight-1. Why is it not assigned a string literal?">1. Why is it not assigned a string literal?</a></h3></div>
+
+<p>
+Because the <code>CodingKeys</code> enum conforms to the <code>String</code> protocol, Swift uses a feature called <span id="Why Must ALL Keys Appear in a Codable Struct?-Ai Insight-1. Why is it not assigned a string literal?-Implicit Raw Values"></span><strong id="Implicit Raw Values">Implicit Raw Values</strong>.
+</p>
+
+<p>
+If you don't explicitly assign a string using the <code>=</code> operator, Swift automatically assigns a string that perfectly matches the name of the case itself.
+</p>
+
+<pre swift>
+enum CodingKeys: String, CodingKey {
+    case firstName = "first" // Explicit: Maps 'firstName' to "first"
+    case lastName = "last"   // Explicit: Maps 'lastName' to "last"
+    case age                 // Implicit: Swift automatically treats this as case age = "age"
+}
+</pre>
+
+<p>
+Since the key in your JSON payload is exactly <code>"age"</code>, and your property name in Swift is exactly age, you don't need to overwrite it. Leaving off the <code>= "age"</code> is just a convenient shortcut to save you some typing.
+</p>
+
+<div id="Why Must ALL Keys Appear in a Codable Struct?-Ai Insight-2. Why do we have to include it as a case at all?"><h3 id="2. Why do we have to include it as a case at all?" class="header"><a href="#Why Must ALL Keys Appear in a Codable Struct?-Ai Insight-2. Why do we have to include it as a case at all?">2. Why do we have to include it as a case at all?</a></h3></div>
+
+<p>
+You might think, <em>"If it already matches perfectly, why can't I just delete case age and let Swift assume it?"</em>
+</p>
+
+<p>
+The rule in Swift is <span id="Why Must ALL Keys Appear in a Codable Struct?-Ai Insight-2. Why do we have to include it as a case at all?-All-or-Nothing"></span><strong id="All-or-Nothing">All-or-Nothing</strong>.
+</p>
+
+<p>
+If you don't create a <code>CodingKeys</code> enum, Swift will automatically build a hidden one behind the scenes that includes <em>every</em> property in your struct.
+</p>
+
+<p>
+However, the moment you type <code>enum CodingKeys: String, CodingKey</code> yourself, <span id="Why Must ALL Keys Appear in a Codable Struct?-Ai Insight-2. Why do we have to include it as a case at all?-you take over full manual control"></span><strong id="you take over full manual control">you take over full manual control</strong>. Swift immediately throws away its automatic generation tool. It now looks at your custom enum as a strict, finalized whitelist.
+</p>
+
+<pre text>
+       How the Decoder Views Your Enum
+┌──────────────────────────────────────────────┐
+│  CodingKeys Checklist:                       │
+│  1. firstName  ───&gt; Looks for "first"        │
+│  2. lastName   ───&gt; Looks for "last"         │
+│  3. age        ───&gt; Looks for "age"          │
+└──────────────────────────────────────────────┘
+  * Anything left out will be completely ignored *
+</pre>
+
+<p>
+If you deleted <code>case age</code> from that list, the compiler would stop you further down in your code. The moment you tried to write <code>forKey: .age</code> inside your <code>init(from:)</code> method, Xcode would throw a compiler error saying: <em>"Value of type 'CodingKeys' has no member 'age'."</em>
+</p>
+
+<p>
+Even though it needs no manual redirection, it has to be on the master checklist so that the container.decode functions have a valid key to point to!
+</p>
+
 <p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_169.html">Hacking With Swift - 169 - Challenge</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
