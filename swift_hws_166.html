@@ -202,6 +202,249 @@ Because we changed the child view's initializer signatures, update your preview 
 
 <p>
 Notice how easy it was to drop this feature in. Because you took the time earlier to split your view into a Parent (<code>ContentView</code>) and a Child (<code>ExpenseListView</code>), adding filtering didn't require breaking your view hierarchy. You simply extended the pipeline you already built to pass one extra piece of configuration down to the database engine.
+</p>
+
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-iExpensesApp.swift"><h4 id="iExpensesApp.swift" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-iExpensesApp.swift">iExpensesApp.swift</a></h4></div>
+
+<p>
+Unchanged.
+</p>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@main
+struct iExpensesApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        .modelContainer(for: ExpenseItem.self) // Link the database here
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-AddView.swift"><h4 id="AddView.swift" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-AddView.swift">AddView.swift</a></h4></div>
+
+<p>
+Unchanged.
+</p>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct AddView: View {
+    
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) var modelContext
+    
+    @State private var name = ""
+    @State private var type = "Personal"
+    @State private var amount = 0.0
+    
+    let types = ["Business", "Personal"]
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Expense item", text: $name)
+                
+                Picker("Type", selection: $type) {
+                    ForEach(types, id: \.self) {
+                        Text($0)
+                    }
+                }
+                TextField("Amount", value: $amount, format: .currency(code: "USD"))
+                    .keyboardType(.decimalPad)
+            }
+            .navigationTitle("Add new expense")
+            
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        let item = ExpenseItem(name: name, type: type, amount: amount)
+                        modelContext.insert(item)
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .topBarLeading){
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .navigationBarBackButtonHidden(true)
+        }
+    }
+}
+
+#Preview {
+    AddView()
+}
+</pre>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-ExpensesListView.swift"><h4 id="ExpensesListView.swift" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-ExpensesListView.swift">ExpensesListView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ExpenseListView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    // The query no dynamically holds filtered and sorted data natively
+    @Query var items: [ExpenseItem]
+    
+    // STEP 2a: Accept both parameters in the initializer
+    init(sortOrder: [SortDescriptor&lt;ExpenseItem&gt;], filterType: String) {
+        
+        // STEP 2b: Build the Predicate database rule
+        let predicate = #Predicate&lt;ExpenseItem&gt; { item in
+            if filterType == "All" {
+                return true // Matches everything
+            } else {
+                return item.type == filterType // Matches only "Personal" or "Business"
+            }
+        }
+        
+        // STEP 2c: Inject both rules into the underlying Query wrapper
+        _items = Query(filter: predicate, sort: sortOrder)
+    }
+    
+    var body: some View {
+        // STEP 2d: The List is now beautifully simple. No manual array filtering needed!
+        List {
+                ForEach(items) { item in
+                    ExpenseRow(item: item)
+                }
+                .onDelete(perform: removeItems)
+                }
+            }
+            
+    
+    func removeItems(at offsets: IndexSet) {
+        for offset in offsets {
+            let item = items[offset]
+            modelContext.delete(item)
+        }
+    }
+}
+
+#Preview("Isolated List View") {
+    ExpenseListView(sortOrder: [SortDescriptor(\ExpenseItem.name)], filterType: "All")
+        .modelContainer(for: ExpenseItem.self, inMemory: true)
+}
+</pre>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@Model
+class ExpenseItem {
+    
+    var name: String
+    var type: String
+    var amount: Double
+    
+    init(name: String, type: String, amount: Double) {
+        self.name = name
+        self.type = type
+        self.amount = amount
+    }
+}
+
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary
+        case ..&lt;100: return .green
+        default: return .red
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor)
+        }
+    }
+}
+
+struct ContentView: View {
+    @State private var sortOrder = [
+        SortDescriptor(\ExpenseItem.name),
+        SortDescriptor(\ExpenseItem.amount)
+    ]
+    
+    // STEP 1a: Add state to track the user's filtering choice
+    @State private var filterType = "All"
+
+    var body: some View {
+        NavigationStack {
+            // STEP 1b: Pass BOTH the sortOrder and the filterType down to the child
+            ExpenseListView(sortOrder: sortOrder, filterType: filterType)
+                .navigationTitle("iExpense")
+                .toolbar {
+                    NavigationLink {
+                        AddView()
+                    } label: {
+                        Label("Add Expense", systemImage: "plus")
+                    }
+                    // STEP 1c: Add a new Menu or expand your current one to host the Filter Picker
+                    Menu("Filter", systemImage: "line.3.horizontal.decrease.circle") {
+                        Picker("Filter", selection: $filterType) {
+                            Text("Show All").tag("All")
+                            Text("Personal Only").tag("Personal")
+                            Text("Business Only").tag("Business")
+                        }
+                    }
+                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                        Picker("Sort", selection: $sortOrder) {
+                            Text("Sort by Name")
+                                .tag([
+                                    SortDescriptor(\ExpenseItem.name),
+                                    SortDescriptor(\ExpenseItem.amount),
+                                ])
+                            Text("Sort by Amount")
+                                .tag([
+                                    SortDescriptor(\ExpenseItem.amount),
+                                    SortDescriptor(\ExpenseItem.name)
+                                ])
+                        }
+                    }
+                }
+        }
+    }
+}
+
+#Preview("Main Dashboard") {
+    ContentView()
+        .modelContainer(for: ExpenseItem.self, inMemory: true)
+}
+</pre>
+
+
+<p>
 <hr>
 <br>
 </p>
