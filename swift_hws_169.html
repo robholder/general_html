@@ -129,6 +129,218 @@ While you’re building this, I want you to keep one thing in mind: this kind of
 
 <p>
 <span id="Hacking With Swift - 169 - Challenge-Tip"></span><strong id="Tip">Tip</strong>: As always, the best way to solve this challenge is to keep it simple - write as little code as you can to solve the challenge, and for you to feel comfortable that it works well.
+</p>
+
+<div id="Hacking With Swift - 169 - Challenge-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 169 - Challenge-Ai Insight">Ai Insight</a></h2></div>
+
+<div id="Hacking With Swift - 169 - Challenge-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 169 - Challenge-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I have a challenge, and to be honest, I'm overwhelmed at the task. I don't want to be 'put off' by the feeling, and I want to push on through this roadblock. Can you help me come up with a plan to make this App?
+Here's the brief, as laid out in the challenge from Paul Hudson:
+</p>
+
+<ul>
+<li>
+(Repeat of Challenge above)
+
+</ul>
+<div id="Hacking With Swift - 169 - Challenge-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER">ANSWER</a></h2></div>
+
+<p>
+It is completely normal to feel overwhelmed by this challenge. Paul Hudson calls this "expansive" for a reason-it is the first time you are connecting multiple distinct pillars of iOS development (Networking, Data Parsing, UI layout, and State Management) completely from scratch.
+</p>
+
+<p>
+Take a deep breath. We are going to conquer this by applying the <span id="Hacking With Swift - 169 - Challenge-ANSWER-&quot;Divide and Conquer&quot;"></span><strong id="&quot;Divide and Conquer&quot;">"Divide and Conquer"</strong> principle. We will treat each requirement as a completely isolated micro-task so you don't have to think about the whole app all at once.
+</p>
+
+<p>
+Here is your step-by-step game plan to push past this roadblock, kept as simple and minimal as possible.
+</p>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 1: Establish Your Data Blueprint (Models)"><h3 id="Phase 1: Establish Your Data Blueprint (Models)" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 1: Establish Your Data Blueprint (Models)">Phase 1: Establish Your Data Blueprint (Models)</a></h3></div>
+
+<p>
+Before you write any UI or networking code, you need Swift types that perfectly mirror the JSON structure.
+</p>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-What to do:"><h4 id="What to do:" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-What to do:">What to do:</a></h4></div>
+
+<ul>
+<li>
+Open the JSON URL in your browser and look at the structure. You will see an array of objects. Inside each object is another array called <code>friends</code>.
+
+<li>
+Create a new Swift file named <code>User.swift</code> and define your structures.
+
+</ul>
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-The Blueprint:"><h4 id="The Blueprint:" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-The Blueprint:">The Blueprint:</a></h4></div>
+
+<pre swift>
+import Foundation
+
+// The main object. It needs Identifiable so it plays nice with SwiftUI Lists.
+struct User: Codable, Identifiable {
+    let id: UUID
+    let isActive: Bool
+    let name: String
+    let age: Int
+    let company: String
+    let email: String
+    let address: String
+    let about: String
+    let registered: Date // We will use Paul's .iso8601 tip for this!
+    let tags: [String]
+    let friends: [Friend] // Nested relationship
+}
+
+// The smaller object inside the user's friend array.
+struct Friend: Codable, Identifiable {
+    let id: UUID
+    let name: String
+}
+</pre>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 2: Create a Dummy UI First"><h3 id="Phase 2: Create a Dummy UI First" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 2: Create a Dummy UI First">Phase 2: Create a Dummy UI First</a></h3></div>
+
+<p>
+Do not try to fetch live data yet. That is a recipe for debugging nightmares. Instead, build your layout using static, fake data so you know your UI works.
+</p>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 2: Create a Dummy UI First-What to do:"><h4 id="What to do:" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 2: Create a Dummy UI First-What to do:">What to do:</a></h4></div>
+
+<ul>
+<li>
+In <code>ContentView</code>, create a temporary <code>@State</code> array with one fake user inside it.
+
+<li>
+Build a simple <code>List</code> and a <code>NavigationLink</code> that pushes to a detail view.
+<pre swift>
+struct ContentView: View {
+    // Start with empty array as requested, but put a dummy item here temporarily to test your UI!
+    @State private var users = [User]() 
+    
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink {
+                    // This will be your detail view
+                    UserDetailView(user: user)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(user.name).font(.headline)
+                            Text(user.company).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        // Status indicator
+                        Circle()
+                            .fill(user.isActive ? .green : .gray)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+            .navigationTitle("FriendFace")
+        }
+    }
+}
+</pre>
+
+</ul>
+<p>
+Create a basic companion view <code>UserDetailView.swift</code> that takes a <code>let user: User</code> and displays their details, along with a <code>ForEach</code> loop over their <code>user.friends</code>.
+</p>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)"><h3 id="Phase 3: The Data Pipeline (URLSession)" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)">Phase 3: The Data Pipeline (URLSession)</a></h3></div>
+
+<p>
+Now that your UI is ready to display users, it's time to go get them. We will add a single network function to <code>ContentView</code> and use the built-in async/await syntax to keep it clean.
+</p>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)-What to do:"><h4 id="What to do:" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)-What to do:">What to do:</a></h4></div>
+
+<ul>
+<li>
+Write a function called <code>loadData()</code> inside <code>ContentView</code>.
+
+<li>
+Use Paul's tip to check if <code>users.isEmpty</code> before running the download.
+
+<li>
+Trigger this function using the <code>.task</code> modifier on your <code>List</code>.
+
+</ul>
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)-The Code:"><h4 id="The Code:" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)-The Code:">The Code:</a></h4></div>
+
+<pre swift>
+func loadData() async {
+    // Guard check: Don't re-download if we already have data
+    guard users.isEmpty else { return }
+    
+    // 1. Create the URL
+    guard let url = URL(string: "https://www.hackingwithswift.com/samples/friendface.json") else {
+        print("Invalid URL")
+        return
+    }
+    
+    do {
+        // 2. Fetch the raw data
+        let (data, _) = try await URLSession.shared.data(from: url)
+        
+        // 3. Configure the Decoder (Crucial step for Dates!)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601 // Handles "2015-11-10T01:47:18-00:00" automatically
+        
+        // 4. Decode into our Swift types
+        let decodedUsers = try decoder.decode([User].self, from: data)
+        
+        // 5. Update our UI state
+        users = decodedUsers
+        
+    } catch {
+        print("Decoding failed: \(error)")
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)-Hooking it up to the UI:"><h4 id="Hooking it up to the UI:" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Phase 3: The Data Pipeline (URLSession)-Hooking it up to the UI:">Hooking it up to the UI:</a></h4></div>
+
+<p>
+Attach the task to your list in <code>ContentView</code>:
+</p>
+
+<pre swift>
+List(users) { user in
+    // ... your list row rows
+}
+.task {
+    await loadData()
+}
+</pre>
+
+<div id="Hacking With Swift - 169 - Challenge-ANSWER-Why This Plan Will Keep You Sane"><h3 id="Why This Plan Will Keep You Sane" class="header"><a href="#Hacking With Swift - 169 - Challenge-ANSWER-Why This Plan Will Keep You Sane">Why This Plan Will Keep You Sane</a></h3></div>
+
+<p>
+By splitting the challenge into these distinct milestones, you isolate your errors:
+</p>
+
+<ul>
+<li>
+If the app fails to compile in <span id="Hacking With Swift - 169 - Challenge-ANSWER-Why This Plan Will Keep You Sane-Phase 1"></span><strong id="Phase 1">Phase 1</strong>, your properties don't match the JSON keys.
+
+<li>
+If the app looks wrong in <span id="Hacking With Swift - 169 - Challenge-ANSWER-Why This Plan Will Keep You Sane-Phase 2"></span><strong id="Phase 2">Phase 2</strong>, your SwiftUI code needs layout adjustments.
+
+<li>
+If the app stays blank in <span id="Hacking With Swift - 169 - Challenge-ANSWER-Why This Plan Will Keep You Sane-Phase 3"></span><strong id="Phase 3">Phase 3</strong>, your networking URL or your <code>dateDecodingStrategy</code> is hitting a snag.
+
+</ul>
+<p>
+You are fully capable of doing this. Take it one phase at a time. Don't worry about making it visually stunning right now; focus on getting the data to flow from the web server onto your screen. You've got this!
+</p>
+
+<p>
 <hr>
 <br>
 </p>
