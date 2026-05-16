@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_166</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_165.html">Hacking With Swift - 165 - Challenge 2 - Adding Sort menu</a>
+
+</ul>
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter"><h1 id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter">Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter</a></h1></div>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I now need to add this to the project:
+</p>
+<ul>
+<li>
+"Add a filter option to show all expenses, just personal expenses, or just business expenses."
+
+<ul>
+<li>
+Should this be another Picker style menu item?
+
+<li>
+How should I implement this in the code?
+
+</ul>
+</ul>
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, a <span id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-Picker style menu item"></span><strong id="Picker style menu item">Picker style menu item</strong> right inside your existing "Sort" or a new "Filter" menu is the perfect UX choice for this. It keeps the navigation bar clean while giving the user explicit control.
+</p>
+
+<p>
+To implement this, we will use the exact same <span id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-View Extraction"></span><strong id="View Extraction">View Extraction</strong> strategy we just set up. Since <code>ExpenseListView</code> is already designed to re-configure its database query on the fly, we just need to pass the filter selection from the parent down to the child.
+</p>
+
+<p>
+However, we are going to make one massive structural improvement: <span id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-We will let the database handle the filtering using a SwiftData"></span><strong id="We will let the database handle the filtering using a SwiftData">We will let the database handle the filtering using a SwiftData</strong> <code>#Predicate</code>, instead of fetching everything and filtering using a standard Swift array helper (<code>.filter { ... }</code>).
+</p>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-Why use a #Predicate?"><h3 id="Why use a #Predicate?" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-Why use a #Predicate?">Why use a #Predicate?</a></h3></div>
+
+<p>
+In your previous code, you fetched all items from the database using <code>@Query var items</code>, and then used computed properties (<code>personalExpenses</code> and <code>businessExpenses</code>) to split them up.
+</p>
+
+<p>
+While that works fine for a few items, if a user has 2,000 expenses, your app has to waste memory loading all 2,000 items into RAM just to display the 5 business expenses. By passing a <code>#Predicate</code> to the <code>@Query</code>, SwiftData asks the underlying SQLite database to only hand over the matching items. It is incredibly fast and memory-efficient.
+</p>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps"><h3 id="The Refactoring Steps" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps">The Refactoring Steps</a></h3></div>
+
+<p>
+Here is how you adjust your code to support the new filtering option.
+</p>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps-Step 1: Update the Parent (ContentView)"><h4 id="Step 1: Update the Parent (ContentView)" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps-Step 1: Update the Parent (ContentView)">Step 1: Update the Parent (ContentView)</a></h4></div>
+
+<p>
+We need to add a new <code>@State</code> property to track the active filter string ("All", "Personal", or "Business") and add the Picker UI to the toolbar.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var sortOrder = [
+        SortDescriptor(\ExpenseItem.name),
+        SortDescriptor(\ExpenseItem.amount)
+    ]
+    
+    // STEP 1a: Add state to track the user's filtering choice
+    @State private var filterType = "All" 
+    
+    var body: some View {
+        NavigationStack {
+            // STEP 1b: Pass BOTH the sortOrder and the filterType down to the child
+            ExpenseListView(sortOrder: sortOrder, filterType: filterType)
+                .navigationTitle("iExpense")
+                .toolbar {
+                    NavigationLink {
+                        AddView()
+                    } label: {
+                        Label("Add Expense", systemImage: "plus")
+                    }
+                    
+                    // STEP 1c: Add a new Menu or expand your current one to host the Filter Picker
+                    Menu("Filter", systemImage: "line.3.horizontal.decrease.circle") {
+                        Picker("Filter", selection: $filterType) {
+                            Text("Show All").tag("All")
+                            Text("Personal Only").tag("Personal")
+                            Text("Business Only").tag("Business")
+                        }
+                    }
+                    
+                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                        Picker("Sort", selection: $sortOrder) {
+                            Text("Sort by Name").tag([SortDescriptor(\ExpenseItem.name), SortDescriptor(\ExpenseItem.amount)])
+                            Text("Sort by Amount").tag([SortDescriptor(\ExpenseItem.amount), SortDescriptor(\ExpenseItem.name)])
+                        }
+                    }
+                }
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps-Step 2: Update the Child (ExpenseListView)"><h4 id="Step 2: Update the Child (ExpenseListView)" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps-Step 2: Update the Child (ExpenseListView)">Step 2: Update the Child (ExpenseListView)</a></h4></div>
+
+<p>
+We change the child view's initializer to accept the <code>filterType</code>. Inside the <code>init</code>, we build a SwiftData <code>#Predicate</code> based on what the user selected, and inject both the predicate and the sort descriptors into the <code>@Query</code> wrapper.
+</p>
+
+<p>
+We can also get rid of the computed array filters entirely, simplifying our <code>List</code> body significantly!
+</p>
+
+<pre swift>
+struct ExpenseListView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    // The query now dynamically holds filtered and sorted data natively
+    @Query var items: [ExpenseItem]
+    
+    // STEP 2a: Accept both parameters in the initializer
+    init(sortOrder: [SortDescriptor&lt;ExpenseItem&gt;], filterType: String) {
+        
+        // STEP 2b: Build the Predicate database rule
+        let predicate = #Predicate&lt;ExpenseItem&gt; { item in
+            if filterType == "All" {
+                return true // Matches everything
+            } else {
+                return item.type == filterType // Matches only "Personal" or "Business"
+            }
+        }
+        
+        // STEP 2c: Inject both rules into the underlying Query wrapper
+        _items = Query(filter: predicate, sort: sortOrder)
+    }
+    
+    var body: some View {
+        // STEP 2d: The List is now beautifully simple. No manual array filtering needed!
+        List {
+            ForEach(items) { item in
+                ExpenseRow(item: item)
+            }
+            .onDelete(perform: removeItems)
+        }
+    }
+    
+    func removeItems(at offsets: IndexSet) {
+        for offset in offsets {
+            let item = items[offset]
+            modelContext.delete(item)
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps-Step 3: Fix the Previews"><h4 id="Step 3: Fix the Previews" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-The Refactoring Steps-Step 3: Fix the Previews">Step 3: Fix the Previews</a></h4></div>
+
+<p>
+Because we changed the child view's initializer signatures, update your preview blocks at the bottom of the file so they pass default placeholder values:
+</p>
+
+<pre swift>
+#Preview("Main Dashboard") {
+    ContentView()
+        .modelContainer(for: ExpenseItem.self, inMemory: true)
+}
+
+#Preview("Isolated List View") {
+    ExpenseListView(sortOrder: [SortDescriptor(\ExpenseItem.name)], filterType: "All")
+        .modelContainer(for: ExpenseItem.self, inMemory: true)
+}
+</pre>
+
+<div id="Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-Summary of why this pattern scales"><h3 id="Summary of why this pattern scales" class="header"><a href="#Hacking With Swift - 166 - Challenge 3 - Adding Personal/Business/All filter-ANSWER-Summary of why this pattern scales">Summary of why this pattern scales</a></h3></div>
+
+<p>
+Notice how easy it was to drop this feature in. Because you took the time earlier to split your view into a Parent (<code>ContentView</code>) and a Child (<code>ExpenseListView</code>), adding filtering didn't require breaking your view hierarchy. You simply extended the pipeline you already built to pass one extra piece of configuration down to the database engine.
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
