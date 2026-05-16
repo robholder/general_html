@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_165</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_164.html">Hacking With Swift - 164 - Challenge 1 Comparison</a>
+
+</ul>
+<div id="Hacking With Swift - 165 - Challenge 2 - Adding a sort menu"><h1 id="Hacking With Swift - 165 - Challenge 2 - Adding a sort menu" class="header"><a href="#Hacking With Swift - 165 - Challenge 2 - Adding a sort menu">Hacking With Swift - 165 - Challenge 2 - Adding a sort menu</a></h1></div>
+
+<div id="Hacking With Swift - 165 - Challenge 2 - Adding a sort menu-Adding a Sort Menu to the iExpense App"><h2 id="Adding a Sort Menu to the iExpense App" class="header"><a href="#Hacking With Swift - 165 - Challenge 2 - Adding a sort menu-Adding a Sort Menu to the iExpense App">Adding a Sort Menu to the iExpense App</a></h2></div>
+
+<p>
+Starting state
+</p>
+
+<div id="Hacking With Swift - 165 - Challenge 2 - Adding a sort menu-Adding a Sort Menu to the iExpense App-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 165 - Challenge 2 - Adding a sort menu-Adding a Sort Menu to the iExpense App-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@Model
+class ExpenseItem {
+    
+    var name: String
+    var type: String
+    var amount: Double
+    
+    init(name: String, type: String, amount: Double) {
+        self.name = name
+        self.type = type
+        self.amount = amount
+    }
+}
+
+
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary
+        case ..&lt;100: return .green
+        default: return .red
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor)
+        }
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query var items: [ExpenseItem]
+    
+    var personalExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Personal" }
+    }
+    var businessExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Business" }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Personal") {
+                    ForEach(personalExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: personalExpenses)
+                    }
+                }
+                
+                Section("Business") {
+                    ForEach(businessExpenses) { item in
+                        ExpenseRow(item: item)
+                    }
+                    .onDelete { offsets in
+                        removeItems(at: offsets, in: businessExpenses)
+                    }
+                }
+            }
+            .navigationTitle("iExpense")
+            .toolbar {
+                NavigationLink {
+                    AddView()
+                } label: {
+                    Label("Add Expense", systemImage: "plus")
+                }
+            }
+        }
+    }
+    
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            modelContext.delete(item)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Adding the Sort Functionality"><h1 id="Adding the Sort Functionality" class="header"><a href="#Adding the Sort Functionality">Adding the Sort Functionality</a></h1></div>
+
+<div id="Adding the Sort Functionality-We Need a New ExpenseListView"><h2 id="We Need a New ExpenseListView" class="header"><a href="#Adding the Sort Functionality-We Need a New ExpenseListView">We Need a New ExpenseListView</a></h2></div>
+
+<p>
+We need to extract the List from ContentView to a new ExpenseListView to control the sorting facility.
+</p>
+
+<p>
+Here is a conceptual guide to understanding why we have to refactor the view, followed by a step-by-step strategic checklist you can reuse in future projects.
+</p>
+
+<div id="Adding the Sort Functionality-The Core Strategy: Why Two Views?"><h2 id="The Core Strategy: Why Two Views?" class="header"><a href="#Adding the Sort Functionality-The Core Strategy: Why Two Views?">The Core Strategy: Why Two Views?</a></h2></div>
+
+<p>
+The problem boils down to a strict limitation in SwiftUI: <code>@Query</code> <span id="Adding the Sort Functionality-The Core Strategy: Why Two Views?-properties are locked in place once a View is created."></span><strong id="properties are locked in place once a View is created.">properties are locked in place once a View is created.</strong> They cannot listen to changes from a <code>@State</code> variable inside the same struct.
+</p>
+
+<p>
+To bypass this roadblock, we use an architectural pattern called <span id="Adding the Sort Functionality-The Core Strategy: Why Two Views?-View Extraction"></span><strong id="View Extraction">View Extraction</strong>.
+</p>
+
+<p>
+By splitting the code into a <span id="Adding the Sort Functionality-The Core Strategy: Why Two Views?-Parent View"></span><strong id="Parent View">Parent View</strong> (<code>ContentView</code>) and a <span id="Adding the Sort Functionality-The Core Strategy: Why Two Views?-Child View"></span><strong id="Child View">Child View</strong> (<code>ExpenseListView</code>), we change the data flow:
+</p>
+
+<ul>
+<li>
+The Parent tracks what the user clicked using <code>@State</code>.
+
+<li>
+When the user changes the sort picker, the Parent forces the <span id="Adding the Sort Functionality-The Core Strategy: Why Two Views?-Child"></span><strong id="Child">Child</strong> to completely destroy and recreate itself.
+
+<li>
+During recreation, the Child's custom <code>init()</code> function interceptively rebuilds the <code>@Query</code> with the updated rules before any data hits the screen.
+
+</ul>
+<div id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist"><h2 id="Step-by-Step Refactoring Checklist" class="header"><a href="#Adding the Sort Functionality-Step-by-Step Refactoring Checklist">Step-by-Step Refactoring Checklist</a></h2></div>
+
+<p>
+Whenever you need to add dynamic sorting or filtering to a SwiftData <code>@Query</code>, use this exact 4-step workflow:
+</p>
+
+<div id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 1: Create the Child Struct"><h3 id="Step 1: Create the Child Struct" class="header"><a href="#Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 1: Create the Child Struct">Step 1: Create the Child Struct</a></h3></div>
+
+<p>
+Create an entirely new View structure. Cut the data-dependent UI elements (usually the <code>List</code>) out of your main view and paste them into this new subview.
+</p>
+
+<div id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 2: Define the Child's Custom Initializer"><h3 id="Step 2: Define the Child's Custom Initializer" class="header"><a href="#Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 2: Define the Child's Custom Initializer">Step 2: Define the Child's Custom Initializer</a></h3></div>
+
+<p>
+Instead of declaring a standard <code>@Query</code>, you leave the query uninitialized. You use a custom <code>init</code> method to receive the sorting rule from the parent and inject it straight into the underlying property wrapper using the underscore (<code>_items</code>) syntax.
+</p>
+
+<pre swift>
+struct MyListView: View {
+    @Query var items: [ExpenseItem] // 1. Uninitialized query
+    
+    init(sortOrder: [SortDescriptor&lt;ExpenseItem&gt;]) {
+        // 2. Underscore targets the Query wrapper itself, configuring it dynamically
+        _items = Query(sort: sortOrder) 
+    }
+    // ... UI goes here
+}
+</pre>
+
+<div id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 3: Set Up Parent State and Menu UI"><h3 id="Step 3: Set Up Parent State and Menu UI" class="header"><a href="#Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 3: Set Up Parent State and Menu UI">Step 3: Set Up Parent State and Menu UI</a></h3></div>
+
+<p>
+Inside your main <code>ContentView</code>, create a <code>@State</code> variable containing a default <code>SortDescriptor</code>. Build your <code>Menu</code> and <code>Picker</code> in the toolbar, assigning corresponding array tags to match your data types.
+</p>
+
+<pre swift>
+@State private var sortOrder = [SortDescriptor(\ExpenseItem.name)]
+
+// Picker Items use arrays matching the State type:
+Text("Sort by Amount").tag([SortDescriptor(\ExpenseItem.amount)])
+</pre>
+
+<div id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 4: Pass State from Parent to Child"><h3 id="Step 4: Pass State from Parent to Child" class="header"><a href="#Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Step 4: Pass State from Parent to Child">Step 4: Pass State from Parent to Child</a></h3></div>
+
+<p>
+Finally, drop your newly created child view into the body of your parent view, passing the <code>@State</code> variable forward as a normal parameter.
+</p>
+
+<pre swift>
+var body: some View {
+    NavigationStack {
+        MyListView(sortOrder: sortOrder) // State automatically flows downward
+    }
+}
+</pre>
+
+<div id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Why this is highly repeatable"><h3 id="Why this is highly repeatable" class="header"><a href="#Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Why this is highly repeatable">Why this is highly repeatable</a></h3></div>
+
+<p>
+This layout scales cleanly. If you later decide to add a <span id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Why this is highly repeatable-Search Bar"></span><strong id="Search Bar">Search Bar</strong> or a <span id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Why this is highly repeatable-Category Filter"></span><strong id="Category Filter">Category Filter</strong>, you do not need to rewrite your views again. You simply expand the child view's initializer to accept a filter string or predicate alongside the sorting rules, allowing <code>ContentView</code> to remain a lightweight control dashboard while the subview handles the database heavy lifting.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
