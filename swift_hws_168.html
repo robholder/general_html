@@ -236,6 +236,10 @@ Now that we have specifically told Swift how to convert between JSON and Swift n
 So, while you do need to know how to create custom <code>Codable</code> conformance, it’s generally best practice to do without it if these other options are possible.
 </p>
 
+<p>
+By the way, that <code>String</code> protocol is for string 'keys', not values! All keys must be strings, but values can be anything.
+</p>
+
 <div id="Hacking With Swift - 168 - Key points-Completely custom Codable implementations"><h2 id="Completely custom Codable implementations" class="header"><a href="#Hacking With Swift - 168 - Key points-Completely custom Codable implementations">Completely custom Codable implementations</a></h2></div>
 
 <p>
@@ -313,6 +317,14 @@ Both of these take quite a bit of code, but helpfully Xcode can sometimes help. 
 <p>
 Your finished <code>User</code> struct should look like this:
 </p>
+
+<table>
+<tr>
+<td>
+THIS WOULD NOT WORK - THIS IS AN EXAMPLE OF WHAT YOU'D EXPECT THE STRUCT TO BE LIKE - SEE BELOW
+</td>
+</tr>
+</table>
 
 <pre swift>
 struct User: Codable {
@@ -454,6 +466,143 @@ try container.encode(String(self.age), forKey: .age)
 I know creating the custom implementation seems like a lot of hassle, but as you can see it gives us exact control over what happens: we can add any kind of logic to our loading and saving, changing names, changing types, providing default values, and more.
 </p>
 
+<div id="Hacking With Swift - 168 - Key points-Completely custom Codable implementations-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 168 - Key points-Completely custom Codable implementations-In Context">In Context</a></h3></div>
+
+<pre swift>
+struct User: Codable {
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first"
+        case lastName = "last"
+        case age
+    }
+
+    var firstName: String
+    var lastName: String
+    var age: Int
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.firstName = try container.decode(String.self, forKey: .firstName)
+        self.lastName = try container.decode(String.self, forKey: .lastName)
+        let stringAge = try container.decode(String.self, forKey: .age)
+        self.age = Int(stringAge) ?? 0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.firstName, forKey: .firstName)
+        try container.encode(self.lastName, forKey: .lastName)
+        try container.encode(String(self.age), forKey: .age)
+    }}
+</pre>
+
+<p>
+This second version from the tutorial is exactly what you need.
+</p>
+
+<div id="Hacking With Swift - 168 - Key points-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 168 - Key points-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+If you tried to run the first version (before the String/Int conversion), the app would crash instantly with a <code>typeMismatch</code> error the second it encountered the age property.
+</p>
+
+<p>
+Here is why your refactoring is completely necessary for this specific JSON payload.
+</p>
+
+<div id="Hacking With Swift - 168 - Key points-Ai Insight-The Problem in the First Version"><h3 id="The Problem in the First Version" class="header"><a href="#Hacking With Swift - 168 - Key points-Ai Insight-The Problem in the First Version">The Problem in the First Version</a></h3></div>
+
+<p>
+Look closely at how age is represented in your raw JSON string:
+</p>
+
+<pre json>
+"age": "13"
+</pre>
+
+<p>
+Because the <code>13</code> is wrapped in quotation marks, JavaScript/JSON rules define this value strictly as a <span id="Hacking With Swift - 168 - Key points-Ai Insight-The Problem in the First Version-String"></span><strong id="String">String</strong>, not a number.
+</p>
+
+<p>
+In the first version, we had:
+</p>
+
+<pre swift>
+self.age = try container.decode(Int.self, forKey: .age)
+</pre>
+
+<p>
+The <code>JSONDecoder</code> is very literal. It goes to the <code>"age"</code> key, sees a string <code>"13"</code>, and says: <em>"Hey, you asked me to decode an Int.self, but I found a String instead!"</em>
+</p>
+
+<p>
+It immediately panics and throws an error, failing to parse the user entirely.
+</p>
+
+<div id="Hacking With Swift - 168 - Key points-Ai Insight-Why Your Second Version Fixes It"><h3 id="Why Your Second Version Fixes It" class="header"><a href="#Hacking With Swift - 168 - Key points-Ai Insight-Why Your Second Version Fixes It">Why Your Second Version Fixes It</a></h3></div>
+
+<p>
+The second version elegantly fixes this mismatch by breaking the process down into two manual steps during decoding and encoding:
+</p>
+
+<div id="Hacking With Swift - 168 - Key points-Ai Insight-Why Your Second Version Fixes It-Decoding (Reading)"><h4 id="Decoding (Reading)" class="header"><a href="#Hacking With Swift - 168 - Key points-Ai Insight-Why Your Second Version Fixes It-Decoding (Reading)">Decoding (Reading)</a></h4></div>
+
+<ul>
+<li>
+You safely decode the raw value as a <code>String</code> first, which matches what is actually inside the JSON file:
+
+</ul>
+  
+<pre swift>
+let stringAge = try container.decode(String.self, forKey: .age)
+</pre>
+
+<ul>
+<li>
+You use Swift's built-in initializer (<code>Int(...)</code>) to manually cast that text into a real integer, providing a safe fallback (<code>?? 0</code>) just in case the JSON string ever contains bad data like <code>"thirteen"</code>:
+
+</ul>
+  
+<pre swift>
+   self.age = Int(stringAge) ?? 0
+</pre>
+
+<div id="Hacking With Swift - 168 - Key points-Ai Insight-Encoding (Writing)"><h3 id="Encoding (Writing)" class="header"><a href="#Hacking With Swift - 168 - Key points-Ai Insight-Encoding (Writing)">Encoding (Writing)</a></h3></div>
+
+<p>
+When you convert your struct back into JSON, you perform the reverse trick. Since your internal Swift property is an actual integer (<code>13</code>), you cast it back into a <code>String</code> so that the output matches the original quotation-marked formatting requirements of your data source:
+</p>
+
+<pre swift>
+try container.encode(String(self.age), forKey: .age)
+</pre>
+
+<div id="Hacking With Swift - 168 - Key points-Pro Tip: The &quot;Clean&quot; Alternative (Decoding Strategies)"><h2 id="Pro Tip: The &quot;Clean&quot; Alternative (Decoding Strategies)" class="header"><a href="#Hacking With Swift - 168 - Key points-Pro Tip: The &quot;Clean&quot; Alternative (Decoding Strategies)">Pro Tip: The "Clean" Alternative (Decoding Strategies)</a></h2></div>
+
+<p>
+Writing custom <code>init(from:)</code> and <code>encode(to:)</code> boilerplate code just to convert a stringy-number can get exhausting.
+</p>
+
+<p>
+If you are dealing with a web API that constantly wraps numbers in strings, <code>JSONDecoder</code> has a built-in switch you can flip to handle this automatically without changing your properties or writing custom initializers.
+</p>
+
+<p>
+You could use your first simple struct layout (without any custom <code>init</code> or <code>encode</code> blocks at all), and simply configure your decoder like this before processing the data:
+</p>
+
+<pre swift>
+let decoder = JSONDecoder()
+
+// This tells the decoder: "If you expect an Int but find a String, try to parse it anyway!"
+decoder.allowsJSON5 = true // If parsing standard JSON5 specs
+// Or alternatively in some custom environments via a non-lossy strategy:
+</pre>
+
+<p>
+<em>(Note: Since pure native foundation JSONDecoder doesn't have an explicit loose-type mapping toggle for standard types, your manual solution in version 2 remains the most foolproof and production-stable approach for handling poorly-typed JSON APIs!)</em>
+</p>
 
 <p>
 <hr>
