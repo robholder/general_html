@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_168</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_167.html">Hacking With Swift - 167 - What you learned</a>
+
+</ul>
+<div id="Hacking With Swift - 168 - Key points"><h1 id="Hacking With Swift - 168 - Key points" class="header"><a href="#Hacking With Swift - 168 - Key points">Hacking With Swift - 168 - Key points</a></h1></div>
+
+<div id="Hacking With Swift - 168 - Key points-Key Points"><h2 id="Key Points" class="header"><a href="#Hacking With Swift - 168 - Key points-Key Points">Key Points</a></h2></div>
+
+<p>
+Although we’ve covered a lot in these last three projects, there is one thing in particular I’d like to cover in more detail: advanced usages of <code>Codable</code>. We already looked at this a little in our projects, but it's a topic that deserves some additional time as you’ll see…
+</p>
+
+<p>
+Tip: If you want to know how to make SwiftData models work with <code>Codable</code>, you should read this fully.
+</p>
+
+<div id="Hacking With Swift - 168 - Key points-Key Points-Custom Codable keys"><h3 id="Custom Codable keys" class="header"><a href="#Hacking With Swift - 168 - Key points-Key Points-Custom Codable keys">Custom Codable keys</a></h3></div>
+
+<p>
+When we have JSON data that matches the way we’ve designed our types, <code>Codable</code> works perfectly. In fact, we often don’t need to do anything other than add <code>Codable</code> conformance – the Swift compiler will synthesize everything we need automatically.
+</p>
+
+<p>
+However, a lot of the time things aren’t so straightforward, and there are three options for working with more complex data:
+</p>
+
+<ul>
+<li>
+Asking Swift to convert property names automatically.
+
+<li>
+Creating custom property name conversions.
+
+<li>
+Creating completely custom encoding and decoding.
+
+</ul>
+<p>
+Generally speaking you should prefer them in that order, with option 1 being most preferable and option 3 being least.
+</p>
+
+<p>
+Let's work through the first two, one at a time. I'll leave option 3 for the time being, because it's comparatively tricky!
+</p>
+
+<p>
+Asking Swift to convert property names automatically is useful when our incoming JSON uses a different naming convention for its properties. For example, we might receive JSON property names in snake case (e.g. <code>first_name</code>) whereas our Swift code uses property names in camel case (e.g. <code>firstName</code>).
+</p>
+
+<p>
+<code>Codable</code> is able to translate between these two as long as it knows what to expect: we need to set a property on our decoder called <code>keyDecodingStrategy</code>.
+</p>
+
+<p>
+To demonstrate this, here’s a <code>User</code> struct with two properties:
+</p>
+
+<pre swift>
+struct User: Codable {
+    var firstName: String
+    var lastName: String
+}
+</pre>
+
+<p>
+That uses the naming convention typically used in Swift code, called camel case because the practice of uppercasing the first letters of words is a bit like humps on a camels back.
+</p>
+
+<p>
+Now here is some JSON data with the same two properties:
+</p>
+
+<pre swift>
+let str = """
+{
+    "first_name": "Andrew",
+    "last_name": "Glouberman"
+}
+"""
+
+let data = Data(str.utf8)
+</pre>
+
+<p>
+That JSON data uses snake case, which is a naming convention where property names are written all in lowercase with words separated by underscores.
+</p>
+
+<p>
+If we try to decode that JSON into a <code>User</code> instance, it won’t work because the two properties have different naming styles:
+</p>
+
+<pre swift>
+do {
+    let decoder = JSONDecoder()
+
+    let user = try decoder.decode(User.self, from: data)
+    print("Hi, I'm \(user.firstName) \(user.lastName)")
+} catch {
+    print("Whoops: \(error.localizedDescription)")
+} 
+</pre>
+
+<p>
+However, if we modify the key decoding strategy before we call <code>decode()</code>, we can ask Swift to convert snake case to and from camel case. So, this will succeed:
+</p>
+
+<pre swift>
+do {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+    let user = try decoder.decode(User.self, from: data)
+    print("Hi, I'm \(user.firstName) \(user.lastName)")
+} catch {
+    print("Whoops: \(error.localizedDescription)")
+} 
+</pre>
+
+<p>
+That works great when we’re converting snake_case to and from camelCase, but what if our property names are completely different? This is where we need to rely on the second option: creating custom property name conversions.
+</p>
+
+<p>
+As an example, take a look at this JSON:
+</p>
+
+<pre swift>
+let str = """
+{
+    "first": "Andrew",
+    "last": "Glouberman"
+}
+"""
+</pre>
+
+<p>
+It still has the first and last name of a user, but the property names don’t match our struct at all.
+</p>
+
+<p>
+When we were looking at <code>Codable</code> I said that we can create an enum of coding keys that describe which keys should be encoded and decoded. At the time I said “this enum is conventionally called <code>CodingKeys</code>, with an S on the end, but you can call it something else if you want,” and while that’s true it’s not the whole story.
+</p>
+
+<p>
+You see, the reason we conventionally use <code>CodingKeys</code> for the name is that this name has super powers: if a <code>CodingKeys</code> enum exists, Swift will automatically use it to decide how to encode and decode an object for times we don’t provide custom <code>Codable</code> implementations.
+</p>
+
+<p>
+I realize that’s a lot to take in, so it’s best demonstrated with some code. Try changing the User struct to this:
+</p>
+
+<pre swift>
+struct User: Codable {
+    enum ZZZCodingKeys: CodingKey {
+        case firstName
+    }
+
+    var firstName: String
+    var lastName: String
+}
+</pre>
+
+<p>
+That code will compile just fine, because the name <code>ZZZCodingKeys</code> is meaningless to Swift – it’s just a nested enum. But if you rename the enum to just <code>CodingKeys</code> you’ll find the code no longer builds: we’re now instructing Swift to encode and decode just the <code>firstName</code> property, which means there is no initializer that handles setting the <code>lastName</code> property - and that’s not allowed.
+</p>
+
+<p>
+All this matters because <code>CodingKeys</code> has a second super power: when we attach raw value strings to our properties, Swift will use those for the JSON property names. That is, the case names should match our Swift property names, and the case values should match the JSON property names.
+</p>
+
+<p>
+So, let’s return to our example JSON:
+</p>
+
+<pre swift>
+let str = """
+{
+    "first": "Andrew",
+    "last": "Glouberman"
+}
+"""
+</pre>
+
+<p>
+That uses “first” and “last” for property names, whereas our <code>User</code> struct uses <code>firstName</code> and <code>lastName</code>. This is a great place where <code>CodingKeys</code> can come to the rescue: we don’t need to write a custom <code>Codable</code> conformance, because we can just add coding keys that marry up our Swift property names to the JSON property names, like this:
+</p>
+
+<pre swift>
+struct User: Codable {
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first"
+        case lastName = "last"
+    }
+
+    var firstName: String
+    var lastName: String
+}
+</pre>
+
+<p>
+Now that we have specifically told Swift how to convert between JSON and Swift naming, we no longer need to use <code>keyDecodingStrategy</code> – just adding that enum is enough.
+</p>
+
+<p>
+So, while you do need to know how to create custom <code>Codable</code> conformance, it’s generally best practice to do without it if these other options are possible.
+</p>
+
+<div id="Hacking With Swift - 168 - Key points-Completely custom Codable implementations"><h2 id="Completely custom Codable implementations" class="header"><a href="#Hacking With Swift - 168 - Key points-Completely custom Codable implementations">Completely custom Codable implementations</a></h2></div>
+
+<p>
+So far you've seen how to let Swift map between snake case and camel case, and how we can specify mappings when JSON has one name and Swift uses an entirely different one.
+</p>
+
+<p>
+This last option is for times when the changes are even bigger, such as if the JSON data provides a number as a string. However, it's also useful when you want to make SwiftData models conform to <code>Codable</code>, as you'll see.
+</p>
+
+<p>
+First, let's try some new JSON that demonstrates the problem:
+</p>
+
+<pre swift>
+let str = """
+{
+    "first": "Andrew",
+    "last": "Glouberman",
+    "age": "13"
+}
+"""
+</pre>
+
+<p>
+As you can see, that has unhelpful names for first name and last, but also stores a number inside a string. While there's very little we can do to fix up JSON data coming from an external server, we certainly don't want its weirdness to infect our code – that's an integer, and we want it to be stored as one in our Swift code.
+</p>
+
+<p>
+So, we might define a <code>User</code> struct like this, so we correct the first and last name properties, and store <code>age</code> as an integer:
+</p>
+
+<pre swift>
+struct User: Codable {
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first"
+        case lastName = "last"
+        case age
+    }
+
+    var firstName: String
+    var lastName: String
+    var age: Int
+}
+</pre>
+
+<p>
+But now we have a problem: while Swift can convert the property names for us, it can't handle different data types.
+</p>
+
+<p>
+For this we need to create a completely custom <code>Codable</code> implementation which means adding two things to the <code>User</code> struct:
+</p>
+
+<ul>
+<li>
+A new initializer that accepts a <code>Decoder</code> instance and knows how to read our properties from it.
+
+<li>
+A new <code>encode(to:)</code> method that accepts an <code>Encoder</code> instance and knows how to write our properties to it.
+
+</ul>
+<p>
+<span id="Hacking With Swift - 168 - Key points-Completely custom Codable implementations-Tip"></span><strong id="Tip">Tip</strong>: Swift uses <code>Decoder</code> and <code>Encoder</code> here because there are lots of ways of converting data to and from Swift objects – JSON is just one of several options.
+</p>
+
+<p>
+Both of these take quite a bit of code, but helpfully Xcode can sometimes help. In this case it will actually fill in all the code required to make both these work: type <code>init</code> in the space below the properties, then press return with <code>init(from decoder: Decoder)</code> selected, then type <code>encode</code> and press return with <code>encode(to encoder: Encoder)</code> selected.
+</p>
+
+<p>
+Your finished <code>User</code> struct should look like this:
+</p>
+
+<pre swift>
+struct User: Codable {
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first"
+        case lastName = "last"
+        case age
+    }
+
+    var firstName: String
+    var lastName: String
+    var age: Int
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.firstName = try container.decode(String.self, forKey: .firstName)
+        self.lastName = try container.decode(String.self, forKey: .lastName)
+        self.age = try container.decode(Int.self, forKey: .age)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.firstName, forKey: .firstName)
+        try container.encode(self.lastName, forKey: .lastName)
+        try container.encode(self.age, forKey: .age)
+    }
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 168 - Key points-Completely custom Codable implementations-Tip"></span><strong id="Tip">Tip</strong>: If this were a class rather than a struct, the new initializer would need to be marked with <code>required</code> so that any subclasses are required to implement it.
+</p>
+
+<p>
+That's a lot of code, but really only four lines matter: two from the initializer, and two from <code>encode(to:)</code>.
+</p>
+
+<p>
+The first line that matters is this, from the initializer:
+</p>
+
+<pre swift>
+let container = try decoder.container(keyedBy: CodingKeys.self)
+</pre>
+
+<p>
+That uses <code>CodingKeys</code> to read all the possible keys that can be loaded from the JSON file. This looks in the <code>CodingKeys</code> enum, so we can refer to things like <code>.firstName</code> and <code>.age</code>.
+</p>
+
+<p>
+The second line that matters is this, also from the initializer:
+</p>
+
+<pre swift>
+self.firstName = try container.decode(String.self, forKey: .firstName)
+</pre>
+
+<p>
+That reads a string from the key <code>.firstName</code>, and assigns it to the <code>firstName</code> property of our struct. This part might be a bit confusing because we have <code>firstName</code> twice, so let me rephrase what the line of code does: "look in the JSON to find the property matching <code>CodingKeys.firstName</code>, and assign it to our local <code>firstName</code> value."
+</p>
+
+<p>
+This little dance matters, because <code>CodingKeys.firstName</code> isn't actually called <code>firstName</code> because we renamed it to match our JSON. So, in practice this line actually means "find the <code>first</code> property in the JSON and assign it to <code>firstName</code> in our struct" – it makes sure all the automatic renaming still happens.
+</p>
+
+<p>
+If it helps, imagine reading the code like this:
+</p>
+
+<pre swift>
+self.structFirstName = try container.decode(String.self, forKey: .jsonFirstName)
+</pre>
+
+<p>
+That's the first two interesting lines of code. The second two are effectively inverses of the first two. These are both in the <code>encode(to:)</code> method:
+</p>
+
+<pre swift>
+var container = encoder.container(keyedBy: CodingKeys.self)
+try container.encode(self.firstName, forKey: .firstName)
+</pre>
+
+<p>
+That first line means we want to create a place where we can store all our <code>CodingKeys</code> values, and the second one writes the current <code>firstName</code> property to whatever is specified in <code>CodingKeys.firstName</code> – again, that's important so we get the automatic renaming to <code>first</code>.
+</p>
+
+<p>
+At this point, chances are you're wondering how you'll ever remember this code, because it's not exactly something you can guess. So, here's my #1 tip:
+</p>
+
+<p>
+<blockquote>
+When you need to implement a custom <code>Codable</code> implementation and Xcode can't generate it for you, just create a new, simple struct with one property and a one-case <code>CodingKeys</code> enum, have Xcode generate that, then use its implementation to help you build your own for the bigger type.
+</blockquote>
+</p>
+
+<p>
+This is particularly important when working with SwiftData, where adding <code>Codable</code> support means create a custom implementation. It's annoying to have to remember all the code above, and Xcode almost certainly won't help, so just create a temporary struct that Xcode can generate a <code>Codable</code> implementation for, then use its structure to make your SwiftData model class <code>Codable</code>.
+</p>
+
+<p>
+Anyway, we got to this point because we were trying to load a string into an integer, which means making two changes to the code Xcode generated for us.
+</p>
+
+<p>
+First, this line of code needs to change:
+</p>
+
+<pre swift>
+self.age = try container.decode(Int.self, forKey: .age)
+</pre>
+
+<p>
+That attempts to read the <code>age</code> property as an integer, which will fail. Instead, we need to read it as a string, then convert that to an integer or provide a default value if conversion fails. Replace the code with this:
+</p>
+
+<pre swift>
+let stringAge = try container.decode(String.self, forKey: .age)
+self.age = Int(stringAge) ?? 0
+</pre>
+
+<p>
+The second thing that needs to change is in <code>encode(to:)</code>, so if we need to write any JSON we keep the existing format. Here, this line needs to change:
+</p>
+
+<pre swift>
+try container.encode(self.age, forKey: .age)
+</pre>
+
+<p>
+That writes an integer, but it needs to write a string like this:
+</p>
+
+<pre swift>
+try container.encode(String(self.age), forKey: .age)
+</pre>
+
+<p>
+I know creating the custom implementation seems like a lot of hassle, but as you can see it gives us exact control over what happens: we can add any kind of logic to our loading and saving, changing names, changing types, providing default values, and more.
+</p>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
