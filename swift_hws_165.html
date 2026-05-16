@@ -243,6 +243,415 @@ var body: some View {
 This layout scales cleanly. If you later decide to add a <span id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Why this is highly repeatable-Search Bar"></span><strong id="Search Bar">Search Bar</strong> or a <span id="Adding the Sort Functionality-Step-by-Step Refactoring Checklist-Why this is highly repeatable-Category Filter"></span><strong id="Category Filter">Category Filter</strong>, you do not need to rewrite your views again. You simply expand the child view's initializer to accept a filter string or predicate alongside the sorting rules, allowing <code>ContentView</code> to remain a lightweight control dashboard while the subview handles the database heavy lifting.
 </p>
 
+<div id="Adding the Sort Functionality-In One Refactored File"><h2 id="In One Refactored File" class="header"><a href="#Adding the Sort Functionality-In One Refactored File">In One Refactored File</a></h2></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+// ==========================================
+// DATA MODEL
+// ==========================================
+@Model
+class ExpenseItem {
+    var name: String
+    var type: String
+    var amount: Double
+    
+    init(name: String, type: String, amount: Double) {
+        self.name = name
+        self.type = type
+        self.amount = amount
+    }
+}
+
+// ==========================================
+// ROW VISUAL COMPONENT
+// ==========================================
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary
+        case ..&lt;100: return .green
+        default: return .red
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor)
+        }
+    }
+}
+
+// ==========================================
+// PARENT VIEW (Step 3 &amp; 4)
+// Acts as the control dashboard for State and UI controls
+// ==========================================
+struct ContentView: View {
+    // STEP 3a: Define a @State variable to store the active sorting rule.
+    // We use an array of SortDescriptors to allow for fallback sorting (e.g., if amounts are equal, sort by name).
+    @State private var sortOrder = [
+        SortDescriptor(\ExpenseItem.name),
+        SortDescriptor(\ExpenseItem.amount)
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            // STEP 4: Inject the child view into the hierarchy, passing our active @State forward.
+            // Whenever 'sortOrder' changes here, SwiftUI automatically recreates ExpenseListView.
+            ExpenseListView(sortOrder: sortOrder)
+                .navigationTitle("iExpense")
+                .toolbar {
+                    NavigationLink {
+                        AddView()
+                    } label: {
+                        Label("Add Expense", systemImage: "plus")
+                    }
+                    
+                    // STEP 3b: Build the Menu and Picker UI.
+                    // The Picker selection binds directly to our @State property.
+                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                        Picker("Sort", selection: $sortOrder) {
+                            // The .tag array types must match the type of our @State property exactly.
+                            Text("Sort by Name")
+                                .tag([
+                                    SortDescriptor(\ExpenseItem.name),
+                                    SortDescriptor(\ExpenseItem.amount),
+                                ])
+                            Text("Sort by Amount")
+                                .tag([
+                                    SortDescriptor(\ExpenseItem.amount),
+                                    SortDescriptor(\ExpenseItem.name)
+                                ])
+                        }
+                    }
+                }
+        }
+    }
+}
+
+// ==========================================
+// CHILD VIEW (Step 1 &amp; 2)
+// Handles the database query execution and data layout
+// ==========================================
+struct ExpenseListView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    // STEP 1a: Cut the original @Query out of ContentView and paste it here.
+    // Leave it uninitialized so it can be dynamically configured in the init method.
+    @Query var items: [ExpenseItem]
+    
+    // STEP 2: Create a custom initializer to intercept the sorting data from the parent.
+    init(sortOrder: [SortDescriptor&lt;ExpenseItem&gt;]) {
+        // The underscore (_) bypasses the wrapped array data and targets the underlying Query structure itself.
+        // This is where the live database stream gets configured with the fresh sorting rules.
+        _items = Query(sort: sortOrder)
+    }
+    
+    // STEP 1b: Paste the data-dependent computed properties inside the child view.
+    var personalExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Personal" }
+    }
+    var businessExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Business" }
+    }
+    
+    var body: some View {
+        // STEP 1c: Paste the original List structural layout here.
+        List {
+            Section("Personal") {
+                ForEach(personalExpenses) { item in
+                    ExpenseRow(item: item)
+                }
+                .onDelete { offsets in
+                    removeItems(at: offsets, in: personalExpenses)
+                }
+            }
+            
+            Section("Business") {
+                ForEach(businessExpenses) { item in
+                    ExpenseRow(item: item)
+                }
+                .onDelete { offsets in
+                    removeItems(at: offsets, in: businessExpenses)
+                }
+            }
+        }
+    }
+    
+    // STEP 1d: Paste the database mutator function inside the child view.
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            modelContext.delete(item)
+        }
+    }
+}
+
+// ==========================================
+// PREVIEWS
+// ==========================================
+#Preview("Main Dashboard") {
+    ContentView()
+        .modelContainer(for: ExpenseItem.self, inMemory: true)
+}
+
+#Preview("Isolated List View") {
+    // When previewing the child view directly, you must manually pass a starting sort order.
+    ExpenseListView(sortOrder: [SortDescriptor(\ExpenseItem.name)])
+        .modelContainer(for: ExpenseItem.self, inMemory: true)
+}
+</pre>
+
+<div id="Previews"><h1 id="Previews" class="header"><a href="#Previews">Previews</a></h1></div>
+
+<p>
+The additions to the <code>#Preview</code> blocks (from those showing in Paul Hudson's examples so far) are the difference between a preview canvas that crashes or stays blank, and one that actually simulates your app flawlessly while you type.
+</p>
+
+<p>
+There are two major improvements added here: <span id="Previews-Naming the Canvas"></span><strong id="Naming the Canvas">Naming the Canvas</strong> and <span id="Previews-Injecting an In-Memory Database."></span><strong id="Injecting an In-Memory Database.">Injecting an In-Memory Database.</strong>
+</p>
+
+<div id="Previews-1. Naming the Canvas (The String Labels)"><h3 id="1. Naming the Canvas (The String Labels)" class="header"><a href="#Previews-1. Naming the Canvas (The String Labels)">1. Naming the Canvas (The String Labels)</a></h3></div>
+
+<p>
+By adding a string like <code>"Main Dashboard"</code> right next to <code>#Preview</code>, you are giving that specific preview block a custom title.
+</p>
+
+<p>
+When your file starts growing and contains multiple preview blocks (like having one for the full view and one for just the list row), Xcode will display tabs or titles at the top of your canvas pane. Labeling them makes it incredibly easy to switch between different view states without guessing which preview is which.
+</p>
+
+<div id="Previews-2. The Database Injector: .modelContainer(..., inMemory: true)"><h3 id="2. The Database Injector: .modelContainer(..., inMemory: true)" class="header"><a href="#Previews-2. The Database Injector: .modelContainer(..., inMemory: true)">2. The Database Injector: .modelContainer(..., inMemory: true)</a></h3></div>
+
+<p>
+This is the most critical addition. If you try to run your original preview blocks, Xcode will likely throw a preview crash or display a blank screen.
+</p>
+
+<div id="Previews-2. The Database Injector: .modelContainer(..., inMemory: true)-The Logic Behind It"><h4 id="The Logic Behind It" class="header"><a href="#Previews-2. The Database Injector: .modelContainer(..., inMemory: true)-The Logic Behind It">The Logic Behind It</a></h4></div>
+
+<p>
+Remember earlier when we discussed how <code>@Query</code> and <code>@Environment(\.modelContext)</code> work? They rely entirely on a database container existing at the root of the app (<code>iExpensesApp.swift</code>).
+</p>
+
+<p>
+However, <span id="Previews-2. The Database Injector: .modelContainer(..., inMemory: true)-The Logic Behind It-the Xcode Preview canvas doesn't run your App struct."></span><strong id="the Xcode Preview canvas doesn't run your App struct.">the Xcode Preview canvas doesn't run your App struct.</strong> It treats <code>ContentView</code> or <code>ExpenseListView</code> as the absolute root of the universe.
+</p>
+
+<p>
+Because of this, when your code hits <code>@Query</code> or tries to fetch the <code>modelContext</code>, it looks up into that "environment bucket"—and finds nothing. The app crashes because the database layer doesn't exist inside the preview sandbox.
+</p>
+
+<div id="Previews-What .modelContainer(..., inMemory: true) solves:"><h3 id="What .modelContainer(..., inMemory: true) solves:" class="header"><a href="#Previews-What .modelContainer(..., inMemory: true) solves:">What .modelContainer(..., inMemory: true) solves:</a></h3></div>
+
+<p>
+By attaching this modifier to the view inside the preview block, you are manually dropping a temporary database into the environment bucket <em>just</em> for the canvas.
+</p>
+
+<ul>
+<li>
+<code>for: ExpenseItem.self</code>: Tells the preview canvas to prepare tables for your expense objects.
+
+<li>
+<code>inMemory: true</code>: This is a brilliant safety setting. It tells SwiftData to build the database completely inside the computer's temporary RAM, <span id="Previews-What .modelContainer(..., inMemory: true) solves:-not on the hard drive."></span><strong id="not on the hard drive.">not on the hard drive.</strong>
+
+</ul>
+<div id="Previews-Why inMemory: true is crucial for development:"><h3 id="Why inMemory: true is crucial for development:" class="header"><a href="#Previews-Why inMemory: true is crucial for development:">Why inMemory: true is crucial for development:</a></h3></div>
+
+<p>
+If you don't use <code>inMemory: true</code>, your preview engine will attempt to read and write to your actual simulator's database file. This can pollute your real testing data with weird "dummy text" you typed while testing layouts, or cause file-locking conflicts if your simulator is running at the same time.
+</p>
+
+<p>
+With an in-memory container, every time the canvas refreshes, you get a pristine, completely blank slate that vanishes the second you close Xcode.
+</p>
+
+<div id="Previews-Why inMemory: true is crucial for development:-Summary Checklist for Future Previews"><h4 id="Summary Checklist for Future Previews" class="header"><a href="#Previews-Why inMemory: true is crucial for development:-Summary Checklist for Future Previews">Summary Checklist for Future Previews</a></h4></div>
+
+<p>
+Whenever you are creating a SwiftUI file that utilizes <span id="Previews-Why inMemory: true is crucial for development:-Summary Checklist for Future Previews-SwiftData"></span><strong id="SwiftData">SwiftData</strong> (<code>@Query</code> or <code>modelContext</code>), your preview blocks must mirror this exact strategy:
+</p>
+
+<ul>
+<li>
+Always pass dependencies: If your child view requires initialization variables (like <code>sortOrder</code>), pass sample ones into the preview call.
+
+<li>
+Always attach a container: Append <code>.modelContainer(for: YourClass.self, inMemory: true)</code> to ensure the preview engine doesn't crash from an empty environment bucket.
+
+</ul>
+<div id="Previews-In Context - With Sort Menu"><h3 id="In Context - With Sort Menu" class="header"><a href="#Previews-In Context - With Sort Menu">In Context - With Sort Menu</a></h3></div>
+
+<div id="Previews-In Context - With Sort Menu-ExpenseListView.swift"><h4 id="ExpenseListView.swift" class="header"><a href="#Previews-In Context - With Sort Menu-ExpenseListView.swift">ExpenseListView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ExpenseListView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    // The query is uninitialized here...
+    @Query var items: [ExpenseItem]
+    
+    // ...and dynamically configured here when the view is created!
+    init(sortOrder: [SortDescriptor&lt;ExpenseItem&gt;]) {
+        _items = Query(sort: sortOrder)
+    }
+    
+    var personalExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Personal" }
+    }
+    var businessExpenses: [ExpenseItem] {
+        items.filter { $0.type == "Business" }
+    }
+    
+    var body: some View {
+        List {
+            Section("Personal") {
+                ForEach(personalExpenses) { item in
+                    ExpenseRow(item: item)
+                }
+                .onDelete { offsets in
+                    removeItems(at: offsets, in: personalExpenses)
+                }
+            }
+            
+            Section("Business") {
+                ForEach(businessExpenses) { item in
+                    ExpenseRow(item: item)
+                }
+                .onDelete { offsets in
+                    removeItems(at: offsets, in: businessExpenses)
+                }
+            }
+        }
+    }
+    
+    func removeItems(at offsets: IndexSet, in source: [ExpenseItem]) {
+        for offset in offsets {
+            let item = source[offset]
+            modelContext.delete(item)
+        }
+    }
+}
+
+#Preview {
+    ExpenseListView(sortOrder: [SortDescriptor(\ExpenseItem.name)])
+}
+</pre>
+
+<div id="Previews-In Context - With Sort Menu-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Previews-In Context - With Sort Menu-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+// Convert struct to @Model class: remove protocols
+@Model
+class ExpenseItem {
+    
+    var name: String
+    var type: String
+    var amount: Double
+    
+    init(name: String, type: String, amount: Double) {
+        self.name = name
+        self.type = type
+        self.amount = amount
+    }
+}
+
+// Deleted Expenses from here
+// GONE!
+
+struct ExpenseRow: View {
+    let item: ExpenseItem
+    
+    var amountColor: Color {
+        switch item.amount {
+        case ..&lt;10: return .primary      // Standard text color
+        case ..&lt;100: return .green      // Mid-range
+        default: return .red            // High expense
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary) // Faded grey look
+            }
+            
+            Spacer() // Pushes the following content to the far right
+            
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                .foregroundStyle(amountColor) // Applies our custom switch-case color
+        }
+    }
+}
+
+struct ContentView: View {
+    @State private var sortOrder = [
+        SortDescriptor(\ExpenseItem.name),
+        SortDescriptor(\ExpenseItem.amount)
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            // Drop our new subview here and pass the sortOrder state!
+            ExpenseListView(sortOrder: sortOrder)
+                .navigationTitle("iExpense")
+                .toolbar {
+                    NavigationLink {
+                        AddView()
+                    } label: {
+                        Label("Add Expense", systemImage: "plus")
+                    }
+                    
+                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                        Picker("Sort", selection: $sortOrder) {
+                            Text("Sort by Name")
+                                .tag([
+                                    SortDescriptor(\ExpenseItem.name),
+                                    SortDescriptor(\ExpenseItem.amount),
+                                ])
+                            Text("Sort by Amount")
+                                .tag([
+                                    SortDescriptor(\ExpenseItem.amount),
+                                    SortDescriptor(\ExpenseItem.name)
+                                ])
+                        }
+                    }
+                }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 <p>
 <hr>
 <br>
