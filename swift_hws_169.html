@@ -148,11 +148,11 @@ Here's the brief, as laid out in the challenge from Paul Hudson:
 <div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
 
 <p>
-It is completely normal to feel overwhelmed by this challenge. Paul Hudson calls this "expansive" for a reason-it is the first time you are connecting multiple distinct pillars of iOS development (Networking, Data Parsing, UI layout, and State Management) completely from scratch.
+It is completely normal to feel overwhelmed by this challenge. Paul Hudson calls this "expansive" for a reason - it is the first time you are connecting multiple distinct pillars of iOS development (Networking, Data Parsing, UI layout, and State Management) completely from scratch.
 </p>
 
 <p>
-Take a deep breath. We are going to conquer this by applying the <span id="Ai Insight-ANSWER-&quot;Divide and Conquer&quot;"></span><strong id="&quot;Divide and Conquer&quot;">"Divide and Conquer"</strong> principle. We will treat each requirement as a completely isolated micro-task so you don't have to think about the whole app all at once.
+Take a deep breath. We are going to achieve this by applying the <span id="Ai Insight-ANSWER-&quot;Divide and Conquer&quot;"></span><strong id="&quot;Divide and Conquer&quot;">"Divide and Conquer"</strong> principle. We will treat each requirement as a completely isolated micro-task so you don't have to think about the whole app all at once.
 </p>
 
 <p>
@@ -169,7 +169,7 @@ Before you write any UI or networking code, you need Swift types that perfectly 
 
 <ul>
 <li>
-Open the JSON URL in your browser and look at the structure. You will see an array of objects. Inside each object is another array called <code>friends</code>.
+Open the JSON URL in your browser and look at the structure. You will see an array of objects. Inside each of these objects is another sub-array called <code>friends</code>.
 
 <li>
 Create a new Swift file named <code>User.swift</code> and define your structures.
@@ -201,6 +201,60 @@ struct Friend: Codable, Identifiable {
     let name: String
 }
 </pre>
+
+<p>
+If you look closely at that raw JSON file, the id value is wrapped in quotation marks, making it a string:
+</p>
+
+<pre json>
+"id": "50a48c60-75b2-4cd3-9391-4c556b40523b"
+</pre>
+
+<p>
+So, why do we declare it as a UUID type instead of a String in Swift?
+</p>
+
+<div id="Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-1. The Magic of JSONDecoder"><h4 id="1. The Magic of JSONDecoder" class="header"><a href="#Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-1. The Magic of JSONDecoder">1. The Magic of JSONDecoder</a></h4></div>
+
+<p>
+<code>JSONDecoder</code> is highly intelligent. A <code>UUID</code> (Universally Unique Identifier) has a very strict, standardized format: exactly 36 characters long, broken up by four hyphens in a specific pattern (<code>8-4-4-4-12</code>).
+</p>
+
+<p>
+Because the string in the JSON matches this exact pattern, <code>JSONDecoder</code> recognizes it automatically. When you tell it to decode into a <code>UUID</code> type, it parses that text string, verifies that it is a valid unique ID format, and converts it into a native Swift <code>UUID</code> object behind the scenes.
+</p>
+
+<div id="Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-2. Why prefer UUID over String?"><h4 id="2. Why prefer UUID over String?" class="header"><a href="#Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-2. Why prefer UUID over String?">2. Why prefer UUID over String?</a></h4></div>
+
+<p>
+While your app would compile and work perfectly fine if you used <code>let id: String</code>, changing it to <code>UUID</code> offers two massive advantages:
+</p>
+
+<div id="Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-Data Safety (Type Safety)"><h4 id="Data Safety (Type Safety)" class="header"><a href="#Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-Data Safety (Type Safety)">Data Safety (Type Safety)</a></h4></div>
+
+<p>
+If you use <code>String</code>, any text is allowed. If the web server accidentally glitched and sent back <code>"id": "hello-world"</code>, a <code>String</code> type would accept it blindly. If you use <code>UUID</code>, the decoder ensures the data is a legitimate, properly formatted identifier.
+</p>
+
+<div id="Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-SwiftUI List Optimization"><h4 id="SwiftUI List Optimization" class="header"><a href="#Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-SwiftUI List Optimization">SwiftUI List Optimization</a></h4></div>
+
+<p>
+You are using a <code>List(users)</code> to display this data. For a List to be smooth and performant, SwiftUI must uniquely identify every row.
+</p>
+
+<p>
+Comparing two native <code>UUID</code> structures in memory is computationally faster for iOS than comparing two random text strings character-by-character. It ensures your list scrolling remains buttery smooth as your data footprint grows.
+</p>
+
+<div id="Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-What if the JSON IDs were simple numbers?"><h4 id="What if the JSON IDs were simple numbers?" class="header"><a href="#Ai Insight-ANSWER-Phase 1: Establish Your Data Blueprint (Models)-What if the JSON IDs were simple numbers?">What if the JSON IDs were simple numbers?</a></h4></div>
+
+<p>
+If the JSON data looked like <code>"id": 1</code> or <code>"id": "user_01"</code>, then you could not use <code>UUID</code>. In those cases, you would have to use <code>Int</code> or <code>String</code> respectively, because they don't match the universal 36-character format.
+</p>
+
+<p>
+But since Paul Hudson's data generator used standard <code>UUID</code> strings, we get to take advantage of Swift's built-in <code>UUID</code> type for free!
+</p>
 
 <div id="Ai Insight-ANSWER-Phase 2: Create a Dummy UI First"><h3 id="Phase 2: Create a Dummy UI First" class="header"><a href="#Ai Insight-ANSWER-Phase 2: Create a Dummy UI First">Phase 2: Create a Dummy UI First</a></h3></div>
 
