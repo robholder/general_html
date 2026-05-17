@@ -221,6 +221,47 @@ Create a new Swift file named <code>User.swift</code> and define your structures
 
 <pre swift>
 import Foundation
+import SwiftUI
+
+struct ContentView: View {
+    // Start with empty array as requested, but put a dummy item here temporarily to test your UI!
+    // This is the real version - when the URL is set up:
+    //@State private var users = [User]()
+    // This is the dummy user array - until the URL is set up:
+    @State var users : [User] = [User.dummyUser]
+
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink {
+                    //this will be your detail view
+                    UserDetailView(user: user)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(user.name)
+                                .font(.headline)
+                            Text(user.company)
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        //Status indicator
+                        Circle()
+                            .fill(user.isActive ? .green : .gray)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+            .navigationTitle("FriendFace")
+        }
+    }
+}
+
+#Preview("Main List Dashboard") {
+    // Pass an array containing your single dummy user into ContentView
+    ContentView(users: [User.dummyUser])
+}
+
 
 // The main object. It needs Identifiable so it plays nice with SwiftUI Lists.
 struct User: Codable, Identifiable {
@@ -641,90 +682,6 @@ Now you can visually see how the entire app links up. The data flow travels seam
 By separating your code this way, <code>ContentView</code> has one job (managing the big list and fetching data), and <code>UserDetailView</code> has one job (styling a single person's profile). This makes your app highly organized and incredibly easy to maintain!
 </p>
 
-<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User"><h3 id="#Preview Blocks - Dummy User" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User">#Preview Blocks - Dummy User</a></h3></div>
-
-<p>
-To pass your dummy user into the <code>#Preview</code> blocks, you use two different strategies depending on whether the preview is for the <span id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-Detail View"></span><strong id="Detail View">Detail View</strong> (which needs exactly one user object) or the <span id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-Content View"></span><strong id="Content View">Content View</strong> (which manages an array of users).
-</p>
-
-<p>
-Here is the exact code configuration for both preview blocks.
-</p>
-
-<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview"><h4 id="1. Passing to the UserDetailView Preview" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview">1. Passing to the UserDetailView Preview</a></h4></div>
-
-<p>
-Since your <code>UserDetailView</code> requires a single <code>User</code> object passed directly into its initializer, you can feed it your static extension property directly.
-</p>
-
-<p>
-It is best to wrap it in a <code>NavigationStack</code> inside the preview block so you can see exactly how the navigation title bar behaves on a real device.
-</p>
-
-<pre swift>
-#Preview("User Detail View") {
-    NavigationStack {
-        // Pass the static dummyUser property straight into the initializer
-        UserDetailView(user: User.dummyUser)
-    }
-}
-</pre>
-
-<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview-2. Passing to the ContentView Preview"><h5 id="2. Passing to the ContentView Preview" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview-2. Passing to the ContentView Preview">2. Passing to the ContentView Preview</a></h5></div>
-
-<p>
-The <code>ContentView</code> doesn't take parameters in its initializer because it manages its own internal data state using <code>@State private var users = [User]()</code>.
-</p>
-
-<p>
-To inject your dummy data into this array <em>only for the preview canvas</em>, you can use a hidden trick: create a custom wrapper view inside your preview block that intercepts the <code>ContentView</code> and modifies its state, or use a tiny helper function.
-</p>
-
-<p>
-However, the cleanest and most reliable way to force a <code>@State</code> array to have data inside an isolated preview block without changing your production code is to create a small "Mock" container view inside your preview file:
-</p>
-
-<pre swift>
-#Preview("Main List Dashboard") {
-    // 1. Create a lightweight temporary view wrapper
-    struct PreviewWrapper: View {
-        @State private var mockUsers = [User.dummyUser] // Array populated with our dummy
-        
-        var body: some View {
-            // We temporarily simulate your view layout using the mock state
-            NavigationStack {
-                List(mockUsers) { user in
-                    NavigationLink(user.name) {
-                        UserDetailView(user: user)
-                    }
-                }
-                .navigationTitle("FriendFace (Preview)")
-            }
-        }
-    }
-    
-    // 2. Return the wrapper to the canvas engine
-    return PreviewWrapper()
-}
-</pre>
-
-<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-Alternative: Testing live networking in Previews"><h4 id="Alternative: Testing live networking in Previews" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User-Alternative: Testing live networking in Previews">Alternative: Testing live networking in Previews</a></h4></div>
-
-<p>
-If you want to test how <code>ContentView</code> looks when it fetches the real data from Paul Hudson's live server, you don't need to pass the dummy user at all! You can let the preview run naturally:
-</p>
-
-<pre swift>
-#Preview("Live Network Test") {
-    ContentView() 
-    // The .task modifier inside your real ContentView will automatically trigger
-    // and fetch the actual JSON array from the internet right inside your canvas.
-}
-</pre>
-
-<p>
-Using these configurations ensures your Xcode design canvas stays perfectly hydrated with realistic data while you tweak your fonts, padding, and layout structures.
-</p>
 
 <div id="Ai Insight-ANSWER-Phase 3: The Data Pipeline (URLSession)"><h3 id="Phase 3: The Data Pipeline (URLSession)" class="header"><a href="#Ai Insight-ANSWER-Phase 3: The Data Pipeline (URLSession)">Phase 3: The Data Pipeline (URLSession)</a></h3></div>
 
@@ -814,6 +771,220 @@ If the app stays blank in <span id="Ai Insight-ANSWER-Why This Plan Will Keep Yo
 You are fully capable of doing this. Take it one phase at a time. Don't worry about making it visually stunning right now; focus on getting the data to flow from the web server onto your screen. You've got this!
 </p>
 
+<div id="Ai Insight-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Ai Insight-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Ai Insight-ANSWER-In Context-FriendFaceApp.swift"><h4 id="FriendFaceApp.swift" class="header"><a href="#Ai Insight-ANSWER-In Context-FriendFaceApp.swift">FriendFaceApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct FriendFaceApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-In Context-User.swift"><h4 id="User.swift" class="header"><a href="#Ai Insight-ANSWER-In Context-User.swift">User.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct User: Codable, Identifiable {
+    let id: UUID
+    let isActive: Bool
+    let name: String
+    let age: Int
+    let company: String
+    let email: String
+    let address: String
+    let about: String
+    let registered: Date // We will use Paul's .iso8601 tip for this!
+    let tags: [String]
+    let friends: [Friend] // Nested relationship
+}
+
+// The smaller object inside the user's friend array.
+struct Friend: Codable, Identifiable {
+    let id: UUID
+    let name: String
+}
+
+extension User {
+    // A single mock user for testing detail views
+    static var dummyUser: User {
+        User(
+            id: UUID(),
+            isActive: true,
+            name: "Andrew Glouberman",
+            age: 13,
+            company: "Horizons Middle School",
+            email: "andrew@friendface.com",
+            address: "123 Mockingbird Lane, Westchester, NY",
+            about: "Just a cartoon character navigating the awkward waters of adolescence.",
+            registered: Date.now,
+            tags: ["student", "anxious", "classic"],
+            friends: [
+                Friend(id: UUID(), name: "Nick Birch"),
+                Friend(id: UUID(), name: "Jessi Glaser")
+            ]
+        )
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-In Context-UserDetailView.swift"><h4 id="UserDetailView.swift" class="header"><a href="#Ai Insight-ANSWER-In Context-UserDetailView.swift">UserDetailView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct UserDetailView: View {
+    // This view receives exactly on user from ContentView
+    let user: User
+    
+    var body: some View {
+        List {
+            // Section 1: Status &amp; Company
+            Section("Status") {
+                HStack {
+                    Text("Account Status:")
+                    Spacer()
+                    Text(user.isActive ? "Active Now" : "Offline")
+                        .fontWeight(.bold)
+                        .foregroundStyle(user.isActive ? .green : .secondary)
+                }
+                // Two versions with the same result: HStack with Text, and LabeledContent
+                // HStack version:
+                //HStack {
+                //    Text("Age")
+                //    Spacer()
+                //    Text("\(user.age) years old")
+                //        //.fontWeight(.bold)
+                //        .foregroundStyle(.secondary)
+                //}
+                // LabeledContent version:
+                LabeledContent("Age", value: "\(user.age) years old")
+                LabeledContent("Company", value: "\(user.company)")
+            }
+            
+            // Section2: Contact Information
+            Section("Contact Details") {
+                LabeledContent("Email", value: user.email)
+                LabeledContent("Address", value: user.address)
+                
+                // Formatted Date display
+                LabeledContent("Registered") {
+                    Text(user.registered, style: .date)
+                }
+            }
+            
+            // Section 3: Bio / About
+            Section("About") {
+                Text(user.about)
+                    .padding(.vertical, 5)
+            }
+            
+            // Section 4: Friends List (Nested Array)
+            Section("Friends (\(user.friends.count))") {
+                ForEach(user.friends) { friend in
+                    HStack {
+                        Image(systemName: "person.crop.circle")
+                            .foregroundStyle(.blue)
+                        Text(friend.name)
+                    }
+                }
+            }
+        }
+        .navigationTitle(user.name)
+        .navigationBarTitleDisplayMode(.inline) // Keeps the title neatly centered in the bar
+    }
+}
+
+#Preview {
+    UserDetailView(user: User.dummyUser)
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Ai Insight-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    // Start with empty array as requested, but put a dummy item here temporarily to test your UI!
+    // This is the real version - when the URL is set up:
+    //@State private var users = [User]()
+    @State var users = [User]()
+    // This is the dummy user array - until the URL is set up:
+    //@State var users : [User] = [User.dummyUser]
+    
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink {
+                    //this will be your detail view
+                    UserDetailView(user: user)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(user.name)
+                                .font(.headline)
+                            Text(user.company)
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        //Status indicator
+                        Circle()
+                            .fill(user.isActive ? .green : .gray)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+            .task {
+                await loadData()
+            }
+            .navigationTitle("FriendFace")
+        }
+    }
+    
+    func loadData() async {
+        // Guard check: Don't re-download if we already have data
+        guard users.isEmpty else { return }
+        
+        // 1. Create the URL
+        guard let url = URL(string: "https://www.hackingwithswift.com/samples/friendface.json") else {
+            print("Invalid URL")
+            return
+        }
+        
+        do {
+            // 2. Fetch the raw data
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            // 3. Configure the Decoder (Crucial step for Dates!)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601 // Handles "2015-11-10T01:47:18-00:00" automatically
+            
+            // 4. Decode into our Swift types
+            let decodedUsers = try decoder.decode([User].self, from: data)
+            
+            // 5. Update our UI state
+            users = decodedUsers
+        } catch {
+            print("Decoding failed: \(error)")
+        }
+    }
+}
+
+#Preview("Main List Dashboard") {
+    // Pass an array containing your single dummy user into ContentView
+    ContentView(users: [User.dummyUser])
+}
+
+</pre>
 <p>
 <hr>
 <br>
