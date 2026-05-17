@@ -396,24 +396,31 @@ In <code>ContentView</code>, create a temporary <code>@State</code> array with o
 <li>
 Build a simple <code>List</code> and a <code>NavigationLink</code> that pushes to a detail view.
 <pre swift>
+import SwiftUI
+
 struct ContentView: View {
     // Start with empty array as requested, but put a dummy item here temporarily to test your UI!
-    @State private var users = [User]() 
-    
+    // This is the real version - when the URL is set up:
+    //@State private var users = [User]()
+    // This is the dummy user array - until the URL is set up:
+    @State var users : [User] = [User.dummyUser]
+
     var body: some View {
         NavigationStack {
             List(users) { user in
                 NavigationLink {
-                    // This will be your detail view
+                    //this will be your detail view
                     UserDetailView(user: user)
                 } label: {
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(user.name).font(.headline)
-                            Text(user.company).font(.subheadline).foregroundStyle(.secondary)
+                            Text(user.name)
+                                .font(.headline)
+                            Text(user.company)
+                                .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        // Status indicator
+                        //Status indicator
                         Circle()
                             .fill(user.isActive ? .green : .gray)
                             .frame(width: 10, height: 10)
@@ -424,6 +431,12 @@ struct ContentView: View {
         }
     }
 }
+
+#Preview("Main List Dashboard") {
+    // Pass an array containing your single dummy user into ContentView
+    ContentView(users: [User.dummyUser])
+}
+
 </pre>
 
 </ul>
@@ -473,11 +486,6 @@ extension User {
 
 <div id="Ai Insight-ANSWER-Creating Dummy Data-2. Effectively Inject It Into Your Array"><h4 id="2. Effectively Inject It Into Your Array" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data-2. Effectively Inject It Into Your Array">2. Effectively Inject It Into Your Array</a></h4></div>
 
-<p>
-You have two excellent choices depending on how you want to use this dummy data to test your layout.
-</p>
-
-<div id="Ai Insight-ANSWER-Creating Dummy Data-Option A: The &quot;Default&quot; State (Best for immediate layout testing)"><h4 id="Option A: The &quot;Default&quot; State (Best for immediate layout testing)" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data-Option A: The &quot;Default&quot; State (Best for immediate layout testing)">Option A: The "Default" State (Best for immediate layout testing)</a></h4></div>
 
 <p>
 If you want the app to launch with this user already sitting inside your list right out of the gate, assign it directly to your <code>@State</code> array property wrapper:
@@ -498,41 +506,6 @@ struct ContentView: View {
 }
 </pre>
 
-<div id="Ai Insight-ANSWER-Creating Dummy Data-Option B: The &quot;Preview Only&quot; Injected Array (Highly Recommended)"><h4 id="Option B: The &quot;Preview Only&quot; Injected Array (Highly Recommended)" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data-Option B: The &quot;Preview Only&quot; Injected Array (Highly Recommended)">Option B: The "Preview Only" Injected Array (Highly Recommended)</a></h4></div>
-
-<p>
-If you want your app to download live data on a real device, but you want your Xcode Preview Canvas to show the dummy user so it isn't blank while you design, leverage a custom <code>onAppear</code> or preview modifier.
-</p>
-
-<p>
-Keep your <code>users</code> array empty inside <code>ContentView</code>, but inject the array modification down inside your <code>#Preview</code> block:
-</p>
-
-<pre swift>
-#Preview("Main Dashboard") {
-    // 1. Create a dummy view state to display inside the canvas
-    ContentView()
-        .onAppear {
-            // This code only triggers when the preview simulator runs!
-            // It allows you to visualize your list layout without hitting the real internet.
-            // Note: If your .task downloads real data, it will eventually replace this.
-        }
-        .modelContainer(for: ExpenseItem.self, inMemory: true) // For SwiftData contexts later
-}
-</pre>
-
-<p>
-If you are just testing the <code>UserDetailView</code> directly, having <code>User.dummyUser</code> makes your canvas setup incredibly clean:
-</p>
-
-<pre swift>
-#Preview("Detail View Screen") {
-    NavigationStack {
-        // Hand the static dummy property straight to the preview pipeline
-        UserDetailView(user: User.dummyUser)
-    }
-}
-</pre>
 
 <div id="Ai Insight-ANSWER-The UserDetailView"><h3 id="The UserDetailView" class="header"><a href="#Ai Insight-ANSWER-The UserDetailView">The UserDetailView</a></h3></div>
 
@@ -578,12 +551,12 @@ Here is a clean, minimal implementation you can copy directly into your project:
 import SwiftUI
 
 struct UserDetailView: View {
-    // This view receives exactly one user from ContentView
+    // This view receives exactly on user from ContentView
     let user: User
-
+    
     var body: some View {
         List {
-            // SECTION 1: Status &amp; Company
+            // Section 1: Status &amp; Company
             Section("Status") {
                 HStack {
                     Text("Account Status:")
@@ -592,12 +565,21 @@ struct UserDetailView: View {
                         .fontWeight(.bold)
                         .foregroundStyle(user.isActive ? .green : .secondary)
                 }
-                
+                // Two versions with the same result: HStack with Text, and LabeledContent
+                // HStack version:
+                HStack {
+                    Text("Age")
+                    Spacer()
+                    Text("\(user.age) years old")
+                        //.fontWeight(.bold)
+                        .foregroundStyle(.secondary)
+                }
+                // LabeledContent version:
                 LabeledContent("Age", value: "\(user.age) years old")
-                LabeledContent("Company", value: user.company)
+                LabeledContent("Company", value: "\(user.company)")
             }
             
-            // SECTION 2: Contact Information
+            // Section2: Contact Information
             Section("Contact Details") {
                 LabeledContent("Email", value: user.email)
                 LabeledContent("Address", value: user.address)
@@ -608,13 +590,13 @@ struct UserDetailView: View {
                 }
             }
             
-            // SECTION 3: Bio / About
+            // Section 3: Bio / About
             Section("About") {
                 Text(user.about)
                     .padding(.vertical, 5)
             }
             
-            // SECTION 4: Friends List (Nested Array)
+            // Section 4: Friends List (Nested Array)
             Section("Friends (\(user.friends.count))") {
                 ForEach(user.friends) { friend in
                     HStack {
@@ -628,6 +610,10 @@ struct UserDetailView: View {
         .navigationTitle(user.name)
         .navigationBarTitleDisplayMode(.inline) // Keeps the title neatly centered in the bar
     }
+}
+
+#Preview {
+    UserDetailView(user: User.dummyUser)
 }
 </pre>
 
