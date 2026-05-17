@@ -655,6 +655,158 @@ Separation of Concerns (Recommended): Adds a couple of extra lightweight structs
 Both ways are 100% correct, but separating them usually saves a lot of headaches down the road!
 </p>
 
+<div id="Benefits of SoC - Separation of Concerns"><h1 id="Benefits of SoC - Separation of Concerns" class="header"><a href="#Benefits of SoC - Separation of Concerns">Benefits of SoC - Separation of Concerns</a></h1></div>
+
+<p>
+The <span id="Benefits of SoC - Separation of Concerns-Separation of Concerns (SoC)"></span><strong id="Separation of Concerns (SoC)">Separation of Concerns (SoC)</strong> pattern is a foundational pillar of software engineering. While it feels like you are writing "more code" upfront by splitting things into separate files or structures, it drastically pays off as your application grows.
+</p>
+
+<p>
+If you bundle your networking rules and your database rules into a single file, you build what developers call a <span id="Benefits of SoC - Separation of Concerns-&quot;Fragile Class.&quot;"></span><strong id="&quot;Fragile Class.&quot;">"Fragile Class."</strong> Change one tiny thing on your server, and your database layout breaks.
+</p>
+
+<p>
+Separating your code provides several distinct architectural advantages.
+</p>
+
+<div id="Benefits of SoC - Separation of Concerns-1. Radical Maintainability (The &quot;Shielding&quot; Effect)"><h3 id="1. Radical Maintainability (The &quot;Shielding&quot; Effect)" class="header"><a href="#Benefits of SoC - Separation of Concerns-1. Radical Maintainability (The &quot;Shielding&quot; Effect)">1. Radical Maintainability (The "Shielding" Effect)</a></h3></div>
+
+<p>
+The primary advantage of SoC is that it decouples your internal app architecture from external factors you cannot control (like a backend web server).
+</p>
+
+<p>
+Imagine six months from now, the server team updates the API. They change the JSON key from <code>company</code> to <code>employer_name</code>, and change the <code>friends</code> array format.
+</p>
+
+<ul>
+<li>
+Without Separation: You have to rewrite your Core Data / SwiftData model properties. This triggers a complex database migration for your existing app users, risking local data loss just because a web server changed.
+
+<li>
+With Separation: You only change one line inside your lightweight <code>NetworkUser</code> struct's <code>CodingKeys</code>. Your database <code>User</code> class remains completely untouched. The network model acts as a blast shield for your database.
+
+</ul>
+<div id="Benefits of SoC - Separation of Concerns-2. Decoupling Lifecycle and Memory Realities"><h3 id="2. Decoupling Lifecycle and Memory Realities" class="header"><a href="#Benefits of SoC - Separation of Concerns-2. Decoupling Lifecycle and Memory Realities">2. Decoupling Lifecycle and Memory Realities</a></h3></div>
+
+<p>
+Network data and Database data live in completely different memory spaces and have wildly different lifecycles:
+</p>
+
+<ul>
+<li>
+Network Structs are Transient: They exist for a fraction of a second. They are fetched, decoded into RAM, mapped, and immediately thrown away by Swift's automatic memory management. Structs are perfect for this because they are lightweight and copy-by-value.
+
+<li>
+Database Classes are Persistent: They are tied to a live SQLite file on the disk, managed by a <code>ModelContext</code>, track undo/redo histories, and stay alive to drive animations and UI updates.
+
+</ul>
+<p>
+Forcing a single type to manage both lifecycles simultaneously creates architectural friction.
+</p>
+
+<div id="Benefits of SoC - Separation of Concerns-3. Simplified Local Testing and Mocking"><h3 id="3. Simplified Local Testing and Mocking" class="header"><a href="#Benefits of SoC - Separation of Concerns-3. Simplified Local Testing and Mocking">3. Simplified Local Testing and Mocking</a></h3></div>
+
+<p>
+When your database models are completely decoupled from <code>Codable</code>, creating dummy data for previews or unit tests becomes a breeze.
+</p>
+
+<p>
+You don't have to simulate complex JSON strings or handle decoder exceptions just to test a feature. You simply instantiate a clean instance of your class like a normal object: <code>User(name: "Andrew")</code>. This makes writing automated unit tests vastly cleaner and faster.
+</p>
+
+<div id="Benefits of SoC - Separation of Concerns-4. Enhanced Team Collaboration"><h3 id="4. Enhanced Team Collaboration" class="header"><a href="#Benefits of SoC - Separation of Concerns-4. Enhanced Team Collaboration">4. Enhanced Team Collaboration</a></h3></div>
+
+<p>
+In larger production environments, teams are often split into different feature sets.
+</p>
+
+<pre text>
+                               ┌───────────────┐
+                               │  JSON Stream  │
+                               └───────┬───────┘
+                                       │
+                         ┌─────────────▼─────────────┐
+                         │  Network Layer (Structs)  │  ◄── Shared with Core API Team
+                         └─────────────┬─────────────┘
+                                       │ (Mapping)
+                         ┌─────────────▼─────────────┐
+                         │ Database Layer (Classes)  │  ◄── Managed by Local App Team
+                         └───────────────────────────┘
+</pre>
+
+<p>
+If the data layouts are unified, a backend engineer optimizing network payloads and a local UI engineer optimizing database query indices will constantly edit the exact same files, leading to messy Git merge conflicts. Separating the layers creates clean boundaries where developers can work concurrently without stepping on each other's toes.
+</p>
+
+<div id="Benefits of SoC - Separation of Concerns-4. Enhanced Team Collaboration-Summary: The Developer's Rule of Thumb"><h4 id="Summary: The Developer's Rule of Thumb" class="header"><a href="#Benefits of SoC - Separation of Concerns-4. Enhanced Team Collaboration-Summary: The Developer's Rule of Thumb">Summary: The Developer's Rule of Thumb</a></h4></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Metric
+</th>
+<th>
+Unified Approach (The "Mega" Class)
+</th>
+<th>
+Separation of Concerns
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Initial Setup Time
+</td>
+<td>
+⚡ Very Fast
+</td>
+<td>
+⏳ Slower (More Boilerplate)
+</td>
+</tr>
+<tr>
+<td>
+Code Readability
+</td>
+<td>
+📉 Poor (Cluttered with protocols)
+</td>
+<td>
+📈 High (Pure Swift properties)
+</td>
+</tr>
+<tr>
+<td>
+API Change Resilience
+</td>
+<td>
+🚨 Dangerous (Requires migrations)
+</td>
+<td>
+🛡️ Safe (Change localized to struct)
+</td>
+</tr>
+<tr>
+<td>
+Scalability
+</td>
+<td>
+🛑 Hard to manage past 3+ models
+</td>
+<td>
+🚀 Scales infinitely
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+For a tiny weekend project, a unified class is fine. But for anything meant to live on the App Store, <span id="Benefits of SoC - Separation of Concerns-4. Enhanced Team Collaboration-Summary: The Developer's Rule of Thumb-Separation of Concerns"></span><strong id="Separation of Concerns">Separation of Concerns</strong> is what keeps a codebase from turning into "spaghetti code" that developers become too terrified to modify.
+</p>
+
 <p>
 <hr>
 <br>
