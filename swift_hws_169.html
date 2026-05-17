@@ -258,6 +258,87 @@ If the JSON data looked like <code>"id": 1</code> or <code>"id": "user_01"</code
 But since Paul Hudson's data generator used standard <code>UUID</code> strings, we get to take advantage of Swift's built-in <code>UUID</code> type for free!
 </p>
 
+<div id="Ai Insight-ANSWER-ID - UUID or String?-Generating UUID"><h4 id="Generating UUID" class="header"><a href="#Ai Insight-ANSWER-ID - UUID or String?-Generating UUID">Generating UUID</a></h4></div>
+
+<p>
+If the JSON didn't include an <code>id</code> property at all, you would have to tell Swift to <span id="Ai Insight-ANSWER-ID - UUID or String?-Generating UUID-ignore"></span><strong id="ignore">ignore</strong> the JSON for that specific property and generate a brand-new <code>UUID()</code> yourself when the object is created.
+</p>
+
+<p>
+To do this, you change how you declare the variable and provide a <span id="Ai Insight-ANSWER-ID - UUID or String?-Generating UUID-default value"></span><strong id="default value">default value</strong>.
+</p>
+
+<div id="Ai Insight-ANSWER-ID - UUID or String?-1. The Dynamic: Changing the Property Declaration"><h4 id="1. The Dynamic: Changing the Property Declaration" class="header"><a href="#Ai Insight-ANSWER-ID - UUID or String?-1. The Dynamic: Changing the Property Declaration">1. The Dynamic: Changing the Property Declaration</a></h4></div>
+
+<p>
+In your original struct, you declared it like this:
+</p>
+
+<pre swift>
+let id: UUID // Look for a UUID inside the JSON file
+</pre>
+
+<p>
+If there is no <code>id</code> key in the JSON, you change it to this:
+</p>
+
+<pre swift>
+var id = UUID() // Ignore the JSON; create a brand-new, random identifier right now
+</pre>
+
+<p>
+By giving it an initial value (= UUID()), you tell Swift: "If you are initializing this struct and nobody hands you an ID, just generate a fresh one automatically."
+</p>
+
+<div id="Ai Insight-ANSWER-ID - UUID or String?-2. The Catch: You Must Keep Codable Happy"><h4 id="2. The Catch: You Must Keep Codable Happy" class="header"><a href="#Ai Insight-ANSWER-ID - UUID or String?-2. The Catch: You Must Keep Codable Happy">2. The Catch: You Must Keep Codable Happy</a></h4></div>
+
+<p>
+There is a subtle catch here. If you just add <code>var id = UUID()</code> to a <code>Codable</code> struct, the automatic <code>Codable</code> system will still look into the JSON file searching for a key named <code>"id"</code>. When it doesn't find it, the decoder will crash with a <code>keyNotFound</code> error.
+</p>
+
+<p>
+To prevent this crash, you must use the <code>CodingKeys</code> <span id="Ai Insight-ANSWER-ID - UUID or String?-2. The Catch: You Must Keep Codable Happy-master checklist"></span><strong id="master checklist">master checklist</strong> we discussed earlier to explicitly exclude <code>id</code>.
+</p>
+
+<p>
+Here is exactly what your struct would look like:
+</p>
+
+<pre swift>
+struct User: Codable, Identifiable {
+    // 1. Give the ID a default value so it populates itself automatically
+    var id = UUID() 
+    
+    let name: String
+    let age: Int
+    let company: String
+
+    // 2. Explicitly leave 'id' OUT of this enum checklist!
+    enum CodingKeys: String, CodingKey {
+        case name
+        case age
+        case company
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-ID - UUID or String?-How this works under the hood:"><h4 id="How this works under the hood:" class="header"><a href="#Ai Insight-ANSWER-ID - UUID or String?-How this works under the hood:">How this works under the hood:</a></h4></div>
+
+<ul>
+<li>
+<code>JSONDecoder</code> looks at your custom <code>CodingKeys</code> enum. It sees <code>name</code>, <code>age</code>, and <code>company</code>. It completely ignores id because it isn't on the checklist.
+
+<li>
+The decoder successfully parses the name, age, and company from your JSON string.
+
+<li>
+When it builds the final <code>User</code> object, it notices that <code>id</code> wasn't part of the JSON stream, so it uses your fallback default value (<code>UUID()</code>) to generate a unique identifier on the spot.
+
+</ul>
+<p>
+This keeps your struct completely compatible with SwiftUI's List (via the Identifiable protocol) even if the web server never provided an ID to begin with!
+</p>
+
 <div id="Ai Insight-ANSWER-Phase 2: Create a Dummy UI First"><h3 id="Phase 2: Create a Dummy UI First" class="header"><a href="#Ai Insight-ANSWER-Phase 2: Create a Dummy UI First">Phase 2: Create a Dummy UI First</a></h3></div>
 
 <p>
