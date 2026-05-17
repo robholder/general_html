@@ -381,6 +381,119 @@ func loadData() async {
 }
 </pre>
 
+<p>
+Here is your completely updated <code>ContentView.swift</code> file.
+</p>
+
+<p>
+This code removes the old local array tracking, integrates SwiftData’s <code>@Query</code> to fetch directly from SQLite, inserts downloaded profiles cleanly into the environment context, and uses an in-memory preview container so your canvas works instantly without crashing.
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+struct ContentView: View {
+    // 1. Gain access to the database's workspace context to perform inserts
+    @Environment(\.modelContext) private var modelContext
+    
+    // 2. Drive the UI by fetching directly from the persistent database store
+    @Query(sort: \User.name) var users: [User]
+    
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink {
+                    UserDetailView(user: user)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(user.name)
+                                .font(.headline)
+                            Text(user.company)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // Status indicator light
+                        Circle()
+                            .fill(user.isActive ? .green : .gray)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+            .navigationTitle("FriendFace")
+            .task {
+                // 3. Trigger network download on boot
+                await loadData()
+            }
+        }
+    }
+    
+    /// Downloads the JSON collection and inserts new entities into SwiftData
+    func loadData() async {
+        // Optimize networking: Only download if the SQLite database is completely fresh
+        guard users.isEmpty else { return }
+        
+        guard let url = URL(string: "https://www.hackingwithswift.com/samples/friendface.json") else {
+            print("Invalid target URL string")
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601 // Paul Hudson's parsing strategy
+            
+            // Decode directly into our combined Codable/@Model class layout
+            let downloadedUsers = try decoder.decode([User].self, from: data)
+            
+            // Loop and stage each persistent object inside our scratchpad context
+            for user in downloadedUsers {
+                modelContext.insert(user)
+            }
+            
+            // SwiftData automatically saves context loops to disk behind the scenes!
+            
+        } catch {
+            print("Failed to correctly parse JSON payload: \(error.localizedDescription)")
+        }
+    }
+}
+
+// MARK: - SwiftData Preview Sandbox Configuration
+#Preview("Main List Dashboard") {
+    do {
+        // 1. Spin up a lightweight, sandboxed database strictly inside RAM memory
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: User.self, configurations: config)
+        
+        // 2. Place our initial dummy user asset right into the temporary container
+        container.mainContext.insert(User.dummyUser)
+        
+        return ContentView()
+            // 3. Inject the preview context into the test canvas stream
+            .modelContainer(container)
+            
+    } catch {
+        return Text("Failed to build SwiftData preview pipeline: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER-2. Update loadData() to Save into SwiftData-Key Highlights of Your New ContentView Setup:"><h4 id="Key Highlights of Your New ContentView Setup:" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-2. Update loadData() to Save into SwiftData-Key Highlights of Your New ContentView Setup:">Key Highlights of Your New ContentView Setup:</a></h4></div>
+
+<ul>
+<li>
+Automatic Layout Updates: By replacing <code>@State</code> with <code>@Query</code>, the moment your <code>for user in downloadedUsers</code> loop inserts data into <code>modelContext</code>, your list screen dynamically fades the network users into view.
+
+<li>
+Network Throttling Built-in: The <code>guard users.isEmpty else { return }</code> check at the top of your network function stops the app from hitting the internet repeatedly if the user leaves the home screen and comes back. It loads instantly from disk on second launch!
+
+</ul>
 <div id="Other Changes to Make the App Use SwiftData-ANSWER-3. Handle the Preview Canvas for ContentView"><h3 id="3. Handle the Preview Canvas for ContentView" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-3. Handle the Preview Canvas for ContentView">3. Handle the Preview Canvas for ContentView</a></h3></div>
 
 <p>
