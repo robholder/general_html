@@ -104,7 +104,7 @@ Moving to SwiftData is an exciting milestone! You are absolutely right: SwiftDat
 </p>
 
 <p>
-When you convert your types to classes, you also have to provide a proper initializer (<code>init</code>). Once that is set up, rewriting your <code>dummyUser</code> static helper looks almost identical to what you had before—with one small, vital tweak regarding how relationships are saved.
+When you convert your types to classes, you also have to provide a proper initializer (<code>init</code>). Once that is set up, rewriting your <code>dummyUser</code> static helper looks almost identical to what you had before - with one small, vital tweak regarding how relationships are saved.
 </p>
 
 <p>
@@ -283,6 +283,207 @@ To fix this effortlessly, you can use an <span id="Challenge 2 - SwiftData-ANSWE
 
 <p>
 By adding those extra few setup lines inside your preview block, SwiftData will happily allow you to use your <code>User.dummyUser</code> extension without breaking your Xcode canvas workflow!
+</p>
+
+<div id="Other Changes to Make the App Use SwiftData"><h1 id="Other Changes to Make the App Use SwiftData" class="header"><a href="#Other Changes to Make the App Use SwiftData">Other Changes to Make the App Use SwiftData</a></h1></div>
+
+<div id="Other Changes to Make the App Use SwiftData-QUESTION"><h2 id="QUESTION" class="header"><a href="#Other Changes to Make the App Use SwiftData-QUESTION">QUESTION</a></h2></div>
+
+<p>
+What other changes are necessary to make the whole code SwiftData compatible?
+</p>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER"><h2 id="ANSWER" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Transitioning the rest of your app to SwiftData involves shifting away from managing a local array state with <code>@State</code> and letting SwiftData’s database engine drive your UI.
+</p>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER-1. Upgrade ContentView to use @Query"><h3 id="1. Upgrade ContentView to use @Query" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-1. Upgrade ContentView to use @Query">1. Upgrade ContentView to use @Query</a></h3></div>
+
+<p>
+Instead of holding onto a local <code>@State var users = [User]()</code> array, you will ask SwiftData to actively fetch and monitor the database for you using the <code>@Query</code> macro.
+</p>
+
+<p>
+You also need access to the database's "scratchpad" (called the <code>ModelContext</code>) so you can save new data into it.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    // 1. Access the database context to insert/delete items
+    @Environment(\.modelContext) private var modelContext
+    
+    // 2. Automatically fetches all Users from the database and updates live
+    @Query(sort: \User.name) var users: [User]
+    
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink(user.name) {
+                    UserDetailView(user: user)
+                }
+            }
+            .navigationTitle("FriendFace")
+            .task {
+                // 3. We still fetch from the network, but the logic inside changes!
+                await loadData()
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER-2. Update loadData() to Save into SwiftData"><h3 id="2. Update loadData() to Save into SwiftData" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-2. Update loadData() to Save into SwiftData">2. Update loadData() to Save into SwiftData</a></h3></div>
+
+<p>
+Previously, your <code>loadData()</code> function downloaded the JSON, decoded it, and assigned it straight to your <code>@State</code> array.
+</p>
+
+<p>
+With SwiftData, you download the JSON, loop through the decoded users, and <span id="Other Changes to Make the App Use SwiftData-ANSWER-2. Update loadData() to Save into SwiftData-insert them directly into the database context"></span><strong id="insert them directly into the database context">insert them directly into the database context</strong>. Once inserted, the <code>@Query</code> we set up above will instantly spot them and slide them onto your screen automatically.
+</p>
+
+<p>
+Here is how you adapt your network fetch:
+</p>
+
+<pre swift>
+func loadData() async {
+    // Optional: Only download data if our database is completely empty
+    // This prevents duplicating users every time the app opens!
+    guard users.isEmpty else { return }
+    
+    guard let url = URL(string: "https://www.hackingwithswift.com/samples/friendface.json") else {
+        print("Invalid URL")
+        return
+    }
+    
+    do {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601 // Paul's date tip!
+        
+        // Decode directly into our Class arrays
+        let downloadedUsers = try decoder.decode([User].self, from: data)
+        
+        // Insert them into the persistent database container
+        for user in downloadedUsers {
+            modelContext.insert(user)
+        }
+        
+        // Note: SwiftData autosaves, so you don't strictly need try? modelContext.save()
+        
+    } catch {
+        print("Decoding failed: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER-3. Handle the Preview Canvas for ContentView"><h3 id="3. Handle the Preview Canvas for ContentView" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-3. Handle the Preview Canvas for ContentView">3. Handle the Preview Canvas for ContentView</a></h3></div>
+
+<p>
+Just like your <code>UserDetailView</code> needed a mock sandbox container to prevent crashing, your <code>ContentView</code> preview needs one too.
+</p>
+
+<p>
+Now that you are using <code>@Query</code>, Solution 1 from earlier (passing a mock array directly into the view initializer) won't work anymore, because <code>@Query</code> completely takes over the array management.
+</p>
+
+<p>
+Instead, use an in-memory database configuration right inside your preview block to cleanly hydrate the list view:
+</p>
+
+<pre swift>
+#Preview("Main List Dashboard") {
+    // 1. Setup a clean sandbox database in memory
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: User.self, Friend.self, configurations: config)
+    
+    // 2. Seed it with your dummy user
+    container.mainContext.insert(User.dummyUser)
+    
+    return ContentView()
+        // 3. Pass the seeded sandbox to the view
+        .modelContainer(container)
+}
+</pre>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER-FriendFaceApp.swift"><h3 id="FriendFaceApp.swift" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-FriendFaceApp.swift">FriendFaceApp.swift</a></h3></div>
+
+<p>
+Here is how you wire up your main entry point in <code>FriendFaceApp.swift</code>.
+</p>
+
+<p>
+To make your code as efficient as possible, you only need to pass the top-level parent model (<code>User.self</code>) into the <code>.modelContainer</code> modifier. Because you established an explicit <code>@Relationship</code> link between your <code>User</code> and <code>Friend</code> classes, SwiftData is smart enough to automatically detect and include the Friend model in the database schema without you needing to explicitly list it!
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+@main
+struct FriendFaceApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // Attaches SwiftData to the entire application lifecycle.
+        // It automatically handles setting up the SQLite database files on the device.
+        .modelContainer(for: User.self)
+    }
+}
+</pre>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER-FriendFaceApp.swift-Pro-Tip for Verification"><h4 id="Pro-Tip for Verification" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-FriendFaceApp.swift-Pro-Tip for Verification">Pro-Tip for Verification</a></h4></div>
+
+<p>
+If you ever want to confirm that your SwiftData stack is creating the database properly behind the scenes, you can temporarily print the path of your database directly to the console by adding an initializer to your app struct:
+</p>
+
+<pre swift>
+@main
+struct FriendFaceApp: App {
+    init() {
+        // Prints the exact hidden folder path where your SQLite database lives
+        print(URL.applicationSupportDirectory.path(percentEncoded: false))
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        .modelContainer(for: User.self)
+    }
+}
+</pre>
+
+<p>
+Now, when you run the app in the simulator, you can copy that path from the Xcode console, navigate to it on your Mac, and inspect your live FriendFace tables using a tool like <em>DB Browser for SQLite!</em>
+</p>
+
+<div id="Other Changes to Make the App Use SwiftData-ANSWER-FriendFaceApp.swift-Summary of Data Flow Changes"><h4 id="Summary of Data Flow Changes" class="header"><a href="#Other Changes to Make the App Use SwiftData-ANSWER-FriendFaceApp.swift-Summary of Data Flow Changes">Summary of Data Flow Changes</a></h4></div>
+
+<p>
+Before SwiftData, your app flow looked like this:
+</p>
+<ul>
+<li>
+<code>Internet JSON</code> ➔ <code>JSONDecoder</code> ➔ <code>@State Array</code> ➔ <code>UI Screen</code>
+
+</ul>
+<p>
+Now, your modern SwiftData flow looks like this:
+</p>
+<ul>
+<li>
+<code>Internet JSON</code> ➔ <code>JSONDecoder</code> ➔ <code>ModelContext (Insert)</code> ➔ <code>SQLite Storage</code> ➔ <code>@Query</code> ➔ <code>UI Screen</code>
+
+</ul>
+<p>
+Once these edits are made, your app is completely independent of transient state app-crashes. If a user backgrounds the app or closes it completely, all of their downloaded friends and user profiles will remain completely intact for the next launch!
 <hr>
 <br>
 </p>
