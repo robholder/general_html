@@ -431,17 +431,120 @@ struct ContentView: View {
 Create a basic companion view <code>UserDetailView.swift</code> that takes a <code>let user: User</code> and displays their details, along with a <code>ForEach</code> loop over their <code>user.friends</code>.
 </p>
 
-<div id="Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-The UserDetailView"><h4 id="The UserDetailView" class="header"><a href="#Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-The UserDetailView">The UserDetailView</a></h4></div>
+<div id="Ai Insight-ANSWER-Creating Dummy Data"><h3 id="Creating Dummy Data" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data">Creating Dummy Data</a></h3></div>
 
 <p>
-<code>UserDetailView</code> is a completely separate view designed to focus entirely on <span id="Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-The UserDetailView-one single user at a time"></span><strong id="one single user at a time">one single user at a time</strong>.
+To create a dummy user, you can write a static helper extension on your <code>User</code> struct. This gives you a reusable, pristine data object that you can inject into your <code>@State</code> array for immediate testing.
+</p>
+
+<p>
+Here is exactly how to build a mock template and include it in your array.
+</p>
+
+<div id="Ai Insight-ANSWER-Creating Dummy Data-1. Create a &quot;Preview Provider&quot; Extension"><h4 id="1. Create a &quot;Preview Provider&quot; Extension" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data-1. Create a &quot;Preview Provider&quot; Extension">1. Create a "Preview Provider" Extension</a></h4></div>
+
+<p>
+Create a new file or add this to the bottom of your <code>User.swift</code> file. By wrapping this in an <code>extension</code>, you keep your main struct clean while keeping your test data organized:
+</p>
+
+<pre swift>
+extension User {
+    // A single mock user for testing detail views
+    static var dummyUser: User {
+        User(
+            id: UUID(),
+            isActive: true,
+            name: "Andrew Glouberman",
+            age: 13,
+            company: "Horizons Middle School",
+            email: "andrew@friendface.com",
+            address: "123 Mockingbird Lane, Westchester, NY",
+            about: "Just a cartoon character navigating the awkward waters of adolescence.",
+            registered: Date.now,
+            tags: ["student", "anxious", "classic"],
+            friends: [
+                Friend(id: UUID(), name: "Nick Birch"),
+                Friend(id: UUID(), name: "Jessi Glaser")
+            ]
+        )
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Creating Dummy Data-2. Effectively Inject It Into Your Array"><h4 id="2. Effectively Inject It Into Your Array" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data-2. Effectively Inject It Into Your Array">2. Effectively Inject It Into Your Array</a></h4></div>
+
+<p>
+You have two excellent choices depending on how you want to use this dummy data to test your layout.
+</p>
+
+<div id="Ai Insight-ANSWER-Creating Dummy Data-Option A: The &quot;Default&quot; State (Best for immediate layout testing)"><h4 id="Option A: The &quot;Default&quot; State (Best for immediate layout testing)" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data-Option A: The &quot;Default&quot; State (Best for immediate layout testing)">Option A: The "Default" State (Best for immediate layout testing)</a></h4></div>
+
+<p>
+If you want the app to launch with this user already sitting inside your list right out of the gate, assign it directly to your <code>@State</code> array property wrapper:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    // Start with your dummy user pre-loaded into the array!
+    @State private var users: [User] = [User.dummyUser]
+    
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink(user.name, destination: UserDetailView(user: user))
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Creating Dummy Data-Option B: The &quot;Preview Only&quot; Injected Array (Highly Recommended)"><h4 id="Option B: The &quot;Preview Only&quot; Injected Array (Highly Recommended)" class="header"><a href="#Ai Insight-ANSWER-Creating Dummy Data-Option B: The &quot;Preview Only&quot; Injected Array (Highly Recommended)">Option B: The "Preview Only" Injected Array (Highly Recommended)</a></h4></div>
+
+<p>
+If you want your app to download live data on a real device, but you want your Xcode Preview Canvas to show the dummy user so it isn't blank while you design, leverage a custom <code>onAppear</code> or preview modifier.
+</p>
+
+<p>
+Keep your <code>users</code> array empty inside <code>ContentView</code>, but inject the array modification down inside your <code>#Preview</code> block:
+</p>
+
+<pre swift>
+#Preview("Main Dashboard") {
+    // 1. Create a dummy view state to display inside the canvas
+    ContentView()
+        .onAppear {
+            // This code only triggers when the preview simulator runs!
+            // It allows you to visualize your list layout without hitting the real internet.
+            // Note: If your .task downloads real data, it will eventually replace this.
+        }
+        .modelContainer(for: ExpenseItem.self, inMemory: true) // For SwiftData contexts later
+}
+</pre>
+
+<p>
+If you are just testing the <code>UserDetailView</code> directly, having <code>User.dummyUser</code> makes your canvas setup incredibly clean:
+</p>
+
+<pre swift>
+#Preview("Detail View Screen") {
+    NavigationStack {
+        // Hand the static dummy property straight to the preview pipeline
+        UserDetailView(user: User.dummyUser)
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-The UserDetailView"><h3 id="The UserDetailView" class="header"><a href="#Ai Insight-ANSWER-The UserDetailView">The UserDetailView</a></h3></div>
+
+<p>
+<code>UserDetailView</code> is a completely separate view designed to focus entirely on <span id="Ai Insight-ANSWER-The UserDetailView-one single user at a time"></span><strong id="one single user at a time">one single user at a time</strong>.
 </p>
 
 <p>
 When a user taps a row in your <code>ContentView</code> list, the <code>NavigationStack</code> pushes this detail view onto the screen. It receives the specific <code>User</code> object that was tapped and spreads out all of their individual properties (like their email, address, bio, and friends) in a clean, readable layout.
 </p>
 
-<div id="Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-What Should Be Shown Here?"><h4 id="What Should Be Shown Here?" class="header"><a href="#Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-What Should Be Shown Here?">What Should Be Shown Here?</a></h4></div>
+<div id="Ai Insight-ANSWER-The UserDetailView-What Should Be Shown Here?"><h4 id="What Should Be Shown Here?" class="header"><a href="#Ai Insight-ANSWER-The UserDetailView-What Should Be Shown Here?">What Should Be Shown Here?</a></h4></div>
 
 <p>
 A good detail view breaks up a massive wall of text into distinct, organized sections. For the FriendFace app, your layout should aim to show:
@@ -461,7 +564,7 @@ The "About" Section: A larger block of text for their biography/profile descript
 The Friends List: A dedicated section or list showing the names of all the friends connected to them.
 
 </ul>
-<div id="Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-How to Build the UserDetailView"><h4 id="How to Build the UserDetailView" class="header"><a href="#Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-How to Build the UserDetailView">How to Build the UserDetailView</a></h4></div>
+<div id="Ai Insight-ANSWER-The UserDetailView-How to Build the UserDetailView"><h4 id="How to Build the UserDetailView" class="header"><a href="#Ai Insight-ANSWER-The UserDetailView-How to Build the UserDetailView">How to Build the UserDetailView</a></h4></div>
 
 <p>
 Create a new SwiftUI View file named <code>UserDetailView.swift</code>. To keep things incredibly simple, use a static <code>let user: User</code> property. Because it's a constant, this view doesn't need to fetch anything; it just layout-binds whatever data the parent view hands it.
@@ -528,7 +631,7 @@ struct UserDetailView: View {
 }
 </pre>
 
-<div id="Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-The Master View to Detail View Pipeline"><h4 id="The Master View to Detail View Pipeline" class="header"><a href="#Ai Insight-ANSWER-Phase 2: Create a Dummy UI First-The Master View to Detail View Pipeline">The Master View to Detail View Pipeline</a></h4></div>
+<div id="Ai Insight-ANSWER-The UserDetailView-The Master View to Detail View Pipeline"><h4 id="The Master View to Detail View Pipeline" class="header"><a href="#Ai Insight-ANSWER-The UserDetailView-The Master View to Detail View Pipeline">The Master View to Detail View Pipeline</a></h4></div>
 
 <p>
 Now you can visually see how the entire app links up. The data flow travels seamlessly from the internet, down through your views:
@@ -550,6 +653,91 @@ Now you can visually see how the entire app links up. The data flow travels seam
 
 <p>
 By separating your code this way, <code>ContentView</code> has one job (managing the big list and fetching data), and <code>UserDetailView</code> has one job (styling a single person's profile). This makes your app highly organized and incredibly easy to maintain!
+</p>
+
+<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User"><h3 id="#Preview Blocks - Dummy User" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User">#Preview Blocks - Dummy User</a></h3></div>
+
+<p>
+To pass your dummy user into the <code>#Preview</code> blocks, you use two different strategies depending on whether the preview is for the <span id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-Detail View"></span><strong id="Detail View">Detail View</strong> (which needs exactly one user object) or the <span id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-Content View"></span><strong id="Content View">Content View</strong> (which manages an array of users).
+</p>
+
+<p>
+Here is the exact code configuration for both preview blocks.
+</p>
+
+<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview"><h4 id="1. Passing to the UserDetailView Preview" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview">1. Passing to the UserDetailView Preview</a></h4></div>
+
+<p>
+Since your <code>UserDetailView</code> requires a single <code>User</code> object passed directly into its initializer, you can feed it your static extension property directly.
+</p>
+
+<p>
+It is best to wrap it in a <code>NavigationStack</code> inside the preview block so you can see exactly how the navigation title bar behaves on a real device.
+</p>
+
+<pre swift>
+#Preview("User Detail View") {
+    NavigationStack {
+        // Pass the static dummyUser property straight into the initializer
+        UserDetailView(user: User.dummyUser)
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview-2. Passing to the ContentView Preview"><h5 id="2. Passing to the ContentView Preview" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User-1. Passing to the UserDetailView Preview-2. Passing to the ContentView Preview">2. Passing to the ContentView Preview</a></h5></div>
+
+<p>
+The <code>ContentView</code> doesn't take parameters in its initializer because it manages its own internal data state using <code>@State private var users = [User]()</code>.
+</p>
+
+<p>
+To inject your dummy data into this array <em>only for the preview canvas</em>, you can use a hidden trick: create a custom wrapper view inside your preview block that intercepts the <code>ContentView</code> and modifies its state, or use a tiny helper function.
+</p>
+
+<p>
+However, the cleanest and most reliable way to force a <code>@State</code> array to have data inside an isolated preview block without changing your production code is to create a small "Mock" container view inside your preview file:
+</p>
+
+<pre swift>
+#Preview("Main List Dashboard") {
+    // 1. Create a lightweight temporary view wrapper
+    struct PreviewWrapper: View {
+        @State private var mockUsers = [User.dummyUser] // Array populated with our dummy
+        
+        var body: some View {
+            // We temporarily simulate your view layout using the mock state
+            NavigationStack {
+                List(mockUsers) { user in
+                    NavigationLink(user.name) {
+                        UserDetailView(user: user)
+                    }
+                }
+                .navigationTitle("FriendFace (Preview)")
+            }
+        }
+    }
+    
+    // 2. Return the wrapper to the canvas engine
+    return PreviewWrapper()
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-#Preview Blocks - Dummy User-Alternative: Testing live networking in Previews"><h4 id="Alternative: Testing live networking in Previews" class="header"><a href="#Ai Insight-ANSWER-#Preview Blocks - Dummy User-Alternative: Testing live networking in Previews">Alternative: Testing live networking in Previews</a></h4></div>
+
+<p>
+If you want to test how <code>ContentView</code> looks when it fetches the real data from Paul Hudson's live server, you don't need to pass the dummy user at all! You can let the preview run naturally:
+</p>
+
+<pre swift>
+#Preview("Live Network Test") {
+    ContentView() 
+    // The .task modifier inside your real ContentView will automatically trigger
+    // and fetch the actual JSON array from the internet right inside your canvas.
+}
+</pre>
+
+<p>
+Using these configurations ensures your Xcode design canvas stays perfectly hydrated with realistic data while you tweak your fonts, padding, and layout structures.
 </p>
 
 <div id="Ai Insight-ANSWER-Phase 3: The Data Pipeline (URLSession)"><h3 id="Phase 3: The Data Pipeline (URLSession)" class="header"><a href="#Ai Insight-ANSWER-Phase 3: The Data Pipeline (URLSession)">Phase 3: The Data Pipeline (URLSession)</a></h3></div>
