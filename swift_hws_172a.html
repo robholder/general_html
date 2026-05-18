@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_172a</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_171.html">Hacking With Swift - 171 - Ai Discussion of SoC - Separation of Concerns</a>
+
+</ul>
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version"><h1 id="Hacking With Swift - 172a - Separation Of Concerns Version" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version">Hacking With Swift - 172a - Separation Of Concerns Version</a></h1></div>
+
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+struct ContentView: View {
+    // 1. Gain access to the database's workspace context to perform inserts
+    @Environment(\.modelContext) private var modelContext
+    
+    // 2. Drive the UI by fetching directly from the persistent database store
+    @Query(sort: \User.name) var users: [User]
+    
+    // State management driven by our decoupled controller
+    @State private var manager: FriendManager?
+    
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink {
+                    UserDetailView(user: user)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(user.name)
+                                .font(.headline)
+                            Text(user.company)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // Status indicator light
+                        Circle()
+                            .fill(user.isActive ? .green : .gray)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+            .navigationTitle("FriendFace")
+            .overlay {
+                // Lean view logic checking states computed by the manager
+                if let manager, manager.isDownloading {
+                    ProgressView("Downloading Friends...")
+                }
+            }
+            .onAppear {
+                // Lazy initialize the manager with the environment view context
+                if manager == nil {
+                    manager = FriendManager(modelContext: modelContext)
+                }
+            }
+            .task {
+                await manager?.loadAndSyncUsers(currentCount: users.count)
+            }
+        }
+    }
+}
+
+// MARK: - SwiftData Preview Sandbox Configuration
+#Preview("Main List Dashboard") {
+    do {
+        // 1. Spin up a lightweight, sandboxed database strictly inside RAM memory
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: User.self, configurations: config)
+        
+        // 2. Place our initial dummy user asset right into the temporary container
+        container.mainContext.insert(User.dummyUser)
+        
+        return ContentView()
+        // 3. Inject the preview context into the test canvas stream
+            .modelContainer(container)
+        
+    } catch {
+        return Text("Failed to build SwiftData preview pipeline: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version-In Context-FriendFaceApp.swift"><h4 id="FriendFaceApp.swift" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version-In Context-FriendFaceApp.swift">FriendFaceApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@main
+struct FriendFaceApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // Attaches SwiftData to the entire application lifecycle.
+        // It automatically handles setting up the SQLite database files on the device.
+        .modelContainer(for: User.self)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version-In Context-FriendManager.swift"><h4 id="FriendManager.swift" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version-In Context-FriendManager.swift">FriendManager.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import SwiftData
+import SwiftUI
+
+@Observable
+@MainActor
+class FriendManager {
+    private let service = FriendService()
+    var modelContext: ModelContext
+    
+    // UI state states can live here cleanly
+    var isDownloading = false
+    var errorMessage: String? = nil
+    
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+    }
+    
+    // Synchronizes remote JSON entities with the persistent store if empty
+    func loadAndSyncUsers(currentCount: Int) async {
+        // Only fetch if database is empty
+        guard currentCount == 0 else { return }
+        
+        isDownloading = true
+        errorMessage = nil
+        
+        do {
+            let downloadedUsers = try await service.fetchUsers()
+            
+            // Core Data / SwiftData batch insertion
+            for user in downloadedUsers {
+                modelContext.insert(user)
+            }
+            
+            // Optional: Force a concrete save point if desired
+            try? modelContext.save()
+            
+        } catch {
+            errorMessage = "Sync Error: \(error.localizedDescription)"
+            print(error.localizedDescription)
+        }
+        
+        isDownloading = false
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version-In Context-FriendService.swift"><h4 id="FriendService.swift" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version-In Context-FriendService.swift">FriendService.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct FriendService {
+    private let urlString = "https://www.hackingwithswift.com/samples/friendface.json"
+    
+    // Pure function responsible solely for downloading and decoding network payloads.
+    func fetchUsers() async throws -&gt; [User] {
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        return try decoder.decode([User].self, from: data)
+    }
+    
+}
+</pre>
+
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version-In Context-User.swift"><h4 id="User.swift" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version-In Context-User.swift">User.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+class User: Codable, Identifiable {
+    var id: UUID
+    var isActive: Bool
+    var name: String
+    var age: Int
+    var company: String
+    var email: String
+    var address: String
+    var about: String
+    var registered: Date
+    var tags: [String]
+    
+    // @Relationshiop tells SwiftData to delete a user's friends from the
+    // database automatically if this user gets deleted.
+    @Relationship(deleteRule: .cascade) var friends: [Friend]
+    
+    enum CodingKeys: String, CodingKey {
+        case id, isActive, name, age, company, email, address, about, registered, tags, friends
+    }
+    
+    // Class Initializer
+    init(id: UUID, isActive: Bool, name: String, age: Int, company: String, email: String, address: String, about: String, registered: Date, tags: [String], friends: [Friend]) {
+        self.id = id
+        self.isActive = isActive
+        self.name = name
+        self.age = age
+        self.company = company
+        self.email = email
+        self.address = address
+        self.about = about
+        self.registered = registered
+        self.tags = tags
+        self.friends = friends
+    }
+    
+    // Decoder Initializer
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.isActive = try container.decode(Bool.self, forKey: .isActive)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.age = try container.decode(Int.self, forKey: .age)
+        self.company = try container.decode(String.self, forKey: .company)
+        self.email = try container.decode(String.self, forKey: .email)
+        self.address = try container.decode(String.self, forKey: .address)
+        self.about = try container.decode(String.self, forKey: .about)
+        self.registered = try container.decode(Date.self, forKey: .registered)
+        self.tags = try container.decode([String].self, forKey: .tags)
+        self.friends = try container.decode([Friend].self, forKey: .friends)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(isActive, forKey: .isActive)
+        try container.encode(name, forKey: .name)
+        try container.encode(age, forKey: .age)
+        try container.encode(company, forKey: .company)
+        try container.encode(email, forKey: .email)
+        try container.encode(address, forKey: .address)
+        try container.encode(about, forKey: .about)
+        try container.encode(registered, forKey: .registered)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(friends, forKey: .friends)
+    }
+}
+
+@Model
+class Friend: Codable, Identifiable {
+    var id: UUID
+    var name: String
+    
+    // Coding keys tell Codable how to map the JSON
+    enum CodingKeys: String, CodingKey {
+        case id, name
+    }
+    
+    // Required initializer for SwiftData
+    init(id: UUID, name: String) {
+        self.id = id
+        self.name = name
+    }
+    
+    // Required initializer for Codable
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.name = try container.decode(String.self, forKey: .name)
+    }
+    
+    // Required method for Codable encoding
+    func encode(to encode: Encoder) throws {
+        var container = encode.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+    }
+}
+
+extension User {
+    // A single mock user for testing detail views
+    static var dummyUser: User {
+        User(
+            id: UUID(),
+            isActive: true,
+            name: "Andrew Glouberman",
+            age: 13,
+            company: "Horizons Middle School",
+            email: "andrew@friendface.com",
+            address: "123 Mockingbird Lane, Westchester, NY",
+            about: "Just a cartoon character navigating the awkward waters of adolescence.",
+            registered: Date.now,
+            tags: ["student", "anxious", "classic"],
+            friends: [
+                Friend(id: UUID(), name: "Nick Birch"),
+                Friend(id: UUID(), name: "Jessi Glaser")
+            ]
+        )
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 172a - Separation Of Concerns Version-In Context-UserDetailsView.swift"><h4 id="UserDetailsView.swift" class="header"><a href="#Hacking With Swift - 172a - Separation Of Concerns Version-In Context-UserDetailsView.swift">UserDetailsView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct UserDetailView: View {
+    let user: User
+    
+    var body: some View {
+        List {
+            // Section 1: Status &amp; Company
+            Section("Status") {
+                HStack {
+                    Text("Account Status:")
+                    Spacer()
+                    Text(user.isActive ? "Active Now" : "Offline")
+                        .fontWeight(.bold)
+                        .foregroundStyle(user.isActive ? .green : .secondary)
+                }
+        
+                LabeledContent("Age", value: "\(user.age) years old")
+                LabeledContent("Company", value: "\(user.company)")
+            }
+            
+            // Section2: Contact Information
+            Section("Contact Details") {
+                LabeledContent("Email", value: user.email)
+                LabeledContent("Address", value: user.address)
+                
+                // Formatted Date display
+                LabeledContent("Registered") {
+                    Text(user.registered, style: .date)
+                }
+            }
+            
+            // Section 3: Bio / About
+            Section("About") {
+                Text(user.about)
+                    .padding(.vertical, 5)
+            }
+            
+            // Section 4: Friends List (Nested Array)
+            Section("Friends (\(user.friends.count))") {
+                ForEach(user.friends) { friend in
+                    HStack {
+                        Image(systemName: "person.crop.circle")
+                            .foregroundStyle(.blue)
+                        Text(friend.name)
+                    }
+                }
+            }
+        }
+        .navigationTitle(user.name)
+        .navigationBarTitleDisplayMode(.inline) // Keeps the title neatly centered in the bar
+    }
+}
+
+#Preview("User Detail Dashboard") {
+    do {
+        // 1. Spin up a lightweight, sandboxed database strictly inside RAM memory
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: User.self, configurations: config)
+        
+        // 2. Reference your dummy asset and insert it into the temporary container
+        let sampleUser = User.dummyUser
+        container.mainContext.insert(sampleUser)
+        
+        // 3. Pass the sample user into the view, wrapped in a NavigationStack
+        return NavigationStack {
+            UserDetailView(user: sampleUser)
+        }
+        // 4. Inject the preview context into the test canvas stream
+        .modelContainer(container)
+        
+    } catch {
+        return Text("Failed to build SwiftData preview pipeline: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+<ul>
+<li>
+<a href="swift_hws_172.html">Hacking With Swift - 172 - Instafilter: Introduction</a>
+
+</ul>
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
