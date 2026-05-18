@@ -1007,7 +1007,122 @@ App Crashes 💥
 </tbody>
 </table>
 
+
+<div id="Guard"><h1 id="Guard" class="header"><a href="#Guard">Guard</a></h1></div>
+
+<p>
+The <code>guard</code> statement is one of Swift's best features for writing clean, readable code. Its primary purpose is to acting as a <span id="Guard-bouncer at the door"></span><strong id="bouncer at the door">bouncer at the door</strong> of your function. It checks if a specific condition is met; if it is, the code continues smoothly, but if it isn't, it immediately kicks execution out of the function.
+</p>
+
+<p>
+To understand its value, it helps to look at the problem it solves, which developers affectionately call the <span id="Guard-&quot;Pyramid of Doom.&quot;"></span><strong id="&quot;Pyramid of Doom.&quot;">"Pyramid of Doom."</strong>
+</p>
+
+<div id="Guard-The Problem: The Pyramid of Doom (if statements)"><h3 id="The Problem: The Pyramid of Doom (if statements)" class="header"><a href="#Guard-The Problem: The Pyramid of Doom (if statements)">The Problem: The Pyramid of Doom (if statements)</a></h3></div>
+
+<p>
+Without <code>guard</code>, you have to use nested <code>if let</code> statements to check if your data is valid. Notice how the important logic gets pushed further and further to the right, creating an unreadable pyramid:
+</p>
+
+<pre swift>
+func processUserSession() {
+    if let url = URL(string: "https://api.com") {
+        if let data = try? Data(contentsOf: url) {
+            if let user = try? JSONDecoder().decode(User.self, from: data) {
+                
+                // ──► THE ACTUAL LOGIC LIVES DEEP DOWN HERE ◄──
+                print("Welcome back, \(user.name)!")
+                
+            } else { print("Parsing error") }
+        } else { print("Network error") }
+    } else { print("Bad URL") }
+}
+</pre>
+
+<div id="Guard-The Solution: The Guard Statement"><h3 id="The Solution: The Guard Statement" class="header"><a href="#Guard-The Solution: The Guard Statement">The Solution: The Guard Statement</a></h3></div>
+
+<p>
+<code>guard</code> flips this logic on its head. Instead of checking if things are right and nesting the code, <code>guard</code> checks if things are <span id="Guard-The Solution: The Guard Statement-wrong"></span><strong id="wrong">wrong</strong> and exits early.
+</p>
+
+<p>
+Here is the exact same function rewritten using guard:
+</p>
+
+<pre swift>
+func processUserSession() {
+    // 1. Check the URL. If it fails, leave immediately.
+    guard let url = URL(string: "https://api.com") else {
+        print("Bad URL")
+        return 
+    }
+    
+    // 2. Check the data. If it fails, leave immediately.
+    guard let data = try? Data(contentsOf: url) else {
+        print("Network error")
+        return 
+    }
+    
+    // 3. Check the parsing. If it fails, leave immediately.
+    guard let user = try? JSONDecoder().decode(User.self, from: data) else {
+        print("Parsing error")
+        return 
+    }
+    
+    // ──► THE ACTUAL LOGIC LIVES SAFELY ON THE MAIN WALL ◄──
+    print("Welcome back, \(user.name)!")
+}
+</pre>
+
+<div id="Guard-The Rules of guard"><h2 id="The Rules of guard" class="header"><a href="#Guard-The Rules of guard">The Rules of guard</a></h2></div>
+
+<p>
+There are two strict structural rules that Swift enforces when you use a <code>guard</code> statement:
+</p>
+
+<div id="Guard-The Rules of guard-1. It Must Have an else Block That Exits"><h3 id="1. It Must Have an else Block That Exits" class="header"><a href="#Guard-The Rules of guard-1. It Must Have an else Block That Exits">1. It Must Have an else Block That Exits</a></h3></div>
+
+<p>
+A <code>guard</code> statement <em>must</em> include an <code>else</code> block, and that block <span id="Guard-The Rules of guard-1. It Must Have an else Block That Exits-must"></span><strong id="must">must</strong> exit the current scope. You cannot just log an error and let the code keep running. You must use a control transfer statement like:
+</p>
+
 <ul>
+<li>
+<code>return</code> (to leave a function)
+
+<li>
+<code>break</code> or <code>continue</code> (to exit or skip a loop)
+
+<li>
+<code>throw</code> (to hurl an error upward)
+
+</ul>
+<p>
+If you forget to exit inside the <code>else</code> block, the Swift compiler will throw an error and refuse to build your app.
+</p>
+
+<div id="Guard-The Rules of guard-2. The &quot;Unwrapped&quot; Variables Are Upgraded to Gold Status"><h3 id="2. The &quot;Unwrapped&quot; Variables Are Upgraded to Gold Status" class="header"><a href="#Guard-The Rules of guard-2. The &quot;Unwrapped&quot; Variables Are Upgraded to Gold Status">2. The "Unwrapped" Variables Are Upgraded to Gold Status</a></h3></div>
+
+<p>
+When you use <code>if let user = ...</code>, the <code>user</code> variable <span id="Guard-The Rules of guard-2. The &quot;Unwrapped&quot; Variables Are Upgraded to Gold Status-only exists inside the curly braces"></span><strong id="only exists inside the curly braces">only exists inside the curly braces</strong> of that <code>if</code> statement.
+</p>
+
+<p>
+When you use <code>guard let user = ...</code>, Swift does something amazing: because it knows that any failure would have already caused the function to return, it safely opens up the <code>user</code> variable to be used anywhere <span id="Guard-The Rules of guard-2. The &quot;Unwrapped&quot; Variables Are Upgraded to Gold Status-below"></span><strong id="below">below</strong> that guard statement for the remainder of the function.
+</p>
+
+<div id="Guard-The Rules of guard-Summary: Why Use It?"><h3 id="Summary: Why Use It?" class="header"><a href="#Guard-The Rules of guard-Summary: Why Use It?">Summary: Why Use It?</a></h3></div>
+
+<ul>
+<li>
+Early Return: It handles errors and edge cases immediately at the top of the function so you can get them out of the way.
+
+<li>
+Linear Readability: It keeps your "happy path" (the actual successful logic of your code) aligned cleanly against the left margin of your screen instead of buried deep inside nested tabs.
+
+<li>
+Safety: The compiler forces you to exit if a condition fails, ensuring you never accidentally run logic on invalid or missing data.
+
 <li>
 <a href="swift_hws_172.html">Hacking With Swift - 172 - Instafilter: Introduction</a>
 
