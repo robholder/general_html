@@ -317,7 +317,320 @@ Scalability
 For a tiny weekend project, a unified class is fine. But for anything meant to live on the App Store, <span id="Benefits of SoC - Separation of Concerns-4. Enhanced Team Collaboration-Summary: The Developer's Rule of Thumb-Separation of Concerns"></span><strong id="Separation of Concerns">Separation of Concerns</strong> is what keeps a codebase from turning into "spaghetti code" that developers become too terrified to modify.
 </p>
 
+
+<div id="Ai Insight - Putting It Into Practice"><h1 id="Ai Insight - Putting It Into Practice" class="header"><a href="#Ai Insight - Putting It Into Practice">Ai Insight - Putting It Into Practice</a></h1></div>
+
 <p>
+This builds on the previous page's 'In Context' code:
+</p>
+
+<p>
+To transform your app into a format with <span id="Ai Insight - Putting It Into Practice-Separation of Concerns"></span><strong id="Separation of Concerns">Separation of Concerns</strong>, we want to move the networking, JSON parsing, and SwiftData context management out of <code>ContentView</code> and into a dedicated business logic controller.
+</p>
+
+<p>
+In modern SwiftUI (iOS 17+), this is achieved beautifully by pairing a service layer with an <code>@Observable</code> <span id="Ai Insight - Putting It Into Practice-Service Manager"></span><strong id="Service Manager">Service Manager</strong>. This keeps your view completely passive—its only job will be rendering data, while the manager handles background data synchronization.
+</p>
+
+<p>
+Here is the structured architecture for separating your code.
+</p>
+
+<div id="Ai Insight - Putting It Into Practice-Step 1: Create the Data Service (Network Layer)"><h3 id="Step 1: Create the Data Service (Network Layer)" class="header"><a href="#Ai Insight - Putting It Into Practice-Step 1: Create the Data Service (Network Layer)">Step 1: Create the Data Service (Network Layer)</a></h3></div>
+
+<p>
+First, create a standalone service that does one thing: fetch raw data over the web and parse it. It doesn't know anything about SwiftData or SwiftUI views.
+</p>
+
+<p>
+Create a new file named FriendService.swift:
+</p>
+
+<pre swift>
+import Foundation
+
+struct FriendService {
+    private let urlString = "https://www.hackingwithswift.com/samples/friendface.json"
+    
+    /// Pure function responsible solely for downloading and decoding network payloads.
+    func fetchUsers() async throws -&gt; [User] {
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        return try decoder.decode([User].self, from: data)
+    }
+}
+</pre>
+
+<div id="Ai Insight - Putting It Into Practice-Step 2: Create the Database Manager (Business Logic Layer)"><h3 id="Step 2: Create the Database Manager (Business Logic Layer)" class="header"><a href="#Ai Insight - Putting It Into Practice-Step 2: Create the Database Manager (Business Logic Layer)">Step 2: Create the Database Manager (Business Logic Layer)</a></h3></div>
+
+<p>
+Next, create a dedicated actor or class to bridge your Network Service and your database. By making this class <code>@Observable</code>, SwiftUI views can read its properties (like a loading state) flawlessly.
+</p>
+
+<p>
+Create a new file named FriendManager.swift:
+</p>
+
+<pre swift>
+import Foundation
+import SwiftData
+import SwiftUI
+
+@Observable
+@MainActor
+class FriendManager {
+    private let service = FriendService()
+    var modelContext: ModelContext
+    
+    // UI state states can live here cleanly
+    var isDownloading = false
+    var errorMessage: String? = nil
+    
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+    }
+    
+    /// Synchronizes remote JSON entities with the persistent store if empty
+    func loadAndSyncUsers(currentCount: Int) async {
+        // Only fetch if database is empty
+        guard currentCount == 0 else { return }
+        
+        isDownloading = true
+        errorMessage = nil
+        
+        do {
+            let downloadedUsers = try await service.fetchUsers()
+            
+            // Core Data / SwiftData batch insertion
+            for user in downloadedUsers {
+                modelContext.insert(user)
+            }
+            
+            // Optional: Force a concrete save point if desired
+            try? modelContext.save()
+            
+        } catch {
+            errorMessage = "Sync Error: \(error.localizedDescription)"
+            print(error.localizedDescription)
+        }
+        
+        isDownloading = false
+    }
+}
+</pre>
+
+<div id="Ai Insight - Putting It Into Practice-Step 3: Refactor ContentView.swift"><h3 id="Step 3: Refactor ContentView.swift" class="header"><a href="#Ai Insight - Putting It Into Practice-Step 3: Refactor ContentView.swift">Step 3: Refactor ContentView.swift</a></h3></div>
+
+<p>
+Now your view becomes incredibly lean. We pass the <code>FriendManager</code> to it, and remove all parsing code entirely. The view simply reads the state and triggers the function.
+</p>
+
+<p>
+Replace your <code>ContentView.swift</code> with this:
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \User.name) private var users: [User]
+    
+    // State management driven by our decoupled controller
+    @State private var manager: FriendManager?
+    
+    var body: some View {
+        NavigationStack {
+            List(users) { user in
+                NavigationLink {
+                    UserDetailView(user: user)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(user.name)
+                                .font(.headline)
+                            Text(user.company)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Circle()
+                            .fill(user.isActive ? .green : .gray)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+            .navigationTitle("FriendFace")
+            .overlay {
+                // Lean view logic checking states computed by the manager
+                if let manager, manager.isDownloading {
+                    ProgressView("Downloading Friends...")
+                }
+            }
+            .onAppear {
+                // Lazy initialize the manager with the environment view context
+                if manager == nil {
+                    manager = FriendManager(modelContext: modelContext)
+                }
+            }
+            .task {
+                await manager?.loadAndSyncUsers(currentCount: users.count)
+            }
+        }
+    }
+}
+
+// MARK: - SwiftData Preview Sandbox Configuration
+#Preview("Main List Dashboard") {
+    do {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: User.self, configurations: config)
+        
+        container.mainContext.insert(User.dummyUser)
+        
+        return ContentView()
+            .modelContainer(container)
+        
+    } catch {
+        return Text("Failed to build SwiftData preview pipeline: \(error.localizedDescription)")
+    }
+}
+</pre>
+
+<div id="Ai Insight - Putting It Into Practice-Step 3: Refactor ContentView.swift-What did we achieve?"><h4 id="What did we achieve?" class="header"><a href="#Ai Insight - Putting It Into Practice-Step 3: Refactor ContentView.swift-What did we achieve?">What did we achieve?</a></h4></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Metric
+</th>
+<th>
+Before
+</th>
+<th>
+After
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ContentView</code> Responsibility
+</td>
+<td>
+Displayed lists, held networking strings, parsed dates, handled encoding/decoding errors, managed database writing.
+</td>
+<td>
+Purely visual UI rendering and reaction to property triggers.
+</td>
+</tr>
+<tr>
+<td>
+Testing Capability
+</td>
+<td>
+Extremely difficult to unit-test without running the actual application window lifecycle.
+</td>
+<td>
+FriendService and FriendManager can now be completely unit-tested inside native test suites with zero UI windows needed.
+</td>
+</tr>
+<tr>
+<td>
+Maintainability
+</td>
+<td>
+Changing a JSON key meant altering structural layout view documents.
+</td>
+<td>
+UI layout maps strictly to the Model objects; parsing fixes live cleanly in the Service architecture.
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Ai Insight - Putting It Into Practice-Other Existing Code"><h2 id="Other Existing Code" class="header"><a href="#Ai Insight - Putting It Into Practice-Other Existing Code">Other Existing Code</a></h2></div>
+
+<p>
+Both <code>User.swift</code> and <code>UserDetailView.swift</code> remain completely untouched.
+</p>
+
+<p>
+This is the beauty of a proper Separation of Concerns architectural refactor. Because we isolated the networking and database-syncing tasks into their own specialized files (<code>FriendService</code> and <code>FriendManager</code>), the other files have no reason to change.
+</p>
+
+<p>
+Here is why they get to stay exactly as they are:
+</p>
+
+<div id="Ai Insight - Putting It Into Practice-Other Existing Code-1. UserDetailView.swift (Untouched)"><h3 id="1. UserDetailView.swift (Untouched)" class="header"><a href="#Ai Insight - Putting It Into Practice-Other Existing Code-1. UserDetailView.swift (Untouched)">1. UserDetailView.swift (Untouched)</a></h3></div>
+
+<p>
+As we established earlier, this view is a pure consumer of data.
+</p>
+
+<ul>
+<li>
+It accepts a <code>User</code> class instance.
+
+<li>
+It reads properties like <code>user.name</code>, <code>user.age</code>, and <code>user.friends</code>.
+
+<li>
+It does not care how that user got into the database, whether it was freshly downloaded from a server by <code>FriendManager</code> or loaded from cache. It simply draws what it's given.
+
+</ul>
+<div id="Ai Insight - Putting It Into Practice-Other Existing Code-2. User.swift (Untouched)"><h3 id="2. User.swift (Untouched)" class="header"><a href="#Ai Insight - Putting It Into Practice-Other Existing Code-2. User.swift (Untouched)">2. User.swift (Untouched)</a></h3></div>
+
+<p>
+Your <code>User</code> and <code>Friend</code> classes serve a dual purpose: they define your <span id="Ai Insight - Putting It Into Practice-Other Existing Code-2. User.swift (Untouched)-database schema"></span><strong id="database schema">database schema</strong> (via <code>@Model</code>) and your API data transport layout (via <code>Codable</code>).
+</p>
+
+<ul>
+<li>
+Even though we moved the execution of the decoding step into <code>FriendService</code>, the service still uses the exact same <code>Decoder</code> logic natively built into your <code>User</code> class initializer (<code>required init(from decoder: Decoder)</code>).
+
+<li>
+The models remain the clean blueprint for what your data looks like.
+
+</ul>
+<div id="Ai Insight - Putting It Into Practice-Other Existing Code-The Clean Architecture Map"><h3 id="The Clean Architecture Map" class="header"><a href="#Ai Insight - Putting It Into Practice-Other Existing Code-The Clean Architecture Map">The Clean Architecture Map</a></h3></div>
+
+<p>
+By organizing the code this way, your app's architecture now flows in a clean, one-way pipeline. If you add features down the road, you'll know exactly which file to open:
+</p>
+
+<pre text>
+[ Web API ] 
+    │
+    ▼
+[ FriendService ]       ──► Only handles raw network transfers &amp; JSON parsing
+    │
+    ▼
+[ FriendManager ]       ──► Only handles database inserts &amp; business rules
+    │
+    ▼
+[ SwiftData Store ]     ──► The persistent SQLite storage managed by iOS
+    │
+    ▼
+[ SwiftUI Views ]       ──► Only handle rendering text/layouts (ContentView &amp; UserDetailView)
+</pre>
+
+<div id="Ai Insight - Putting It Into Practice-Other Existing Code-The Clean Architecture Map-Future-Proof Benefits"><h4 id="Future-Proof Benefits" class="header"><a href="#Ai Insight - Putting It Into Practice-Other Existing Code-The Clean Architecture Map-Future-Proof Benefits">Future-Proof Benefits</a></h4></div>
+
+<p>
+If the web API address changes tomorrow, you <em>only</em> edit <code>FriendService.swift</code>. If you decide to add a button that lets users manually delete a friend from the database, you <em>only</em> write that logic in <code>FriendManager.swift</code>. Your UI files remain completely safe from accidental bugs.
 <hr>
 <br>
 </p>
