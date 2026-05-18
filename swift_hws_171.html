@@ -116,6 +116,21 @@ struct NetworkFriend: Codable {
 }
 </pre>
 
+<div id="Hacking With Swift - 171 - Ai Discussion of SoC - Separation of Concerns-The Pro-Level Alternative: The &quot;Separation of Concerns&quot; Pattern-The Data Life Cycle Summary"><h4 id="The Data Life Cycle Summary" class="header"><a href="#Hacking With Swift - 171 - Ai Discussion of SoC - Separation of Concerns-The Pro-Level Alternative: The &quot;Separation of Concerns&quot; Pattern-The Data Life Cycle Summary">The Data Life Cycle Summary</a></h4></div>
+
+<p>
+Think of the entire data pipeline like a camera snapshot that becomes a blueprint for a house:
+</p>
+
+<pre text>
+[ Web API JSON ] ──► [ Network Struct (let) ] ──► [ SwiftData Class (var) ] ──► [ Local SQLite Store ]
+  (Raw Stream)         (Unchangeable Photo)          (Living, Editable Object)     (Persistent Disk file)
+</pre>
+
+<p>
+By using <code>let</code> for networking, you guarantee your API parsing layer is completely safe and crash-free. By using <code>var</code> for SwiftData, you ensure your UI layer is fully dynamic and capable of modifying the data as your user interacts with the app!
+</p>
+
 <div id="Hacking With Swift - 171 - Ai Discussion of SoC - Separation of Concerns-How It Changes loadData()"><h3 id="How It Changes loadData()" class="header"><a href="#Hacking With Swift - 171 - Ai Discussion of SoC - Separation of Concerns-How It Changes loadData()">How It Changes loadData()</a></h3></div>
 
 <p>
@@ -642,6 +657,184 @@ By organizing the code this way, your app's architecture now flows in a clean, o
 
 <p>
 If the web API address changes tomorrow, you <em>only</em> edit <code>FriendService.swift</code>. If you decide to add a button that lets users manually delete a friend from the database, you <em>only</em> write that logic in <code>FriendManager.swift</code>. Your UI files remain completely safe from accidental bugs.
+</p>
+
+<p>
+<hr>
+</p>
+<div id="Absolute Stripped Down Code"><h1 id="Absolute Stripped Down Code" class="header"><a href="#Absolute Stripped Down Code">Absolute Stripped Down Code</a></h1></div>
+
+<div id="Absolute Stripped Down Code-Data Structure (struct)"><h4 id="Data Structure (struct)" class="header"><a href="#Absolute Stripped Down Code-Data Structure (struct)">Data Structure (struct)</a></h4></div>
+
+<pre swift>
+struct Post: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let body: String
+}
+</pre>
+
+<div id="Absolute Stripped Down Code-Fetch Data"><h4 id="Fetch Data" class="header"><a href="#Absolute Stripped Down Code-Fetch Data">Fetch Data</a></h4></div>
+
+<pre swift>
+import Foundation
+import Observation // 1. Import the Observation framework
+
+@Observable // 2. Attach the modern macro (removes ObservableObject)
+@MainActor  // 3. Ensures all UI data updates safely happen on the main thread
+class NetworkManager {
+    var posts: [Post] = []
+    
+    func fetchData() async {
+        guard let url = URL(string: "https://jsonplaceholder.typicode.com/posts") else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let decodedData = try JSONDecoder().decode([Post].self, from: data)
+            
+            self.posts = decodedData
+            
+        } catch {
+            print("Failed to fetch data: \(error)")
+        }
+    }
+}
+</pre>
+
+<div id="Absolute Stripped Down Code-Show Data"><h4 id="Show Data" class="header"><a href="#Absolute Stripped Down Code-Show Data">Show Data</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @State private var networkManager = NetworkManager()
+
+    var body: some View {
+        NavigationStack {
+            List(networkManager.posts) { post in
+                VStack(alignment: .leading) {
+                    Text(post.title)
+                        .font(.headline)
+                    Text(post.body)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Internet Data")
+            .task {
+                await networkManager.fetchData()
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+<hr>
+</p>
+<div id="@MainActor"><h1 id="@MainActor" class="header"><a href="#@MainActor">@MainActor</a></h1></div>
+
+<p>
+You will use the <code>@MainActor</code> property wrapper whenever you need to guarantee that a specific piece of code runs on the <span id="@MainActor-Main Thread"></span><strong id="Main Thread">Main Thread</strong> (also known as the UI Thread).
+</p>
+
+<p>
+To understand why this is so critical, we have to look at how modern iPhones multi-task behind the scenes, a concept known as <span id="@MainActor-Concurrency"></span><strong id="Concurrency">Concurrency</strong>.
+</p>
+
+<div id="@MainActor-The Problem: Background vs. Main Thread"><h3 id="The Problem: Background vs. Main Thread" class="header"><a href="#@MainActor-The Problem: Background vs. Main Thread">The Problem: Background vs. Main Thread</a></h3></div>
+
+<p>
+An iPhone has multiple CPU cores, allowing it to do many things at once using different "threads":
+</p>
+
+<ul>
+<li>
+The Main Thread: This is a dedicated, high-priority thread that handles only user interface tasks. Every button tap, swipe gesture, animation, and text update happens here. It must stay incredibly fast and unblocked, or the app will stutter and freeze.
+
+<li>
+Background Threads: These are low-priority helper threads used for heavy, time-consuming tasks like downloading files from the internet, reading from a database, or rendering video frames.
+
+</ul>
+<p>
+Here is the absolute golden rule of Apple development: <span id="@MainActor-The Problem: Background vs. Main Thread-You must never perform heavy work on the main thread, and you must never update the UI from a background thread."></span><strong id="You must never perform heavy work on the main thread, and you must never update the UI from a background thread.">You must never perform heavy work on the main thread, and you must never update the UI from a background thread.</strong>
+</p>
+
+<p>
+If a background thread finishes downloading data and tries to directly update a SwiftUI view, it causes a <span id="@MainActor-The Problem: Background vs. Main Thread-data race"></span><strong id="data race">data race</strong> or a UI glitch. In the past, developers had to manually manage this jumping back-and-forth using <code>DispatchQueue.main.async</code>.
+</p>
+
+<div id="@MainActor-The Solution: @MainActor as the Traffic Cop"><h3 id="The Solution: @MainActor as the Traffic Cop" class="header"><a href="#@MainActor-The Solution: @MainActor as the Traffic Cop">The Solution: @MainActor as the Traffic Cop</a></h3></div>
+
+<p>
+<code>@MainActor</code> is Swift’s modern, bulletproof way of automating this process. When you mark a class or a function with <code>@MainActor</code>, you are telling the compiler: "No matter where or how this code is called, force it to execute on the Main Thread."
+</p>
+
+<p>
+If a background task is running a network download, the moment it finishes and tries to pass data into a <code>@MainActor</code> function, Swift automatically and safely halts the background thread, jumps over to the main thread, updates your data, and refreshes the UI.
+</p>
+
+<div id="@MainActor-Where should you apply it?"><h3 id="Where should you apply it?" class="header"><a href="#@MainActor-Where should you apply it?">Where should you apply it?</a></h3></div>
+
+<p>
+You generally apply <code>@MainActor</code> to your <span id="@MainActor-Where should you apply it?-ViewModel"></span><strong id="ViewModel">ViewModel</strong> or <span id="@MainActor-Where should you apply it?-Manager classes"></span><strong id="Manager classes">Manager classes</strong> (the ones using <code>@Observable</code> or <code>ObservableObject</code>) because their entire job is to hold data that directly drives your SwiftUI views.
+</p>
+
+<p>
+You can apply it in two different scopes:
+</p>
+
+<div id="@MainActor-Where should you apply it?-Scope 1: To an Entire Class (Most Common)"><h4 id="Scope 1: To an Entire Class (Most Common)" class="header"><a href="#@MainActor-Where should you apply it?-Scope 1: To an Entire Class (Most Common)">Scope 1: To an Entire Class (Most Common)</a></h4></div>
+
+<p>
+If your class exists solely to feed data to the UI, mark the whole thing. Every variable change and function inside it will safely run on the main thread.
+</p>
+
+<pre swift>
+@Observable
+@MainActor // ◄ Everything in this class is now guaranteed to be on the Main Thread
+class ProfileManager {
+    var username = "Anonymous"
+    
+    func updateUsername(to newName: String) {
+        self.username = newName // Completely safe UI update
+    }
+}
+</pre>
+
+<div id="@MainActor-Where should you apply it?-Scope 2: To an Individual Function"><h4 id="Scope 2: To an Individual Function" class="header"><a href="#@MainActor-Where should you apply it?-Scope 2: To an Individual Function">Scope 2: To an Individual Function</a></h4></div>
+
+<p>
+If you have a class that mostly does heavy background math, but has one specific function that updates the UI, you can target just that function.
+</p>
+
+<pre swift>
+class ImageProcessor {
+    // Runs on a background thread automatically
+    func applyComplexFilter(to image: Data) -&gt; Data {
+        // ... heavy math here ...
+        return processedData
+    }
+    
+    @MainActor // ◄ Only this function hops to the main thread
+    func updateInterface(with image: Data) {
+        // Safely hand the result to your SwiftUI views here
+    }
+}
+</pre>
+
+<div id="@MainActor-Where should you apply it?-Why haven't you seen it in Paul Hudson's introductory lessons?"><h4 id="Why haven't you seen it in Paul Hudson's introductory lessons?" class="header"><a href="#@MainActor-Where should you apply it?-Why haven't you seen it in Paul Hudson's introductory lessons?">Why haven't you seen it in Paul Hudson's introductory lessons?</a></h4></div>
+
+<p>
+If you are following 100 Days of SwiftUI, Paul introduces concepts step-by-step to avoid cognitive overload.
+</p>
+
+<p>
+In early Swift projects, when you use the modern <code>.task</code> modifier in SwiftUI to download data, SwiftUI secretly applies some <code>@MainActor</code> magic behind the scenes to keep things working. However, the moment you move your networking out of the view and into your own standalone custom architecture (like our <code>FriendManager</code>), the safety net disappears.
+</p>
+
+<p>
+Adding <code>@MainActor</code> to your decoupled manager classes ensures you never see the dreaded Xcode purple warning: <em>"Publishing changes from background threads is not allowed."</em>
 </p>
 
 <p>
