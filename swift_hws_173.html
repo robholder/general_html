@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_173</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_172.html">Hacking With Swift - 172 - Instafilter: Introduction</a>
+
+</ul>
+<div id="Hacking With Swift - 173 - How property wrappers become structs"><h1 id="Hacking With Swift - 173 - How property wrappers become structs" class="header"><a href="#Hacking With Swift - 173 - How property wrappers become structs">Hacking With Swift - 173 - How property wrappers become structs</a></h1></div>
+
+<p>
+You’ve seen how SwiftUI lets us store changing data in our view structs by using the <code>@State</code> property wrapper, how we can bind that state to the value of a UI control using <code>＄</code>, and how changes to that state automatically cause SwiftUI to reinvoke the <code>body</code> property of our view.
+</p>
+
+<p>
+All that combined lets us write code such as this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var blurAmount = 0.0
+
+    var body: some View {
+        VStack {
+            Text("Hello, World!")
+                .blur(radius: blurAmount)
+
+            Slider(value: $blurAmount, in: 0...20)
+
+            Button("Random Blur") {
+                blurAmount = Double.random(in: 0...20)
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+If you run that, you’ll find that dragging the slider left and right adjusts the blur amount for the text label, exactly as you would expect, and tapping the button immediately jumps to a random blur amount.
+</p>
+
+<p>
+Now, let’s say we want that binding to do more than just handle the radius of the blur effect. Perhaps we want to run a method, or just print out the value for debugging purposes. You might try updating the property like this:
+</p>
+
+<pre swift>
+@State private var blurAmount = 0.0 {
+    didSet {
+        print("New value is \(blurAmount)")
+    }
+}
+</pre>
+
+<p>
+If you run that code, you’ll be disappointed: as you drag the slider around you’ll see the blur amount change, but you won’t see our <code>print()</code> statement being triggered - in fact, nothing will be output at all. But if you try pressing the <em>button</em> you will see a message printed.
+</p>
+
+<p>
+To understand what’s happening here, I want you to explore a little of how <code>@State</code> functions, and what property wrappers are actually doing for us.
+</p>
+
+<p>
+Property wrappers have that name because they wrap our property inside another struct. What this means is that when we use <code>@State</code> to wrap a string, the actual type of property we end up with is a <code>State&lt;String&gt;</code>. Similarly, when we use <code>@Environment</code> and others we end up with a struct of type <code>Environment</code> that contains some other value inside it.
+</p>
+
+<p>
+Previously I explained that we can’t modify properties in our views because they are structs, and are therefore fixed. However, <em>now</em> you know that <code>@State</code> itself produces a struct, so we have a conundrum: how come <em>that</em> struct can be modified?
+</p>
+
+<p>
+Xcode has a really helpful command called “Open Quickly” (accessed using <code>Cmd+Shift+O</code>), which lets you find any file or type in your project or any of the frameworks you have imported. Activate it now, and type “State” - hopefully the first result says SwiftUI below it, but if not please find that and select it.
+</p>
+
+<p>
+You’ll be taken to a generated interface for SwiftUI, which is essentially all the parts that SwiftUI exposes to us. There’s no implementation code in there, just lots of definitions for protocols, structs, modifiers, and such.
+</p>
+
+<p>
+We asked to see <code>State</code>, so you should have been taken to this line:
+</p>
+
+<pre swift>
+@propertyWrapper public struct State&lt;Value&gt; : DynamicProperty {
+</pre>
+
+<p>
+That <code>@propertyWrapper</code> attribute is what makes this into <code>@State</code> for us to use.
+</p>
+
+<p>
+Now look a few lines further down, and you should see this:
+</p>
+
+<pre swift>
+public var wrappedValue: Value { get nonmutating set }
+</pre>
+
+<p>
+That wrapped value is the actual value we’re trying to store, such as a string. What this generated interface is telling us is that the property can be read (<code>get</code>), and written (<code>set</code>), but that when we set the value it won’t actually change the struct itself. Behind the scenes, it sends that value off to SwiftUI for storage in a place where it can be modified freely, so it’s true that the struct itself never changes.
+</p>
+
+<p>
+Now you know all that, let’s circle back to our problematic code:
+</p>
+
+<pre swift>
+@State private var blurAmount = 0.0 {
+    didSet {
+        print("New value is \(blurAmount)")
+    }
+}
+</pre>
+
+<p>
+On the surface, that states "when blurAmount changes, print out its new value." However, because <code>@State</code> actually wraps its contents, what it’s <em>actually</em> saying is that when the <code>State</code> struct that wraps <code>blurAmount</code> changes, print out the new blur amount.
+</p>
+
+<p>
+Still with me? Now let’s go a stage further: you’ve just seen how <code>State</code> wraps its value using a non-mutating setter, which means neither <code>blurAmount</code> or the <code>State</code> struct wrapping it are changing - our binding is directly changing the internally stored value, which means the property observer is never being triggered.
+</p>
+
+<p>
+So, changing the property directly using a button works fine, because it goes through the nonmutating setter and triggers the <code>didSet</code> observer, but using a binding <code>doesn’t</code> because it bypasses the setter and adjusts the value directly.
+</p>
+
+<p>
+How then can we solve this - how can we ensure some code is run whenever a binding is changed, no matter how that change happens? Well, there’s a modifier just for that purpose...
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
