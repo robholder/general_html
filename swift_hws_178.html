@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_178</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_177.html">Hacking With Swift - 177 - Showing empty states with ContentUnavailableView</a>
+
+</ul>
+<div id="Hacking With Swift - 178 - Loading photos from the user's photo library"><h1 id="Hacking With Swift - 178 - Loading photos from the user's photo library" class="header"><a href="#Hacking With Swift - 178 - Loading photos from the user's photo library">Hacking With Swift - 178 - Loading photos from the user's photo library</a></h1></div>
+
+<p>
+Believe it or not, we still have one more day of techniques for this project before we get into the implementation phase, and I’ve left the fun stuff to the end.
+</p>
+
+<p>
+Today you’re going to look at how to bring data <code>into</code> your app, and also send it back <code>out</code> again, which is where apps really come to life - users love to be able to bring in their existing content, remix it somehow, and share the results with their friends.
+</p>
+
+<p>
+Stick with it! After today we’ll start putting all these concepts into action, so you’re really close to the building part. Take your inspiration from the postage stamp - as the writer Josh Billings once quipped,
+</p>
+
+<p>
+<blockquote>
+"Its usefulness consists in the ability to stick to one thing until it gets there."
+</blockquote>
+</p>
+
+<p>
+Today you have three topics to work through, in which you’ll learn about loading photos, sharing data, and asking for app reviews.
+</p>
+
+<div id="Loading photos from the user's photo library"><h1 id="Loading photos from the user's photo library" class="header"><a href="#Loading photos from the user's photo library">Loading photos from the user's photo library</a></h1></div>
+
+<p>
+SwiftUI's <code>PhotosPicker</code> view provides us with a simple way to import one or more photos from the user's photo library. To avoid causing any performance hiccups, the data gets provided to us as a special type called <code>PhotosPickerItem</code>, which we can then load asynchronously to convert the data into a SwiftUI image.
+</p>
+
+<p>
+This takes five steps in total, starting with adding an import for PhotosUI alongside your regular SwiftUI import, like this:
+</p>
+
+<pre swift>
+import PhotosUI
+import SwiftUI
+</pre>
+
+<p>
+Second, we need to create two properties: one to store the item that was selected, and one to store that selected item as a SwiftUI image. This distinction matters, because the selected item is just a reference to a picture in the user's photo library until we actually ask for it to be loaded.
+</p>
+
+<p>
+Add these two now:
+</p>
+
+<pre swift>
+@State private var pickerItem: PhotosPickerItem?
+@State private var selectedImage: Image?
+</pre>
+
+<p>
+The third step is to add a <code>PhotosPicker</code> view somewhere in your SwiftUI view hierarchy. This must be created with a title to show the user, a binding where to store the selected image, and also what type of data to show - that last part allows us use <code>PhotosPicker</code> to load videos, Live Photos, and more.
+</p>
+
+<p>
+Replace the current <code>body</code> property of your view with this:
+</p>
+
+<pre swift>
+VStack {
+    PhotosPicker("Select a picture", selection: $pickerItem, matching: .images)
+}
+</pre>
+
+<p>
+<span id="Loading photos from the user's photo library-Tip"></span><strong id="Tip">Tip</strong>: That's in a <code>VStack</code> intentionally - more on that in a moment.
+</p>
+
+<p>
+The fourth step is to watch <code>pickerItem</code> for changes, because when it changes it means the user has selected a picture for us to load. Once that's done, we can call <code>loadTransferable(type:)</code> on the picker item, which is a method that tells SwiftUI we want to load actual underlying data from the picker item into a SwiftUI image. If that succeeds, we can assign the resulting value to the <code>selectedImage</code> property.
+</p>
+
+<p>
+Add this modifier to the <code>VStack</code>:
+</p>
+
+<pre swift>
+.onChange(of: pickerItem) {
+    Task {
+        selectedImage = try await pickerItem?.loadTransferable(type: Image.self)
+    }
+}
+</pre>
+
+<p>
+<span id="Loading photos from the user's photo library-Tip"></span><strong id="Tip">Tip</strong>: Calling <code>loadTransferable(type:)</code> might take a few seconds to complete, particularly for a large picture such as a panorama.
+</p>
+
+<p>
+And now the fifth and final step is to show the loaded SwiftUI image somewhere. Add this to the <code>VStack</code>, either before or after the <code>PhotosPicker</code>:
+</p>
+
+<pre swift>
+selectedImage?
+    .resizable()
+    .scaledToFit()
+</pre>
+
+<p>
+Now give it a try! The Simulator comes with a handful of built-in images you can test with, and if you select one you should see it loaded into the <code>Image</code> view and displayed on-screen.
+</p>
+
+<p>
+There are lots of other ways <code>PhotosPicker</code> can be used, depending on what you need. For example, you can pass it a binding to an array of picker items and let the user select several. That means creating a an array of picker items as a property:
+</p>
+
+<pre swift>
+@State private var pickerItems = [PhotosPickerItem]()
+</pre>
+
+<p>
+Then passing that array in just like before:
+</p>
+
+<pre swift>
+PhotosPicker("Select images", selection: $pickerItems, matching: .images)
+</pre>
+
+<p>
+The harder part is processing those images then displaying them somehow, because we can't watch a single photo picker item item any more.
+</p>
+
+<p>
+Instead, you should create an array to store the images that get loaded, like this:
+</p>
+
+<pre swift>
+@State private var selectedImages = [Image]()
+</pre>
+
+<p>
+Then display them using a <code>ForEach</code> or similar, like this:
+</p>
+
+<pre swift>
+ScrollView {
+    ForEach(0..&lt;selectedImages.count, id: \.self) { i in
+        selectedImages[i]
+            .resizable()
+            .scaledToFit()
+    }
+}
+</pre>
+
+<p>
+And finally update your <code>onChange()</code> so that you clear that array when new items are selected, then load the new set individually:
+</p>
+
+<pre swift>
+.onChange(of: pickerItems) {
+    Task {
+        selectedImages.removeAll()
+
+        for item in pickerItems {
+            if let loadedImage = try await item.loadTransferable(type: Image.self) {
+                selectedImages.append(loadedImage)
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+If you're going to allow users to select several photos, I would recommend you limit how many pictures actually can be selected at once by adding a <code>maxSelectionCount</code> parameter, like this:
+</p>
+
+<pre swift>
+PhotosPicker("Select images", selection: $pickerItems, maxSelectionCount: 3, matching: .images)
+</pre>
+
+<p>
+There are two last ways you can customize photo import, starting with the label. As with many SwiftUI views, you can provide a completely custom label if you prefer, which might be a <code>Label</code> view or something completely custom:
+</p>
+
+<pre swift>
+PhotosPicker(selection: $pickerItems, maxSelectionCount: 3, matching: .images) {
+    Label("Select a picture", systemImage: "photo")
+}
+</pre>
+
+<p>
+And the last way is to limit the kinds of pictures that can be imported. We've used <code>.images</code> here across the board, which means we'll get regular photos, screenshots, panoramas, and more. You can apply a more advanced filter using <code>.any()</code>, <code>.all()</code>, and <code>.not()</code>, and passing them an array. For example, this matches all images except screenshots:
+</p>
+
+<div id="Loading photos from the user's photo library-Original Line Breaks"><h4 id="Original Line Breaks" class="header"><a href="#Loading photos from the user's photo library-Original Line Breaks">Original Line Breaks</a></h4></div>
+
+<pre swift>
+PhotosPicker(selection: $pickerItems, maxSelectionCount: 3, matching: .any(of: [.images, .not(.screenshots)])) {
+    Label("Select a picture", systemImage: "photo")
+}
+</pre>
+
+<div id="Loading photos from the user's photo library-Alternate Line Breaks"><h4 id="Alternate Line Breaks" class="header"><a href="#Loading photos from the user's photo library-Alternate Line Breaks">Alternate Line Breaks</a></h4></div>
+
+<pre swift>
+PhotosPicker(
+    selection: $pickerItems,
+    maxSelectionCount: 3,
+    matching: .any(of: [.images, .not(.screenshots)])
+) {
+    Label("Select a picture", systemImage: "photo")
+}
+</pre>
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
