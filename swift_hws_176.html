@@ -67,7 +67,11 @@ struct ContentView: View {
 </pre>
 
 <p>
-First, notice how smoothly SwiftUI handles optional views - it just works! However, notice how I attached the <code>onAppear()</code> modifier to a <code>VStack</code> around the image, because if the optional image is <code>nil</code> then it won’t trigger the <code>onAppear()</code> function.
+First, notice how smoothly SwiftUI handles optional views - it just works!
+</p>
+
+<p>
+However, notice how I attached the <code>onAppear()</code> modifier to a <code>VStack</code> around the image, because if the optional image is <code>nil</code> then it won’t trigger the <code>onAppear()</code> function.
 </p>
 
 <p>
@@ -86,24 +90,38 @@ If we want to use Core Image, SwiftUI’s Image view is a great end point, but i
 Apple gives us three other image types to work with, and cunningly we need to use all three if we want to work with Core Image. They might sound similar, but there is some subtle distinction between them, and it’s important that you use them correctly if you want to get anything meaningful out of Core Image.
 </p>
 
-<p>
-Apart from SwiftUI’s <code>Image</code> view, the three other image types are:
-</p>
+<div id="Hacking With Swift - 176 - Integrating Core Image with SwiftUI-Image"><h4 id="Image" class="header"><a href="#Hacking With Swift - 176 - Integrating Core Image with SwiftUI-Image">Image</a></h4></div>
 
 <ul>
 <li>
-<code>UIImage</code>, which comes from UIKit. This is an extremely powerful image type capable of working with a variety of image types, including bitmaps (like PNG), vectors (like SVG), and even sequences that form an animation. <code>UIImage</code> is the standard image type for UIKit, and of the three it’s closest to SwiftUI’s <code>Image</code> type.
+Apart from SwiftUI’s <code>Image</code> view, the three other image types are...
 
-<li>
-<code>CGImage</code>, which comes from Core Graphics. This is a simpler image type that is really just a two-dimensional array of pixels.
+</ul>
+<div id="Hacking With Swift - 176 - Integrating Core Image with SwiftUI-UIImage"><h4 id="UIImage" class="header"><a href="#Hacking With Swift - 176 - Integrating Core Image with SwiftUI-UIImage">UIImage</a></h4></div>
 
+<ul>
 <li>
-<code>CIImage</code>, which comes from Core Image. This stores all the information required to produce an image but doesn’t actually turn that into pixels unless it’s asked to. Apple calls <code>CIImage</code> “an image recipe” rather than an actual image.
+<code>UIImage</code>, which comes from <span id="Hacking With Swift - 176 - Integrating Core Image with SwiftUI-UIImage-UIKit"></span><strong id="UIKit">UIKit</strong>. This is an extremely powerful image type capable of working with a variety of image types, including bitmaps (like PNG), vectors (like SVG), and even sequences that form an animation. <code>UIImage</code> is the standard image type for UIKit, and of the three it’s closest to SwiftUI’s <code>Image</code> type.
+
+</ul>
+<div id="Hacking With Swift - 176 - Integrating Core Image with SwiftUI-CGImage"><h4 id="CGImage" class="header"><a href="#Hacking With Swift - 176 - Integrating Core Image with SwiftUI-CGImage">CGImage</a></h4></div>
+
+<ul>
+<li>
+<code>CGImage</code>, which comes from <span id="Hacking With Swift - 176 - Integrating Core Image with SwiftUI-CGImage-Core Graphics"></span><strong id="Core Graphics">Core Graphics</strong>. This is a simpler image type that is really just a two-dimensional array of pixels.
+
+</ul>
+<div id="Hacking With Swift - 176 - Integrating Core Image with SwiftUI-CIImage"><h4 id="CIImage" class="header"><a href="#Hacking With Swift - 176 - Integrating Core Image with SwiftUI-CIImage">CIImage</a></h4></div>
+
+<ul>
+<li>
+<code>CIImage</code>, which comes from <span id="Hacking With Swift - 176 - Integrating Core Image with SwiftUI-CIImage-Core Image"></span><strong id="Core Image">Core Image</strong>. This stores all the information required to produce an image but doesn’t actually turn that into pixels unless it’s asked to. Apple calls <code>CIImage</code> “an image recipe” rather than an actual image.
 
 </ul>
 <p>
 There is some interoperability between the various image types:
 </p>
+
 
 <ul>
 <li>
@@ -227,6 +245,305 @@ image = Image(uiImage: uiImage)
 If you run the app again you should see your example image now has a sepia effect applied, all thanks to Core Image.
 </p>
 
+<div id="Ai Insight - Function Breakdown"><h1 id="Ai Insight - Function Breakdown" class="header"><a href="#Ai Insight - Function Breakdown">Ai Insight - Function Breakdown</a></h1></div>
+
+<p>
+Mastering this specific code block is the absolute "secret handshake" to working with graphics in Apple development. The reason it feels confusing is because Apple uses three entirely separate image frameworks here (<code>UIKit</code>, <code>Core Image</code>, and <code>Core Graphics</code>), and they all have very similar-sounding names.
+</p>
+
+<p>
+To untangle this, let's categorize what you are looking at into four buckets:
+</p>
+
+<ul>
+<li>
+Keywords: Built-in commands that belong to the Swift language itself.
+
+<li>
+Variables/Constants: Names you create to hold data temporarily.
+
+<li>
+Data Types/Classes: Apple's blueprints for what kind of object is being created.
+
+<li>
+Properties: Characteristics or settings attached to an object (accessed with a .).
+
+</ul>
+<p>
+Here is the line-by-line breakdown.
+</p>
+
+<div id="Ai Insight - Function Breakdown-The Function"><h2 id="The Function" class="header"><a href="#Ai Insight - Function Breakdown-The Function">The Function</a></h2></div>
+
+<pre swift>
+func loadImage() {
+   
+    let inputImage = UIImage(resource: .example)
+    let beginImage = CIImage(image: inputImage)
+    
+    let context = CIContext()
+    let currentFilter = CIFilter.sepiaTone()
+    
+    currentFilter.inputImage = beginImage
+    currentFilter.intensity = 1
+    
+    // get a CIImage from our filter or exit if that fails
+    guard let outputImage = currentFilter.outputImage else { return }
+    
+    // attempt to get a CGImage from our CIImage
+    guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent)  else { return }
+    
+    // convert that to a UIImage
+    let uiImage = UIImage(cgImage: cgImage)
+    
+    // and convert that to a SwiftUI image
+    image = Image(uiImage: uiImage)
+</pre>
+<div id="Ai Insight - Function Breakdown-The Function-Line 1: The Function Declaration"><h3 id="Line 1: The Function Declaration" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 1: The Function Declaration">Line 1: The Function Declaration</a></h3></div>
+
+<pre swift>
+func loadImage() {
+</pre>
+
+<ul>
+<li>
+<code>func</code> (Keyword): Tells Swift, "I am about to define a reusable block of code."
+
+<li>
+<code>loadImage</code> (Your Name): A custom name you invented for this specific function.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 2: Loading the Raw Asset"><h3 id="Line 2: Loading the Raw Asset" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 2: Loading the Raw Asset">Line 2: Loading the Raw Asset</a></h3></div>
+
+<pre swift>
+let inputImage = UIImage(resource: .example)
+</pre>
+
+<ul>
+<li>
+<code>let</code> (Keyword): Creates an unchangeable constant.
+
+<li>
+<code>inputImage</code> (Your Variable): The name you chose to hold the original, raw photo.
+
+<li>
+<code>UIImage</code> (Data Type): Apple's standard display image format from the UIKit framework.
+
+<li>
+<code>(resource: .example)</code>: A configuration parameter fetching a photo named "example" from your Assets folder.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 3: Converting to the Filter Format"><h3 id="Line 3: Converting to the Filter Format" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 3: Converting to the Filter Format">Line 3: Converting to the Filter Format</a></h3></div>
+
+<pre swift>
+let beginImage = CIImage(image: inputImage)
+</pre>
+
+<ul>
+<li>
+<code>let</code> (Keyword): Creates a constant.
+
+<li>
+<code>beginImage</code> (Your Variable): Your custom name for the image once it is ready to be manipulated.
+
+<li>
+<code>CIImage</code> (Data Type): A Core Image format. Unlike a UIImage, this doesn't actually contain pixel data yet—it is a recipe for a picture that Core Image knows how to apply filters to.
+
+<li>
+<code>(image: inputImage)</code>: Passes your variable from line 2 into this new blueprint.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 4: Creating the Engine and the Recipe"><h3 id="Line 4: Creating the Engine and the Recipe" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 4: Creating the Engine and the Recipe">Line 4: Creating the Engine and the Recipe</a></h3></div>
+
+<pre swift>
+let context = CIContext()
+let currentFilter = CIFilter.sepiaTone()
+</pre>
+
+<ul>
+<li>
+<code>context</code> &amp; <code>currentFilter</code> (Your Variables): Names you created.
+
+<li>
+<code>CIContext</code> (Data Type): The heavy-duty processing engine. Think of it as the physical graphics card/CPU worker that will render the image later.
+
+<li>
+<code>CIFilter.sepiaTone()</code> (Data Type &amp; Method): A specific mathematical recipe from the Core Image library that turns images brown/vintage.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 5: Tweaking the Filter Settings"><h3 id="Line 5: Tweaking the Filter Settings" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 5: Tweaking the Filter Settings">Line 5: Tweaking the Filter Settings</a></h3></div>
+
+<pre swift>
+currentFilter.inputImage = beginImage
+currentFilter.intensity = 1
+</pre>
+
+<ul>
+<li>
+<code>currentFilter</code> (Your Variable): Calls upon the filter you created in the step prior.
+
+<li>
+<code>.inputImage</code> &amp; <code>.intensity</code> (Properties): Internal settings built into Apple's sepia filter blueprint. You are assigning your beginImage variable as the target, and setting the effect strength to 100% (1).
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 6: Drawing the Filter Output Safely"><h3 id="Line 6: Drawing the Filter Output Safely" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 6: Drawing the Filter Output Safely">Line 6: Drawing the Filter Output Safely</a></h3></div>
+
+<pre swift>
+guard let outputImage = currentFilter.outputImage else { return }
+</pre>
+
+<ul>
+<li>
+<code>guard let</code> &amp; <code>else { return }</code> (Keywords): Swift's bouncer logic. It safely unwraps the data; if the filter failed to generate an output, it exits early.
+
+<li>
+<code>outputImage</code> (Your Variable): The name you assigned to hold the filtered, sepia-toned <code>CIImage</code> recipe.
+
+<li>
+<code>.outputImage</code> (Property): A built-in property of the filter that generates the final filtered product.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 7: Baking the Recipe into Pixels"><h3 id="Line 7: Baking the Recipe into Pixels" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 7: Baking the Recipe into Pixels">Line 7: Baking the Recipe into Pixels</a></h3></div>
+
+<pre swift>
+guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent) else { return }
+</pre>
+
+<ul>
+<li>
+<code>cgImage</code> (Your Variable): Your name for the raw, uncompressed bitmap pixel data.
+
+<li>
+<code>CGImage</code> (Data Type): A low-level Core Graphics data type. This represents raw, mathematical coordinates of pixels on a grid.
+
+<li>
+<code>context.createCGImage(...)</code>: You command your graphics engine (<code>context</code>) to actually "bake" the recipe (<code>outputImage</code>) into hard pixel data, using the entire size (<code>.extent</code>) of the image.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 8: Wrapping Pixels for iOS"><h3 id="Line 8: Wrapping Pixels for iOS" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 8: Wrapping Pixels for iOS">Line 8: Wrapping Pixels for iOS</a></h3></div>
+
+<pre swift>
+let uiImage = UIImage(cgImage: cgImage)
+</pre>
+
+<ul>
+<li>
+<code>uiImage</code> (Your Variable): Your final UIKit-compatible variable name.
+
+<li>
+<code>UIImage(cgImage:)</code>: Core Graphics images (<code>CGImage</code>) can't easily be rendered inside iOS interfaces directly. You wrap it inside a user-friendly <code>UIImage</code> container.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Function-Line 9: Displaying in SwiftUI"><h3 id="Line 9: Displaying in SwiftUI" class="header"><a href="#Ai Insight - Function Breakdown-The Function-Line 9: Displaying in SwiftUI">Line 9: Displaying in SwiftUI</a></h3></div>
+
+<pre swift>
+image = Image(uiImage: uiImage)
+</pre>
+
+<ul>
+<li>
+<code>image</code> (Existing State Variable): This is a @State variable that lives at the very top of your View file (outside this function) which controls what the user sees on their screen.
+
+<li>
+<code>Image</code> (SwiftUI UI Element): The visual view wrapper. You pass it your final processed uiImage, causing the screen to instantly refresh and show the beautiful sepia photo!
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Architecture Visualized"><h2 id="The Architecture Visualized" class="header"><a href="#Ai Insight - Function Breakdown-The Architecture Visualized">The Architecture Visualized</a></h2></div>
+
+<p>
+The reason this pipeline exists is because each step speaks a different framework "language."
+</p>
+
+<ul>
+<li>
+<code>UIImage</code> is the delivery truck (how iOS passes files around).
+
+<li>
+<code>CIImage</code> is the raw blueprint instructions for the filter.
+
+<li>
+<code>CGImage</code> is the physical concrete slab of pixels printed out by the graphics card processor.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Flow"><h2 id="The Flow" class="header"><a href="#Ai Insight - Function Breakdown-The Flow">The Flow</a></h2></div>
+
+<p>
+Because each framework has a specific specialty (handling files, calculating math, or drawing pixels), the image changes its identity at every single stage until it finally lands on the user's screen.
+</p>
+
+<pre text>
+ ┌────────────────────────────────────────────────────────┐
+ │ 1. START: UIImage (resource: .example)                 │
+ │    Identity: The Delivery Truck                        │
+ │    Role: Fetches the asset file from your app bundle.  │
+ └───────────────────────────┬────────────────────────────┘
+                             │
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ 2. CONVERT: CIImage (image: inputImage)                │
+ │    Identity: The Recipe Blueprint                      │
+ │    Role: Translates the photo into a math instruction. │
+ └───────────────────────────┬────────────────────────────┘
+                             │
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ 3. PROCESS: CIFilter.sepiaTone()                       │
+ │    Identity: The Kitchen Prep                          │
+ │    Role: Applies the sepia and intensity rules.        │
+ └───────────────────────────┬────────────────────────────┘
+                             │
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ 4. SAFE EXTRACT: guard let outputImage                 │
+ │    Identity: The Unbaked Dish                          │
+ │    Role: Verifies the recipe instructions are valid.   │
+ └───────────────────────────┬────────────────────────────┘
+                             │
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ 5. BAKE: context.createCGImage()                       │
+ │    Identity: The Hard Concrete Slab (CGImage)          │
+ │    Role: The GPU graphics engine renders actual pixels.│
+ └───────────────────────────┬────────────────────────────┘
+                             │
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ 6. PACKAGE: UIImage (cgImage: cgImage)                 │
+ │    Identity: The Wrapped Package                       │
+ │    Role: Wraps raw pixels back into an iOS wrapper.    │
+ └───────────────────────────┬────────────────────────────┘
+                             │
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ 7. DISPLAY: Image (uiImage: uiImage)                   │
+ │    Identity: The Final Gallery Piece                   │
+ │    Role: Passes the result to SwiftUI to draw on screen│
+ └────────────────────────────────────────────────────────┘
+</pre>
+
+<div id="Ai Insight - Function Breakdown-The Flow-The Key Takeaway"><h3 id="The Key Takeaway" class="header"><a href="#Ai Insight - Function Breakdown-The Flow-The Key Takeaway">The Key Takeaway</a></h3></div>
+
+
+<p>
+Whenever you want to perform real-time photo editing, blurring, or face-detection in an Apple app, you will almost always follow this exact U-turn route:
+</p>
+
+<ul>
+<li>
+Start with a standard UI layout asset
+
+<li>
+→ drop down into Core Image math vectors
+
+<li>
+→ flatten it into raw Core Graphics pixels
+
+<li>
+→ lift it back up into a user-facing SwiftUI View.
+
+</ul>
+<div id="Ai Insight - Function Breakdown-The Flow-The Key Takeaway-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Ai Insight - Function Breakdown-The Flow-The Key Takeaway-Back to the tutorial">Back to the tutorial</a></h4></div>
+
 <p>
 Now, you might well think that was a heck of a lot of work just to get a fairly simple result, but now that you have all the basics of Core Image in place it’s relatively easy to switch to different filters.
 </p>
@@ -270,6 +587,8 @@ currentFilter.radius = 1000
 currentFilter.center = CGPoint(x: inputImage.size.width / 2, y: inputImage.size.height / 2)
 </pre>
 
+<div id="Ai Insight - Function Breakdown-Old API with inputKeys"><h2 id="Old API with inputKeys" class="header"><a href="#Ai Insight - Function Breakdown-Old API with inputKeys">Old API with inputKeys</a></h2></div>
+
 <p>
 So, there’s a lot we can do using only the modern API. But for this project we’re going to use the older API for setting values such as <code>radius</code> and <code>scale</code> because it lets us set values dynamically - we can literally ask the current filter what values it supports, then send them on in.
 </p>
@@ -279,17 +598,25 @@ Here’s how that looks:
 </p>
 
 <pre swift>
-let currentFilter = CIFilter.twirlDistortion()
-currentFilter.inputImage = beginImage
-
-let amount = 1.0
-
-let inputKeys = currentFilter.inputKeys
-
-if inputKeys.contains(kCIInputIntensityKey) {
-    currentFilter.setValue(amount, forKey: kCIInputIntensityKey) }
-if inputKeys.contains(kCIInputRadiusKey) { currentFilter.setValue(amount * 200, forKey: kCIInputRadiusKey) }
-if inputKeys.contains(kCIInputScaleKey) { currentFilter.setValue(amount * 10, forKey: kCIInputScaleKey) }
+    let currentFilter = CIFilter.twirlDistortion()
+    currentFilter.inputImage = beginImage
+    
+    let amount = 1.0
+    
+    let inputKeys = currentFilter.inputKeys
+    
+    if inputKeys.contains(kCIInputIntensityKey) {
+        currentFilter.setValue(amount, forKey: kCIInputIntensityKey)
+    }
+    
+    if inputKeys.contains(kCIInputRadiusKey) {
+        currentFilter.setValue(amount * 200, forKey: kCIInputRadiusKey)
+    }
+    
+    if inputKeys.contains(kCIInputScaleKey) {
+        currentFilter.setValue(amount * 10, forKey: kCIInputScaleKey)
+    }
+        
 </pre>
 
 <p>
@@ -304,6 +631,126 @@ Notice how that relies on setting values for keys, which might remind you of the
 If you’re implementing precise Core Image adjustments you should definitely be using the newer API that uses exact property names and types, but in this project the older API comes in useful because it lets us send in adjustments regardless of what filter is actually used.
 </p>
 
+<div id="Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?"><h2 id="Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?" class="header"><a href="#Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?">Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?</a></h2></div>
+
+<div id="Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-Why doesn't the first import the second?"><h3 id="Why doesn't the first import the second?" class="header"><a href="#Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-Why doesn't the first import the second?">Why doesn't the first import the second?</a></h3></div>
+
+<p>
+Apple explicitly chose to keep <code>CoreImage.CIFilterBuiltins</code> as an <span id="Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-Why doesn't the first import the second?-opt-in"></span><strong id="opt-in">opt-in</strong> import for two reasons:
+</p>
+
+<div id="Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-1. Backward Compatibility &amp; Code Size"><h3 id="1. Backward Compatibility &amp; Code Size" class="header"><a href="#Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-1. Backward Compatibility &amp; Code Size">1. Backward Compatibility &amp; Code Size</a></h3></div>
+
+<p>
+There are thousands of legacy Mac and iOS apps that still use the older string-based API or custom-built, third-party filters. By keeping the modern Swift built-ins separate, Apple avoids forcing the compiler to load thousands of modern Swift property wrappers into an older project that doesn't use them.
+</p>
+
+<div id="Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-2. Name Collisions"><h3 id="2. Name Collisions" class="header"><a href="#Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-2. Name Collisions">2. Name Collisions</a></h3></div>
+
+<p>
+The built-in filters add hundreds of shorthand function names (like <code>.gaussianBlur()</code>, <code>.vignette()</code>, etc.) directly onto the <code>CIFilter</code> class. Keeping them in a separate sub-module prevents these new names from accidentally overriding or crashing custom code written by developers who built their own filters with identical names.
+</p>
+
+<div id="Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-The Cheat Sheet for Imports"><h3 id="The Cheat Sheet for Imports" class="header"><a href="#Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-The Cheat Sheet for Imports">The Cheat Sheet for Imports</a></h3></div>
+
+<p>
+Think of it like buying a power tool:
+</p>
+
+<ul>
+<li>
+<code>import CoreImage</code> gives you the physical tool battery and engine block (the <code>CIContext</code>, <code>CIImage</code>, and base <code>CIFilter</code> mechanics).
+
+<li>
+<code>import CoreImage.CIFilterBuiltins</code> opens up the deluxe accessory kit containing all of Apple's pre-fabricated attachments (the <code>.sepiaTone()</code> helper methods).
+
+</ul>
+ 
+<div id="Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-In Context"><h3 id="In Context" class="header"><a href="#Ai Insight - Function Breakdown-Ai Insight - Why Import CoreImage AND CoreImage.CIFilterBuiltins?-In Context">In Context</a></h3></div>
+
+<pre swift>
+import CoreImage
+import CoreImage.CIFilterBuiltins
+import SwiftUI
+
+struct ContentView: View {
+    @State private var image: Image?
+
+    var body: some View {
+        VStack {
+            image?
+                .resizable()
+                .scaledToFit()
+        }
+        .onAppear(perform: loadImage)
+    }
+    
+    func loadImage() {
+       
+        let inputImage = UIImage(resource: .example)
+        let beginImage = CIImage(image: inputImage)
+        
+        let context = CIContext()
+        
+        //-------------------- NEW API--------------------//
+//        let currentFilter = CIFilter.sepiaTone()
+//        currentFilter.inputImage = beginImage
+//        currentFilter.intensity = 1
+        
+//        let currentFilter = CIFilter.pixellate()
+//        currentFilter.inputImage = beginImage
+//        currentFilter.scale = 10
+        
+//        let currentFilter = CIFilter.crystallize()
+//        currentFilter.inputImage = beginImage
+//        currentFilter.radius = 100
+        
+//        let currentFilter = CIFilter.twirlDistortion()
+//        currentFilter.inputImage = beginImage
+//        currentFilter.radius = 200
+//        currentFilter.center  = CGPoint(x: inputImage.size.width / 2, y: inputImage.size.height / 2)
+        
+        //-------------------- OLD API--------------------//
+        // Old API (for our project)
+        let currentFilter = CIFilter.twirlDistortion()
+        currentFilter.inputImage = beginImage
+        
+        let amount = 1.0
+        
+        let inputKeys = currentFilter.inputKeys
+        
+        if inputKeys.contains(kCIInputIntensityKey) {
+            currentFilter.setValue(amount, forKey: kCIInputIntensityKey)
+        }
+        
+        if inputKeys.contains(kCIInputRadiusKey) {
+            currentFilter.setValue(amount * 200, forKey: kCIInputRadiusKey)
+        }
+        
+        if inputKeys.contains(kCIInputScaleKey) {
+            currentFilter.setValue(amount * 10, forKey: kCIInputScaleKey)
+        }
+        //-------------------- OLD API -- END ------------//
+        
+        // get a CIImage from our filter or exit if that fails
+        guard let outputImage = currentFilter.outputImage else { return }
+        
+        // attempt to get a CGImage from our CIImage
+        guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent)  else { return }
+        
+        // convert that to a UIImage
+        let uiImage = UIImage(cgImage: cgImage)
+        
+        // and convert that to a SwiftUI image
+        image = Image(uiImage: uiImage)
+        
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 <p>
 <hr>
 <br>
