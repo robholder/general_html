@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_184</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_183.html">Hacking With Swift - 183 - Basic image filtering using Core Image</a>
+
+</ul>
+<div id="Hacking With Swift - 184 - Customizing our filter using confirmationDialog"><h1 id="Hacking With Swift - 184 - Customizing our filter using confirmationDialog" class="header"><a href="#Hacking With Swift - 184 - Customizing our filter using confirmationDialog">Hacking With Swift - 184 - Customizing our filter using confirmationDialog</a></h1></div>
+
+<p>
+It’s time to put the finishing touches to our app, which will allow the user to experiment with different Core Image filters then share their result with other apps.
+</p>
+
+<p>
+Today’s work requires us to return back to some of the Core Image warts we met earlier, namely the quirky-at-best 'stringly typed' (uses strings) API for Core Image. There is ample room for mistakes here, so take your time, double check your code against mine, and remember Mosher’s Law of Software Engineering:
+</p>
+
+<p>
+<blockquote>
+"Don’t worry if it doesn’t work right - if everything did, you’d be out of a job."
+</blockquote>
+</p>
+
+<p>
+Today you have two topics to work through, in which you’ll put into practice
+</p>
+<ul>
+<li>
+Confirmation dialogs,
+
+<li>
+<code>ShareLink</code>,
+
+</ul>
+<p>
+...and more.
+</p>
+
+<div id="Hacking With Swift - 184 - Customizing our filter using confirmationDialog-Customizing our filter using confirmationDialog"><h2 id="Customizing our filter using confirmationDialog" class="header"><a href="#Hacking With Swift - 184 - Customizing our filter using confirmationDialog-Customizing our filter using confirmationDialog">Customizing our filter using confirmationDialog</a></h2></div>
+
+<p>
+So far we’ve brought together SwiftUI and Core Image, but the app still isn’t terribly useful - after all, the sepia tone effect isn’t <em>that</em> interesting.
+</p>
+
+<p>
+To make the whole app better, we’re going to let users customize the filter they want to apply, and we’ll accomplish that using a confirmation dialog. On iPhone this is a list of buttons that slides up from the bottom of the screen, and you can add as many as you want - it can even scroll if you really need it to.
+</p>
+
+<p>
+First we need a property that will store whether the confirmation dialog should be showing or not, so add this to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var showingFilters = false
+</pre>
+
+<p>
+Now we can add our buttons using the <code>confirmationDialog()</code> modifier. This works identically to <code>alert()</code>: we provide a title and condition to monitor, and as soon as the condition becomes true the confirmation dialog will be shown.
+</p>
+
+<p>
+Start by adding this modifier below the navigation title:
+</p>
+
+<pre swift>
+.confirmationDialog("Select a filter", isPresented: $showingFilters) {
+    // dialog here
+}
+</pre>
+
+<p>
+Now fill in the <code>changeFilter()</code> method with this:
+</p>
+
+<pre swift>
+showingFilters = true
+</pre>
+
+<p>
+In terms of <em>what</em> to show in the confirmation dialog, we can create an array of buttons to show and an optional message. These buttons work just like with <code>alert()</code>: we provide a text title and an action to run when it’s selected.
+</p>
+
+<p>
+For the confirmation dialog in this app, we want users to select from a range of different Core Image filters, and when they choose one it should be activated and immediately applied. To make this work we’re going to write a method that modifies <code>currentFilter</code> to whatever new filter they chose, then calls <code>loadImage()</code> straight away.
+</p>
+
+<p>
+There is a wrinkle in our plan, and it’s a result of the way Apple wrapped the Core Image APIs to make them more Swift-friendly. You see, the underlying Core Image API is entirely 'stringly typed' - it uses strings to set values, rather than fixed properties - so rather than invent all new classes for us to use Apple instead created a series of protocols.
+</p>
+
+<p>
+When we assign <code>CIFilter.sepiaTone()</code> to a property, we get an object of the class <code>CIFilter</code> that happens to conform to a protocol called <code>CISepiaTone</code>. That protocol then exposes the <code>intensity</code> parameter we’ve been using, but internally it will just map it to a call to <code>setValue(_:forKey:)</code>.
+</p>
+
+<p>
+This flexibility actually works in our favor because it means we can write code that works across all filters, as long as we’re careful not to send in an invalid value.
+</p>
+
+<p>
+So, let’s start solving the problem. Please change your <code>currentFilter</code> property to this:
+</p>
+
+<pre swift>
+@State private var currentFilter: CIFilter = CIFilter.sepiaTone()
+</pre>
+
+<p>
+So, again, <code>CIFilter.sepiaTone()</code> returns a <code>CIFilter</code> object that conforms to the <code>CISepiaTone</code> protocol. Adding that explicit type annotation means we’re throwing away some data: we’re saying that the filter must be a <code>CIFilter</code> but doesn’t have to conform to <code>CISepiaTone</code> any more.
+</p>
+
+<p>
+As a result of this change we lose access to the <code>intensity</code> property, which means this code won’t work any more:
+</p>
+
+<pre swift>
+currentFilter.intensity = Float(filterIntensity)
+</pre>
+
+<p>
+Instead, we need to replace that with a call to <code>setValue(:_forKey:)</code>. This is all the protocol was doing anyway, but it did provide valuable extra type safety.
+</p>
+
+<p>
+Replace that broken line of code with this:
+</p>
+
+<pre swift>
+currentFilter.setValue(filterIntensity, forKey: kCIInputIntensityKey)
+</pre>
+
+<p>
+<code>kCIInputIntensityKey</code> is another Core Image constant value, and it has the same effect as setting the <code>intensity</code> parameter of the sepia tone filter.
+</p>
+
+<p>
+With that change, we can return to our confirmation dialog: we want to be able to change that filter to something else, then call <code>loadImage()</code> to reset everything and apply initial processing. So, add this method to <code>ContentView</code>:
+</p>
+
+<pre swift>
+func setFilter(_ filter: CIFilter) {
+    currentFilter = filter
+    loadImage()
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 184 - Customizing our filter using confirmationDialog-Customizing our filter using confirmationDialog-Tip"></span><strong id="Tip">Tip</strong>: This means image loading is triggered every time a filter changes. If you wanted to make this run a little faster, you could store <code>beginImage</code> in another <code>@State</code> property to avoid reloading the image each time a filter changes.
+</p>
+
+<p>
+With that in place we can now replace the <code>// dialog here</code> comment with a series of buttons that try out various Core Image filters.
+</p>
+
+<p>
+Put this in its place:
+</p>
+
+<pre swift>
+Button("Crystallize") { setFilter(CIFilter.crystallize()) }
+Button("Edges") { setFilter(CIFilter.edges()) }
+Button("Gaussian Blur") { setFilter(CIFilter.gaussianBlur()) }
+Button("Pixellate") { setFilter(CIFilter.pixellate()) }
+Button("Sepia Tone") { setFilter(CIFilter.sepiaTone()) }
+Button("Unsharp Mask") { setFilter(CIFilter.unsharpMask()) }
+Button("Vignette") { setFilter(CIFilter.vignette()) }
+Button("Cancel", role: .cancel) { }
+</pre>
+
+<p>
+I picked out those from the vast range of Core Image filters, but you’re welcome to try using code completion to try something else - type <code>CIFilter</code>. and see what comes up!
+</p>
+
+<p>
+Go ahead and run the app, select a picture, then try changing Sepia Tone to Vignette - this applies a darkening effect around the edges of your photo. (If you’re using the simulator, remember to give it a little time because it’s slow!)
+</p>
+
+<p>
+Now try changing it to Gaussian Blur, which <em>ought</em> to blur the image, but will instead cause our app to crash. By jettisoning the <code>CISepiaTone</code> restriction for our filter, we’re now forced to send values in using <code>setValue(_:forKey:)</code>, which provides no safety at all. In this case, the Gaussian Blur filter doesn’t have an intensity value, so the app just crashes.
+</p>
+
+<div id="Hacking With Swift - 184 - Customizing our filter using confirmationDialog-Fixing the Crash"><h2 id="Fixing the Crash" class="header"><a href="#Hacking With Swift - 184 - Customizing our filter using confirmationDialog-Fixing the Crash">Fixing the Crash</a></h2></div>
+
+<p>
+To fix this - and also to make our single slider do much more work - we’re going to add some more code that reads all the valid keys we can use with <code>setValue(_:forKey:)</code>, and only sets the intensity key if it’s supported by the current filter. Using this approach we can actually query as many keys as we want, and set all the ones that are supported. So, for sepia tone this will set intensity, but for Gaussian blur it will set the radius (size of the blur), and so on.
+</p>
+
+<p>
+This conditional approach will work with any filters you choose to apply, which means you can experiment with others safely. The only thing you need be careful with is to make sure you scale up <code>filterIntensity</code> by a number that makes sense - a 1-pixel blur is pretty much invisible, for example, so I’m going to multiply that by 200 to make it more pronounced.
+</p>
+
+<p>
+Replace this line:
+</p>
+
+<pre swift>
+currentFilter.setValue(filterIntensity, forKey: kCIInputIntensityKey)
+</pre>
+
+<p>
+With this:
+</p>
+
+<pre swift>
+let inputKeys = currentFilter.inputKeys
+
+if inputKeys.contains(kCIInputIntensityKey) { currentFilter.setValue(filterIntensity, forKey: kCIInputIntensityKey) }
+if inputKeys.contains(kCIInputRadiusKey) { currentFilter.setValue(filterIntensity * 200, forKey: kCIInputRadiusKey) }
+if inputKeys.contains(kCIInputScaleKey) { currentFilter.setValue(filterIntensity * 10, forKey: kCIInputScaleKey) }
+</pre>
+
+<p>
+And with that in place you can now run the app safely, import a picture of your choosing, then try out all the various filters - nothing should crash any more. Try experimenting with different filters and keys to see what you can find!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+<ul>
+<li>
+<a href="swift_hws_185.html">Hacking With Swift - 185 - Sharing an image using ShareLink</a>
+
+</ul>
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
