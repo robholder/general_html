@@ -207,7 +207,7 @@ The Simulator comes with a handful of built-in images you can test with, and if 
 
 <div id="Hacking With Swift - 178 - Loading photos from the user's photo library-Loading photos from the user's photo library-In Context - Single Image Selection-InstafilterApp.swift"><h4 id="InstafilterApp.swift" class="header"><a href="#Hacking With Swift - 178 - Loading photos from the user's photo library-Loading photos from the user's photo library-In Context - Single Image Selection-InstafilterApp.swift">InstafilterApp.swift</a></h4></div>
 
-<pre>
+<pre swift>
 import SwiftUI
 
 @main
@@ -217,7 +217,7 @@ struct InstafilterApp: App {
             ContentView()
         }
     }
-}swift
+}
 </pre>
 
 <div id="Hacking With Swift - 178 - Loading photos from the user's photo library-Loading photos from the user's photo library-In Context - Single Image Selection-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 178 - Loading photos from the user's photo library-Loading photos from the user's photo library-In Context - Single Image Selection-ContentView.swift">ContentView.swift</a></h4></div>
@@ -369,6 +369,83 @@ PhotosPicker(
 }
 </pre>
 
+<div id="Hacking With Swift - 178 - Loading photos from the user's photo library-Multiple Image Selection-In Context - Multiple Image Selection"><h3 id="In Context - Multiple Image Selection" class="header"><a href="#Hacking With Swift - 178 - Loading photos from the user's photo library-Multiple Image Selection-In Context - Multiple Image Selection">In Context - Multiple Image Selection</a></h3></div>
+
+<p>
+InstafilterApp.swift
+</p>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct InstafilterApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 178 - Loading photos from the user's photo library-Multiple Image Selection-In Context - Multiple Image Selection-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 178 - Loading photos from the user's photo library-Multiple Image Selection-In Context - Multiple Image Selection-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+// Step 1: import
+import PhotosUI
+import SwiftUI
+
+struct ContentView: View {
+    // Step 2: Optionals (since nothing is selected yet)
+    // (Initially empty...) Array for multiple picks
+    @State private var pickerItems =  [PhotosPickerItem]()
+    @State private var selectedImages = [Image]()
+
+    var body: some View {
+        // Step 3: Create picker
+        VStack {
+            // Make a dedicated label to add a flourish
+            //PhotosPicker("Select a picture",
+            PhotosPicker(
+                selection: $pickerItems,
+                 // Limit selection amount
+                 maxSelectionCount: 3,
+                 matching: .any(of: [.images, .not(.screenshots)])
+            ) {
+                // Add nicer label to button with this closure
+                Label("Select a picture", systemImage: "photo")
+            }
+            // Show image when present
+            ScrollView {
+                ForEach(0..&lt;selectedImages.count, id: \.self) { i in
+                    selectedImages[i]
+                        .resizable()
+                        .scaledToFit()
+                }
+            }
+        }
+        // Step 4: Create a 'watcher'
+        .onChange(of: pickerItems) {
+            // Async process (it'll take time)
+            Task {
+                // Remove previously selected images
+                selectedImages.removeAll()
+                // Loop through selection array and add to array
+                for item in pickerItems {
+                    if let loadedImage = try await item.loadTransferable(type: Image.self) {
+                        selectedImages.append(loadedImage)
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+
+</pre>
 <p>
 <hr>
 <br>
