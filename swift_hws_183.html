@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_183</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_182.html">Hacking With Swift - 182 - Importing an image into SwiftUI using PhotosPicker</a>
+
+</ul>
+<div id="Hacking With Swift - 183 - Basic image filtering using Core Image"><h1 id="Hacking With Swift - 183 - Basic image filtering using Core Image" class="header"><a href="#Hacking With Swift - 183 - Basic image filtering using Core Image">Hacking With Swift - 183 - Basic image filtering using Core Image</a></h1></div>
+
+<p>
+Now that our project has an image the user selected, the next step is to let the user apply varying Core Image filters to it. To start with we’re just going to work with a single filter, but shortly we’ll extend that using a confirmation dialog.
+</p>
+
+<p>
+If we want to use Core Image in our apps, we first need to add two imports to the top of ContentView.swift:
+</p>
+
+<pre swift>
+import CoreImage
+import CoreImage.CIFilterBuiltins
+</pre>
+
+<p>
+Next we need both a context and a filter. A Core Image context is an object that’s responsible for rendering a <code>CIImage</code> to a <code>CGImage</code>, or in more practical terms an object for converting the recipe for an image into an actual series of pixels we can work with.
+</p>
+
+<p>
+Contexts are expensive to create, so if you intend to render many images it’s a good idea to create a context once and keep it alive. As for the filter, we’ll be using <code>CIFilter.sepiaTone()</code> as our default but because we’ll make it flexible later we’ll make the filter use <code>@State</code> so it can be changed.
+</p>
+
+<p>
+So, add these two properties to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var currentFilter = CIFilter.sepiaTone()
+let context = CIContext()
+</pre>
+
+<p>
+With those two in place we can now write a method that will process whatever image was imported – that means it will set our sepia filter’s intensity based on the value in <code>filterIntensity</code>, read the output image back from the filter, ask our <code>CIContext</code> to render it, then place the result into our <code>processedImage</code> property so it’s visible on-screen.
+</p>
+
+<pre swift>
+func applyProcessing() {
+    currentFilter.intensity = Float(filterIntensity)
+
+    guard let outputImage = currentFilter.outputImage else { return }
+    guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent) else { return }
+
+    let uiImage = UIImage(cgImage: cgImage)
+    processedImage = Image(uiImage: uiImage)
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 183 - Basic image filtering using Core Image-Tip"></span><strong id="Tip">Tip</strong>: Sadly the Core Image behind the sepia tone filter wants <code>Float</code> rather than <code>Double</code> for its values. This makes Core Image feel even older, I know, but don’t worry – we’ll make it go away soon!
+</p>
+
+<p>
+The next job is to change the way <code>loadImage()</code> works. Right now it ends with a <code>// more code to come</code> comment, but really it should send whatever image was chosen into the sepia tone filter, then call <code>applyProcessing()</code> to make the magic happen.
+</p>
+
+<p>
+Core Image filters have a dedicated <code>inputImage</code> property that lets us send in a <code>CIImage</code> for the filter to work with, but often this is thoroughly broken and will cause your app to crash – it’s much safer to use the filter’s <code>setValue()</code> method with the key <code>kCIInputImageKey</code>.
+</p>
+
+<p>
+So, replace the <code>// more code to come</code> comment with this:
+</p>
+
+<pre swift>
+let beginImage = CIImage(image: inputImage)
+currentFilter.setValue(beginImage, forKey: kCIInputImageKey)
+applyProcessing()
+</pre>
+
+<p>
+If you run the code now you’ll see our basic app flow works great: we can select an image, then see it with a sepia effect applied. But that intensity slider we added doesn’t do anything, even though it’s bound to the same <code>filterIntensity</code> value that our filter is reading from.
+</p>
+
+<p>
+What’s happening here ought not to be too surprising: even though the slider is changing the value of <code>filterIntensity</code>, changing that property won’t automatically trigger our <code>applyProcessing()</code> method again. Instead, we need to do that by hand by telling SwiftUI to watch <code>filterIntensity</code> with <code>onChange()</code>.
+</p>
+
+<p>
+Again, these <code>onChange()</code> modifiers can go anywhere in our SwiftUI view hierarchy, but as the slider changes the value directly I'll attach it there:
+</p>
+
+<pre swift>
+Slider(value: $filterIntensity)
+    .onChange(of: filterIntensity, applyProcessing)
+    
+Tip: If multiple views adjust the same value, or if it’s not quite so specific what is changing the value, then I’d add the modifier at the end of the view.
+</pre>
+
+<p>
+You can go ahead and run the app now, but be warned: even though Core Image is extremely fast on all iPhones, it’s often extremely <em>slow</em> in the simulator. That means you can try it out to make sure everything works, but don’t be surprised if your code runs at a glacial pace.
+</p>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
