@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_191</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_190.html">Hacking With Swift - 190 - Bucket List: Introduction</a>
+
+</ul>
+<div id="Hacking With Swift - 191 - Adding conformance to Comparable for custom types"><h1 id="Hacking With Swift - 191 - Adding conformance to Comparable for custom types" class="header"><a href="#Hacking With Swift - 191 - Adding conformance to Comparable for custom types">Hacking With Swift - 191 - Adding conformance to Comparable for custom types</a></h1></div>
+
+<p>
+When you think about it, we take a heck of a lot of stuff for granted when we write Swift code. For example, if we write <code>4 &lt; 5</code>, we expect that to return true - the developers of Swift (and LLVM, the larger compiler project that sits behind Swift) have already done all the hard work of checking whether that calculation is actually true, so we don’t have to worry about it.
+</p>
+
+<p>
+But what Swift does <em>really</em> well is extend functionality into lots of places using protocols and protocol extensions. For example, we know that <code>4 &lt; 5</code> is true because we’re able to compare two integers and decide whether the first one comes before or after the second.
+</p>
+
+<p>
+Swift extends that functionality to arrays of integers: we can compare all the integers in an array to decide whether each one should come before or after the others. Swift then uses that result to sort the array.
+</p>
+
+<p>
+So, in Swift we expect this kind of code to Just Work:
+</p>
+
+<pre swift>
+struct ContentView: View {  
+    let values = [1, 5, 3, 6, 2, 9].sorted()
+
+    var body: some View {
+        List(values, id: \.self) {
+            Text(String($0))
+        }
+    }
+}
+</pre>
+
+<p>
+We don’t need to tell <code>sorted()</code> how it should work, because it understands how arrays of integers work.
+</p>
+
+<p>
+Now consider a struct like this one:
+</p>
+
+<pre swift>
+struct User: Identifiable {
+    let id = UUID()
+    var firstName: String
+    var lastName: String
+}
+</pre>
+
+<p>
+We could make an array of those users, and use them inside a <code>List</code> like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let users = [
+        User(firstName: "Arnold", lastName: "Rimmer"),
+        User(firstName: "Kristine", lastName: "Kochanski"),
+        User(firstName: "David", lastName: "Lister"),
+    ]
+
+    var body: some View {
+        List(users) { user in
+            Text("\(user.lastName), \(user.firstName)")
+        }
+    }
+}
+</pre>
+
+<p>
+That will work just fine, because we made the <code>User</code> struct conform to <code>Identifiable</code>.
+</p>
+
+<p>
+But how about if we wanted to show those users in a sorted order? If we modify the code to this it won’t work:
+</p>
+
+<pre swift>
+let users = [
+    User(firstName: "Arnold", lastName: "Rimmer"),
+    User(firstName: "Kristine", lastName: "Kochanski"),
+    User(firstName: "David", lastName: "Lister"),
+].sorted()
+</pre>
+
+<p>
+Swift doesn’t understand what <code>sorted()</code> means here, because it doesn’t know whether to sort by first name, last name, both, or something else.
+</p>
+
+<p>
+One way to do this is by providing a closure to <code>sorted()</code> to do the sorting ourselves. We'll be handed two objects from the array, ＄0 and ＄1 if you're using shorthand names, and we should return true if the first object should be sorted before the second, like this:
+</p>
+
+<pre swift>
+let users = [
+    User(firstName: "Arnold", lastName: "Rimmer"),
+    User(firstName: "Kristine", lastName: "Kochanski"),
+    User(firstName: "David", lastName: "Lister"),
+].sorted {
+    $0.lastName &lt; $1.lastName
+}
+</pre>
+
+<p>
+That absolutely works, but it’s not an ideal solution for two reasons.
+</p>
+
+<p>
+First, this is <em>model</em> data, by which I mean that it’s affecting the way we work with the <code>User</code> struct. That struct and its properties are our data model, and in a well-developed application we don’t really want to tell the model how it should behave inside our SwiftUI code. SwiftUI represents our <em>view</em>, i.e. our layout, and if we put model code in there then things get confused.
+</p>
+
+<p>
+Second, what happens if we want to sort User arrays in multiple places? You might copy and paste the closure once or twice, before realizing you’re just creating a problem for yourself: if you end up changing your sorting logic so that you also use <code>firstName</code> if the last name is the same, then you need to search through all your code to make sure all the closures get updated.
+</p>
+
+<p>
+Swift has a better solution. Arrays of integers get a simple <code>sorted()</code> method with no parameters because Swift understands how to compare two integers. In coding terms, <code>Int</code> conforms to the <code>Comparable</code> protocol, which means it defines a function that takes two integers and returns true if the first should be sorted before the second.
+</p>
+
+<p>
+We can make our own types conform to <code>Comparable</code>, and when we do so we also get a <code>sorted()</code> method with no parameters. This takes two steps:
+</p>
+
+<ul>
+<li>
+Add the <code>Comparable</code> conformance to the definition of <code>User</code>.
+
+<li>
+Add a method called <code>&lt;</code> that takes two users and returns true if the first should be sorted before the second.
+
+</ul>
+<p>
+Here’s how that looks in code:
+</p>
+
+<pre swift>
+struct User: Identifiable, Comparable {
+    let id = UUID()
+    var firstName: String
+    var lastName: String
+
+    static func &lt;(lhs: User, rhs: User) -&gt; Bool {
+        lhs.lastName &lt; rhs.lastName
+    }
+}
+</pre>
+
+<p>
+There’s not a lot of code in there, but there is still a lot to unpack.
+</p>
+
+<div id="Hacking With Swift - 191 - Adding conformance to Comparable for custom types-The Static Method"><h5 id="The Static Method" class="header"><a href="#Hacking With Swift - 191 - Adding conformance to Comparable for custom types-The Static Method">The Static Method</a></h5></div>
+
+<p>
+First, yes the method is just called <code>&lt;</code>, which is the “less than” operator. It’s the job of the method to decide whether one user is “less than” (in a sorting sense) another, so we’re adding functionality to an existing operator. This is called +<em>operator overloading</em>, and it can be both a blessing and a curse.
+</p>
+
+<p>
+Second, <code>lhs</code> and <code>rhs</code> are coding conventions short for “left-hand side” and “right-hand side”, and they are used because the <code>&lt;</code> operator has one operand on its left and one on its right.
+</p>
+
+<p>
+Third, this method must return a Boolean, which means we must decide whether one object should be sorted before another. There is no room for “they are the same” here - that’s handled by another protocol called <code>Equatable</code>.
+</p>
+
+<p>
+Fourth, the method must be marked as <code>static</code>, which means it’s called on the <code>User</code> struct directly rather than a single instance of the struct.
+</p>
+
+<div id="Hacking With Swift - 191 - Adding conformance to Comparable for custom types-The Logic"><h4 id="The Logic" class="header"><a href="#Hacking With Swift - 191 - Adding conformance to Comparable for custom types-The Logic">The Logic</a></h4></div>
+
+<p>
+Finally, our logic here is pretty simple: we’re just passing on the comparison to one of our properties, asking Swift to use <code>&lt;</code> for the two last name strings. You can add as much logic as you want, comparing as many properties as needed, but ultimately you need to return true or false.
+</p>
+
+<p>
+<span id="Hacking With Swift - 191 - Adding conformance to Comparable for custom types-The Logic-Tip"></span><strong id="Tip">Tip</strong>: One thing you can’t see in that code is that conforming to <code>Comparable</code> also gives us access to the <code>&gt;</code> operator - greater than. This is the opposite of <code>&lt;</code>, so Swift creates it for us by using <code>&lt;</code> and flipping the Boolean between true and false.
+</p>
+
+<p>
+Now that our <code>User</code> struct conforms to <code>Comparable</code>, we automatically get access to the parameter-less version of <code>sorted()</code>, which means this kind of code works now:
+</p>
+
+<pre swift>
+let users = [
+    User(firstName: "Arnold", lastName: "Rimmer"),
+    User(firstName: "Kristine", lastName: "Kochanski"),
+    User(firstName: "David", lastName: "Lister"),
+].sorted()
+</pre>
+
+<p>
+This resolves the problems we had before: we now isolate our model functionality in the struct itself, and we no longer need to copy and paste code around - we can use <code>sorted()</code> everywhere, safe in the knowledge that if we ever change the algorithm then all our code will adapt.
+</p>
+
+<div id="Hacking With Swift - 191 - Adding conformance to Comparable for custom types-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 191 - Adding conformance to Comparable for custom types-Ai Insight">Ai Insight</a></h2></div>
+
+<div id="Using an Extension on Existing Structs"><h1 id="Using an Extension on Existing Structs" class="header"><a href="#Using an Extension on Existing Structs">Using an Extension on Existing Structs</a></h1></div>
+
+<p>
+Using an extension to add protocol conformances like Comparable is considered a <span id="Using an Extension on Existing Structs-best practice"></span><strong id="best practice">best practice</strong> in the Swift community.
+</p>
+
+<p>
+Separating your protocols into extensions keeps your code incredibly clean and organized. It leaves your main struct definition focused purely on its properties, while moving the logic for specific behaviors (like sorting) down into its own dedicated block.
+</p>
+
+<div id="Using an Extension on Existing Structs-How to do it with an Extension"><h3 id="How to do it with an Extension" class="header"><a href="#Using an Extension on Existing Structs-How to do it with an Extension">How to do it with an Extension</a></h3></div>
+
+<p>
+Imagine you have a basic <code>Book</code> struct that was created elsewhere - maybe it's in a different file, or maybe it comes from a framework you didn't write:
+</p>
+
+<pre swift>
+// The original, clean struct
+struct Book {
+    let title: String
+    let pageCount: Int
+}
+</pre>
+
+<p>
+You can seamlessly add <code>Comparable</code> conformance later in the file (or in an entirely separate file) using an <code>extension</code>:
+</p>
+
+<pre swift>
+// Add sorting capabilities via an extension
+extension Book: Comparable {
+    static func &lt; (lhs: Book, rhs: Book) -&gt; Bool {
+        // Sort books by their page count
+        return lhs.pageCount &lt; rhs.pageCount
+    }
+}
+</pre>
+
+<p>
+Now, your <code>Book</code> struct instantly gains the ability to use <code>.sorted()</code> anywhere in your app:
+</p>
+
+<pre swift>
+let book1 = Book(title: "The Hobbit", pageCount: 310)
+let book2 = Book(title: "The Fellowship of the Ring", pageCount: 423)
+
+let shelf = [book2, book1]
+let sortedShelf = shelf.sorted() // Automatically sorts by pageCount!
+</pre>
+
+<div id="Using an Extension on Existing Structs-The Secret Superpower of Extension Conformances"><h3 id="The Secret Superpower of Extension Conformances" class="header"><a href="#Using an Extension on Existing Structs-The Secret Superpower of Extension Conformances">The Secret Superpower of Extension Conformances</a></h3></div>
+
+<p>
+Aside from keeping your code tidy, there is a massive architectural reason to use extensions for this: <span id="Using an Extension on Existing Structs-The Secret Superpower of Extension Conformances-Memberwise Initializers"></span><strong id="Memberwise Initializers">Memberwise Initializers</strong>.
+</p>
+
+<p>
+In Swift, when you create a struct, the compiler automatically generates a hidden initializer for you behind the scenes, allowing you to write <code>Book(title: "...", pageCount: 123)</code>.
+</p>
+
+<ul>
+<li>
+If you add a custom initializer <em>inside</em> the main struct body, Swift deletes that automatic initializer.
+
+<li>
+If you add your custom logic or protocols inside an extension, Swift <span id="Using an Extension on Existing Structs-The Secret Superpower of Extension Conformances-keeps"></span><strong id="keeps">keeps</strong> the automatic initializer completely intact.
+
+</ul>
+<div id="Using an Extension on Existing Structs-A Shorthand Alternative (Key Paths)"><h3 id="A Shorthand Alternative (Key Paths)" class="header"><a href="#Using an Extension on Existing Structs-A Shorthand Alternative (Key Paths)">A Shorthand Alternative (Key Paths)</a></h3></div>
+
+<p>
+Since you are learning how to sort collections, it's worth noting that if you <em>only</em> want to sort a struct by a specific property and don't necessarily want to bind the entire struct to a permanent <code>Comparable</code> rule, you don't even need a protocol or an extension.
+</p>
+
+<p>
+You can use a <span id="Using an Extension on Existing Structs-A Shorthand Alternative (Key Paths)-Key Path"></span><strong id="Key Path">Key Path</strong> directly inside the <code>.sorted()</code> method using the property name:
+</p>
+
+<pre swift>
+// No extensions or protocols needed!
+let sortedByTitle = shelf.sorted { $0.title &lt; $1.title }
+</pre>
+
+<p>
+Using an extension with <code>Comparable</code> is perfect when there is a clear, definitive way that a struct should <em>always</em> be sorted (like sorting users alphabetically by last name). If your sorting needs change depending on the screen, inline Key Paths are your best friend!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
