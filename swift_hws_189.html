@@ -39,6 +39,435 @@ Explore the range of available Core Image filters, and add any three of your cho
 
 </ul>
 <p>
+I think the current set up has a bit of a code smell, so I want to create a loop to create the filter buttons. I was thinking of an array of strings or a dictionary.
+</p>
+
+<div id="Hacking With Swift - 189 - Challenge 3-Challenge 3-Ai Insight"><h3 id="Ai Insight" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-Challenge 3-Ai Insight">Ai Insight</a></h3></div>
+
+<p>
+The best strategy in SwiftUI is to avoid raw arrays of strings (like <code>[["Name", "key"]]</code>) because they are prone to typos and force you to use fragile array indexing like <code>[0]</code> and <code>[1]</code>. Instead, you should use a <span id="Hacking With Swift - 189 - Challenge 3-Challenge 3-Ai Insight-strongly typed Enum"></span><strong id="strongly typed Enum">strongly typed Enum</strong> or an <span id="Hacking With Swift - 189 - Challenge 3-Challenge 3-Ai Insight-array of Structs"></span><strong id="array of Structs">array of Structs</strong>.
+</p>
+
+<p>
+Using a struct is the easiest and most readable approach for your exact setup.
+</p>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs"><h2 id="The Strategy: Array of Structs" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs">The Strategy: Array of Structs</a></h2></div>
+
+<p>
+First, define a simple struct that conforms to <code>Identifiable</code>. This lets <code>ForEach</code> safely loop through your filters.
+</p>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs-1. Define the Struct and Data Array"><h4 id="1. Define the Struct and Data Array" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs-1. Define the Struct and Data Array">1. Define the Struct and Data Array</a></h4></div>
+
+<p>
+Place this inside your view or as a global configuration:
+</p>
+
+<pre swift>
+struct FilterOption: Identifiable {
+    let id = UUID()         // Required for ForEach
+    let name: String        // The UI button label
+    let ciFilter: CIFilter  // The actual Core Image filter instance
+}
+
+// Create your data array
+let availableFilters = [
+    FilterOption(name: "Crystallize", ciFilter: .crystallize()),
+    FilterOption(name: "Edges", ciFilter: .edges()),
+    FilterOption(name: "Gaussian Blur", ciFilter: .gaussianBlur()),
+    FilterOption(name: "Pixellate", ciFilter: .pixellate()),
+    FilterOption(name: "Sepia Tone", ciFilter: .sepiaTone()),
+    FilterOption(name: "Unsharp Mask", ciFilter: .unsharpMask()),
+    FilterOption(name: "Vignette", ciFilter: .vignette())
+]
+</pre>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs-2. Loop it inside your confirmationDialog"><h4 id="2. Loop it inside your confirmationDialog" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs-2. Loop it inside your confirmationDialog">2. Loop it inside your confirmationDialog</a></h4></div>
+
+<p>
+Now, instead of duplicating eight lines of button code, use a clean <code>ForEach</code> loop to unpack the <code>name</code> and pass the <code>ciFilter</code> straight to your <code>setFilter</code> function:
+</p>
+
+<pre swift>
+.confirmationDialog("Select a filter", isPresented: $showingFilters) {
+    // Loop through your structured array
+    ForEach(availableFilters) { option in
+        Button(option.name) {
+            setFilter(option.ciFilter)
+        }
+    }
+    
+    Button("Cancel", role: .cancel) { }
+}
+</pre>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs-Why this is better"><h3 id="Why this is better" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Strategy: Array of Structs-Why this is better">Why this is better</a></h3></div>
+
+<ul>
+<li>
+Type Safety: You cannot accidentally misspell the filter name in code, because you are passing the actual <code>CIFilter</code> object directly.
+
+<li>
+Readability: <code>option.name</code> and <code>option.ciFilter</code> are immediately obvious to anyone reading your code, unlike <code>[0]</code> and <code>[1]</code>.
+
+<li>
+Scalability: If you want to add 10 more filters later, you only add them to the <code>availableFilters</code> array. Your UI code stays exactly the same.
+
+</ul>
+<div id="Hacking With Swift - 189 - Challenge 3-The Enum Approach"><h2 id="The Enum Approach" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Enum Approach">The Enum Approach</a></h2></div>
+
+<p>
+The Enum approach is arguably the gold standard for this type of problem. Because <code>CIFilter</code> instances are mutable, creating them once inside a static array can sometimes lead to state preservation bugs if you reuse the same filter instance repeatedly.
+</p>
+
+<p>
+By using an enum, you store raw selection tokens. When a user taps a button, the enum's computed property spits out a <span id="Hacking With Swift - 189 - Challenge 3-The Enum Approach-fresh, clean filter instance"></span><strong id="fresh, clean filter instance">fresh, clean filter instance</strong> every single time.
+</p>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Enum Approach-The Strategy: Enum with CaseIterable and Identifiable"><h3 id="The Strategy: Enum with CaseIterable and Identifiable" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Enum Approach-The Strategy: Enum with CaseIterable and Identifiable">The Strategy: Enum with CaseIterable and Identifiable</a></h3></div>
+
+<p>
+You can implement this by backing your enum with the <code>CaseIterable</code> protocol (which automatically converts your enum cases into a loopable array via <code>.allCases</code>) and the <code>Identifiable</code> protocol (so <code>ForEach</code> knows how to track them).
+</p>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Enum Approach-The Strategy: Enum with CaseIterable and Identifiable-1. Define the Enum"><h4 id="1. Define the Enum" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Enum Approach-The Strategy: Enum with CaseIterable and Identifiable-1. Define the Enum">1. Define the Enum</a></h4></div>
+
+<p>
+Create an enum representing your available filters. Use a computed property to map each case to its matching text description and its corresponding <code>CIFilter</code> instance.
+</p>
+
+<pre swift>
+import SwiftUI
+import CoreImage
+import CoreImage.CIFilters // Ensures modern type-safe filter methods are available
+
+enum ActiveFilter: String, CaseIterable, Identifiable {
+    case crystallize
+    case edges
+    case gaussianBlur
+    case pixellate
+    case sepiaTone
+    case unsharpMask
+    case vignette
+
+    // Required for Identifiable. Sticking with the raw string token is perfect here.
+    var id: String { self.rawValue }
+
+    // User-facing display names
+    var displayName: String {
+        switch self {
+        case .crystallize: return "Crystallize"
+        case .edges: return "Edges"
+        case .gaussianBlur: return "Gaussian Blur"
+        case .pixellate: return "Pixellate"
+        case .sepiaTone: return "Sepia Tone"
+        case .unsharpMask: return "Unsharp Mask"
+        case .vignette: return "Vignette"
+        }
+    }
+
+    // Instantiates a FRESH filter configuration upon request
+    var ciFilter: CIFilter {
+        switch self {
+        case .crystallize: return CIFilter.crystallize()
+        case .edges: return CIFilter.edges()
+        case .gaussianBlur: return CIFilter.gaussianBlur()
+        case .pixellate: return CIFilter.pixellate()
+        case .sepiaTone: return CIFilter.sepiaTone()
+        case .unsharpMask: return CIFilter.unsharpMask()
+        case .vignette: return CIFilter.vignette()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Enum Approach-The Strategy: Enum with CaseIterable and Identifiable-2. Loop it inside your confirmationDialog"><h4 id="2. Loop it inside your confirmationDialog" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Enum Approach-The Strategy: Enum with CaseIterable and Identifiable-2. Loop it inside your confirmationDialog">2. Loop it inside your confirmationDialog</a></h4></div>
+
+<p>
+With <code>CaseIterable</code> in place, you can loop over <code>ActiveFilter.allCases</code> inside your dialog structure:
+</p>
+
+<pre swift>
+.confirmationDialog("Select a filter", isPresented: $showingFilters) {
+    // ActiveFilter.allCases gives you a safe, loopable collection out-of-the-box
+    ForEach(ActiveFilter.allCases) { filterType in
+        Button(filterType.displayName) {
+            setFilter(filterType.ciFilter) // Passes the freshly initialized CIFilter
+        }
+    }
+    
+    Button("Cancel", role: .cancel) { }
+}
+</pre>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Enum Approach-Why this approach wins"><h3 id="Why this approach wins" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Enum Approach-Why this approach wins">Why this approach wins</a></h3></div>
+
+<ul>
+<li>
+Zero Overhead State: The enum handles everything text-based implicitly or explicitly, while constructing fresh instances of CPU/GPU heavy objects (<code>CIFilter</code>) only on-demand.
+
+<li>
+Automatic Iteration: You never have to manually update a secondary tracking array. If you add <code>case thermal</code> to the top of your enum, it instantly updates the confirmation sheet with no extra steps.
+
+<li>
+Clean State Storage: If you need to keep track of what filter the app is actively rendering right now, you can just save it to an application property like <code>@State private var currentSelectedType: ActiveFilter = .sepiaTone</code>.
+
+</ul>
+<div id="Hacking With Swift - 189 - Challenge 3-The Enum Approach-In Context - Instafilter"><h3 id="In Context - Instafilter" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Enum Approach-In Context - Instafilter">In Context - Instafilter</a></h3></div>
+
+<div id="Hacking With Swift - 189 - Challenge 3-The Enum Approach-In Context - Instafilter-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 189 - Challenge 3-The Enum Approach-In Context - Instafilter-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import CoreImage
+import CoreImage.CIFilterBuiltins
+import PhotosUI
+import StoreKit
+import SwiftUI
+
+struct ContentView: View {
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var processedImage: Image?
+    
+    @State private var filterIntensity = 0.5
+    // Added to track if intensity key is present on selected filter
+    @State private var intensityPresent = false
+    @State private var filterRadius = 0.5
+    // Added to track if radius key is present on selected filter
+    @State private var radiusPresent = false
+    @State private var filterScale = 0.5
+    // Added to track if scale key is present on selected filter
+    @State private var scalePresent = false
+
+    // We need a context to convert a CIImage -&gt; CGImage
+    // and a filter to apply
+    // Core Image Context is an object for rendering a CIImage to a CGImage
+    // Recipe -&gt; image
+    let context = CIContext()
+    
+    @State private var currentFilter: CIFilter = CIFilter.sepiaTone()
+    @State private var showingFilters = false
+    
+    // Counter to count how many times the user is changing filter
+    @AppStorage("filterCount") var filterCount = 0
+    // Set up Request Review environment
+    @Environment(\.requestReview) var requestReview
+    
+    // Create a struct to store available filters
+    struct FilterOption: Identifiable {
+        let id = UUID()         // Required for ForEach
+        let name: String        // The UI button label
+        let ciFilter: CIFilter  // The actual Core Image filter instance
+    }
+    
+    // Create a data array of filters
+    let availableFilters = [
+        FilterOption(name: "Crystallize", ciFilter: .crystallize()),
+        FilterOption(name: "Edges", ciFilter: .edges()),
+        FilterOption(name: "Gaussian Blur", ciFilter: .gaussianBlur()),
+        FilterOption(name: "Pixellate", ciFilter: .pixellate()),
+        FilterOption(name: "Sepia Tone", ciFilter: .sepiaTone()),
+        FilterOption(name: "Unsharp Mask", ciFilter: .unsharpMask()),
+        FilterOption(name: "Vignette", ciFilter: .vignette()),
+        FilterOption(name: "Bloom", ciFilter: .bloom()),
+        FilterOption(name: "Pointillize", ciFilter: .pointillize()),
+        FilterOption(name: "Color Inver", ciFilter: .colorInvert()),
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            VStack {
+                Spacer()
+                
+                // Wrap image secion with picker closure
+                PhotosPicker(selection: $selectedItem) {
+                    // Unwrap optional (processedImage)
+                    if let processedImage {
+                        processedImage
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        // Show 'unavailable' screen if no image selected
+                        ContentUnavailableView(
+                            "No Picture",
+                            systemImage: "photo.badge.plus",
+                            description: Text("Tap to import a photo")
+                        )
+                    }
+                }
+                // Stop the 'No Picture' view from turning active blue
+                .buttonStyle(.plain)
+                .onChange(of: selectedItem, loadImage)
+                
+                Spacer()
+                
+                HStack {
+                    // Add slider control (filter intensity)
+                    Text("Intensity")
+                    Slider(value: $filterIntensity)
+                    // Add 'onChange' to watch for live changes of intensity slider
+                        .onChange(of: filterIntensity, applyProcessing)
+                        // Disable button if parameter not present in Keys
+                        .disabled(!intensityPresent)
+                }
+                // Reduce visibility if parameter not present in Keys
+                .opacity(!intensityPresent ? 0.3 : 1)
+                HStack {
+                    // Add slider control (filter radius)
+                    Text("Radius")
+                    Slider(value: $filterRadius)
+                    // Add 'onChange' to watch for live changes of radius slider
+                        .onChange(of: filterRadius, applyProcessing)
+                        // Disable button if parameter not present in Keys
+                        .disabled(!radiusPresent)
+                }
+                // Reduce visibility if parameter not present in Keys
+                .opacity(!radiusPresent ? 0.3 : 1)
+                HStack {
+                    Text("Scale")
+                    Slider(value: $filterScale)
+                    // Add 'onChange' to watch for live changes of scale slider
+                        .onChange(of: filterScale, applyProcessing)
+                        // Disable button if parameter not present in Keys
+                        .disabled(!scalePresent)
+                }
+                // Reduce visibility if parameter not present in Keys
+                .opacity(!scalePresent ? 0.3 : 1)
+                    .padding(.bottom)
+                
+                HStack {
+                    // Add filter button, but extract function outside of layout
+                    Button("Change Filter", action: changeFilter).disabled(selectedItem == nil)
+                    
+                    Spacer()
+                    }
+                    
+                    // Share the picture
+                    if let processedImage {
+                        ShareLink(item: processedImage,
+                            preview: SharePreview("Instafilter image",
+                                image: processedImage)
+                        )
+                    }
+                }
+            }
+            .padding([.horizontal, .bottom])
+            .navigationTitle("Instafilter")
+            // Dialog to choose filter
+            .confirmationDialog(
+                "Select a filter",
+                isPresented: $showingFilters) {
+                    ForEach(availableFilters) {option in
+                        Button(option.name) {
+                            setFilter(option.ciFilter)
+                        }
+                    }
+                }
+    }
+    // Move button action here (out of layout)
+    func changeFilter() {
+        showingFilters = true
+     }
+    
+    func loadImage() {
+        Task {
+            // Load selected image as pure 'data' and not an image type.
+            guard let imageData = try await selectedItem?.loadTransferable(
+                type: Data.self) else { return }
+            // Convert data to image
+            guard let inputImage = UIImage(data: imageData) else { return }
+            
+            // Convert UIImage to CIImage
+            let beginImage = CIImage(image: inputImage)
+            currentFilter.setValue(beginImage, forKey: kCIInputImageKey)
+            // Apply the chosen filter
+            applyProcessing()
+        }
+    }
+    
+    func applyProcessing() {
+        // Due to compatibiltiy with this old code, we have
+        // to use 'Float' instead of 'Double'
+        // Once we change the @State, we lose access to .intensity
+        //currentFilter.intensity = Float(filterIntensity)
+        // Instead, we feed our filterIntensity var into a Key
+        //currentFilter.setValue(filterIntensity, forKey: kCIInputIntensityKey)
+        // This works for sepiaTone, but not for others, and it crashes
+        
+        // Fix:
+        let inputKeys = currentFilter.inputKeys
+        
+        // Map filterIntensity to kCIInputIntensityKey
+        if inputKeys.contains(kCIInputIntensityKey) {
+            currentFilter.setValue(
+                filterIntensity,
+                forKey: kCIInputIntensityKey
+            )
+            // Set bool for presence of parameter in filter
+            intensityPresent = true
+        } else {
+            // Set bool to report lack of parameter in Keys
+            intensityPresent = false
+        }
+        // Map filterIntensity to kCIInputRadiusKey and multiply by 200
+        if inputKeys.contains(kCIInputRadiusKey) {
+            currentFilter.setValue(
+                filterRadius * 200,
+                forKey: kCIInputRadiusKey
+            )
+            // Set bool for presence of parameter in filter
+            radiusPresent = true
+        } else {
+            // Set bool to report lack of parameter in Keys
+            radiusPresent = false
+        }
+        // Map filterIntensity to kCIInputScaleKey and multipty by 100
+        if inputKeys.contains(kCIInputScaleKey) {
+            currentFilter.setValue(
+                filterScale * 100,
+                forKey: kCIInputScaleKey
+            )
+            // Set bool for presence of parameter in filter
+            scalePresent = true
+        } else {
+            // Set bool to report lack of parameter in Keys
+            scalePresent = false
+        }
+
+        
+        // Capture outputImage (after filtering)
+        guard let outputImage = currentFilter.outputImage else { return }
+        // Convert to actual pixels
+        guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent)
+                else { return }
+        
+        let uiImage = UIImage(cgImage: cgImage)
+        processedImage = Image(uiImage: uiImage)
+    }
+    
+    // Set main actor so that this runs on the main thread
+    @MainActor
+    func setFilter(_ filter: CIFilter) {
+        currentFilter = filter
+        loadImage()
+        
+        // Track usage to guage when to trigger Review Request
+        filterCount += 1
+        
+        // Ask for Review
+        if filterCount &gt;= 20 {
+            requestReview()
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+
+</pre>
+
+<p>
 <hr>
 <br>
 </p>
