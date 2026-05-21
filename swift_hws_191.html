@@ -310,6 +310,162 @@ let sortedByTitle = shelf.sorted { $0.title &lt; $1.title }
 Using an extension with <code>Comparable</code> is perfect when there is a clear, definitive way that a struct should <em>always</em> be sorted (like sorting users alphabetically by last name). If your sorting needs change depending on the screen, inline Key Paths are your best friend!
 </p>
 
+<div id="Using an Extension on Existing Structs-Off on a Tangent - Multiple Sorts"><h2 id="Off on a Tangent - Multiple Sorts" class="header"><a href="#Using an Extension on Existing Structs-Off on a Tangent - Multiple Sorts">Off on a Tangent - Multiple Sorts</a></h2></div>
+
+<div id="Using an Extension on Existing Structs-QUESTION"><h2 id="QUESTION" class="header"><a href="#Using an Extension on Existing Structs-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Is it possible to set up a struct with more than one sorting static methods? I'm wondering if it's possible to pass and arg to the sorted method to select a sorting technique.
+</p>
+
+<p>
+As a hypothetical, I'm thinking of your book example. Could you set up one art for 'pages' and one for 'book name'; something like:
+</p>
+<pre swift>
+mybook.sorted(pages)
+</pre>
+
+<div id="Using an Extension on Existing Structs-ANSWER"><h2 id="ANSWER" class="header"><a href="#Using an Extension on Existing Structs-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a brilliant question. You have hit on a classic problem: a struct can only conform to the <code>Comparable</code> protocol <span id="Using an Extension on Existing Structs-ANSWER-one way"></span><strong id="one way">one way</strong>. If you use <code>extension Book: Comparable</code>, you have to pick one master rule (like sorting by page count), and your app is stuck with that as the default whenever you call <code>.sorted()</code>.
+</p>
+
+<p>
+To answer your question: <span id="Using an Extension on Existing Structs-ANSWER-No, you cannot pass a custom argument directly into the standard"></span><strong id="No, you cannot pass a custom argument directly into the standard">No, you cannot pass a custom argument directly into the standard</strong> <code>.sorted()</code> *method to switch behaviors like <code>shelf.sorted(pages)</code>.
+</p>
+
+<p>
+However, you can achieve the exact same result using a few elegant Swift techniques. Here are the two best ways to do it.
+</p>
+
+<div id="Using an Extension on Existing Structs-ANSWER-Option 1: The Modern Swift Way (Key Paths)"><h3 id="Option 1: The Modern Swift Way (Key Paths)" class="header"><a href="#Using an Extension on Existing Structs-ANSWER-Option 1: The Modern Swift Way (Key Paths)">Option 1: The Modern Swift Way (Key Paths)</a></h3></div>
+
+<p>
+Swift actually has a built-in way to sort by any property you want on the fly, without needing to write any static methods or protocols. You do this by passing a <span id="Using an Extension on Existing Structs-ANSWER-Option 1: The Modern Swift Way (Key Paths)-Key Path"></span><strong id="Key Path">Key Path</strong> (which starts with a backslash <code>\</code>) into a variation of the sort method.
+</p>
+
+<p>
+You don't need to change your struct at all. You just write it like this:
+</p>
+
+<pre swift>
+// Sort by title
+let alphabeticalBooks = shelf.sorted(by: { $0.title &lt; $1.title })
+
+// Sort by page count
+let shortestBooks = shelf.sorted(by: { $0.pageCount &lt; $1.pageCount })
+</pre>
+
+<p>
+<em>Note: In recent versions of Swift, you can even use the SortDescriptor syntax, which looks incredibly close to what you imagined:</em>
+</p>
+
+<pre swift>
+let sortedByPages = shelf.sorted(using: KeyPathComparator(\.pageCount))
+let sortedByTitle = shelf.sorted(using: KeyPathComparator(\.title))
+</pre>
+
+<div id="Using an Extension on Existing Structs-ANSWER-Option 2: The Static Method Way (Functions as Arguments)"><h3 id="Option 2: The Static Method Way (Functions as Arguments)" class="header"><a href="#Using an Extension on Existing Structs-ANSWER-Option 2: The Static Method Way (Functions as Arguments)">Option 2: The Static Method Way (Functions as Arguments)</a></h3></div>
+
+<p>
+If you really want to keep the sorting logic centralized inside your <code>Book</code> struct using static methods, you can absolutely do that!
+</p>
+
+<p>
+In Swift, <span id="Using an Extension on Existing Structs-ANSWER-Option 2: The Static Method Way (Functions as Arguments)-functions are first-class citizens"></span><strong id="functions are first-class citizens">functions are first-class citizens</strong>. This means a function (or a static method) can be passed around as an argument to another function. The standard <code>.sorted(by:)</code> method expects a function that compares two things and returns a <code>Bool</code>.
+</p>
+
+<p>
+Here is how you can set up multiple static sorting methods inside your struct or extension:
+</p>
+
+<pre swift>
+struct Book {
+    let title: String
+    let pageCount: Int
+    
+    // Static method 1: Compares titles
+    static func sortByTitle(lhs: Book, rhs: Book) -&gt; Bool {
+        return lhs.title &lt; rhs.title
+    }
+    
+    // Static method 2: Compares page counts
+    static func sortByPages(lhs: Book, rhs: Book) -&gt; Bool {
+        return lhs.pageCount &lt; rhs.pageCount
+    }
+}
+</pre>
+
+<p>
+Now, you can pass those exact static methods directly into the <code>.sorted(by:)</code> method as the argument:
+</p>
+
+<pre swift>
+let shelf = [
+    Book(title: "The Hobbit", pageCount: 310),
+    Book(title: " there is no spoon", pageCount: 5)
+]
+
+// Pass the static methods as the sorting rule!
+let booksByTitle = shelf.sorted(by: Book.sortByTitle)
+let booksByPages = shelf.sorted(by: Book.sortByPages)
+</pre>
+
+<p>
+Notice how we don't include parentheses <code>()</code> after <code>Book.sortByPages</code>. We aren't running the method right there; we are handing the entire method over to <code>sorted</code> so it can run it behind the scenes to compare the items.
+</p>
+
+<div id="Using an Extension on Existing Structs-ANSWER-Option 3: The Custom Enum Way (Closest to your syntax)"><h3 id="Option 3: The Custom Enum Way (Closest to your syntax)" class="header"><a href="#Using an Extension on Existing Structs-ANSWER-Option 3: The Custom Enum Way (Closest to your syntax)">Option 3: The Custom Enum Way (Closest to your syntax)</a></h3></div>
+
+<p>
+If you want a strict, clean syntax where you pass an argument like <code>pages</code> or <code>title</code>, you can build a custom sorting method using an <code>enum</code>.
+</p>
+
+<pre swift>
+extension Array where Element == Book {
+    enum SortStyle {
+        case title
+        case pages
+    }
+    
+    // We write a custom sorted method for arrays of Books
+    func sorted(by style: SortStyle) -&gt; [Book] {
+        switch style {
+        case .title:
+            return self.sorted { $0.title &lt; $1.title }
+        case .pages:
+            return self.sorted { $0.pageCount &lt; $1.pageCount }
+        }
+    }
+}
+</pre>
+
+<p>
+This gives you a beautifully clean API that reads almost exactly like what you envisioned:
+</p>
+
+<pre swift>
+let dynamicSorted1 = shelf.sorted(by: .title)
+let dynamicSorted2 = shelf.sorted(by: .pages)
+</pre>
+
+<div id="Using an Extension on Existing Structs-ANSWER-Option 3: The Custom Enum Way (Closest to your syntax)-Summary"><h4 id="Summary" class="header"><a href="#Using an Extension on Existing Structs-ANSWER-Option 3: The Custom Enum Way (Closest to your syntax)-Summary">Summary</a></h4></div>
+
+<p>
+While <code>Comparable</code> gives your struct a single "default" sorting behavior,
+</p>
+<ul>
+<li>
+<span id="Using an Extension on Existing Structs-ANSWER-Option 3: The Custom Enum Way (Closest to your syntax)-Summary-Option 1 (Key Paths)"></span><strong id="Option 1 (Key Paths)">Option 1 (Key Paths)</strong> is what most iOS developers use for quick switches, and
+
+<li>
+<span id="Using an Extension on Existing Structs-ANSWER-Option 3: The Custom Enum Way (Closest to your syntax)-Summary-Option 2 (Static Methods)"></span><strong id="Option 2 (Static Methods)">Option 2 (Static Methods)</strong> or
+
+<li>
+<span id="Using an Extension on Existing Structs-ANSWER-Option 3: The Custom Enum Way (Closest to your syntax)-Summary-Option 3 (Enums)"></span><strong id="Option 3 (Enums)">Option 3 (Enums)</strong> are perfect if you want to keep your sorting logic neatly organized inside the struct itself!
+
+</ul>
 <p>
 <hr>
 <br>
