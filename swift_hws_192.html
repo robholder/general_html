@@ -31,6 +31,92 @@
 </ul>
 <div id="Hacking With Swift - 192 - Writing data to the documents directory"><h1 id="Hacking With Swift - 192 - Writing data to the documents directory" class="header"><a href="#Hacking With Swift - 192 - Writing data to the documents directory">Hacking With Swift - 192 - Writing data to the documents directory</a></h1></div>
 
+<p>
+Previously we looked at how to read and write data to <code>UserDefaults</code>, which works great for user settings or small amounts of JSON, and we also looked at SwiftData, which is a great choice for times when you want relationships between objects, or more advanced sorting and filtering.
+</p>
+
+<p>
+In this app we’re going to look at a middle ground: we'll just write our data to a file directly. This isn't because I hate SwiftData, and in fact I think SwiftData would make a good choice here. Instead, it's so that I can show you the full spread of what's possible in iOS development, because there are lots of apps you'll work on that use exactly this approach to saving their data - it's good that you can at least see how it works.
+</p>
+
+<p>
+That being said, using <code>UserDefaults</code> is definitely a bad idea here, because there's no limit to how much data users can create in the app. <code>UserDefaults</code> is better used for simple settings and similar.
+</p>
+
+<p>
+Fortunately, iOS makes it very easy to read and write data from device storage, and in fact all apps get a directory for storing any kind of documents we want. Files here are automatically synchronized with iCloud backups, so if the user gets a new device then our data will be restored along with all the other system data - we don’t even need to think about it.
+</p>
+
+<p>
+There is a small catch - isn’t there always? - and it’s that all iOS apps are sandboxed, which means they run in their own container with a hard to guess directory name. As a result, we can’t - and shouldn’t try to - guess the directory where our app is installed, and instead need to rely on a special URL that points to our app’s documents directory:
+</p>
+
+<pre swift>
+print(URL.documentsDirectory)
+</pre>
+
+<p>
+That documents directory is ours to do with as we please, and because it belongs to the app it will automatically get deleted if the app itself gets deleted. Other than physical device limitations there is no limit to how much we can store, although remember that users can use the Settings app to see how much storage your app takes up - be respectful!
+</p>
+
+<p>
+Now that we have a directory to work with, we can read and write files there freely. You already met <code>String(contentsOf:)</code> and <code>Data(contentsOf:)</code> for reading data, but for writing data we need to use the <code>write(to:)</code> method. This takes two parameters:
+</p>
+
+<ul>
+<li>
+A <code>URL</code> to write to.
+
+<li>
+Any additional options to use when saving.
+
+</ul>
+<p>
+The first of those can be created by combining the documents directory URL with a filename, such as myfile.txt.
+</p>
+
+<p>
+As for the second, I prefer to give it two values as an array: <code>.atomic</code> and <code>.completeFileProtection</code>. They do very different things, but both are important:
+</p>
+
+<ul>
+<li>
+Asking for atomic saving means the whole file should be written in one lump. If this isn't included and we try to write a big file, it’s possible that another part of our app might try and read the file while it’s still being written. This shouldn’t cause a crash or anything, but it does mean that it’s going to read only part of the data, because the other part hasn’t been written yet. Atomic writing causes the system to write our full file to a temporary filename (not the one we asked for), and when that’s finished it does a simple rename to our target filename. This means either the whole file is there or nothing is.
+
+<li>
+Asking for complete file protection means iOS automatically (and transparently) encrypts the file, and only allows our app to read it while the device is unlocked. iOS does a great job of keeping user data secure, but there's no harm being extra safe!
+
+</ul>
+<p>
+To put all this code into action, we’re going to modify the default code from our template so that it writes a test string to a file in the documents directory, reads it back into a new string, then prints it out - the complete cycle of reading and writing data.
+</p>
+
+<p>
+Change the <code>body</code> property of <code>ContentView</code> to this:
+</p>
+
+<pre swift>
+Button("Read and Write") {
+    let data = Data("Test Message".utf8)
+    let url = URL.documentsDirectory.appending(path: "message.txt")
+
+    do {
+        try data.write(to: url, options: [.atomic, .completeFileProtection])
+        let input = try String(contentsOf: url)
+        print(input)
+    } catch {
+        print(error.localizedDescription)
+    }
+}
+</pre>
+
+<p>
+When that runs you should be able to tap the label to see “Test message” printed to Xcode’s debug output area.
+</p>
+
+<p>
+Before we move on, here’s a small challenge for you: back in project 8 we looked at how to create a generic extension on <code>Bundle</code> that let us find, load, and decode any <code>Codable</code> data from our app bundle. Can you write something similar for the documents directory, perhaps making it an extension on <code>FileManager</code>?
+</p>
 
 <p>
 <hr>
