@@ -32,9 +32,16 @@
 <div id="Hacking With Swift - 185 - Sharing an image using ShareLink"><h1 id="Hacking With Swift - 185 - Sharing an image using ShareLink" class="header"><a href="#Hacking With Swift - 185 - Sharing an image using ShareLink">Hacking With Swift - 185 - Sharing an image using ShareLink</a></h1></div>
 
 <p>
-To complete this project we’re going to add two more important features: letting the user share their image using SwiftUI's <code>ShareLink</code> view, then adding a prompt to encourage them to review our app on the App Store - once a suitable amount of time has elapsed, of course.
+To complete this project we’re going to add two more important features:
 </p>
+<ul>
+<li>
+Letting the user share their image using SwiftUI's <code>ShareLink</code> view,
 
+<li>
+Then adding a prompt to encourage them to review our app on the App Store - once a suitable amount of time has elapsed, of course.
+
+</ul>
 <p>
 Neither of these are challenging, so let's get straight into the code.
 </p>
@@ -70,7 +77,26 @@ So, rather than <em>always</em> showing the request, we're instead going to wait
 </p>
 
 <p>
-First, we need to add two new properties: one to get the reviewer requester from SwiftUI's environment, and one to track how many filter changes have happened. Add another import to <code>ContentView.swift</code>, this time for StoreKit, then add these two properties to ContentView:
+First, we need to add two new properties:
+</p>
+<ul>
+<li>
+one to get the reviewer requester from SwiftUI's environment,
+
+<li>
+and one to track how many filter changes have happened.
+
+</ul>
+<p>
+Add another import to <code>ContentView.swift</code>, this time for StoreKit...
+</p>
+
+<pre swift>
+import StoreKit
+</pre>
+
+<p>
+...then add these two properties to ContentView:
 </p>
 
 <pre swift>
@@ -114,6 +140,198 @@ Now Swift will ensure that code always runs on the main actor, and the compile e
 That final step completes our app, so go ahead and run it again and try it from end to end - import a picture, apply a filter, then share it to a different app. Well done!
 </p>
 
+<div id="Hacking With Swift - 185 - Sharing an image using ShareLink-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 185 - Sharing an image using ShareLink-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 185 - Sharing an image using ShareLink-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 185 - Sharing an image using ShareLink-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import CoreImage
+import CoreImage.CIFilterBuiltins
+import PhotosUI
+import StoreKit
+import SwiftUI
+
+struct ContentView: View {
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var processedImage: Image?
+    @State private var filterIntensity = 0.5
+    
+    // We need a context to convert a CIImage -&gt; CGImage
+    // and a filter to apply
+    // Core Image Context is an object for rendering a CIImage to a CGImage
+    // Recipe -&gt; image
+    let context = CIContext()
+    // Place holder to update:
+    //@State private var currentFilter = CIFilter.sepiaTone()
+    // Updated to set type to CIFilter, rather then CIFilter.sepiaTone only.
+    // Now we lose acdess to the 'intensity' property.
+    @State private var currentFilter: CIFilter = CIFilter.sepiaTone()
+    
+    // Keep beginImage in a var to prevent having to re-select everytime
+    // the filter is selected.
+    //@State private var beginImage: CIImage?
+    
+    @State private var showingFilters = false
+    
+    // Counter to count how many times the user is changing filter
+    @AppStorage("filterCount") var filterCount = 0
+    // Set up Request Review environment
+    @Environment(\.requestReview) var requestReview
+
+    var body: some View {
+        NavigationStack {
+            VStack {
+                Spacer()
+                
+                // Wrap image secion with picker closure
+                PhotosPicker(selection: $selectedItem) {
+                    // Unwrap optional (processedImage)
+                    if let processedImage {
+                        processedImage
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        // Show 'unavailable' screen if no image selected
+                        ContentUnavailableView(
+                            "No Picture",
+                            systemImage: "photo.badge.plus",
+                            description: Text("Tap to import a photo")
+                        )
+                    }
+                }
+                // Stop the 'No Picture' view from turning active blue
+                .buttonStyle(.plain)
+                .onChange(of: selectedItem, loadImage)
+
+                Spacer()
+                
+                HStack {
+                    // Add slider control (filter intensity)
+                    Text("Intensity")
+                    Slider(value: $filterIntensity)
+                        // Add 'onChange' to watch for live changes of intensity slider
+                        .onChange(of: filterIntensity, applyProcessing)
+                }
+                .padding(.vertical)
+                
+                HStack {
+                    // Add filter button, but extract function outside of layout
+                    Button("Change Filter", action: changeFilter)
+                    
+                    Spacer()
+                    }
+                    
+                    // Share the picture
+                    if let processedImage {
+                        ShareLink(item: processedImage,
+                            preview: SharePreview("Instafilter image",
+                                image: processedImage)
+                        )
+                    }
+                }
+            }
+            .padding([.horizontal, .bottom])
+            .navigationTitle("Instafilter")
+            // Dialog to choose filter
+            .confirmationDialog(
+                "Select a filter",
+                isPresented: $showingFilters) {
+                    Button("Crystallize") { setFilter(CIFilter.crystallize()) }
+                    Button("Edges") { setFilter(CIFilter.edges()) }
+                    Button("Gaussian Blur") { setFilter(CIFilter.gaussianBlur()) }
+                    Button("Pixellate") { setFilter(CIFilter.pixellate()) }
+                    Button("Sepia Tone") { setFilter(CIFilter.sepiaTone()) }
+                    Button("Unsharp Mask") { setFilter(CIFilter.unsharpMask()) }
+                    Button("Vignette") { setFilter(CIFilter.vignette()) }
+                    Button("Cancel", role: .cancel) { }
+                }
+    }
+    // Move button action here (out of layout)
+    func changeFilter() {
+        showingFilters = true
+     }
+    
+    func loadImage() {
+        Task {
+            // Load selected image as pure 'data' and not an image type.
+            guard let imageData = try await selectedItem?.loadTransferable(
+                type: Data.self) else { return }
+            // Convert data to image
+            guard let inputImage = UIImage(data: imageData) else { return }
+            
+            // Convert UIImage to CIImage
+            let beginImage = CIImage(image: inputImage)
+            currentFilter.setValue(beginImage, forKey: kCIInputImageKey)
+            // Apply the chosen filter
+            applyProcessing()
+        }
+    }
+    
+    func applyProcessing() {
+        // Due to compatibiltiy with this old code, we have
+        // to use 'Float' instead of 'Double'
+        // Once we change the @State, we lose access to .intensity
+        //currentFilter.intensity = Float(filterIntensity)
+        // Instead, we feed our filterIntensity var into a Key
+        //currentFilter.setValue(filterIntensity, forKey: kCIInputIntensityKey)
+        // This works for sepiaTone, but not for others, and it crashes
+        
+        // Fix:
+        let inputKeys = currentFilter.inputKeys
+        
+        // Map filterIntensity to kCIInputIntensityKey
+        if inputKeys.contains(kCIInputIntensityKey) {
+            currentFilter.setValue(
+                filterIntensity,
+                forKey: kCIInputIntensityKey
+            )
+        }
+        // Map filterIntensity to kCIInputRadiusKey and multiply by 200
+        if inputKeys.contains(kCIInputRadiusKey) {
+            currentFilter.setValue(
+                filterIntensity * 200,
+                forKey: kCIInputRadiusKey
+            )
+        }
+        // Map filterIntensity to kCIInputScaleKey and multipty by 100
+        if inputKeys.contains(kCIInputScaleKey) {
+            currentFilter.setValue(
+                filterIntensity * 100,
+                forKey: kCIInputScaleKey
+            )
+        }
+
+        
+        // Capture outputImage (after filtering)
+        guard let outputImage = currentFilter.outputImage else { return }
+        // Convert to actual pixels
+        guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent)
+                else { return }
+        
+        let uiImage = UIImage(cgImage: cgImage)
+        processedImage = Image(uiImage: uiImage)
+    }
+    
+    // Set main actor so that this runs on the main thread
+    @MainActor
+    func setFilter(_ filter: CIFilter) {
+        currentFilter = filter
+        loadImage()
+        
+        // Track usage to guage when to trigger Review Request
+        filterCount += 1
+        
+        // Ask for Review
+        if filterCount &gt;= 20 {
+            requestReview()
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 <p>
 <hr>
 <br>
