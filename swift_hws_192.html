@@ -187,6 +187,148 @@ Back in project 8 we looked at how to create a generic extension on <code>Bundle
 Can you write something similar for the documents directory, perhaps making it an extension on <code>FileManager</code>?
 </p>
 
+<div id="Hacking With Swift - 192 - Writing data to the documents directory-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 192 - Writing data to the documents directory-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+This is a massive milestone in an iOS developer's journey. You are taking a highly advanced concept - <span id="Hacking With Swift - 192 - Writing data to the documents directory-Ai Insight-Generics combined with Protocols"></span><strong id="Generics combined with Protocols">Generics combined with Protocols</strong> - and translating it from one system domain to another.
+</p>
+
+<p>
+Before we write the code, let’s demystify what FileManager actually is, because once you understand its purpose, the code will make total sense.
+</p>
+
+<div id="What is FileManager vs. Bundle?"><h1 id="What is FileManager vs. Bundle?" class="header"><a href="#What is FileManager vs. Bundle?">What is FileManager vs. Bundle?</a></h1></div>
+
+<p>
+Think of your app like a <span id="What is FileManager vs. Bundle?-boxed video game console"></span><strong id="boxed video game console">boxed video game console</strong>:
+</p>
+
+<ul>
+<li>
+<span id="What is FileManager vs. Bundle?-Bundle is the Game Disc"></span><strong id="Bundle is the Game Disc">Bundle is the Game Disc</strong>: It represents your app's main installation package. Everything in your Bundle (like the JSON files for your Astronauts and Missions) was packed tightly at the factory. It is <span id="What is FileManager vs. Bundle?-Read-Only"></span><strong id="Read-Only">Read-Only</strong>. Your app can read files from the Bundle, but it can never write new data back into it.
+
+<li>
+<span id="What is FileManager vs. Bundle?-FileManager is the Memory Card"></span><strong id="FileManager is the Memory Card">FileManager is the Memory Card</strong>: This is iOS's gateway to the device's actual file storage. It handles the "Documents Directory" - a private sandbox folder where your app is allowed to dynamically create, write, edit, and delete files while the user is actively playing the game.
+
+</ul>
+<p>
+Your previous project used a Bundle extension to <em>read</em> factory-set JSON data. Your current challenge is to use a FileManager extension to read and <em>write</em> user-generated JSON data to that "Memory Card".
+</p>
+
+<div id="What is FileManager vs. Bundle?-The Goal: Universal FileManager Extensions"><h3 id="The Goal: Universal FileManager Extensions" class="header"><a href="#What is FileManager vs. Bundle?-The Goal: Universal FileManager Extensions">The Goal: Universal FileManager Extensions</a></h3></div>
+
+<p>
+Right now, your ContentView is manually handling the URL, writing raw Data, and converting it to a string.
+</p>
+
+<p>
+We want to build two generic extensions on FileManager:
+</p>
+
+<ul>
+<li>
+<code>encode(...)</code>: Take <em>any</em> Codable struct, turn it into JSON, and write it to the documents directory.
+
+<li>
+<code>decode(...)</code>: Go to the documents directory, grab a file, and instantly turn it back into your struct.
+
+</ul>
+<p>
+Here is how you can write that new extension file (you can name it something like FileManager-Documents.swift):
+</p>
+
+<pre swift>
+import Foundation
+
+extension FileManager {
+    
+    // 1. THE WRITER: Takes any Codable object and saves it as a file
+    func encode&lt;T: Codable&gt;(_ data: T, to file: String) {
+        // Find the documents directory URL
+        let url = URL.documentsDirectory.appending(path: file)
+        
+        let encoder = JSONEncoder()
+        // Optional: Makes the saved JSON look pretty if you open the file manually
+        encoder.outputFormatting = .prettyPrinted 
+        
+        do {
+            // Convert the Swift struct into raw JSON Data
+            let encodedData = try encoder.encode(data)
+            
+            // Write it to disk with atomic writing and encryption
+            try encodedData.write(to: url, options: [.atomic, .completeFileProtection])
+        } catch {
+            fatalError("Failed to encode and save \(file): \(error.localizedDescription)")
+        }
+    }
+    
+    // 2. THE READER: Grabs a file and decodes it back into a Swift struct
+    func decode&lt;T: Codable&gt;(_ file: String) -&gt; T {
+        // Find the file in the documents directory
+        let url = URL.documentsDirectory.appending(path: file)
+        
+        // Try to load the raw data out of that file
+        guard let data = try? Data(contentsOf: url) else {
+            fatalError("Failed to load \(file) from Documents Directory.")
+        }
+        
+        let decoder = JSONDecoder()
+        
+        // Map the same detailed error handling you used in your Bundle project
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch DecodingError.keyNotFound(let key, let context) {
+            fatalError("Failed to decode \(file) due to missing key '\(key.stringValue)' - \(context.debugDescription)")
+        } catch DecodingError.typeMismatch(_, let context) {
+            fatalError("Failed to decode \(file) due to type mismatch - \(context.debugDescription)")
+        } catch DecodingError.valueNotFound(let type, let context) {
+            fatalError("Failed to decode \(file) due to missing \(type) value - \(context.debugDescription)")
+        } catch DecodingError.dataCorrupted(_) {
+            fatalError("Failed to decode \(file) because it appears to be invalid JSON.")
+        } catch {
+            fatalError("Failed to decode \(file): \(error.localizedDescription)")
+        }
+    }
+}
+</pre>
+
+<div id="What is FileManager vs. Bundle?-How this cleans up your ContentView"><h3 id="How this cleans up your ContentView" class="header"><a href="#What is FileManager vs. Bundle?-How this cleans up your ContentView">How this cleans up your ContentView</a></h3></div>
+
+<p>
+Look how incredibly simple your ContentView button becomes once the FileManager extension is doing the heavy lifting under the hood.
+</p>
+
+<p>
+Instead of dealing with URLs, data arrays, and encoding types manually, you just talk to FileManager.default:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        Button("Read and Write") {
+            // Imagine we have a custom profile struct
+            let currentMission = Mission(id: 101, launchDate: "2026-05-22", crew: [], description: "Mars Prep")
+            
+            // WRITE IT: Save the mission to disk as a JSON file
+            FileManager.default.encode(currentMission, to: "savedMission.json")
+            
+            print("Saved successfully!")
+            
+            // READ IT: Instantly read it back out as a Mission struct
+            let loadedMission: Mission = FileManager.default.decode("savedMission.json")
+            
+            print("Loaded mission ID: \(loadedMission.id)")
+        }
+    }
+}
+</pre>
+
+<div id="What is FileManager vs. Bundle?-Notice the Magic Word: FileManager.default"><h3 id="Notice the Magic Word: FileManager.default" class="header"><a href="#What is FileManager vs. Bundle?-Notice the Magic Word: FileManager.default">Notice the Magic Word: FileManager.default</a></h3></div>
+
+<p>
+<code>FileManager</code> utilizes a shared instance that lives throughout your app, accessible by calling <code>FileManager.default</code>. By adding your methods to the <code>FileManager</code> extension, you can invoke your clean <code>.encode()</code> and <code>.decode()</code> tools from anywhere inside your codebase.
+</p>
+
 <p>
 <hr>
 <br>
