@@ -329,12 +329,170 @@ struct ContentView: View {
 <code>FileManager</code> utilizes a shared instance that lives throughout your app, accessible by calling <code>FileManager.default</code>. By adding your methods to the <code>FileManager</code> extension, you can invoke your clean <code>.encode()</code> and <code>.decode()</code> tools from anywhere inside your codebase.
 </p>
 
+<div id="What is FileManager vs. Bundle?-Applying to the Moonshot Example"><h2 id="Applying to the Moonshot Example" class="header"><a href="#What is FileManager vs. Bundle?-Applying to the Moonshot Example">Applying to the Moonshot Example</a></h2></div>
+
+<p>
+Let's integrate your actual data models (Astronaut and Mission) with our new FileManager setup.
+</p>
+
+<p>
+To show you how this handles complex types, look at how the two JSON files are structured differently:
+</p>
+
+<ul>
+<li>
+<code>astronauts.json</code> is a <span id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Dictionary"></span><strong id="Dictionary">Dictionary</strong> (<code>[String: Astronaut]</code>).
+
+<li>
+<code>missions.json</code> is an <span id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Array"></span><strong id="Array">Array</strong> (<code>[Mission]</code>).
+
+</ul>
+<p>
+Because we wrote our <code>FileManager</code> extension using <span id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Generics (<T: Codable>)"></span><strong id="Generics (<T: Codable>)">Generics (<T: Codable>)</strong>, it is smart enough to handle both of these distinct shapes automatically.
+</p>
+
+<div id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Step 1: Update your ContentView"><h3 id="Step 1: Update your ContentView" class="header"><a href="#What is FileManager vs. Bundle?-Applying to the Moonshot Example-Step 1: Update your ContentView">Step 1: Update your ContentView</a></h3></div>
+
+<p>
+We will modify your <code>ContentView</code> to simulate a real-world app flow:
+</p>
+
+<ul>
+<li>
+<span id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Step 1: Update your ContentView-Read"></span><strong id="Read">Read</strong> the initial data out of the read-only <code>Bundle</code> (factory settings).
+
+<li>
+<span id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Step 1: Update your ContentView-Save (Encode)"></span><strong id="Save (Encode)">Save (Encode)</strong> that data into the <code>FileManager</code> documents directory (creating user-editable copies).
+
+<li>
+<span id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Step 1: Update your ContentView-Load (Decode)"></span><strong id="Load (Decode)">Load (Decode)</strong> the data directly back out from <code>FileManager</code>.
+
+</ul>
+<p>
+Replace your <code>ContentView.swift</code> with this code:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    // 1. Grab the read-only factory data out of the Bundle
+    let factoryAstronauts: [String: Astronaut] = Bundle.main.decode("astronauts.json")
+    let factoryMissions: [Mission] = Bundle.main.decode("missions.json")
+
+    // State variables to hold the data we read back from FileManager
+    @State private var loadedAstronauts: [String: Astronaut] = [:]
+    @State private var loadedMissions: [Mission] = []
+
+    var body: some View {
+        VStack(spacing: 20) {
+            // Displays counts from the data pulled from FileManager
+            Text("FileManager Astronauts: \(loadedAstronauts.count)")
+            Text("FileManager Missions: \(loadedMissions.count)")
+            
+            Button("Run Save &amp; Load Challenge") {
+                runFileManagerChallenge()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+
+    func runFileManagerChallenge() {
+        // 2. ENCODE: Copy the factory structures into our application storage files
+        FileManager.default.encode(factoryAstronauts, to: "user_astronauts.json")
+        FileManager.default.encode(factoryMissions, to: "user_missions.json")
+        
+        print("Successfully wrote files to the Documents Directory!")
+
+        // 3. DECODE: Read them back using our FileManager extension
+        // Explicitly type the targets so the Generic compiler knows what model to unpack into
+        let spaceCrew: [String: Astronaut] = FileManager.default.decode("user_astronauts.json")
+        let flightMissions: [Mission] = FileManager.default.decode("user_missions.json")
+
+        // Update the UI state properties
+        self.loadedAstronauts = spaceCrew
+        self.loadedMissions = flightMissions
+        
+        // Print proof to the console
+        if let gus = loadedAstronauts["grissom"] {
+            print("Successfully recovered from FileManager: \(gus.name)")
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Step 2: The Double Check"><h3 id="Step 2: The Double Check" class="header"><a href="#What is FileManager vs. Bundle?-Applying to the Moonshot Example-Step 2: The Double Check">Step 2: The Double Check</a></h3></div>
+
+<p>
+For this to build successfully, make sure your project has the <code>FileManager</code> extension file we designed earlier. Here is a quick refresher of exactly how it sits alongside your actual models:
+</p>
+
+<pre swift>
+import Foundation
+
+extension FileManager {
+    // Encodes any type (Array, Dictionary, Struct) to a file in documents directory
+    func encode&lt;T: Codable&gt;(_ data: T, to file: String) {
+        let url = URL.documentsDirectory.appending(path: file)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        
+        do {
+            let encodedData = try encoder.encode(data)
+            try encodedData.write(to: url, options: [.atomic, .completeFileProtection])
+        } catch {
+            fatalError("Failed to encode \(file): \(error.localizedDescription)")
+        }
+    }
+    
+    // Decodes any type out of a file in documents directory
+    func decode&lt;T: Codable&gt;(_ file: String) -&gt; T {
+        let url = URL.documentsDirectory.appending(path: file)
+        
+        guard let data = try? Data(contentsOf: url) else {
+            fatalError("Failed to locate or open \(file) in Documents Directory.")
+        }
+        
+        let decoder = JSONDecoder()
+        
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch DecodingError.keyNotFound(let key, let context) {
+            fatalError("Missing key '\(key.stringValue)' decoding \(file) - \(context.debugDescription)")
+        } catch DecodingError.typeMismatch(_, let context) {
+            fatalError("Type mismatch decoding \(file) - \(context.debugDescription)")
+        } catch DecodingError.valueNotFound(let type, let context) {
+            fatalError("Missing \(type) value decoding \(file) - \(context.debugDescription)")
+        } catch DecodingError.dataCorrupted(_) {
+            fatalError("Invalid JSON in \(file).")
+        } catch {
+            fatalError("Error decoding \(file): \(error.localizedDescription)")
+        }
+    }
+}
+</pre>
+
+<div id="What is FileManager vs. Bundle?-Applying to the Moonshot Example-Why this is so clean"><h3 id="Why this is so clean" class="header"><a href="#What is FileManager vs. Bundle?-Applying to the Moonshot Example-Why this is so clean">Why this is so clean</a></h3></div>
+
+<p>
+Notice that inside <code>runFileManagerChallenge()</code>, you used the exact same <code>.decode()</code> function signature for <code>user_astronauts.json</code> and <code>user_missions.json</code>. Swift automatically saw that <code>spaceCrew</code> was a dictionary and <code>flightMissions</code> was an array, and it handled the complex internal loop mappings for you entirely behind the scenes!
+</p>
+
 <p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_193.html">Hacking With Swift - 193 - Switching view states with enums</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
