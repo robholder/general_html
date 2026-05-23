@@ -45,6 +45,295 @@ Elvis Presley is reputed to have once said, “values are like fingerprints: nob
 
 <p>
 Today you have two topics to work through, in which you’ll learn how embed maps into a SwiftUI app, how to use Face ID to unlock your app, and more.
+</p>
+
+<div id="Hacking With Swift - 194 - Integrating MapKit with SwiftUI-Integrating MapKit with SwiftUI"><h2 id="Integrating MapKit with SwiftUI" class="header"><a href="#Hacking With Swift - 194 - Integrating MapKit with SwiftUI-Integrating MapKit with SwiftUI">Integrating MapKit with SwiftUI</a></h2></div>
+
+<p>
+Maps have been a core feature of iPhone since the very first device shipped way back in 2007, and the underlying framework has been available to developers for almost as long. Even better, Apple provides a SwiftUI <code>Map</code> view that wraps up the underlying map framework beautifully, letting us place maps, annotations, and more alongside the rest of our SwiftUI view hierarchy.
+</p>
+
+<p>
+Let’s start with something simple: just showing a map. Maps and all their configuration data come from a dedicated framework called MapKit, so our first step is to import that framework:
+</p>
+
+<pre swift>
+import MapKit 
+</pre>
+
+<p>
+And now we can place a map in our SwiftUI view, with just this:
+</p>
+
+<pre swift>
+Map()
+</pre>
+
+<p>
+That's enough to show a map on the screen, so try running the app and take a moment to learn some key shortcuts in the simulator:
+</p>
+
+<ul>
+<li>
+Hold down the Option key to trigger two-finger pinching. If you click and drag while option is held down, the virtual fingers will move closer or further.
+
+<li>
+Hold down Option and Shift to trigger two-finger panning. If you click and drag up and down while this combination is held down, you'll adjust the tilt of the map.
+
+<li>
+You can also mimic the single-finger zoom by tapping once, then tapping and dragging up or down.
+
+</ul>
+<p>
+Once you're in control of the map, there are stacks of options to customize it further.
+</p>
+
+<p>
+For example, you can use the <code>mapStyle()</code> modifier to control how the map looks. You can get a satellite map like this:
+</p>
+
+<pre swift>
+Map()
+    .mapStyle(.imagery)
+</pre>
+
+<p>
+Or combine both satellite and street map like this:
+</p>
+
+<pre swift>
+Map()
+    .mapStyle(.hybrid)
+</pre>
+
+<p>
+Or you can get both maps along with realistic elevation, creating a 3D map, like this:
+</p>
+
+<pre swift>
+.mapStyle(.hybrid(elevation: .realistic))
+</pre>
+
+<p>
+You can adjust how the user can work with your map, such as whether they can zoom or rotate their position. For example, we could make a map that always remains centered on a particular location, but users can still adjust the rotation and zoom:
+</p>
+
+<pre swift>
+Map(interactionModes: [.rotate, .zoom])
+</pre>
+
+<p>
+Or we could specify no interaction modes, meaning that the map is always exactly fixed:
+</p>
+
+<pre swift>
+Map(interactionModes: [])
+</pre>
+
+<p>
+Those are all the easy customization options, but there are three that take a little more thinking: controlling the position, placing annotations, and handling taps.
+</p>
+
+<p>
+First, you can customize the position of the camera. This can be done as an initial position, where you're setting how the map should start, or as a binding to its current position, which tracks its position over time.
+</p>
+
+<p>
+For example, we could create a constant property storing the location of London, with a span specified as 1 degree by 1 degree:
+</p>
+
+<pre swift>
+let position = MapCameraPosition.region(
+    MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 51.507222, longitude: -0.1275),
+        span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1)
+    )
+)
+</pre>
+
+<p>
+We could then use that for the initial position of our map:
+</p>
+
+<pre swift>
+Map(initialPosition: position)
+</pre>
+
+<p>
+That value is only an <em>initial</em> position. If you want to change the position over time you'll need to mark it as <code>@State</code> then pass it in as a binding.
+</p>
+
+<p>
+So, first make it use <code>@State</code>:
+</p>
+
+<pre swift>
+@State private var position = MapCameraPosition.region(
+    MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 51.507222, longitude: -0.1275),
+        span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1)
+    )
+)
+</pre>
+
+<p>
+Then pass it in as a binding:
+</p>
+
+<p>
+Map(position: $position)
+Now that's it's stored as program state, we can change it by adding some buttons to jump to other locations. For example, we could wrap the map in a <code>VStack</code>, then place this below it:
+</p>
+
+<pre swift>
+HStack(spacing: 50) {
+    Button("Paris") {
+        position = MapCameraPosition.region(
+            MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 48.8566, longitude: 2.3522),
+                span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1)
+            )
+        )
+    }
+
+    Button("Tokyo") {
+        position = MapCameraPosition.region(
+            MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 35.6897, longitude: 139.6922),
+                span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1)
+            )
+        )
+    }
+}
+</pre>
+
+<p>
+Although we're now passing a binding to the map, we can't just read the location as the map moves around. Instead, we have a separate <code>onMapCameraChange()</code> modifier that tells us when the position changes, either immediately or once movement has ended.
+</p>
+
+<p>
+For example, we could write get an update when they have finished dragging the map, then print it out:
+</p>
+
+<pre swift>
+Map(position: $position)
+    .onMapCameraChange { context in
+        print(context.region)
+    }
+</pre>
+<pre><code>
+</code></pre>
+<p>
+Alternatively, you can have it post continuous updates like this:
+</p>
+
+<pre swift>
+Map(position: $position)
+    .onMapCameraChange(frequency: .continuous) { context in
+        print(context.region)
+    }
+</pre>
+
+<p>
+You might think continuous mode is always preferable, but it's not that simple - if you're running a search on where the user has positioned the map, that's the kind of thing you'd want to do only when they have finished moving.
+</p>
+
+<p>
+The second customizable thing I want to look at is placing annotations.
+</p>
+
+<p>
+To do this takes at least three steps depending on your goal: defining a new data type that contains your location, creating an array of those containing <em>all</em> your locations, then adding them as annotations in the map. Whatever new data type you create to store locations, it <em>must</em> conform to the <code>Identifiable</code> protocol so that SwiftUI can identify each map marker uniquely.
+</p>
+
+<p>
+For example, we might start with this kind of <code>Location</code> struct:
+</p>
+
+<pre swift>
+struct Location: Identifiable {
+    let id = UUID()
+    var name: String
+    var coordinate: CLLocationCoordinate2D
+}
+</pre>
+
+<p>
+Now we can go ahead and define an array of locations, wherever we want map annotations to appear:
+</p>
+
+<pre swift>
+let locations = [
+    Location(name: "Buckingham Palace", coordinate: CLLocationCoordinate2D(latitude: 51.501, longitude: -0.141)),
+    Location(name: "Tower of London", coordinate: CLLocationCoordinate2D(latitude: 51.508, longitude: -0.076))
+]
+</pre>
+
+<p>
+Step three is the important part: we can feed that array of locations into the <code>Map</code> view as its content. SwiftUI provides us with a couple of different content types, but a simple one is called <code>Marker</code>: a balloon with a title and latitude/longitude coordinate attached.
+</p>
+
+<p>
+For example, we could place markers at both our locations like so:
+</p>
+
+<pre swift>
+Map {
+    ForEach(locations) { location in
+        Marker(location.name, coordinate: location.coordinate)
+    }
+}
+</pre>
+
+<p>
+When that runs you’ll see two red balloons on the map, and even better you'll see the map adjusts its position and scale so the two markers are visible.
+</p>
+
+<p>
+If you want more control over the way your markers look on the map, use an <code>Annotation</code> instead. This lets you provide a completely custom view to use instead of the standard system marker balloon, and if you prefer you can hide the default title so you can replace it with your own, like this:
+</p>
+
+<pre swift>
+Annotation(location.name, coordinate: location.coordinate) {
+    Text(location.name)
+        .font(.headline)
+        .padding()
+        .background(.blue)
+        .foregroundStyle(.white)
+        .clipShape(.capsule)
+}
+.annotationTitles(.hidden)
+</pre>
+
+<p>
+And finally, you can handle taps on the map using <code>onTapGesture()</code>. This tells us where on the map the user tapped, but it does so in <em>screen coordinates</em> - e.g., 50 points from the top, and 100 points from the left.
+</p>
+
+<p>
+In order to get an actual location on the map, we need a special view called <code>MapReader</code>. When you wrap one of these around your map, you'll be handed a special <code>MapProxy</code> object that is able to convert screen locations to map locations and back the other way.
+</p>
+
+<p>
+Use it like this:
+</p>
+
+<pre swift>
+MapReader { proxy in
+    Map()
+        .onTapGesture { position in
+            if let coordinate = proxy.convert(position, from: .local) {
+                print(coordinate)
+            }
+        }
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 194 - Integrating MapKit with SwiftUI-Integrating MapKit with SwiftUI-Tip"></span><strong id="Tip">Tip</strong>: The <code>.local</code> part means we're converting that position in the map's local coordinate space, meaning that the tap location we're working with is relative to the top-left corner of the map rather than the whole screen or some other coordinate space.
+</p>
+
+
+<p>
 <hr>
 <br>
 </p>
