@@ -31,6 +31,163 @@
 </ul>
 <div id="Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI"><h1 id="Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI" class="header"><a href="#Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI">Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI</a></h1></div>
 
+<p>
+The vast majority of Apple’s devices come with biometric authentication as standard, which means they use fingerprint, facial, and even iris recognition to unlock. This functionality is available to us too, which means we can make sure that sensitive data can only be read when unlocked by a valid user.
+</p>
+
+<p>
+This is another Objective-C API, but it’s only a little bit unpleasant to use with SwiftUI, which is better than we’ve had with some other frameworks we’ve looked at so far.
+</p>
+
+<div id="Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI-FaceID - Setup Key"><h2 id="FaceID - Setup Key" class="header"><a href="#Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI-FaceID - Setup Key">FaceID - Setup Key</a></h2></div>
+
+<p>
+Before we write any code, you need to add a new key to your project options, explaining to the user why you want access to Face ID. For reasons known only to Apple, we pass the Touch ID request reason in code, and the Face ID request reason in project options.
+</p>
+
+<p>
+So, select your current target:
+</p>
+<ul>
+<li>
+Go to the Info tab,
+
+<li>
+Right-click on an existing key (any in the list):
+
+<ul>
+<li>
+Choose Add Row.
+
+<li>
+Or: Click on last row's <code>+</code> icon to create new key.
+
+</ul>
+<li>
+Scroll through the list of keys until you find "<span id="Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI-FaceID - Setup Key-Privacy - Face ID Usage Description"></span><strong id="Privacy - Face ID Usage Description">Privacy - Face ID Usage Description</strong>"
+
+<li>
+and give it the <span id="Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI-FaceID - Setup Key-Value"></span><strong id="Value">Value</strong> (value column):
+
+<ul>
+<li>
+<code>We need to unlock your data</code>
+
+</ul>
+</ul>
+<p>
+Now head back to <code>ContentView.swift</code>, and add this import near the top of the file:
+</p>
+
+<pre swift>
+import LocalAuthentication
+</pre>
+
+<p>
+And with that, we’re all set to write some biometrics code.
+</p>
+
+<p>
+I mentioned earlier this was “only a <em>little</em> bit unpleasant”, and here’s where it comes in: Swift developers use the <code>Error</code> protocol for representing errors that occur at runtime, but Objective-C uses a special class called <code>NSError</code>. We need to be able to pass that into the function and have it changed inside the function rather than returning a new value - although this was the standard in Objective-C, it’s quite an alien way of working in Swift so we need to mark this behavior specially by using <code>&amp;</code>.
+</p>
+
+<p>
+We’re going to write an <code>authenticate()</code> method that isolates all the biometric functionality in a single place. To make that happen requires four steps:
+</p>
+
+<ul>
+<li>
+Create instance of <code>LAContext</code>, which allows us to query biometric status and perform the authentication check.
+
+<li>
+Ask that context whether it’s capable of performing biometric authentication - this is important because iPod touch has neither Touch ID nor Face ID.
+
+<li>
+If biometrics are possible, then we kick off the actual request for authentication, passing in a closure to run when authentication completes.
+
+<li>
+When the user has either been authenticated or not, our completion closure will be called and tell us whether it worked or not, and if not what the error was.
+
+</ul>
+<p>
+Please go ahead and add this method to <code>ContentView</code>:
+</p>
+
+<pre swift>
+func authenticate() {
+    let context = LAContext()
+    var error: NSError?
+
+    // check whether biometric authentication is possible
+    if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+        // it's possible, so go ahead and use it
+        let reason = "We need to unlock your data."
+
+        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+            // authentication has now completed
+            if success {
+                // authenticated successfully
+            } else {
+                // there was a problem
+            }
+        }
+    } else {
+        // no biometrics
+    }
+}
+</pre>
+
+<p>
+That method by itself won’t do anything, because it’s not connected to SwiftUI at all. To fix that we need to add some state we can adjust when authentication is successful, and also an <code>onAppear()</code> modifier to trigger authentication.
+</p>
+
+<p>
+So, first add this property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var isUnlocked = false
+</pre>
+
+<p>
+That simple Boolean will store whether the app is showing its protected data or not, so we’ll flip that to true when authentication succeeds. Replace the <code>// authenticated successfully</code> comment with this:
+</p>
+
+<pre swift>
+isUnlocked = true
+</pre>
+
+<p>
+Finally, we can show the current authentication state and begin the authentication process inside the <code>body</code> property, like this:
+</p>
+
+<pre swift>
+VStack {
+    if isUnlocked {
+        Text("Unlocked")
+    } else {
+        Text("Locked")
+    }
+}
+.onAppear(perform: authenticate)
+</pre>
+
+<p>
+If you run the app there’s a good chance you just see “Locked” and nothing else. This is because the simulator isn’t opted in to biometrics by default, and we didn’t provide any error messages, so it fails silently.
+</p>
+
+<p>
+To take Face ID for a test drive in the simulator, go to the Features menu and choose Face ID &gt; Enrolled, then launch the app again. This time you should see the Face ID prompt appear, and you can trigger successful or failed authentication by going back to the Features menu and choosing Face ID &gt; Matching Face or Non-matching Face.
+</p>
+
+<p>
+All being well you should see the Face ID prompt go away, and underneath it will be the “Unlocked” text view - our app has detected the authentication, and is now open to use.
+</p>
+
+<p>
+<span id="Hacking With Swift - 195 - Using Touch ID and Face ID with SwiftUI-FaceID - Setup Key-Important"></span><strong id="Important">Important</strong>: When working with biometric authentication, you should always look for a backup plan that lets users authenticate without biometrics. This usually means adding a screen that prompts for a passcode then providing that as a fallback if biometrics fail, but this is something you need to build yourself.
+</p>
+
 
 <p>
 <hr>
