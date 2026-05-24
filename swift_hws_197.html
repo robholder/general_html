@@ -31,8 +31,89 @@
 </ul>
 <div id="Hacking With Swift - 197 - Improving our map annotations"><h1 id="Hacking With Swift - 197 - Improving our map annotations" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations">Hacking With Swift - 197 - Improving our map annotations</a></h1></div>
 
+<p>
+Right now we’re using <code>Marker</code> to place locations in our <code>Map</code> view, but SwiftUI lets us place any kind of view on top of our map so we can have complete customizability. So, we’re going to use that to show a custom SwiftUI view containing a custom icon, then take a look at the underlying data type to see what improvements can be made there.
+</p>
 
 <p>
+Thanks to the brilliance of SwiftUI, this takes hardly any code at all - replace your existing <code>Marker</code> code with this:
+</p>
+
+<pre swift>
+Annotation(location.name, coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)) {
+    Image(systemName: "star.circle")
+        .resizable()
+        .foregroundStyle(.red)
+        .frame(width: 44, height: 44)
+        .background(.white)
+        .clipShape(.circle)
+}
+</pre>
+
+<p>
+That really helps our location stand out on the map. However, I want to look beyond just the SwiftUI view: I want to look at the <code>Location</code> struct itself, and apply a few improvements that make it better.
+</p>
+
+<p>
+First, I don’t particularly like having to make a <code>CLLocationCoordinate2D</code> inside our SwiftUI view, and I’d much prefer to move that kind of logic inside our <code>Location</code> struct. So, we can move that into a computed property to clean up our code. First, add an import for <code>MapKit</code> into <code>Location</code>.swift, then add this to Location:
+</p>
+
+<pre swift>
+var coordinate: CLLocationCoordinate2D {
+    CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+}
+</pre>
+
+<p>
+Now our <code>ContentView</code> code is simpler:
+</p>
+
+<pre swift>
+Annotation(location.name, coordinate: location.coordinate) {
+</pre>
+
+<p>
+The second change I want to make is one I encourage everyone to make when building custom data types for use with SwiftUI: add an example! This makes previewing significantly easier, so where possible I would encourage you to add a static <code>example</code> property to your types containing some sample data that can be previewed well.
+</p>
+
+<p>
+So, add this second property to <code>Location</code> now:
+</p>
+
+<pre swift>
+static let example = Location(
+    id: UUID(),
+    name: "Buckingham Palace",
+    description: "Lit by over 40,000 lightbulbs.",
+    latitude: 51.501,
+    longitude: -0.141
+    )
+</pre>
+
+<p>
+<span id="Hacking With Swift - 197 - Improving our map annotations-Tip"></span><strong id="Tip">Tip</strong>: If you wanted, you could wrap the <code>static let example</code> line with <code>#if DEBUG</code> and <code>#endif</code> to avoid it being built into your App Store releases.
+</p>
+
+<p>
+The last change I’d like to make here is to add a custom <code>==</code> function to the struct. We already made <code>Location</code> conform to <code>Equatable</code>, which means we can already compare one location to another using <code>==</code>. Behind the scenes, Swift will write this function for us by comparing every property against every other property, which is rather wasteful - all our locations already have a unique identifier, so if two locations have the same identifier then we can be sure they are the same without also checking the other properties.
+</p>
+
+<p>
+So, we can save a bunch of work by writing our own <code>==</code> function to <code>Location</code>, which compares two identifiers and nothing else:
+</p>
+
+<pre swift>
+static func ==(lhs: Location, rhs: Location) -&gt; Bool {
+    lhs.id == rhs.id
+}
+</pre>
+
+<p>
+I’m a huge fan of making structs conform to <code>Equatable</code> as standard, even if you can’t use an optimized comparison function like above - structs are simple values like strings and integers, and I think we should extend that same status to our own custom structs too.
+</p>
+
+<p>
+With that in place the next step of our project is complete, so please run it now - you should be able to drop a marker and see our custom annotation, but now behind the scenes know that our code is a little bit neater too!
 <hr>
 <br>
 </p>
