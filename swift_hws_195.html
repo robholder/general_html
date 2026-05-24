@@ -279,13 +279,167 @@ struct ContentView: View {
 }
 </pre>
 
+<div id="Ai Insight - Offering PIN Access on FaceID Fail"><h1 id="Ai Insight - Offering PIN Access on FaceID Fail" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail">Ai Insight - Offering PIN Access on FaceID Fail</a></h1></div>
+
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I have this SwiftUI <code>ContentView.swift</code> code (above), and while it asks for <code>FaceID</code> authentication, there is no prevision for a backup (like an 'enter pin' option). Can you suggest how this facility could be incorporated into this code?
+</p>
+
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a very common requirement when working with <code>LocalAuthentication</code>. Currently, you are using the policy <code>.deviceOwnerAuthenticationWithBiometrics</code>. This policy strictly tells iOS: <em>"Use Face ID or Touch ID. If they fail or aren't available, stop right there."</em>
+</p>
+
+<p>
+To automatically get the "Enter Passcode/PIN" backup option provided by iOS, you need to change your authentication policy to <code>.deviceOwnerAuthentication</code>.
+</p>
+
+<p>
+Here is how you can update your code to seamlessly support both biometrics and the device passcode fallback.
+</p>
+
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-The Updated Code"><h3 id="The Updated Code" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-The Updated Code">The Updated Code</a></h3></div>
+
+<pre swift>
+import LocalAuthentication
+import SwiftUI
+
+struct ContentView: View {
+    @State private var isUnlocked = false
+
+    var body: some View {
+        VStack {
+            if isUnlocked {
+                Text("Unlocked")
+            } else {
+                Text("Locked")
+            }
+        }
+        .onAppear(perform: authenticate)
+    }
+    
+    func authenticate() {
+        let context = LAContext()
+        var error: NSError?
+        
+        // 1. Change policy to allow BOTH biometrics and device passcode fallback
+        if context.canEvaluatePolicy(
+            .deviceOwnerAuthentication, 
+            error: &amp;error
+        ) {
+            let reason = "We need to unlock your data"
+            
+            // 2. Evaluate with the same fallback-supported policy
+            context.evaluatePolicy(
+                .deviceOwnerAuthentication, 
+                localizedReason: reason
+            ) { success, authenticationError in
+                
+                // 3. Make sure to update UI on the Main Thread
+                DispatchQueue.main.sync {
+                    if success {
+                        isUnlocked = true
+                    } else {
+                        // The user cancelled, or failed both FaceID and Passcode
+                        if let error = authenticationError as? LAError {
+                            print("Authentication failed: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+        } else {
+            // No biometrics AND no passcode set up on this device at all
+            print("No authentication methods available.")
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?"><h3 id="What Changed Under the Hood?" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?">What Changed Under the Hood?</a></h3></div>
+
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?-1. The Policy Swap"><h4 id="1. The Policy Swap" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?-1. The Policy Swap">1. The Policy Swap</a></h4></div>
+
+<p>
+By switching from <code>.deviceOwnerAuthenticationWithBiometrics</code> to <code>.deviceOwnerAuthentication</code>, you change how iOS behaves when Face ID fails or when the user opts out:
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?-1. The Policy Swap-First Try"></span><strong id="First Try">First Try</strong>: iOS will attempt to use Face ID or Touch ID normally.
+
+<li>
+<span id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?-1. The Policy Swap-The Backup"></span><strong id="The Backup">The Backup</strong>: If Face ID fails (or if the user taps a button on the alert), iOS will automatically replace the alert with the standard system screen asking for the device's lock screen PIN/Passcode.
+
+</ul>
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?-2. Thread Safety (DispatchQueue.main.sync)"><h4 id="2. Thread Safety (DispatchQueue.main.sync)" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?-2. Thread Safety (DispatchQueue.main.sync)">2. Thread Safety (DispatchQueue.main.sync)</a></h4></div>
+
+<p>
+You'll notice I wrapped <code>isUnlocked = true</code> inside <code>DispatchQueue.main.sync</code>.
+</p>
+
+<p>
+<code>LocalAuthentication</code> runs its checks on a background thread. In SwiftUI, whenever you change a <code>@State</code> variable that updates the user interface (like switching text from "Locked" to "Unlocked"), <span id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-What Changed Under the Hood?-2. Thread Safety (DispatchQueue.main.sync)-you must do that work on the Main Thread"></span><strong id="you must do that work on the Main Thread">you must do that work on the Main Thread</strong>. Without this, Xcode might throw a runtime warning or your app's UI might freeze.
+</p>
+
+
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-A Note on Testing in the Simulator"><h3 id="A Note on Testing in the Simulator" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-ANSWER-A Note on Testing in the Simulator">A Note on Testing in the Simulator</a></h3></div>
+
+<p>
+When testing this in the Xcode Simulator:
+</p>
+
+<ul>
+<li>
+Go to the Simulator menu bar and choose <code>Features &gt; Face ID &gt; Enrolled</code> to mock a device with Face ID.
+
+<li>
+Trigger the authentication. If you want to test the passcode fallback, select <code>Features &gt; Face ID &gt; Matching Face</code> (to succeed) or <code>Non-matching Face</code> (to trigger the fallback prompt).
+
+</ul>
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device"><h2 id="What Happens When FaceID Fails - Physical Device" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device">What Happens When FaceID Fails - Physical Device</a></h2></div>
+
+<p>
+When Face ID "fails" (meaning it looks at your face but doesn't recognize you), iOS intentionally <span id="Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device-does not drop you straight into the PIN passcode screen"></span><strong id="does not drop you straight into the PIN passcode screen">does not drop you straight into the PIN passcode screen</strong>. Instead, it gives you a second chance to try again.
+</p>
+
+<div id="Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device-How Face ID Behaves on a Real Device"><h3 id="How Face ID Behaves on a Real Device" class="header"><a href="#Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device-How Face ID Behaves on a Real Device">How Face ID Behaves on a Real Device</a></h3></div>
+
+<p>
+If you run the multi-stage code on your iPhone 14 Pro, the workflow proceeds through these deliberate phases:
+</p>
+
+<ul>
+<li>
+First Failure: You look at the phone, Face ID fails to recognize you, and the little padlock icon shakes. The Face ID prompt stays on screen, displaying a button that says <span id="Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device-How Face ID Behaves on a Real Device-&quot;Try Face ID Again&quot;"></span><strong id="&quot;Try Face ID Again&quot;">"Try Face ID Again"</strong>.
+
+<li>
+Second Failure (or tapping the screen): If it fails a second time, a new button labeled <span id="Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device-How Face ID Behaves on a Real Device-&quot;Use Passcode&quot;"></span><strong id="&quot;Use Passcode&quot;">"Use Passcode"</strong> (the text we customized via <code>localizedFallbackTitle</code>) appears on the prompt.
+
+<li>
+The Trigger: The PIN dialog only appears <span id="Ai Insight - Offering PIN Access on FaceID Fail-What Happens When FaceID Fails - Physical Device-How Face ID Behaves on a Real Device-after you explicitly tap that &quot;Use Passcode&quot; button"></span><strong id="after you explicitly tap that &quot;Use Passcode&quot; button">after you explicitly tap that "Use Passcode" button</strong>.
+
+</ul>
+<p>
+Apple designs it this way because jumping directly to a full-screen passcode view every time Face ID misses a glance would become incredibly intrusive.
+</p>
 
 <p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_196.html">Hacking With Swift - 196 - Adding user locations to a map</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
