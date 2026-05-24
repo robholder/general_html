@@ -206,6 +206,144 @@ I’m a huge fan of making structs conform to <code>Equatable</code> as standard
 
 <p>
 With that in place the next step of our project is complete, so please run it now - you should be able to drop a marker and see our custom annotation, but now behind the scenes know that our code is a little bit neater too!
+</p>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Add Example Pin (Location)-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Add Example Pin (Location)-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Add Example Pin (Location)-In Context-Location.swift"><h4 id="Location.swift" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Add Example Pin (Location)-In Context-Location.swift">Location.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import MapKit
+
+struct Location: Codable, Equatable, Identifiable {
+    let id: UUID
+    var name: String
+    var description: String
+    var latitude: Double
+    var longitude: Double
+    
+    // Computed Property
+    var coordinates: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+    
+    // Return 'equal' if IDs are the same.
+    static func ==(lhs: Location, rhs: Location) -&gt; Bool {
+        lhs.id == rhs.id
+    }
+    
+    #if DEBUG
+    // Example Location
+    static let example = Location(
+        id: UUID(),
+        name: "Buckingham Palace",
+        description: "Lit by over 40,000 lightbulbs.",
+        latitude: 51.501,
+        longitude: -0.141
+    )
+    #endif
+}
+</pre>
+
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+When you wrap code inside <code>#if DEBUG</code> and <code>#endif</code>, that entire block of code is stripped out completely and never compiled into the final application package that gets sent to the App Store.
+</p>
+
+<p>
+Here is a breakdown of what this entails, how it works, and why it is a best practice.
+</p>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What are #if DEBUG and #endif?"><h3 id="What are #if DEBUG and #endif?" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What are #if DEBUG and #endif?">What are #if DEBUG and #endif?</a></h3></div>
+
+<p>
+These are called <span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What are #if DEBUG and #endif?-Compiler Directives"></span><strong id="Compiler Directives">Compiler Directives</strong> (specifically, conditional compilation blocks). They act like an <code>if/else</code> statement, but instead of running while your app is executing on a user's phone, they run <span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What are #if DEBUG and #endif?-while Xcode is building your app"></span><strong id="while Xcode is building your app">while Xcode is building your app</strong> on your Mac.
+</p>
+
+<p>
+Xcode uses a setting called <span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What are #if DEBUG and #endif?-Build Configurations"></span><strong id="Build Configurations">Build Configurations</strong>. By default, every project has two:
+</p>
+
+<ul>
+<li>
+<span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What are #if DEBUG and #endif?-Debug"></span><strong id="Debug">Debug</strong>: Used when you click the Play button (Command + R) to test your app on the Simulator or a plugged-in iPhone.
+
+<li>
+<span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What are #if DEBUG and #endif?-Release"></span><strong id="Release">Release</strong>: Used when you archive your app to submit it to the App Store.
+
+</ul>
+<div id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What it Entails in Your Code"><h3 id="What it Entails in Your Code" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What it Entails in Your Code">What it Entails in Your Code</a></h3></div>
+
+<p>
+In the context of Paul Hudson's tutorial, you are likely creating a mock data structure so you can easily preview your SwiftUI designs in Xcode.
+</p>
+
+<p>
+By wrapping it, your code looks like this:
+</p>
+
+<pre swift>
+struct Location {
+    let id: UUID
+    let name: String
+    
+    // This code only exists when testing on your machine
+    #if DEBUG
+    static let example = Location(id: UUID(), name: "Buckingham Palace")
+    #endif
+}
+</pre>
+
+<p>
+Or:
+</p>
+
+<pre swift>
+#if DEBUG
+static let example = Location(
+    id: UUID(),
+    name: "Buckingham Palace",
+    description: "Lit by over 40,000 lightbulbs.",
+    latitude: 51.501,
+    longitude: -0.141
+    )
+#endif
+</pre>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What it Entails in Your Code-How Xcode processes this during a build:"><h4 id="How Xcode processes this during a build:" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What it Entails in Your Code-How Xcode processes this during a build:">How Xcode processes this during a build:</a></h4></div>
+
+<ul>
+<li>
+<span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What it Entails in Your Code-How Xcode processes this during a build:-When you are testing (Debug Configuration)"></span><strong id="When you are testing (Debug Configuration)">When you are testing (Debug Configuration)</strong>: Xcode sees that <code>DEBUG</code> is true. It compiles the <code>example</code> property normally so you can use <code>Location.example</code> inside your SwiftUI <code>#Preview</code> blocks.
+
+<li>
+<span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What it Entails in Your Code-How Xcode processes this during a build:-When you build for the App Store (Release Configuration)"></span><strong id="When you build for the App Store (Release Configuration)">When you build for the App Store (Release Configuration)</strong>: Xcode sees <code>#if DEBUG</code>, recognizes that <code>DEBUG</code> is false, and <span id="Hacking With Swift - 197 - Improving our map annotations-Ai Insight-What it Entails in Your Code-How Xcode processes this during a build:-completely ignores"></span><strong id="completely ignores">completely ignores</strong> everything down to <code>#endif</code>. As far as the App Store is concerned, that code simply does not exist.
+
+</ul>
+<div id="Hacking With Swift - 197 - Improving our map annotations-Why is this useful?"><h2 id="Why is this useful?" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Why is this useful?">Why is this useful?</a></h2></div>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Why is this useful?-1. Reduces App Size"><h3 id="1. Reduces App Size" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Why is this useful?-1. Reduces App Size">1. Reduces App Size</a></h3></div>
+
+<p>
+Mock data often includes massive arrays of hardcoded strings, dummy text, or sample images meant to mimic a real user's database. Leaving that in your app inflates the file size for your real users unnecessarily.
+</p>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Why is this useful?-2. Enhances App Security"><h3 id="2. Enhances App Security" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Why is this useful?-2. Enhances App Security">2. Enhances App Security</a></h3></div>
+
+<p>
+If you leave testing tools, hardcoded dummy user accounts, or bypass switches in your production code, clever attackers can reverse-engineer your app's binary file and find them. Stripping them out entirely removes that security risk.
+</p>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Why is this useful?-3. Prevents Accidental Use"><h3 id="3. Prevents Accidental Use" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Why is this useful?-3. Prevents Accidental Use">3. Prevents Accidental Use</a></h3></div>
+
+<p>
+If you accidentally try to use <code>Location.example</code> in a real production view, Xcode will throw a compiler error when you try to archive the app, protecting you from accidentally releasing test data to your actual customers.
+</p>
+
+<p>
 <hr>
 <br>
 </p>
