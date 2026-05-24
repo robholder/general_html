@@ -40,19 +40,25 @@ Thanks to the brilliance of SwiftUI, this takes hardly any code at all - replace
 </p>
 
 <pre swift>
-Annotation(location.name, coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)) {
-    Image(systemName: "star.circle")
-        .resizable()
-        .foregroundStyle(.red)
-        .frame(width: 44, height: 44)
-        .background(.white)
-        .clipShape(.circle)
+Annotation(
+    location.name,
+    coordinate: CLLocationCoordinate2D(
+            latitude: location.latitude,
+            longitude: location.longitude)) {
+                Image(systemName: "star.circle")
+                .resizable()
+                .foregroundStyle(.red)
+                .frame(width: 44, height: 44)
+                .background(.white)
+                .clipShape(.circle)
 }
 </pre>
 
 <p>
 That really helps our location stand out on the map. However, I want to look beyond just the SwiftUI view: I want to look at the <code>Location</code> struct itself, and apply a few improvements that make it better.
 </p>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property"><h2 id="Clean Up Code With Computed Property" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property">Clean Up Code With Computed Property</a></h2></div>
 
 <p>
 First, I don’t particularly like having to make a <code>CLLocationCoordinate2D</code> inside our SwiftUI view, and I’d much prefer to move that kind of logic inside our <code>Location</code> struct. So, we can move that into a computed property to clean up our code. First, add an import for <code>MapKit</code> into <code>Location</code>.swift, then add this to Location:
@@ -64,6 +70,28 @@ var coordinate: CLLocationCoordinate2D {
 }
 </pre>
 
+<div id="Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context-Location.swift"><h4 id="Location.swift" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context-Location.swift">Location.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import MapKit
+
+struct Location: Codable, Equatable, Identifiable {
+    let id: UUID
+    var name: String
+    var description: String
+    var latitude: Double
+    var longitude: Double
+    
+    // Computed Property
+    var coordinates: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+</pre>
+
 <p>
 Now our <code>ContentView</code> code is simpler:
 </p>
@@ -71,6 +99,70 @@ Now our <code>ContentView</code> code is simpler:
 <pre swift>
 Annotation(location.name, coordinate: location.coordinate) {
 </pre>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Clean Up Code With Computed Property-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import MapKit
+import SwiftUI
+
+let startPosition = MapCameraPosition.region(
+    MKCoordinateRegion(
+        center: CLLocationCoordinate2D(
+            latitude: 56,
+            longitude: -3),
+        span: MKCoordinateSpan(
+            latitudeDelta: 10,
+            longitudeDelta: 10)
+        )
+    )
+
+struct ContentView: View {
+    @State private var locations = [Location]()
+    
+    var body: some View {
+        MapReader { proxy in
+            Map(initialPosition: startPosition) {
+                ForEach(locations) { location in
+                    // Swap out Marker for Annotation
+                    Annotation(
+                        location.name,
+                        // Use computed property from Location struct
+                        coordinate: location.coordinates) {
+                            // Custom 'pin' icon:
+                            Image(systemName: "star.circle")
+                                .resizable()
+                                .foregroundStyle(.red)
+                                .frame(width: 44, height: 44)
+                                .background(.white)
+                                .clipShape(.circle)
+                            }
+                    }
+            }
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local) {
+                        let newLocation = Location(
+                            id: UUID(),
+                            name: "New location",
+                            description: "",
+                            latitude: coordinate.latitude,
+                            longitude: coordinate.longitude
+                        )
+                        locations.append(newLocation)
+                    }
+                }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 197 - Improving our map annotations-Add Example Pin (Location)"><h2 id="Add Example Pin (Location)" class="header"><a href="#Hacking With Swift - 197 - Improving our map annotations-Add Example Pin (Location)">Add Example Pin (Location)</a></h2></div>
 
 <p>
 The second change I want to make is one I encourage everyone to make when building custom data types for use with SwiftUI: add an example! This makes previewing significantly easier, so where possible I would encourage you to add a static <code>example</code> property to your types containing some sample data that can be previewed well.
@@ -91,7 +183,7 @@ static let example = Location(
 </pre>
 
 <p>
-<span id="Hacking With Swift - 197 - Improving our map annotations-Tip"></span><strong id="Tip">Tip</strong>: If you wanted, you could wrap the <code>static let example</code> line with <code>#if DEBUG</code> and <code>#endif</code> to avoid it being built into your App Store releases.
+<span id="Hacking With Swift - 197 - Improving our map annotations-Add Example Pin (Location)-Tip"></span><strong id="Tip">Tip</strong>: If you wanted, you could wrap the <code>static let example</code> line with <code>#if DEBUG</code> and <code>#endif</code> to avoid it being built into your App Store releases.
 </p>
 
 <p>
