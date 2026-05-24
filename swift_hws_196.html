@@ -32,7 +32,7 @@
 <div id="Hacking With Swift - 196 - Adding user locations to a map"><h1 id="Hacking With Swift - 196 - Adding user locations to a map" class="header"><a href="#Hacking With Swift - 196 - Adding user locations to a map">Hacking With Swift - 196 - Adding user locations to a map</a></h1></div>
 
 <p>
-It’s time to start putting all our techniques into practice, which means building a map view where we can add and interact with annotations. As we progress, I’d like you to reflect a little on how our app benefits from all the standard design affordances that come with iOS, and what means for our users – they already know how to use maps, and how to tap on markers to activate functionality,
+It’s time to start putting all our techniques into practice, which means building a map view where we can add and interact with annotations. As we progress, I’d like you to reflect a little on how our app benefits from all the standard design affordances that come with iOS, and what means for our users - they already know how to use maps, and how to tap on markers to activate functionality,
 </p>
 
 <p>
@@ -53,7 +53,173 @@ Users <em>know</em> how our map works because it works just like every other map
 Today you have three topics to work through, in which we take a really deep dive into integrating <code>MapKit</code> with SwiftUI.
 </p>
 
+<div id="Hacking With Swift - 196 - Adding user locations to a map-Adding user locations to a map"><h2 id="Adding user locations to a map" class="header"><a href="#Hacking With Swift - 196 - Adding user locations to a map-Adding user locations to a map">Adding user locations to a map</a></h2></div>
+
 <p>
+This project is going to be based around a map view, asking users to add places to the map that they want to visit. To do that we need to place a <code>Map</code> so that it takes up our whole view, track its annotations, and also whether or not the user is viewing place details.
+</p>
+
+<p>
+We’re going to start with a full-screen <code>Map</code> view, giving it an initial position showing the UK - you're welcome to change that, of course!
+</p>
+
+<p>
+First, add an extra <code>import</code> line so we get access to <code>MapKit</code>’s data types:
+</p>
+
+<pre swift>
+import MapKit
+</pre>
+
+<p>
+Second, add a property inside <code>ContentView</code> that will store the start position for the map:
+</p>
+
+<pre swift>
+let startPosition = MapCameraPosition.region(
+    MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 56, longitude: -3),
+        span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+    )
+)
+</pre>
+
+<p>
+And now we can fill in the <code>body</code> property
+</p>
+
+<pre swift>
+Map(initialPosition: startPosition)
+</pre>
+
+<p>
+If you run the app now you’ll see you can move the map around freely - if you want to change the map style, now is a good time to try using <code>.mapStyle(.hybrid)</code> or similar, for example.
+</p>
+
+<p>
+All this work by itself isn’t terribly interesting, so the next step is to let users tap on the map to add place marks. Previously we used buttons for handling screen taps, but in this instance we need something different called a tap <em>gesture</em> - a new modifier we can add to any view to trigger code when it's tapped by the user.
+</p>
+
+<p>
+<span id="Hacking With Swift - 196 - Adding user locations to a map-Adding user locations to a map-Important"></span><strong id="Important">Important</strong>: Many SwiftUI developers over-use tap gestures, and it causes all sorts of problems for users who rely on screen readers. If possible, it's always a better idea to use a button or other built-in control rather than adding a tap gesture. In this case we have no choice but to use a tap gesture, because it tells us where on the map the user tapped.
+</p>
+
+<p>
+Go ahead and modify the <code>Map</code> to this:
+</p>
+
+<pre swift>
+Map(initialPosition: startPosition)
+    .onTapGesture { position in
+        print("Tapped at \(position)")
+    }
+</pre>
+
+<p>
+If you run the app again you'll see how the tap gesture doesn't interfere with the default map gestures - you can still pan around, pinch to zoom, and more.
+</p>
+
+<p>
+However, the tap location isn't ideal because it gives us screen coordinates rather than map coordinates. To fix that, we need a <code>MapReader</code> view around our map, so we can convert between the two types of coordinates.
+</p>
+
+<p>
+Change your code to this:
+</p>
+
+<pre swift>
+MapReader { proxy in
+    Map(initialPosition: startPosition)
+        .onTapGesture { position in
+            if let coordinate = proxy.convert(position, from: .local) {
+                print("Tapped at \(coordinate)")
+            }
+        }
+}
+</pre>
+
+<p>
+Where things get <em>interesting</em> is how we place locations on the map. We’ve bound the location of the map to a property in <code>ContentView</code>, but now we need to send in an array of locations we want to show.
+</p>
+
+<p>
+This takes a few steps, starting with a basic definition of the type of locations we’re creating in our app. This needs to conform to a few protocols:
+</p>
+
+<ul>
+<li>
+<code>Identifiable</code>, so we can create many location markers in our map.
+
+<li>
+<code>Codable</code>, so we can load and save map data easily.
+
+<li>
+<code>Equatable</code>, so we can find one particular location in an array of locations.
+
+</ul>
+<p>
+In terms of the data it will contain, we’ll give each location a name and description, plus a latitude and longitude. We’ll also need to add a unique identifier so SwiftUI is happy to create them from dynamic data.
+</p>
+
+<p>
+So, create a new Swift file called Location.swift, giving it this code:
+</p>
+
+<pre swift>
+struct Location: Codable, Equatable, Identifiable {
+    let id: UUID
+    var name: String
+    var description: String
+    var latitude: Double
+    var longitude: Double
+}
+</pre>
+
+<p>
+Storing latitude and longitude separately gives us <code>Codable</code> conformance out of the box, which is always nice to have. We’ll add a little more to that shortly, but it’s enough to get us moving.
+</p>
+
+<p>
+Now that we have a data type where we can store an individual location, we need an array of those to store all the places the user wants to visit. We’ll put this into <code>ContentView</code> for now just we can get moving, but again we’ll return to it shortly to add more.
+</p>
+
+<p>
+So, start by adding this property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var locations = [Location]()
+</pre>
+
+<p>
+Next, we want to add a location to that whenever the <code>onTapGesture()</code> is triggered, so replace its current code with this:
+</p>
+
+<pre swift>
+if let coordinate = proxy.convert(position, from: .local) {
+    let newLocation = Location(id: UUID(), name: "New location", description: "", latitude: coordinate.latitude, longitude: coordinate.longitude)
+    locations.append(newLocation)
+}
+</pre>
+
+<p>
+Finally, update <code>ContentView</code> so we create markers from each of the locations in the array:
+</p>
+
+<pre swift>
+Map(initialPosition: startPosition) {
+    ForEach(locations) { location in
+        Marker(location.name, coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude))
+    }
+}
+</pre>
+
+<p>
+That’s enough map work for now, so go ahead and run your app again - you should be able to move around as much as you need, then add locations wherever you see fit.
+</p>
+
+<p>
+I know it took a fair amount of work to get set up, but at least you can see the basics of the app coming together!
 <hr>
 <br>
 </p>
