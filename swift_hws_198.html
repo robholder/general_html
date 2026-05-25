@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_198</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_197.html">Hacking With Swift - 197 - Improving our map annotations</a>
+
+</ul>
+<div id="Hacking With Swift - 198 - Selecting and editing map annotations"><h1 id="Hacking With Swift - 198 - Selecting and editing map annotations" class="header"><a href="#Hacking With Swift - 198 - Selecting and editing map annotations">Hacking With Swift - 198 - Selecting and editing map annotations</a></h1></div>
+
+<p>
+Users can now drop markers onto our SwiftUI <code>Map</code>, but they can’t do anything with them – they can’t attach their own name and description. Fixing this requires a few steps, and learning a couple of things along the way, but it really brings the whole app together as you’ll see.
+</p>
+
+<p>
+First, we want to show some kind of sheet when the user selects a map annotation, giving them the chance to view or edit details about a location.
+</p>
+
+<p>
+The way we’ve tackled sheets previously has meant creating a Boolean that determines whether the sheet is visible, then sending in some other data for the sheet to present or edit. This time, though, we’re going to take a different approach: we’re going to handle it all with one property.
+</p>
+
+<p>
+So, add this to <code>ContentView</code> now:
+</p>
+
+<pre swift>
+@State private var selectedPlace: Location?
+</pre>
+
+<p>
+What we’re saying is that we might have a selected location, or we might not – and that’s all SwiftUI needs to know in order to present a sheet. As soon as we place a value into that optional we’re telling SwiftUI to show the sheet, and the value will automatically be set back to <code>nil</code> when the sheet is dismissed. Even better, SwiftUI automatically unwraps the optional for us, so when we’re creating the contents of our sheet we can be sure we have a real value to work with.
+</p>
+
+<p>
+To try it out, attach this modifier to your <code>Map</code>:
+</p>
+
+<pre swift>
+.sheet(item: $selectedPlace) { place in
+    Text(place.name)
+}
+</pre>
+
+<p>
+As you can see, it takes an optional binding, but also a function that will receive the <em>unwrapped</em> optional when it has a value set. So, inside there our sheet can refer to <code>place.name</code> directly rather than needing to unwrap the optional or use nil coalescing.
+</p>
+
+<p>
+Now to bring the whole thing to life, we just need to give <code>selectedPlace</code> a value by adding another gesture to our annotations. However, here we need to be careful: although in theory adding another tap gesture here ought to work well, in practice the <code>Map</code> view frequently gets confused between selecting existing annotations and creating a new one, so rather than adding another tap gesture we're going to add a long press gesture instead.
+</p>
+
+<p>
+This does exactly what you'd think: it triggers some code of our choosing when the user presses and holds on a view, which is ideal for selecting a place.
+</p>
+
+<p>
+So, add this directly below the <code>.clipShape(.circle)</code> line:
+</p>
+
+<pre swift>
+.onLongPressGesture {
+    selectedPlace = location
+}
+</pre>
+
+<p>
+That’s it! We can now present a sheet showing the selected location’s name, and it only took a small amount of code. This kind of optional binding isn’t always possible, but I think where it is possible it makes for much more natural code – SwiftUI’s behavior of unwrapping the optional automatically is really helpful.
+</p>
+
+<p>
+Of course, just showing the place’s name isn’t too useful, so the next step here is to create a detail view where used can see and adjust a location’s name and description. This needs to receive a location to edit, allow the user to adjust the two values for that location, then will send back a new location with that tweaked data – it will effectively work like a function, receiving data and sending back something transformed.
+</p>
+
+<p>
+As always we’re going to start small and work our way up, so please create a new SwiftUI view called "EditView" then give it this code:
+</p>
+
+<pre swift>
+struct EditView: View {
+    @Environment(\.dismiss) var dismiss
+    var location: Location
+
+    @State private var name: String
+    @State private var description: String
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Place name", text: $name)
+                    TextField("Description", text: $description)
+                }
+            }
+            .navigationTitle("Place details")
+            .toolbar {
+                Button("Save") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+That code won’t compile, because we have a conundrum: what initial values should we use for the <code>name</code> and <code>description</code> properties? Previously we’ve used <code>@State</code> with initial values, but we can’t do that here – their initial values should come from what location is being passed in, so the user sees the saved data.
+</p>
+
+<p>
+The solution is to create a new initializer that accepts a location, and uses that to create <code>State</code> structs using the location’s data. This uses the same underscore approach we used when creating a SwiftData query inside an initializer, which allows us to create an instance of the property wrapper not the data inside the wrapper.
+</p>
+
+<p>
+So, to solve our problem we need to add this initializer to <code>EditView</code>:
+</p>
+
+<pre swift>
+init(location: Location) {
+    self.location = location
+
+    _name = State(initialValue: location.name)
+    _description = State(initialValue: location.description)
+}
+</pre>
+
+<p>
+You’ll need to modify your preview code to use that initializer:
+</p>
+
+<pre swift>
+#Preview {
+    EditView(location: .example)
+}
+</pre>
+
+<p>
+That makes the code compile, but we have a second problem: when we’re done editing the location, how can we pass the new location data back? We <em>could</em> use something like <code>@Binding</code> to pass in a remote value, but that creates problems with our optional in <code>ContentView</code> – we want <code>EditView</code> to be bound to a real value rather than an optional value, because otherwise it would get confusing.
+</p>
+
+<p>
+We’re going to take simplest solution we can: we’ll require a function to call where we can pass back whatever new location we want. This means any other SwiftUI can send us some data, and get back some new data to process however we want.
+</p>
+
+<p>
+Start by adding this property to <code>EditView</code>:
+</p>
+
+<pre swift>
+var onSave: (Location) -&gt; Void
+</pre>
+
+<p>
+That asks for a function that accepts a single location and returns nothing, which is perfect for our usage. We need to accept that in our initializer, like this:
+</p>
+
+<pre swift>
+init(location: Location, onSave: @escaping (Location) -&gt; Void) {
+    self.location = location
+    self.onSave = onSave
+
+    _name = State(initialValue: location.name)
+    _description = State(initialValue: location.description)
+}
+</pre>
+
+<p>
+That <code>@escaping</code> part is important, and means the function is being stashed away for user later on, rather than being called immediately, and it’s needed here because the <code>onSave</code> function will get called only when the user presses Save.
+</p>
+
+<p>
+Speaking of which, we need to update that Save button to create a new location with the modified details, and send it back with <code>onSave()</code>:
+</p>
+
+<pre swift>
+Button("Save") {
+    var newLocation = location
+    newLocation.name = name
+    newLocation.description = description
+
+    onSave(newLocation)
+    dismiss()
+}
+</pre>
+
+<p>
+By taking a variable copy of the original location, we get access to its existing data – it’s identifier, latitude, and longitude.
+</p>
+
+<p>
+Don’t forget to update your preview code too – just passing in a placeholder closure is fine here:
+</p>
+
+<pre swift>
+EditView(location: .example) { _ in }
+</pre>
+
+<p>
+That completes <code>EditView</code> for now, but there’s still some work to do back in <code>ContentView</code> because we need to present the new UI in our sheet, send in the location that was selected, and also handle updating changes.
+</p>
+
+<p>
+Well, thanks to the way we’ve built our code this only takes a handful of lines of code – place this into the <code>sheet()</code> modifier in <code>ContentView</code>:
+</p>
+
+<pre swift>
+EditView(location: place) { newLocation in
+    if let index = locations.firstIndex(of: place) {
+        locations[index] = newLocation
+    }
+}
+</pre>
+
+<p>
+So, that passes the location into <code>EditView</code>, and also passes in a closure to run when the Save button is pressed. That accepts the new location, then looks up where the <em>current</em> location is and replaces it in the array. This will cause our map to update immediately with the new data.
+</p>
+
+<p>
+Go ahead and give the app a try – see if you spot a problem with our code. Hopefully it’s rather glaring: renaming doesn’t actually work!
+</p>
+
+<p>
+The problem here is that we told SwiftUI that two places were identical if their IDs were identical, and that isn’t true any more – when we update a marker so it has a different name, SwiftUI will compare the old marker and new one, see that their IDs are the same, and therefore not bother to change the map.
+</p>
+
+<p>
+The fix here is to make the <code>id</code> property mutable, like this:
+</p>
+
+<pre swift>
+var id: UUID
+</pre>
+
+<p>
+And now we can adjust that when we create new locations:
+</p>
+
+<pre swift>
+var newLocation = location
+newLocation.id = UUID()
+newLocation.name = name
+newLocation.description = description
+</pre>
+
+<p>
+There is no hard and fast rule for when it’s better to make a wholly new object from scratch, or just copy an existing one and change the bits you want like we’re doing here; I encourage you to experiment and find an approach you like.
+</p>
+
+<p>
+Anyway, with that you can now run your code again. Sure, it doesn’t save any data yet, but you can now add as many locations as you want and give them meaningful names.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
