@@ -80,7 +80,7 @@ Before we’re done with this screen, we need to replace the <code>Text("Page de
 </p>
 
 <p>
-We don’t want this mess to plague our SwiftUI code, so again the best thing to do is make a computed property that returns the description if it exists, or a fixed string otherwise. Add this to the <code>Page</code> struct to finish it off:
+We don’t want this mess to plague our SwiftUI code, so again the best thing to do is make a computed property that returns the description if it exists, or a fixed string otherwise. Add this to the <code>Page</code> struct in <code>Result.swift</code> to finish it off:
 </p>
 
 <pre swift>
@@ -100,6 +100,143 @@ Text(page.description)
 <p>
 That completes <code>EditView</code> - it lets us edit the two properties of our annotation views, it downloads and sorts data from Wikipedia, it shows different UI depending on how the network request is going, and it even carefully looks through the Wikipedia content to decide what can be shown.
 </p>
+
+<div id="Hacking With Swift - 200 - Sorting Wikipedia results-Making Comparable-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 200 - Sorting Wikipedia results-Making Comparable-In Context">In Context</a></h3></div>
+
+<p>
+See other swift files on previous page.
+</p>
+
+<div id="Hacking With Swift - 200 - Sorting Wikipedia results-Making Comparable-In Context-Result.swift"><h4 id="Result.swift" class="header"><a href="#Hacking With Swift - 200 - Sorting Wikipedia results-Making Comparable-In Context-Result.swift">Result.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct Result: Codable {
+    let query: Query
+}
+
+struct Query: Codable {
+    // dictionary with Int as Key, Page as value
+    let pages: [Int: Page]
+}
+
+struct Page: Codable, Comparable {
+    let pageid: Int
+    let title: String
+    // dictionary with String as key and a String array as value (optional also)
+    let terms: [String: [String]]?
+    
+    var description: String {
+        terms?["description"]?.first ?? "No further information"
+    }
+    
+    // The '&lt;' function allows for parameterless '.sorted()' method
+    static func &lt;(lhs: Page, rhs: Page) -&gt; Bool {
+        lhs.title &lt; rhs.title
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 200 - Sorting Wikipedia results-Making Comparable-In Context-EditView.swift"><h4 id="EditView.swift" class="header"><a href="#Hacking With Swift - 200 - Sorting Wikipedia results-Making Comparable-In Context-EditView.swift">EditView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct EditView: View {
+    
+    enum LoadingState {
+        case loading, loaded, failed
+    }
+    
+    @Environment(\.dismiss) var dismiss
+    var location: Location
+    
+    @State private var name: String
+    @State private var description: String
+    var onSave: (Location) -&gt; Void
+   
+    @State private var loadingState = LoadingState.loading
+    @State private var pages = [Page]()
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Place name", text: $name)
+                    TextField("Description", text: $description)
+                }
+                
+                Section("Nearby…") {
+                    switch loadingState {
+                    case .loaded:
+                        ForEach(pages, id: \.pageid) { page in
+                            //Text("**\(page.title)**: *Page description here*")
+                            Text("**\(page.title)**: *\(page.description)*")
+                        }
+                    case .loading:
+                        Text("Loading…")
+                    case .failed:
+                        Text("Please try again later.")
+                    }
+                }
+            }
+            .navigationTitle("Place Details")
+            .toolbar {
+                Button("Save") {
+                    var newLocation = location
+                    newLocation.id = UUID()
+                    newLocation.name = name
+                    newLocation.description = description
+                    
+                    onSave(newLocation)
+                    dismiss()
+                }
+            }
+        }
+        .task {
+            await fetchNearbyPlaces()
+        }
+    }
+    
+    init(location: Location, onSave: @escaping (Location) -&gt; Void) {
+        self.location = location
+        self.onSave = onSave
+        
+        _name = State(initialValue: location.name)
+        _description = State(initialValue: location.description)
+    }
+    func fetchNearbyPlaces() async {
+        let urlString = "https://en.wikipedia.org/w/api.php?ggscoord=\(location.latitude)%7C\(location.longitude)&amp;action=query&amp;prop=coordinates%7Cpageimages%7Cpageterms&amp;colimit=50&amp;piprop=thumbnail&amp;pithumbsize=500&amp;pilimit=50&amp;wbptterms=description&amp;generator=geosearch&amp;ggsradius=10000&amp;ggslimit=50&amp;format=json"
+        
+        guard let url = URL(string: urlString) else {
+            print("Bad URL: \(urlString)")
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            // we got some data back!
+            let items = try JSONDecoder().decode(Result.self, from: data)
+            
+            // success – convert the array values to our pages array
+            //pages = items.query.pages.values.sorted { $0.title &lt; $1.title }
+            pages = items.query.pages.values.sorted()
+            loadingState = .loaded
+        } catch {
+            // if we're still here it means the request failed somehow
+            loadingState = .failed
+        }
+    }
+}
+
+#Preview {
+    EditView(location: .example) { _ in }
+}
+</pre>
+
 
 <p>
 <hr>
