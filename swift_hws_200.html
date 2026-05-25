@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_200</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_199.html">Hacking With Swift - 199 - Downloading data from Wikipedia</a>
+
+</ul>
+<div id="Hacking With Swift - 200 - Sorting Wikipedia results"><h1 id="Hacking With Swift - 200 - Sorting Wikipedia results" class="header"><a href="#Hacking With Swift - 200 - Sorting Wikipedia results">Hacking With Swift - 200 - Sorting Wikipedia results</a></h1></div>
+
+<p>
+Wikipedia’s results come back to us in an order that probably seems random, but it’s actually sorted according to their internal page ID. That doesn’t help us though, which is why we’re sorting results using a custom closure.
+</p>
+
+<p>
+There are lots of times when using a custom sorting function is exactly what you need, but more often than not there is one natural order to your data - maybe showing news stories newest first, or contacts last name first, etc. So, rather than just provide an inline closure to <code>sorted()</code> we are instead going to make our <code>Page</code> struct conform to <code>Comparable</code>. This is actually pretty easy to do, because we already have the sorting code written - it’s just a matter of moving it across to our <code>Page</code> struct.
+</p>
+
+<p>
+So, start by modifying the definition of the <code>Page</code> struct to this:
+</p>
+
+<pre swift>
+struct Page: Codable, Comparable {
+</pre>
+
+<p>
+If you recall, conforming to <code>Comparable</code> has only a single requirement: we must implement a <code>&lt;</code> function that accepts two parameters of the type of our struct, and returns true if the first should be sorted before the second. In this case we can just pass the test directly onto the <code>title</code> strings, so add this method to the <code>Page</code> struct now:
+</p>
+
+<pre swift>
+static func &lt;(lhs: Page, rhs: Page) -&gt; Bool {
+    lhs.title &lt; rhs.title
+}
+</pre>
+
+<p>
+Now that Swift understands how to sort pages, it will automatically gives us a parameter-less <code>sorted()</code> method on page arrays. This means when we set self.pages in <code>fetchNearbyPlaces()</code> we can now add <code>sorted()</code> to the end, like this:
+</p>
+
+<pre swift>
+pages = items.query.pages.values.sorted()
+</pre>
+
+<p>
+Before we’re done with this screen, we need to replace the <code>Text("Page description here")</code> view with something real. Wikipedia’s JSON data does contain a description, but it’s buried: the <code>terms</code> dictionary might not be there, and if it is there it might not have a <code>description</code> key, and if it has a description key it might be an empty array rather than an array with some text inside.
+</p>
+
+<p>
+We don’t want this mess to plague our SwiftUI code, so again the best thing to do is make a computed property that returns the description if it exists, or a fixed string otherwise. Add this to the <code>Page</code> struct to finish it off:
+</p>
+
+<pre swift>
+var description: String {
+    terms?["description"]?.first ?? "No further information"
+}
+</pre>
+
+<p>
+With that done you can replace <code>Text("Page description here")</code> with this:
+</p>
+
+<pre swift>
+Text(page.description)
+</pre>
+
+<p>
+That completes <code>EditView</code> - it lets us edit the two properties of our annotation views, it downloads and sorts data from Wikipedia, it shows different UI depending on how the network request is going, and it even carefully looks through the Wikipedia content to decide what can be shown.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
