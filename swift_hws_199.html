@@ -88,12 +88,14 @@ struct Result: Codable {
 }
 
 struct Query: Codable {
+    // dictionary with Int as Key, Page as value
     let pages: [Int: Page]
 }
 
 struct Page: Codable {
     let pageid: Int
     let title: String
+    // dictionary with String as key and a String array as value (optional also)
     let terms: [String: [String]]?
 }
 </pre>
@@ -105,6 +107,8 @@ We’re going to use that to store data we fetch from Wikipedia, then show it im
 <p>
 This means conditionally showing different UI depending on the current load state, and that means defining an enum that actually stores the current load state otherwise we don’t know what to show.
 </p>
+
+<div id="Hacking With Swift - 199 - Downloading data from Wikipedia-Edit View"><h2 id="Edit View" class="header"><a href="#Hacking With Swift - 199 - Downloading data from Wikipedia-Edit View">Edit View</a></h2></div>
 
 <p>
 Start by adding this nested enum to <code>EditView</code>:
@@ -157,15 +161,80 @@ Section("Nearby…") {
 </pre>
 
 <p>
-<span id="Hacking With Swift - 199 - Downloading data from Wikipedia-Downloading data from Wikipedia-Tip"></span><strong id="Tip">Tip</strong>: Notice how we can use <code>+</code> to add text views together? This lets us create larger text views that mix and match different kinds of formatting. That "Page description here" is just temporary – we’ll replace it soon.
+<span id="Hacking With Swift - 199 - Downloading data from Wikipedia-Edit View-Tip"></span><strong id="Tip">Tip</strong>: Notice how we can use <code>+</code> to add text views together? This lets us create larger text views that mix and match different kinds of formatting. That "Page description here" is just temporary – we’ll replace it soon.
 </p>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<p>
+It turns out Apple deprecated text concatenation (<code>+</code>) in the latest SDK release.
+</p>
+
+<p>
+They are steering everyone toward <span id="Ai Insight-Markdown-powered String Interpolation"></span><strong id="Markdown-powered String Interpolation">Markdown-powered String Interpolation</strong> instead. It accomplishes the exact same line-wrapping behavior, but it does it all inside a single <code>Text</code> initializer, which is significantly faster for SwiftUI to render under the hood.
+</p>
+
+<p>
+Here is how you update your layout to clear that warning completely while retaining your exact formatting:
+</p>
+
+<pre swift>
+ForEach(pages.values.sorted(by: { $0.pageid &lt; $1.pageid })) { page in
+    // Combine everything into a single Text block using Markdown syntax
+    Text("**\(page.title)**: *Page description here*")
+}
+</pre>
+
+<div id="Ai Insight-Full block with adjustments"><h4 id="Full block with adjustments" class="header"><a href="#Ai Insight-Full block with adjustments">Full block with adjustments</a></h4></div>
+
+<pre swift>
+Section("Nearby…") {
+    switch loadingState {
+    case .loaded:
+        ForEach(pages, id: \.pageid) { page in
+            Text("**\(page.title)**: *Page description here*")
+        }
+    case .loading:
+        Text("Loading…")
+    case .failed:
+        Text("Please try again later.")
+    }
+}
+</pre>
+
+<div id="Ai Insight-How the new syntax keeps your formatting"><h3 id="How the new syntax keeps your formatting" class="header"><a href="#Ai Insight-How the new syntax keeps your formatting">How the new syntax keeps your formatting</a></h3></div>
+
+<p>
+SwiftUI natively interprets standard <span id="Ai Insight-How the new syntax keeps your formatting-Markdown formatting syntax"></span><strong id="Markdown formatting syntax">Markdown formatting syntax</strong> inside localized string views. By combining string interpolation <code>\( )</code> with Markdown symbols, you can mix and match styles inline without needing to stitch separate text views together:
+</p>
+
+<ul>
+<li>
+<code>Bold</code>: Placing two asterisks around <code>\(page.title)</code> replicates your original <code>.font(.headline)</code> / bold effect.
+
+<li>
+<code>*Italics*</code>: Placing single asterisks around your description text replaces <code>.italic()</code>.
+
+<li>
+<span id="Ai Insight-How the new syntax keeps your formatting-The Colon"></span><strong id="The Colon">The Colon</strong>: The <code>": "</code> sits naturally in the middle of the string without needing its own separate view.
+
+</ul>
+<div id="Ai Insight-How the new syntax keeps your formatting-Why Apple made this change"><h4 id="Why Apple made this change" class="header"><a href="#Ai Insight-How the new syntax keeps your formatting-Why Apple made this change">Why Apple made this change</a></h4></div>
+
+<p>
+Using the <code>+</code> operator forced SwiftUI to instantiate three entirely separate view objects and structurally glue them together in the layout engine. The new interpolation approach creates just <span id="Ai Insight-How the new syntax keeps your formatting-Why Apple made this change-one"></span><strong id="one">one</strong> view object, which scales much better when you have long lists of data.
+</p>
+
+<div id="Ai Insight-How the new syntax keeps your formatting-Back to the tutorial"><h4 id="Back to the tutorial" class="header"><a href="#Ai Insight-How the new syntax keeps your formatting-Back to the tutorial">Back to the tutorial</a></h4></div>
+
+<div id="Fetch Data"><h1 id="Fetch Data" class="header"><a href="#Fetch Data">Fetch Data</a></h1></div>
 
 <p>
 Now for the part that really brings all this together: we need to fetch some data from Wikipedia, decode it into a <code>Result</code>, assign its <code>pages</code> to our pages property, then set <code>loadingState</code> to <code>.loaded</code>. If the fetch fails, we’ll set <code>loadingState</code> to <code>.failed</code>, and SwiftUI will load the appropriate UI.
 </p>
 
 <p>
-<span id="Hacking With Swift - 199 - Downloading data from Wikipedia-Downloading data from Wikipedia-Warning"></span><strong id="Warning">Warning</strong>: The Wikipedia URL we need to load is really long, so rather than try to type it in you might want to copy and paste from the text or from my GitHub gist:
+<span id="Fetch Data-Warning"></span><strong id="Warning">Warning</strong>: The Wikipedia URL we need to load is really long, so rather than try to type it in you might want to copy and paste from the text or from my GitHub gist:
 </p>
 
 <ul>
