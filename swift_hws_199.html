@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_199</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_197.html">Hacking With Swift - 197 - Improving our map annotations</a>
+
+</ul>
+<div id="Hacking With Swift - 199 - Downloading data from Wikipedia"><h1 id="Hacking With Swift - 199 - Downloading data from Wikipedia" class="header"><a href="#Hacking With Swift - 199 - Downloading data from Wikipedia">Hacking With Swift - 199 - Downloading data from Wikipedia</a></h1></div>
+
+<p>
+It’s taken a while to get to this point, but today you’re going to put in place some app features using remarkably little code - this should be a relatively easy day!
+</p>
+
+<p>
+More specifically, you’ll see how to show different UI based on an enum’s value, how to add custom <code>Comparable</code> conformance to some data we fetched from a network request, and more. There are some important techniques here, but they really do take our app up a notch.
+</p>
+
+<p>
+If you’re finding it hard, you’d do well to remember what William Eardley once said:
+</p>
+
+<p>
+<blockquote>
+"Ambition is the path to success, persistence is the vehicle you arrive in."
+</blockquote>
+</p>
+
+<p>
+You showed ambition for starting this course, and now you’ve made it to day 71 you’re clearly showing persistence too!
+</p>
+
+<p>
+Today you have two topics to work through, in which you’ll make network calls, add Comparable conformance, and more.
+</p>
+
+<div id="Hacking With Swift - 199 - Downloading data from Wikipedia-Downloading data from Wikipedia"><h2 id="Downloading data from Wikipedia" class="header"><a href="#Hacking With Swift - 199 - Downloading data from Wikipedia-Downloading data from Wikipedia">Downloading data from Wikipedia</a></h2></div>
+
+<p>
+To make this whole app more useful, we’re going to modify our <code>EditView</code> screen so that it shows interesting places. After all, if visiting London is on your bucket list, you’d probably want some suggestions for things to see nearby. This might sound hard to do, but actually we can query Wikipedia using GPS coordinates, and it will send back a list of places that are nearby.
+</p>
+
+<p>
+Wikipedia’s API sends back JSON data in a precise format, so we need to do a little work to define <code>Codable</code> structs capable of storing it all. The structure is this:
+</p>
+
+<ul>
+<li>
+The main result contains the result of our query in a key called "query".
+
+<li>
+Inside the query is a "pages" dictionary, with page IDs as the key and the Wikipedia pages themselves as values.
+
+<li>
+Each page has a lot of information, including its coordinates, title, terms, and more.
+
+</ul>
+<p>
+We can represent that using three linked structs, so create a new Swift file called <code>Result.swift</code> and give it this content:
+</p>
+
+<pre swift>
+struct Result: Codable {
+    let query: Query
+}
+
+struct Query: Codable {
+    let pages: [Int: Page]
+}
+
+struct Page: Codable {
+    let pageid: Int
+    let title: String
+    let terms: [String: [String]]?
+}
+</pre>
+
+<p>
+We’re going to use that to store data we fetch from Wikipedia, then show it immediately in our UI. However, we need something to show while the fetch is happening – a text view saying "Loading" or similar ought to do the trick.
+</p>
+
+<p>
+This means conditionally showing different UI depending on the current load state, and that means defining an enum that actually stores the current load state otherwise we don’t know what to show.
+</p>
+
+<p>
+Start by adding this nested enum to <code>EditView</code>:
+</p>
+
+<pre swift>
+enum LoadingState {
+    case loading, loaded, failed
+}
+</pre>
+
+<p>
+Those cover all the states we need to represent our network request.
+</p>
+
+<p>
+Next we’re going to add two properties to <code>EditView</code>: one to represent the loading state, and one to store an array of Wikipedia pages once the fetch has completed. So, add these two now:
+</p>
+
+<pre swift>
+@State private var loadingState = LoadingState.loading
+@State private var pages = [Page]()
+</pre>
+
+<p>
+Before we tackle the network request itself, we have one last easy job to do: adding to our <code>Form</code> a new section to show pages if they have loaded, or status text views otherwise. We can put these <code>if/else</code> if conditions or a <code>switch</code> statement right into the <code>Section</code> and SwiftUI will figure it out.
+</p>
+
+<p>
+So, put this section below the existing one:
+</p>
+
+<pre swift>
+Section("Nearby…") {
+    switch loadingState {
+    case .loaded:
+        ForEach(pages, id: \.pageid) { page in
+            Text(page.title)
+                .font(.headline)
+            + Text(": ") +
+            Text("Page description here")
+                .italic()
+        }
+    case .loading:
+        Text("Loading…")
+    case .failed:
+        Text("Please try again later.")
+    }
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 199 - Downloading data from Wikipedia-Downloading data from Wikipedia-Tip"></span><strong id="Tip">Tip</strong>: Notice how we can use <code>+</code> to add text views together? This lets us create larger text views that mix and match different kinds of formatting. That "Page description here" is just temporary – we’ll replace it soon.
+</p>
+
+<p>
+Now for the part that really brings all this together: we need to fetch some data from Wikipedia, decode it into a <code>Result</code>, assign its <code>pages</code> to our pages property, then set <code>loadingState</code> to <code>.loaded</code>. If the fetch fails, we’ll set <code>loadingState</code> to <code>.failed</code>, and SwiftUI will load the appropriate UI.
+</p>
+
+<p>
+<span id="Hacking With Swift - 199 - Downloading data from Wikipedia-Downloading data from Wikipedia-Warning"></span><strong id="Warning">Warning</strong>: The Wikipedia URL we need to load is really long, so rather than try to type it in you might want to copy and paste from the text or from my GitHub gist:
+</p>
+
+<ul>
+<li>
+<a href="http://bit.ly/swiftwiki.">ExternalLink: GitHub gist</a>
+
+</ul>
+  
+<pre text>
+let urlString = "https://en.wikipedia.org/w/api.php?ggscoord=\(location.latitude)%7C\(location.longitude)&amp;action=query&amp;prop=coordinates%7Cpageimages%7Cpageterms&amp;colimit=50&amp;piprop=thumbnail&amp;pithumbsize=500&amp;pilimit=50&amp;wbptterms=description&amp;generator=geosearch&amp;ggsradius=10000&amp;ggslimit=50&amp;format=json"
+</pre>
+
+
+<p>
+Add this method to <code>EditView</code>:
+</p>
+
+<pre swift>
+func fetchNearbyPlaces() async {
+    let urlString = "https://en.wikipedia.org/w/api.php?ggscoord=\(location.latitude)%7C\(location.longitude)&amp;action=query&amp;prop=coordinates%7Cpageimages%7Cpageterms&amp;colimit=50&amp;piprop=thumbnail&amp;pithumbsize=500&amp;pilimit=50&amp;wbptterms=description&amp;generator=geosearch&amp;ggsradius=10000&amp;ggslimit=50&amp;format=json"
+
+    guard let url = URL(string: urlString) else {
+        print("Bad URL: \(urlString)")
+        return
+    }
+
+    do {
+        let (data, _) = try await URLSession.shared.data(from: url)
+
+        // we got some data back!
+        let items = try JSONDecoder().decode(Result.self, from: data)
+
+        // success – convert the array values to our pages array
+        pages = items.query.pages.values.sorted { $0.title &lt; $1.title }
+        loadingState = .loaded
+    } catch {
+        // if we're still here it means the request failed somehow
+        loadingState = .failed
+    }
+}
+</pre>
+
+<p>
+That request should begin as soon as the view appears, so add this <code>task()</code> modifier after the existing <code>toolbar()</code> modifier:
+</p>
+
+<pre swift>
+.task {
+    await fetchNearbyPlaces()
+}
+</pre>
+
+<p>
+Now go ahead and run the app again – you’ll find that as you drop a pin our <code>EditView</code> screen will slide up and show you all the places nearby. Nice!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
