@@ -38,6 +38,397 @@
 Allow the user to switch map modes, between the standard mode and hybrid.
 
 </ul>
+<div id="Hacking With Swift - 205 - Challenge 1-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-Ai Insight">Ai Insight</a></h2></div>
+
+<div id="Hacking With Swift - 205 - Challenge 1-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I want to add a 'map' options button on my Map() view inside my app.
+</p>
+
+<p>
+My idea is to perhaps have an emum with .imagery, .hybrid etc, and be able to have a popup to choose setting. Is this possible in the SwiftUI app?
+</p>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, this is absolutely possible! In fact, SwiftUI's MapKit framework makes changing map styles incredibly easy using the <code>.mapStyle</code> modifier.
+</p>
+
+<p>
+To build this beautifully, we can create an <code>enum</code> for your map styles, track the active style with a <code>@State</code> variable in your <code>ViewModel</code>, and use a SwiftUI <code>Menu</code> button to display a clean popup list of choices right on top of your map.
+</p>
+
+<p>
+Here is how to implement this step-by-step.
+</p>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-Step 1: Update your ViewModel"><h3 id="Step 1: Update your ViewModel" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-Step 1: Update your ViewModel">Step 1: Update your ViewModel</a></h3></div>
+
+<p>
+Open your <code>ViewModel</code> class and add an <code>enum</code> to represent your style options, along with a variable to hold the currently selected style.
+</p>
+
+<p>
+Using an enum that conforms to <code>String</code> and <code>CaseIterable</code> allows us to easily loop through all choices to build our picker menu automatically.
+</p>
+
+<pre swift>
+@Observable
+class ViewModel {
+    // 1. Define your custom map style choices
+    enum MapStyleOption: String, CaseIterable, Identifiable {
+        case standard = "Standard"
+        case imagery = "Satellite"
+        case hybrid = "Hybrid"
+        
+        var id: String { self.rawValue }
+    }
+    
+    // 2. Track the active style selection
+    var selectedStyle: MapStyleOption = .standard
+    
+    // ... your existing properties (locations, selectedPlace, etc.)
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-Step 2: Create a View Helper (Optional but Clean)"><h3 id="Step 2: Create a View Helper (Optional but Clean)" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-Step 2: Create a View Helper (Optional but Clean)">Step 2: Create a View Helper (Optional but Clean)</a></h3></div>
+
+<p>
+Because your enum holds your custom app settings, we need a quick way to convert your enum cases into actual, native <code>MapKit</code> <code>MapStyle</code> structs.
+</p>
+
+<p>
+Add this helper computed property to your enum inside the <code>ViewModel</code>:
+</p>
+
+<pre swift>
+// Add this right inside your MapStyleOption enum:
+var nativeStyle: MapStyle {
+    switch self {
+    case .standard: return .standard(elevation: .realistic)
+    case .imagery:  return .imagery(elevation: .realistic)
+    case .hybrid:   return .hybrid(elevation: .realistic)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-Step 3: Update ContentView with the Style Modifier and Menu Button"><h3 id="Step 3: Update ContentView with the Style Modifier and Menu Button" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-Step 3: Update ContentView with the Style Modifier and Menu Button">Step 3: Update ContentView with the Style Modifier and Menu Button</a></h3></div>
+
+<p>
+Now, we wrap your map inside a <code>ZStack</code>. This allows us to overlay a gorgeous floating map options button in the top-right corner of the screen, mimicking native Apple apps.
+</p>
+
+<pre swift>
+var body: some View {
+    if viewModel.isUnlocked {
+        ZStack(alignment: .topTrailing) { // ZStack aligns the button to the top-right
+            
+            MapReader { proxy in
+                Map(initialPosition: startPosition) {
+                    ForEach(viewModel.locations) { location in
+                        // ... your existing Annotation code
+                    }
+                }
+                // 1. Apply the active map style directly to the Map view!
+                .mapStyle(viewModel.selectedStyle.nativeStyle)
+                .onTapGesture { position in
+                    // ... your existing tap gesture code
+                }
+                .confirmationDialog("Manage Location", isPresented: $showingOptions, presenting: viewModel.selectedPlace) {
+                    // ... your existing dialog buttons
+                }
+                .sheet(item: $placeToEdit) { place in
+                    // ... your existing sheet code
+                }
+            }
+            
+            // 2. The Floating Map Options Menu Button
+            Menu {
+                Picker("Map Style", selection: $viewModel.selectedStyle) {
+                    ForEach(ViewModel.MapStyleOption.allCases) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+            } label: {
+                Image(systemName: "map.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(.primary)
+                    .background(.white)
+                    .clipShape(.circle)
+                    .shadow(radius: 4)
+                    .padding() // Keeps it safely away from the screen edges
+            }
+        }
+    } else {
+        // ... your existing unlock button layout
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-How It Works"><h3 id="How It Works" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-How It Works">How It Works</a></h3></div>
+
+<ul>
+<li>
+<code>ZStack(alignment: .topTrailing)</code>: This layers your UI elements on top of each other. The map becomes the bottom layer, and the <code>Menu</code> button is pinned perfectly to the upper-right corner.
+
+<li>
+<code>Menu</code> + <code>Picker</code>: SwiftUI automatically renders a specialized context menu when you wrap a standard <code>Picker</code> inside a <code>Menu</code> element. Tapping the map icon brings up a smooth iOS popup menu right beneath the button.
+
+<li>
+<code>.mapStyle()</code>: The moment a user selects an option in the picker menu, <code>viewModel.selectedStyle</code> updates. SwiftUI notices the state change, recalculates <code>.mapStyle()</code>, and the map instantly morphs from flat vector lines into rich satellite photography!
+
+</ul>
+<div id="Hacking With Swift - 205 - Challenge 1-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-QUESTION">QUESTION</a></h2></div>
+
+<p>
+How would that fit into what I already have?
+</p>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Here is exactly how everything fits together into your current codebase.
+</p>
+
+<p>
+We will drop the <code>MapStyleOption</code> enum and its helper into your <code>ViewModel</code> file, wrap your <code>MapReader</code> inside a <code>ZStack</code> in your <code>ContentView</code>, and swap out your fixed <code>.mapStyle(.imagery)</code> for the dynamic layout variable.
+</p>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-1. Updated ContentView-ViewModel.swift"><h3 id="1. Updated ContentView-ViewModel.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-1. Updated ContentView-ViewModel.swift">1. Updated ContentView-ViewModel.swift</a></h3></div>
+
+<p>
+Add the <code>MapStyleOption</code> nested enum, its computed <code>nativeStyle</code> property, and the <code>selectedStyle</code> state tracking variable directly into the top of your class.
+</p>
+
+<pre swift>
+import CoreLocation
+import Foundation
+import LocalAuthentication
+import MapKit
+
+extension ContentView {
+    @Observable
+    class ViewModel {
+        // --- NEW MAP OPTION FEATURES ---
+        enum MapStyleOption: String, CaseIterable, Identifiable {
+            case standard = "Standard"
+            case imagery = "Satellite"
+            case hybrid = "Hybrid"
+            
+            var id: String { self.rawValue }
+            
+            var nativeStyle: MapStyle {
+                switch self {
+                case .standard: return .standard(elevation: .realistic)
+                case .imagery:  return .imagery(elevation: .realistic)
+                case .hybrid:   return .hybrid(elevation: .realistic)
+                }
+            }
+        }
+        
+        var selectedStyle: MapStyleOption = .standard
+        // -------------------------------
+        
+        private(set) var locations: [Location]
+        var selectedPlace: Location?
+        var isUnlocked = false
+        
+        let savePath = URL.documentsDirectory.appending(path: "SavedPlaces")
+        
+        init() {
+            do {
+                let data = try Data(contentsOf: savePath)
+                locations = try JSONDecoder().decode([Location].self, from: data)
+            } catch {
+                locations = []
+            }
+        }
+        
+        func save() {
+            do {
+                let data = try JSONEncoder().encode(locations)
+                try data.write(to: savePath, options: [.atomic, .completeFileProtection])
+            } catch {
+                print("Unable to save data.")
+            }
+        }
+        
+        func addLocation(at point: CLLocationCoordinate2D) {
+            let newLocation = Location(
+                id: UUID(),
+                name: "New location",
+                description: "",
+                latitude: point.latitude,
+                longitude: point.longitude
+            )
+            locations.append(newLocation)
+            save()
+        }
+        
+        func update(location: Location) {
+            guard let selectedPlace else { return }
+            
+            if let index = locations.firstIndex(of: selectedPlace) {
+                locations[index] = location
+                save()
+            }
+        }
+        
+        func authenticate() {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+                let reason = "Please authenticate yourself to unlock your places"
+                
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                    if success {
+                        Task { @MainActor in
+                            self.isUnlocked = true
+                        }
+                    } else {
+                        // error handling
+                    }
+                }
+            } else {
+                // no biometrics
+            }
+        }
+        
+        func delete(location: Location) {
+            if let index = locations.firstIndex(of: location) {
+                locations.remove(at: index)
+                save()
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-2. Updated ContentView.swift"><h3 id="2. Updated ContentView.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-2. Updated ContentView.swift">2. Updated ContentView.swift</a></h3></div>
+
+<p>
+Here, we wrap the <code>MapReader</code> container inside a <code>ZStack(alignment: .topTrailing)</code>. We also changed <code>.mapStyle(.imagery)</code> to dynamically use <code>.mapStyle(viewModel.selectedStyle.nativeStyle)</code>.
+</p>
+
+<pre swift>
+import MapKit
+import SwiftUI
+
+struct ContentView: View {
+    let startPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: 56,
+                longitude: -3),
+            span: MKCoordinateSpan(
+                latitudeDelta: 10,
+                longitudeDelta: 10)
+        )
+    )
+    
+    @State private var viewModel = ViewModel()
+    @State private var showingOptions = false // Controls the dialog menu
+    @State private var placeToEdit: Location? // Controls the final edit sheet
+    
+    var body: some View {
+        // Un-commenting your authentication block so it aligns correctly with the layout
+        if viewModel.isUnlocked {
+            ZStack(alignment: .topTrailing) { // Aligns the floating menu icon to the top right
+                
+                MapReader { proxy in
+                    Map(initialPosition: startPosition) {
+                        ForEach(viewModel.locations) { location in
+                            Annotation(
+                                location.name,
+                                coordinate: location.coordinates) {
+                                    Image(systemName: "star.circle")
+                                        .resizable()
+                                        .foregroundStyle(.red)
+                                        .frame(width: 44, height: 44)
+                                        .background(.white)
+                                        .clipShape(.circle)
+                                        .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                                            .onEnded { _ in
+                                                viewModel.selectedPlace = location
+                                                showingOptions.toggle()
+                                            }
+                                        )
+                                }
+                        }
+                    }
+                    // 1. DYNAMICALLY BIND THE MAP STYLE HERE
+                    .mapStyle(viewModel.selectedStyle.nativeStyle)
+                    .onTapGesture { position in
+                        if let coordinate = proxy.convert(position, from: .local) {
+                            viewModel.addLocation(at: coordinate)
+                        }
+                    }
+                    .confirmationDialog(
+                        "Manage Location",
+                        isPresented: $showingOptions,
+                        titleVisibility: .visible,
+                        presenting: viewModel.selectedPlace
+                    ) { place in
+                        Button("Edit Details") {
+                            placeToEdit = place
+                        }
+                        
+                        Button("Delete Pin", role: .destructive) {
+                            viewModel.delete(location: place)
+                            viewModel.selectedPlace = nil
+                        }
+                        
+                        Button("Cancel", role: .cancel) {
+                            viewModel.selectedPlace = nil
+                        }
+                    } message: { place in
+                        Text("What would you like to do with \(place.name)?")
+                    }
+                    .sheet(item: $placeToEdit) { place in
+                        EditView(location: place) {
+                            viewModel.update(location: $0)
+                            viewModel.selectedPlace = nil
+                        }
+                    }
+                }
+                
+                // 2. THE FLOATING MAP OPTIONS POPUP MENU
+                Menu {
+                    Picker("Map Style", selection: $viewModel.selectedStyle) {
+                        ForEach(ViewModel.MapStyleOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "map.circle.fill")
+                        .font(.system(size: 44)) // Matches normal Apple map button sizes
+                        .foregroundStyle(.primary)
+                        .background(.white)
+                        .clipShape(.circle)
+                        .shadow(radius: 4)
+                        .padding() // Keeps it safely out of the status bar area
+                }
+            }
+        } else {
+            // Displays if the application state is locked
+            Button("Unlock Places", action: viewModel.authenticate)
+                .padding()
+                .background(.blue)
+                .foregroundStyle(.white)
+                .clipShape(.capsule)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
 <p>
 <hr>
 <br>
