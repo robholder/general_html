@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_204</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_203.html">Hacking With Swift - 203 - Bucket List: Wrap up</a>
+
+</ul>
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)"><h1 id="Hacking With Swift - 204 - Challenge 0 (My own)" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)">Hacking With Swift - 204 - Challenge 0 (My own)</a></h1></div>
+
+<p>
+This challenge is my own. The current app is really frustrating, in that short taps and long taps are very flaky. Plus, when you create a location, you can't delete it.
+</p>
+
+<p>
+I want to show a dialog with:
+</p>
+<ul>
+<li>
+Edit
+
+<li>
+Delete
+
+<li>
+Cancel
+
+</ul>
+<p>
+...instead of just the edit page.
+</p>
+
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+Can I have a dialog instead that offers to edit, delete or cancel?
+</p>
+
+<p>
+You absolutely can! In SwiftUI, the perfect UI component for this is a <span id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Confirmation Dialog"></span><strong id="Confirmation Dialog">Confirmation Dialog</strong> (historically called an Action Sheet). It slides up from the bottom of the screen with a clean menu of choices, which is excellent for a "Manage Pin" workflow.
+</p>
+
+<p>
+To build this cleanly, we need to introduce a second piece of state to manage when the dialog appears, add a delete function to your <code>ViewModel</code>, and chain the modifiers together.
+</p>
+
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Step 1: Add a Delete Function to your ViewModel"><h3 id="Step 1: Add a Delete Function to your ViewModel" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Step 1: Add a Delete Function to your ViewModel">Step 1: Add a Delete Function to your ViewModel</a></h3></div>
+
+<p>
+First, open your <code>ViewModel</code> class and add a quick function so it knows how to remove a specific location:
+</p>
+
+<pre swift>
+func delete(location: Location) {
+    if let index = locations.firstIndex(of: location) {
+        locations.remove(at: index)
+        save() // Keep your local storage synchronized!
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Step 2: Add Dialog State to ContentView"><h3 id="Step 2: Add Dialog State to ContentView" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Step 2: Add Dialog State to ContentView">Step 2: Add Dialog State to ContentView</a></h3></div>
+
+<p>
+Right now, your <code>.sheet</code> triggers automatically the second <code>viewModel.selectedPlace</code> is given a value. Because we want a dialog to show up before that edit sheet appears, we'll use a boolean <code>@State</code> variable to control the dialog's visibility, plus a separate storage property for the sheet.
+</p>
+
+<p>
+Update your <code>ContentView</code> state area to look like this:
+</p>
+
+<pre swift>
+@State private var viewModel = ViewModel()
+@State private var showingOptions = false   // Controls the dialog menu
+@State private var placeToEdit: Location?   // Controls the final edit sheet
+</pre>
+
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Step 3: Wire up the Map and Modifiers"><h3 id="Step 3: Wire up the Map and Modifiers" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Step 3: Wire up the Map and Modifiers">Step 3: Wire up the Map and Modifiers</a></h3></div>
+
+<p>
+Now, rewrite your layout sequence. When the user long-presses, we toggle <code>showingOptions = true</code>.
+</p>
+
+<pre swift>
+MapReader { proxy in
+    Map(initialPosition: startPosition) {
+        ForEach(viewModel.locations) { location in
+            Annotation(location.name, coordinate: location.coordinates) {
+                Image(systemName: "star.circle")
+                    .resizable()
+                    .foregroundStyle(.red)
+                    .frame(width: 44, height: 44)
+                    .background(.white)
+                    .clipShape(.circle)
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                        .onEnded { _ in
+                            // 1. Lock in the active location choice
+                            viewModel.selectedPlace = location
+                            // 2. Trigger the options dialog menu
+                            showingOptions = true 
+                        }
+                    )
+            }
+        }
+    }
+    .onTapGesture { position in
+        if let coordinate = proxy.convert(position, from: .local) {
+            viewModel.addLocation(at: coordinate)
+        }
+    }
+    // MARK: - 1. The Options Menu Dialog
+    .confirmationDialog(
+        "Manage Location", 
+        isPresented: $showingOptions, 
+        titleVisibility: .visible, 
+        presenting: viewModel.selectedPlace
+    ) { place in
+        Button("Edit Details") {
+            placeToEdit = place // Hands off to the sheet
+        }
+        
+        Button("Delete Pin", role: .destructive) {
+            viewModel.delete(location: place)
+            viewModel.selectedPlace = nil // Reset state cleanup
+        }
+        
+        Button("Cancel", role: .cancel) {
+            viewModel.selectedPlace = nil // Reset state cleanup
+        }
+    } message: { place in
+        Text("What would you like to do with \(place.name)?")
+    }
+    // MARK: - 2. The Final Edit Sheet
+    .sheet(item: $placeToEdit) { place in
+        EditView(location: place) {
+            viewModel.update(location: $0)
+            viewModel.selectedPlace = nil // Final pipeline cleanup
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Why this works so beautifully"><h3 id="Why this works so beautifully" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Why this works so beautifully">Why this works so beautifully</a></h3></div>
+
+<ul>
+<li>
+<code>role: .destructive</code>: Giving your delete button this role automatically renders the text in red and positions it natively according to iOS design guidelines.
+
+<li>
+<code>role: .cancel</code>: The system styles this cleanly as a bold, separated button at the bottom. Tapping it or anywhere outside the dialog automatically drops the menu without you writing extra dismissal code.
+
+<li>
+<span id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-Why this works so beautifully-The Hand-Off Pipeline"></span><strong id="The Hand-Off Pipeline">The Hand-Off Pipeline</strong>: The dialog uses <code>viewModel.selectedPlace</code>. If you tap "Edit", it copies that value over into <code>placeToEdit</code>. Because the .sheet modifier is listening closely to <code>placeToEdit</code>, the sheet slides up seamlessly the exact moment the options dialog slides away!
+
+</ul>
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-In Context-ContentView-ViewModel.swift"><h4 id="ContentView-ViewModel.swift" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-In Context-ContentView-ViewModel.swift">ContentView-ViewModel.swift</a></h4></div>
+
+<pre swift>
+import CoreLocation
+import Foundation
+import LocalAuthentication
+import MapKit
+
+// Make extension to keep ViewModel easy to call.
+// Just call it within the ContentView in this case.
+extension ContentView {
+    @Observable
+    class ViewModel {
+        // private(set) means other parts of the code can read it, but can't set it
+        private(set) var locations: [Location]
+        var selectedPlace: Location?
+        var isUnlocked = false
+        
+        let savePath = URL.documentsDirectory.appending(path: "SavedPlaces")
+        
+        init() {
+            do {
+                let data = try Data(contentsOf: savePath)
+                locations = try JSONDecoder().decode([Location].self, from: data)
+            } catch {
+                locations = []
+            }
+        }
+        
+        func save() {
+            do {
+                let data = try JSONEncoder().encode(locations)
+                try data.write(to: savePath, options: [.atomic, .completeFileProtection])
+            } catch {
+                print("Unable to save data.")
+            }
+        }
+        func addLocation(at point: CLLocationCoordinate2D) {
+            let newLocation = Location(
+                id: UUID(),
+                name: "New location",
+                description: "",
+                latitude: point.latitude,
+                longitude: point.longitude
+            )
+            locations.append(newLocation)
+            save()
+        }
+        
+        func update(location: Location) {
+            guard let selectedPlace else { return }
+            
+            if let index = locations.firstIndex(of: selectedPlace) {
+                locations[index] = location
+                save()
+            }
+        }
+        
+        func authenticate() {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+                let reason = "Please authenticate yourself to unlock your places"
+                
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                    if success {
+                        // Force the UI update to hop back to the safe main thread
+                        Task { @MainActor in
+                            self.isUnlocked = true
+                        }
+                    } else {
+                        // error handling
+                    }
+                }
+            } else {
+                // no biometrics
+            }
+        }
+        
+        // Challenge zero - option dialog
+        func delete(location: Location) {
+            if let index = locations.firstIndex(of: location) {
+                locations.remove(at: index)
+                save() // Keep your local storage synchronized!
+            }
+        }
+
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 204 - Challenge 0 (My own)-Ai Insight-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import MapKit
+import SwiftUI
+
+struct ContentView: View {
+    let startPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: 56,
+                longitude: -3),
+            span: MKCoordinateSpan(
+                latitudeDelta: 10,
+                longitudeDelta: 10)
+        )
+    )
+    
+    @State private var viewModel = ViewModel()
+    @State private var showingOptions = false // Controls the dialog menu
+    @State private var placeToEdit: Location? // Controls the final edit sheet
+    
+    
+    var body: some View {
+        if viewModel.isUnlocked {
+            MapReader { proxy in
+                Map(initialPosition: startPosition) {
+                    ForEach(viewModel.locations) { location in
+                        Annotation(
+                            location.name,
+                            // Use computed property from Location struct
+                            coordinate: location.coordinates) {
+                                // Custom 'pin' icon:
+                                Image(systemName: "star.circle")
+                                    .resizable()
+                                    .foregroundStyle(.red)
+                                    .frame(width: 44, height: 44)
+                                    .background(.white)
+                                    .clipShape(.circle)
+                                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                                        .onEnded { _ in
+                                            // 1. Lock in the active location choice
+                                            viewModel.selectedPlace = location
+                                            // 2. Trigger the options dialog menu
+                                            showingOptions.toggle()
+                                        }
+                                    )
+                            }
+                    }
+                }
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local) {
+                        // Run the addLocation function in the viewModel
+                        viewModel.addLocation(at: coordinate)
+                    }
+                }
+                // MARK: - 1. The Options Menu Dialog
+                .confirmationDialog(
+                    "Manage Location",
+                    isPresented: $showingOptions,
+                    titleVisibility: .visible,
+                    presenting: viewModel.selectedPlace
+                ) { place in
+                    Button("Edit Details") {
+                        placeToEdit = place // Hands off to the sheet
+                    }
+                    
+                    Button("Delete Pin", role: .destructive) {
+                        viewModel.delete(location: place)
+                        viewModel.selectedPlace = nil // Reset state cleanup
+                    }
+                    
+                    Button("Cancel", role: .cancel) {
+                        viewModel.selectedPlace = nil // Reset state cleanup
+                    }
+                } message: { place in
+                    Text("What would you like to do with \(place.name)?")
+                }
+                // MARK: - 2. The Final Edit Sheet
+                .sheet(item: $placeToEdit) { place in
+                    EditView(location: place) {
+                        viewModel.update(location: $0)
+                        viewModel.selectedPlace = nil // Final pipeline cleanup
+                    }
+                }
+            }
+        } else {
+            Button("Unlock Places", action: viewModel.authenticate)
+                .padding()
+                .background(.blue)
+                .foregroundStyle(.white)
+                .clipShape(.capsule)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+<ul>
+<li>
+<a href="swift_hws_205.html">Hacking With Swift - 205 - Challenge 1</a>
+
+</ul>
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
