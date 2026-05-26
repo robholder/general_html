@@ -31,7 +31,114 @@
 </ul>
 <div id="Hacking With Swift - 202 - Locking our UI behind Face ID"><h1 id="Hacking With Swift - 202 - Locking our UI behind Face ID" class="header"><a href="#Hacking With Swift - 202 - Locking our UI behind Face ID">Hacking With Swift - 202 - Locking our UI behind Face ID</a></h1></div>
 
+<p>
+To finish off our app, we’re going to make one last important change: we’re going to require the user to authenticate themselves using either Touch ID or Face ID in order to see all the places they have marked on the app. After all, this is their private data and we should be respectful of that, and of course it gives me a chance to let you use an important skill in a practical context!
+</p>
 
+<p>
+First we need some new state in our view model that tracks whether the app is unlocked or not. So, start by adding this new property:
+</p>
+
+<pre swift>
+var isUnlocked = false
+</pre>
+
+<p>
+Second, we need to add the Face ID permission request key to our project configuration options, explaining to the user why we want to use Face ID. If you haven’t added this already, go to your target options now, select the Info tab, then right-click on any existing row and add the "Privacy - Face ID Usage Description" key there. You can enter what you like, but “Please authenticate yourself to unlock your places” seems like a good choice.
+</p>
+
+<p>
+Third, we need to add "import LocalAuthentication" to the top of your view model’s file, so we have access to Apple’s authentication framework.
+</p>
+
+<p>
+And now for the hard part. If you recall, the code for biometric authentication was a teensy bit unpleasant because of its Objective-C roots, so it’s always a good idea to get it far away from the neatness of SwiftUI. So, we’re going to write a dedicated <code>authenticate()</code> method that handles all the biometric work:
+</p>
+
+<ul>
+<li>
+Creating an <code>LAContext</code> so we have something that can check and perform biometric authentication.
+
+<li>
+Ask it whether the current device is capable of biometric authentication.
+
+<li>
+If it is, start the request and provide a closure to run when it completes.
+
+<li>
+When the request finishes, check the result.
+
+<li>
+If it was successful, we’ll set <code>isUnlocked</code> to true so we can run our app as normal.
+
+</ul>
+<p>
+Add this method to your view model now:
+</p>
+
+<pre swift>
+func authenticate() {
+    let context = LAContext()
+    var error: NSError?
+
+    if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+        let reason = "Please authenticate yourself to unlock your places."
+
+        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+
+            if success {
+                self.isUnlocked = true
+            } else {
+                // error
+            }
+        }
+    } else {
+        // no biometrics
+    }
+}
+</pre>
+
+<p>
+Remember, the string in our code is used for Touch ID, whereas the string in Info.plist is used for Face ID.
+</p>
+
+<p>
+And now we need to make an adjustment that is in reality very small, but can be hard to visualize if you’re reading this rather than watching the video. Everything inside the <code>body</code> property needs to be indented in by one level, and have this placed before it:
+</p>
+
+<pre swift>
+if viewModel.isUnlocked {
+</pre>
+
+<p>
+Then at the end of the <code>body</code> property add this to close the condition and leave space for an unlock button:
+</p>
+
+<pre swift>
+} else {
+    // button here
+}
+</pre>
+
+<p>
+So now we all we need to do is fill in the <code>// button here</code> comment with an actual button that triggers the <code>authenticate()</code> method. You can design whatever you want, but something like this ought to be enough:
+</p>
+
+<pre swift>
+Button("Unlock Places", action: viewModel.authenticate)
+    .padding()
+    .background(.blue)
+    .foregroundStyle(.white)
+    .clipShape(.capsule)
+</pre>
+
+<p>
+You can now go ahead and run the app again, because our code is almost done. If this is the first time you’ve used Face ID in the simulator you’ll need to go to the Features menu and choose Face ID &gt; Enrolled, but once you relaunch the app you can authenticate using Features &gt; Face ID &gt; Matching Face.
+</p>
+
+<p>
+And with that our code is done, and that’s another app complete – good job!
+</p>
 
 <p>
 <hr>
