@@ -35,8 +35,10 @@
 To finish off our app, we’re going to make one last important change: we’re going to require the user to authenticate themselves using either Touch ID or Face ID in order to see all the places they have marked on the app. After all, this is their private data and we should be respectful of that, and of course it gives me a chance to let you use an important skill in a practical context!
 </p>
 
+<div id="Hacking With Swift - 202 - Locking our UI behind Face ID-Adding Face ID Functionality"><h2 id="Adding Face ID Functionality" class="header"><a href="#Hacking With Swift - 202 - Locking our UI behind Face ID-Adding Face ID Functionality">Adding Face ID Functionality</a></h2></div>
+
 <p>
-First we need some new state in our view model that tracks whether the app is unlocked or not. So, start by adding this new property:
+First we need some new state in our view model (<code>ContentView-ViewModel</code> class) that tracks whether the app is unlocked or not. So, start by adding this new property:
 </p>
 
 <pre swift>
@@ -44,20 +46,48 @@ var isUnlocked = false
 </pre>
 
 <p>
-Second, we need to add the Face ID permission request key to our project configuration options, explaining to the user why we want to use Face ID. If you haven’t added this already, go to your target options now, select the Info tab, then right-click on any existing row and add the "Privacy - Face ID Usage Description" key there. You can enter what you like, but “Please authenticate yourself to unlock your places” seems like a good choice.
+Second, we need to add the Face ID permission request key to our project configuration options, explaining to the user why we want to use Face ID. If you haven’t added this already:
+</p>
+<ul>
+<li>
+Go to your target options:
+
+<ul>
+<li>
+Select topmost item in the file hierarchy
+
+<li>
+Select 'TARGETS'
+
+</ul>
+<li>
+Select the Info tab
+
+<li>
+Right-click on any existing row and add the "Privacy - Face ID Usage Description" key
+
+<li>
+You can enter what you like for the value:
+
+<ul>
+<li>
+"Please authenticate yourself to unlock your places" seems like a good choice.
+
+</ul>
+</ul>
+<p>
+Third, we need to add "import LocalAuthentication" to the top of your view model’s file (<code>ContentView-ViewModel.swift</code>), so we have access to Apple’s authentication framework.
 </p>
 
-<p>
-Third, we need to add "import LocalAuthentication" to the top of your view model’s file, so we have access to Apple’s authentication framework.
-</p>
+<div id="Hacking With Swift - 202 - Locking our UI behind Face ID-Authenticate Method"><h2 id="Authenticate Method" class="header"><a href="#Hacking With Swift - 202 - Locking our UI behind Face ID-Authenticate Method">Authenticate Method</a></h2></div>
 
 <p>
-And now for the hard part. If you recall, the code for biometric authentication was a teensy bit unpleasant because of its Objective-C roots, so it’s always a good idea to get it far away from the neatness of SwiftUI. So, we’re going to write a dedicated <code>authenticate()</code> method that handles all the biometric work:
+And now for the hard part. If you recall, the code for biometric authentication was a bit unpleasant because of its Objective-C roots, so it’s always a good idea to get it far away from the neatness of SwiftUI. So, we’re going to write a dedicated <code>authenticate()</code> method that handles all the biometric work:
 </p>
 
 <ul>
 <li>
-Creating an <code>LAContext</code> so we have something that can check and perform biometric authentication.
+Create an <code>LAContext</code> so we have something that can check and perform biometric authentication.
 
 <li>
 Ask it whether the current device is capable of biometric authentication.
@@ -102,6 +132,35 @@ func authenticate() {
 Remember, the string in our code is used for Touch ID, whereas the string in Info.plist is used for Face ID.
 </p>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-One Tiny Code Optimization (Thread Safety)"><h2 id="One Tiny Code Optimization (Thread Safety)" class="header"><a href="#Ai Insight-One Tiny Code Optimization (Thread Safety)">One Tiny Code Optimization (Thread Safety)</a></h2></div>
+
+<p>
+While your current biometrics logic works, <code>LocalAuthentication</code> runs its checks on a background thread. When the scan succeeds, changing a view property like <code>self.isUnlocked = true</code> forces a UI refresh. In SwiftUI, <span id="Ai Insight-One Tiny Code Optimization (Thread Safety)-UI updates must always happen on the Main Thread"></span><strong id="UI updates must always happen on the Main Thread">UI updates must always happen on the Main Thread</strong>.
+</p>
+
+<p>
+To ensure your app never behaves weirdly or stutters during the unlock transition, wrap your success state change in a <code>@MainActor</code> block inside your <code>ViewModel</code>:
+</p>
+
+<pre swift>
+context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+    if success {
+        // Force the UI update to hop back to the safe main thread
+        Task { @MainActor in
+            self.isUnlocked = true
+        }
+    } else {
+        // error handling
+    }
+}
+</pre>
+
+<div id="Ai Insight-One Tiny Code Optimization (Thread Safety)-Back to tutorial"><h4 id="Back to tutorial" class="header"><a href="#Ai Insight-One Tiny Code Optimization (Thread Safety)-Back to tutorial">Back to tutorial</a></h4></div>
+
+<div id="Ai Insight-Embed ContentView Body In Conditional"><h2 id="Embed ContentView Body In Conditional" class="header"><a href="#Ai Insight-Embed ContentView Body In Conditional">Embed ContentView Body In Conditional</a></h2></div>
+
 <p>
 And now we need to make an adjustment that is in reality very small, but can be hard to visualize if you’re reading this rather than watching the video. Everything inside the <code>body</code> property needs to be indented in by one level, and have this placed before it:
 </p>
@@ -136,9 +195,181 @@ Button("Unlock Places", action: viewModel.authenticate)
 You can now go ahead and run the app again, because our code is almost done. If this is the first time you’ve used Face ID in the simulator you’ll need to go to the Features menu and choose Face ID &gt; Enrolled, but once you relaunch the app you can authenticate using Features &gt; Face ID &gt; Matching Face.
 </p>
 
+<table>
+<tr>
+<td>
+Note: I had to switch 'Enrolled' on and off multiple times before Face ID would register on the simulator.
+</td>
+</tr>
+</table>
+
 <p>
 And with that our code is done, and that’s another app complete – good job!
 </p>
+
+<div id="Ai Insight-Embed ContentView Body In Conditional-In Context"><h3 id="In Context" class="header"><a href="#Ai Insight-Embed ContentView Body In Conditional-In Context">In Context</a></h3></div>
+
+<p>
+See previous pages for other swift files, but these were updated in this lesson:
+</p>
+
+<div id="Ai Insight-Embed ContentView Body In Conditional-In Context-ContentView-ViewModel.swift"><h4 id="ContentView-ViewModel.swift" class="header"><a href="#Ai Insight-Embed ContentView Body In Conditional-In Context-ContentView-ViewModel.swift">ContentView-ViewModel.swift</a></h4></div>
+
+<pre swift>
+import CoreLocation
+import Foundation
+import LocalAuthentication
+import MapKit
+
+// Make extension to keep ViewModel easy to call.
+// Just call it within the ContentView in this case.
+extension ContentView {
+    @Observable
+    class ViewModel {
+        // private(set) means other parts of the code can read it, but can't set it
+        private(set) var locations: [Location]
+        var selectedPlace: Location?
+        var isUnlocked = false
+        
+        let savePath = URL.documentsDirectory.appending(path: "SavedPlaces")
+        
+        init() {
+            do {
+                let data = try Data(contentsOf: savePath)
+                locations = try JSONDecoder().decode([Location].self, from: data)
+            } catch {
+                locations = []
+            }
+        }
+        
+        func save() {
+            do {
+                let data = try JSONEncoder().encode(locations)
+                try data.write(to: savePath, options: [.atomic, .completeFileProtection])
+            } catch {
+                print("Unable to save data.")
+            }
+        }
+        func addLocation(at point: CLLocationCoordinate2D) {
+            let newLocation = Location(
+                id: UUID(),
+                name: "New location",
+                description: "",
+                latitude: point.latitude,
+                longitude: point.longitude
+            )
+            locations.append(newLocation)
+            save()
+        }
+        
+        func update(location: Location) {
+            guard let selectedPlace else { return }
+            
+            if let index = locations.firstIndex(of: selectedPlace) {
+                locations[index] = location
+                save()
+            }
+        }
+        
+        func authenticate() {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+                let reason = "Please authenticate yourself to unlock your places"
+                
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                    if success {
+                        // Force the UI update to hop back to the safe main thread
+                        Task { @MainActor in
+                            self.isUnlocked = true
+                        }
+                    } else {
+                        // error handling
+                    }
+                }
+            } else {
+                // no biometrics
+            }
+        }
+
+    }
+}
+</pre>
+
+<div id="Ai Insight-Embed ContentView Body In Conditional-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Ai Insight-Embed ContentView Body In Conditional-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import MapKit
+import SwiftUI
+
+struct ContentView: View {
+    let startPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: 56,
+                longitude: -3),
+            span: MKCoordinateSpan(
+                latitudeDelta: 10,
+                longitudeDelta: 10)
+        )
+    )
+    
+    @State private var viewModel = ViewModel()
+    
+    
+    var body: some View {
+        if viewModel.isUnlocked {
+            MapReader { proxy in
+                Map(initialPosition: startPosition) {
+                    ForEach(viewModel.locations) { location in
+                        Annotation(
+                            location.name,
+                            // Use computed property from Location struct
+                            coordinate: location.coordinates) {
+                                // Custom 'pin' icon:
+                                Image(systemName: "star.circle")
+                                    .resizable()
+                                    .foregroundStyle(.red)
+                                    .frame(width: 44, height: 44)
+                                    .background(.white)
+                                    .clipShape(.circle)
+                                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                                        .onEnded { _ in
+                                            // Pass location data to the viewModel
+                                            viewModel.selectedPlace = location }
+                                    )
+                            }
+                    }
+                }
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local) {
+                        // Run the addLocation function in the viewModel
+                        viewModel.addLocation(at: coordinate)
+                    }
+                }
+                .sheet(item: $viewModel.selectedPlace) { place in
+                    EditView(location: place) {
+                        // Run the update function in the viewModel
+                        viewModel.update(location: $0)
+                    }
+                }
+            }
+        } else {
+            Button("Unlock Places", action: viewModel.authenticate)
+                .padding()
+                .background(.blue)
+                .foregroundStyle(.white)
+                .clipShape(.capsule)
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 
 <p>
 <hr>
