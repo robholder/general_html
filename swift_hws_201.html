@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_201</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_200.html">Hacking With Swift - 200 - Sorting Wikipedia results</a>
+
+</ul>
+<div id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project"><h1 id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project" class="header"><a href="#Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project">Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project</a></h1></div>
+
+<p>
+Today is the last day of coding for this project, and I'm sure you're looking forward to the challenges and review tomorrow - it should make a nice change from such a long tutorial.
+</p>
+
+<p>
+First, though, we need to cover off two tricky topics, one of which will really challenge you because we'll remodel our code to use the MVVM design pattern. As you'll see, this helps separate logic from layout in our projects, but it takes a bit of thinking too - not least because you need to understand the concept of the main actor.
+</p>
+
+<p>
+While you're working through today, chances are you're really starting to feel the difficulty curve ramp up, because our projects are growing and size and complexity. I want to take this opportunity to remind you of a few things:
+</p>
+
+<ul>
+<li>
+You're not alone; everyone is having to go through this same learning curve.
+
+<li>
+It's a marathon, not a sprint; take your time and it will come.
+
+<li>
+It's OK to take a break and come at a topic again later; having fresh eyes will help.
+
+<li>
+There is no learning without struggle; if you're fighting to learn something, it will stick way better at the end.
+
+</ul>
+<p>
+There's a quote widely attributed to Confucius that you would do well to remember:
+</p>
+
+<p>
+<blockquote>
+"It doesn't matter how slowly you go, as long as you don't stop."
+</blockquote>
+</p>
+
+<p>
+Today you have two topics to work through, in which you'll learn how to:
+</p>
+<ul>
+<li>
+write data to disk securely, and
+
+<li>
+how to enable biometric authentication.
+
+</ul>
+<div id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Introducing MVVM into your SwiftUI project"><h2 id="Introducing MVVM into your SwiftUI project" class="header"><a href="#Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Introducing MVVM into your SwiftUI project">Introducing MVVM into your SwiftUI project</a></h2></div>
+
+<p>
+So far I've introduced you to a range of concepts across Swift and SwiftUI, and I've also dropped a few tips on ways to organize your code better. Well, here I want to explore that latter part a bit further: we're going to look at what is commonly called a <em>software architecture</em>, or the more grandiose name an <em>architectural design pattern</em> - really it's just a particular way of structuring your code.
+</p>
+
+<div id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Model View View-Model"><h2 id="Model View View-Model" class="header"><a href="#Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Model View View-Model">Model View View-Model</a></h2></div>
+
+<p>
+The pattern we're going to look at is called <span id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Model View View-Model-MVVM"></span><strong id="MVVM">MVVM</strong>, which is an acronym standing for
+</p>
+<ul>
+<li>
+Model View View-Model.
+
+</ul>
+<p>
+This is a terrifically bad name, and thoroughly confuses people, but I'm afraid we're rather stuck with it at this point. There is no single definition of what is MVVM, and you'll find all sorts of people arguing about it online, but that's okay - here we're going to keep it simple, and use MVVM as a way of getting some of our program state and logic out of our view structs.
+</p>
+
+<p>
+We are, in effect, separating logic from layout.
+</p>
+
+<p>
+We'll explore that definition as we go, but for now let's start with the big stuff:
+</p>
+<ul>
+<li>
+Make a new Swift file called <code>ContentView-ViewModel.swift</code>, then
+
+<li>
+give it an extra import for <code>MapKit</code>.
+
+</ul>
+<p>
+We're going to use this to create a new class that manages our data, and manipulates it on behalf of the <code>ContentView</code> struct so that our view doesn't really care how the underlying data system works.
+</p>
+
+<p>
+We're going to start with two trivial things, then build our way up from there.
+</p>
+
+<p>
+First, inside the new file, create a new class that uses the <code>Observable</code> macro, so we're able to report changes back to any SwiftUI view that's watching:
+</p>
+
+<pre swift>
+@Observable
+class ViewModel {
+}
+</pre>
+
+<p>
+Second, I want you to place that new class inside an extension on <code>ContentView</code>, like this:
+</p>
+
+<pre swift>
+extension ContentView {
+    @Observable
+    class ViewModel {
+    }
+}
+</pre>
+
+<p>
+Now we're saying this isn't just <em>any</em> view model, it's the view model for <code>ContentView</code>. Later on it will be your job to add a second view model to handle <code>EditView</code>, so you can try seeing how the concepts map elsewhere.
+</p>
+
+<p>
+<span id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Model View View-Model-Tip"></span><strong id="Tip">Tip</strong>: I get lots of questions about why I place my view models into view extensions, so I'd like to take a moment to explain why. This is a small app, but think about how this would look when you have 10 views, or 50 views, or even 500 views. If you use extensions like this, the view model for your current view is always just called <code>ViewModel</code>, and not <code>EditMapLocationViewModel</code> or similar - it's much shorter, and avoids cluttering up your code with lots of different class names!
+</p>
+
+<p>
+Now that we have our class in place, we get to choose which pieces of state from our view should be moved into the view model. Some people will tell you to move all of it, others will be more selective, and that's okay - again, there is no single definition of what MVVM looks like, so I'm going to provide you with the tools and knowledge to experiment yourself.
+</p>
+
+<p>
+Let's start with the easy stuff: move both <code>@State</code> properties in <code>ContentView</code> over to its view model, removing the <code>@State private</code> components because they aren't needed any more:
+</p>
+
+<pre swift>
+extension ContentView {
+    @Observable
+    class ViewModel {
+        var locations = [Location]()
+        var selectedPlace: Location?
+    }
+}
+</pre>
+
+<p>
+And now we can replace all those properties in <code>ContentView</code> with a single one:
+</p>
+
+<pre swift>
+@State private var viewModel = ViewModel()
+</pre>
+
+<p>
+<span id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Model View View-Model-Tip"></span><strong id="Tip">Tip</strong>: This is a good example of why placing view models inside extensions is helpful - we just say <code>ViewModel</code> and we automatically get the correct view model type for the current view.
+</p>
+
+<p>
+That will of course break a lot of code, but the fixes are easy - just add <code>viewModel</code> in various places. So, <code>locations</code> becomes <code>＄viewModel.locations</code>, and <code>selectedPlace</code> becomes <code>＄viewModel.selectedPlace</code>.
+</p>
+
+<p>
+Once you've added that everywhere your code will compile again, but you might wonder how this has helped - haven't we just moved our code from one place to another? Well, yes, but there is an important distinction that will become clearer as your skills grow: having all this functionality in a separate class makes it much easier to write tests for your code.
+</p>
+
+<p>
+Views work best when they handle presentation of data, meaning that <em>manipulation</em> of data is a great candidate for code to move into a view model. With that in mind, if you have a look through your <code>ContentView</code> code you might notice two places our view does more work than it ought to: adding a new location and updating an existing location, both of which root around inside the internal data of our view model.
+</p>
+
+<p>
+<em>Reading</em> data from a view model's properties is usually fine, but <em>writing</em> it isn't because the whole point of this exercise is to separate logic from layout. You can find these two places immediately if we clamp down on writing view model data - modify the <code>locations</code> property in your view model to this:
+</p>
+
+<pre swift>
+private(set) var locations = [Location]()
+</pre>
+
+<p>
+Now we've said that reading locations is fine, but only the class itself can <em>write</em> locations. Immediately Xcode will point out the two places where we need to get code out of the view: adding a new location, and updating an existing one.
+</p>
+
+<p>
+So, we can start by adding a new method to the view model to handle adding a new location. First, add an import for <code>CoreLocation</code> to the top, then add this method to the class:
+</p>
+
+<pre swift>
+func addLocation(at point: CLLocationCoordinate2D) {
+    let newLocation = Location(id: UUID(), name: "New location", description: "", latitude: point.latitude, longitude: point.longitude)
+    locations.append(newLocation)
+}
+</pre>
+
+<p>
+That can then be used from the tap gesture in <code>ContentView</code>:
+</p>
+
+<pre swift>
+.onTapGesture { position in
+    if let coordinate = proxy.convert(position, from: .local) {
+        viewModel.addLocation(at: coordinate)
+    }
+}
+</pre>
+
+<p>
+The second problematic place is updating a location, so I want you to cut that whole <code>if let index</code> check to your clipboard, then paste it into a new method in the view model, adding in a check that we have a selected place to work with:
+</p>
+
+<pre swift>
+func update(location: Location) {
+    guard let selectedPlace else { return }
+
+    if let index = locations.firstIndex(of: selectedPlace) {
+        locations[index] = location
+    }
+}
+</pre>
+
+<p>
+You'll need to adjust the code just a little, including making sure to remove the two <code>viewModel</code> references from there - they aren't needed any more.
+</p>
+
+<p>
+Now the <code>EditView</code> sheet in <code>ContentView</code> can just pass its data onto the view model:
+</p>
+
+<pre swift>
+EditView(location: place) {
+    viewModel.update(location: $0)
+}
+</pre>
+
+<p>
+At this point the view model has taken over all aspects of <code>ContentView</code>, which is great: the view is there to present data, and the view model is there to <em>manage</em> data. The split isn't always quite as clean as that, despite what you might hear elsewhere online, and again that's okay - once you move into more advanced projects you'll find that “one size fits all” approaches usually fit nobody, so we just do our best with what we have.
+</p>
+
+<p>
+Anyway, in this case now that we have our view model all set up, we can upgrade it to support loading and saving of data. This will look in the documents directory for a particular file, then use either <code>JSONEncoder</code> or <code>JSONDecoder</code> to convert it ready for use.
+</p>
+
+<p>
+Previously I showed you how to locate your app's documents directory and create filenames inside there, but I <code>don't</code> want to do that when both loading and saving files because it means if we ever change our save location we need to remember to update both places.
+</p>
+
+<p>
+So, a better idea is to add a new property to our view model to store the location we're saving to:
+</p>
+
+<pre swift>
+let savePath = URL.documentsDirectory.appending(path: "SavedPlaces")
+</pre>
+
+<p>
+And with that in place we can create a new initializer and a new <code>save()</code> method that makes sure our data is saved automatically. Start by adding this to the view model:
+</p>
+
+<pre swift>
+init() {
+    do {
+        let data = try Data(contentsOf: savePath)
+        locations = try JSONDecoder().decode([Location].self, from: data)
+    } catch {
+        locations = []
+    }
+}
+</pre>
+
+<p>
+As for saving, previously I showed you how to write a string to disk, but the <code>Data</code> version is even better because it lets us do something quite amazing in just one line of code: we can ask iOS to ensure the file is written with encryption so that it can only be read once the user has unlocked their device. This is in <em>addition</em> to requesting atomic writes - iOS does almost all the work for us.
+</p>
+
+<p>
+Add this method to the view model now:
+</p>
+
+<pre swift>
+func save() {
+    do {
+        let data = try JSONEncoder().encode(locations)
+        try data.write(to: savePath, options: [.atomic, .completeFileProtection])
+    } catch {
+        print("Unable to save data.")
+    }
+}
+</pre>
+
+<p>
+Yes, all it takes to ensure that the file is stored with strong encryption is to add <code>.completeFileProtection</code> to the data writing options.
+</p>
+
+<p>
+Using this approach we can write any amount of data in any number of files - it's much more flexible than <code>UserDefaults</code>, and also allows us to load and save data as needed rather than immediately when the app launches as with <code>UserDefaults</code>.
+</p>
+
+<p>
+Before we're done with this step, we need to make a handful of small changes to our view model so that uses the code we just wrote.
+</p>
+
+<p>
+First, the <code>locations</code> array no longer needs to be initialized to an empty array, because that's handled by the initializer. Change it to this:
+</p>
+
+<pre swift>
+private(set) var locations: [Location]
+</pre>
+
+<p>
+And second, we need to call the <code>save()</code> method after adding a new location or after updating an existing one, so add <code>save()</code> to the end of both those methods.
+</p>
+
+<p>
+Go ahead and run the app now, and you should find that you can add items freely, then relaunch the app to see them restored just as they were.
+</p>
+
+<p>
+That took quite a bit of code in total, but the end result is that we have loading and saving done really well:
+</p>
+
+<ul>
+<li>
+All the logic is handled outside the view, so later on when you learn to write tests you'll find the view model is much easier to work with.
+
+<li>
+When we write data we're making iOS encrypt it so the file can't be read or written until the user unlocks their device.
+
+<li>
+The load and save process is almost transparent - our view has no idea it's even happening.
+
+</ul>
+<p>
+Sometimes people ask me why I didn't introduce MVVM earlier in the course, and there are two primary answers:
+</p>
+
+<ul>
+<li>
+It works really badly with SwiftData, at least right now. This might improve in the future, but right now using SwiftData is basically impossible with MVVM.
+
+<li>
+There are lots of ways of structuring projects, with MVVM being just one of many. Spend some time experimenting rather than locking yourself into the first idea that comes along.
+
+</ul>
+<p>
+Of course, our app isn't truly secure yet: we've ensured our data file is saved out using encryption so that it can only be read once the device has been unlocked, but there's nothing stopping someone else from reading the data afterwards.
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
