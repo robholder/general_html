@@ -305,7 +305,7 @@ At this point the view model has taken over all aspects of <code>ContentView</co
 <div id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data"><h2 id="Save Data" class="header"><a href="#Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data">Save Data</a></h2></div>
 
 <p>
-Anyway, in this case now that we have our view model all set up, we can upgrade it to support loading and saving of data. This will look in the documents directory for a particular file, then use either <code>JSONEncoder</code> or <code>JSONDecoder</code> to convert it ready for use.
+Now that the data model is set up, we can build the 'save data' feature. This will look in the documents directory for a particular file, then use either <code>JSONEncoder</code> or <code>JSONDecoder</code> to convert it ready for use.
 </p>
 
 <p>
@@ -313,7 +313,7 @@ Previously I showed you how to locate your app's documents directory and create 
 </p>
 
 <p>
-So, a better idea is to add a new property to our view model to store the location we're saving to:
+So, a better idea is to add a new property to our view model to store the location we're saving to. Add this to the <code>ViewModel</code> extension in <code>ContentView-ViewModel.swift</code>:
 </p>
 
 <pre swift>
@@ -411,6 +411,140 @@ There are lots of ways of structuring projects, with MVVM being just one of many
 </ul>
 <p>
 Of course, our app isn't truly secure yet: we've ensured our data file is saved out using encryption so that it can only be read once the device has been unlocked, but there's nothing stopping someone else from reading the data afterwards.
+</p>
+
+<div id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data-In Context">In Context</a></h3></div>
+
+<p>
+These two files changed in this lesson:
+</p>
+
+<div id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data-In Context-ContentView-ViewModel.swift"><h4 id="ContentView-ViewModel.swift" class="header"><a href="#Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data-In Context-ContentView-ViewModel.swift">ContentView-ViewModel.swift</a></h4></div>
+
+<pre swift>
+import CoreLocation
+import Foundation
+import MapKit
+
+// Make extension to keep ViewModel easy to call.
+// Just call it within the ContentView in this case.
+extension ContentView {
+    @Observable
+    class ViewModel {
+        // private(set) means other parts of the code can read it, but can't set it
+        private(set) var locations: [Location]
+        var selectedPlace: Location?
+        
+        let savePath = URL.documentsDirectory.appending(path: "SavedPlaces")
+        
+        init() {
+            do {
+                let data = try Data(contentsOf: savePath)
+                locations = try JSONDecoder().decode([Location].self, from: data)
+            } catch {
+                locations = []
+            }
+        }
+        
+        func save() {
+            do {
+                let data = try JSONEncoder().encode(locations)
+                try data.write(to: savePath, options: [.atomic, .completeFileProtection])
+            } catch {
+                print("Unable to save data.")
+            }
+        }
+        func addLocation(at point: CLLocationCoordinate2D) {
+            let newLocation = Location(
+                id: UUID(),
+                name: "New location",
+                description: "",
+                latitude: point.latitude,
+                longitude: point.longitude
+            )
+            locations.append(newLocation)
+            save()
+        }
+        
+        func update(location: Location) {
+            guard let selectedPlace else { return }
+            
+            if let index = locations.firstIndex(of: selectedPlace) {
+                locations[index] = location
+                save()
+            }
+        }
+
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 201 - Introducing MVVM into your SwiftUI project-Save Data-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import MapKit
+import SwiftUI
+
+struct ContentView: View {
+    let startPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: 56,
+                longitude: -3),
+            span: MKCoordinateSpan(
+                latitudeDelta: 10,
+                longitudeDelta: 10)
+        )
+    )
+    
+    @State private var viewModel = ViewModel()
+    
+
+    var body: some View {
+        MapReader { proxy in
+            Map(initialPosition: startPosition) {
+                ForEach(viewModel.locations) { location in
+                    Annotation(
+                        location.name,
+                        // Use computed property from Location struct
+                        coordinate: location.coordinates) {
+                            // Custom 'pin' icon:
+                            Image(systemName: "star.circle")
+                                .resizable()
+                                .foregroundStyle(.red)
+                                .frame(width: 44, height: 44)
+                                .background(.white)
+                                .clipShape(.circle)
+                                .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                                    .onEnded { _ in
+                                        // Pass location data to the viewModel
+                                        viewModel.selectedPlace = location }
+                                )
+                        }
+                    }
+            }
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local) {
+                        // Run the addLocation function in the viewModel
+                        viewModel.addLocation(at: coordinate)
+                    }
+                }
+                .sheet(item: $viewModel.selectedPlace) { place in
+                    EditView(location: place) {
+                        // Run the update function in the viewModel
+                        viewModel.update(location: $0)
+                    }
+                }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
 <hr>
 <br>
 </p>
