@@ -142,7 +142,7 @@ Let's build it step-by-step so you can see how it works.
 <div id="Ai Insight-How to implement the solution-Step 1: Create EditView-ViewModel.swift"><h3 id="Step 1: Create EditView-ViewModel.swift" class="header"><a href="#Ai Insight-How to implement the solution-Step 1: Create EditView-ViewModel.swift">Step 1: Create EditView-ViewModel.swift</a></h3></div>
 
 <p>
-Create a new file and build a custom nested <code>ViewModel</code> extension for <code>EditView</code> using the <code>@Observable</code> macro:
+Create a new file and build a custom nested <code>ViewModel</code> extension for <code>EditView</code> using the <code>@Observable</code> macro. We will move the <code>LoadingState</code> enum, your text states, the Wikipedia networking function, and the location creation helper into this class:
 </p>
 
 <pre swift>
@@ -151,29 +151,57 @@ import Foundation
 extension EditView {
     @Observable
     class ViewModel {
-        // 1. These track what the user types in the TextFields
+        enum LoadingState {
+            case loading, loaded, failed
+        }
+        
+        // 1. Core properties migrated from the View
         var name: String
         var description: String
-        
-        // 2. Keep track of the original pin we started with
         let location: Location
         
-        // 3. The initializer accepts the location from ContentView and fills the text fields
+        var loadingState = LoadingState.loading
+        var pages = [Page]()
+        
+        // 2. Initializer captures the raw location and populates fields
         init(location: Location) {
             self.location = location
             self.name = location.name
             self.description = location.description
         }
         
-        // 4. Helper to build a completely fresh Location struct with the edits applied
-        func createNewLocation() -&gt; Location {
-            Location(
-                id: location.id,
-                name: name,
-                description: description,
-                latitude: location.latitude,
-                longitude: location.longitude
-            )
+        // 3. Helper to build the customized location payload for saving
+        func createUpdatedLocation() -&gt; Location {
+            var newLocation = location
+            newLocation.id = UUID() // Matches your original replacement behavior
+            newLocation.name = name
+            newLocation.description = description
+            return newLocation
+        }
+        
+        // 4. Async Networking moved entirely to background domain logic
+        func fetchNearbyPlaces() async {
+            let urlString = "https://en.wikipedia.org/w/api.php?ggscoord=\(location.latitude)%7C\(location.longitude)&amp;action=query&amp;prop=coordinates%7Cpageimages%7Cpageterms&amp;colimit=50&amp;piprop=thumbnail&amp;pithumbsize=500&amp;pilimit=50&amp;wbptterms=description&amp;generator=geosearch&amp;ggsradius=10000&amp;ggslimit=50&amp;format=json"
+            
+            guard let url = URL(string: urlString) else {
+                print("Bad URL: \(urlString)")
+                return
+            }
+            
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let items = try JSONDecoder().decode(Result.self, from: data)
+                
+                // Keep the UI update safe on the main thread loop
+                await MainActor.run {
+                    self.pages = items.query.pages.values.sorted()
+                    self.loadingState = .loaded
+                }
+            } catch {
+                await MainActor.run {
+                    self.loadingState = .failed
+                }
+            }
         }
     }
 }
@@ -182,7 +210,7 @@ extension EditView {
 <div id="Ai Insight-How to implement the solution-Step 2: Update EditView.swift"><h3 id="Step 2: Update EditView.swift" class="header"><a href="#Ai Insight-How to implement the solution-Step 2: Update EditView.swift">Step 2: Update EditView.swift</a></h3></div>
 
 <p>
-Now, open your existing view layout file and swap out your old individual <code>@State</code> properties for this new single ViewModel using the underscore initializer syntax:
+Now, open your existing view layout file and swap out your old individual <code>@State</code> properties for this new single <code>ViewModel</code> using the underscore initializer syntax. It only acts as a wrapper that displays what the viewModel provides:
 </p>
 
 <pre swift>
@@ -191,38 +219,58 @@ import SwiftUI
 struct EditView: View {
     @Environment(\.dismiss) var dismiss
     
-    // 1. Instead of individual properties, we have ONE State tracking the ViewModel
+    // 1. One single State container managing our new ViewModel
     @State private var viewModel: ViewModel
     var onSave: (Location) -&gt; Void
-
-    // 2. The Initializer (This is where Paul's underscore trick happens!)
+    
+    // 2. Custom Initializer implementing Paul's underscore (_) State trick
     init(location: Location, onSave: @escaping (Location) -&gt; Void) {
         self.onSave = onSave
-        
-        // _viewModel lets us inject a fully-formed ViewModel straight into the State wrapper
         self._viewModel = State(initialValue: ViewModel(location: location))
     }
-
+    
     var body: some View {
         NavigationStack {
             Form {
-                Section("Location Details") {
-                    // 3. Bind your text fields directly to the ViewModel variables
+                Section {
+                    // 3. Bind text input fields directly to the ViewModel variables
                     TextField("Place name", text: $viewModel.name)
                     TextField("Description", text: $viewModel.description)
                 }
+                
+                Section("Nearby…") {
+                    // 4. Read matching cases out of the ViewModel state engine
+                    switch viewModel.loadingState {
+                    case .loaded:
+                        ForEach(viewModel.pages, id: \.pageid) { page in
+                            Text("**\(page.title)**: *\(page.description)*")
+                        }
+                    case .loading:
+                        Text("Loading…")
+                    case .failed:
+                        Text("Please try again later.")
+                    }
+                }
             }
-            .navigationTitle("Edit Place")
+            .navigationTitle("Place Details")
             .toolbar {
                 Button("Save") {
-                    // 4. Grab the updated location object from the ViewModel
-                    let newLocation = viewModel.createNewLocation()
-                    onSave(newLocation)
+                    // 5. Ask the view model to build the new structural copy
+                    let updatedLocation = viewModel.createUpdatedLocation()
+                    onSave(updatedLocation)
                     dismiss()
                 }
             }
         }
+        .task {
+            // 6. Trigger the background networking fetch task directly
+            await viewModel.fetchNearbyPlaces()
+        }
     }
+}
+
+#Preview {
+    EditView(location: .example) { _ in }
 }
 </pre>
 
@@ -232,6 +280,17 @@ struct EditView: View {
 By doing this, you've completed a clean <span id="Ai Insight-How to implement the solution-Summary of why this is important-MVVM (Model-View-ViewModel)"></span><strong id="MVVM (Model-View-ViewModel)">MVVM (Model-View-ViewModel)</strong> design pattern. Your view files no longer care how data is handled or created; they simply draw the layout on screen and look at the <code>ViewModel</code> for what text should be shown!
 </p>
 
+<div id="Ai Insight-How to implement the solution-Summary of why this is important-What makes this implementation work perfectly:"><h4 id="What makes this implementation work perfectly:" class="header"><a href="#Ai Insight-How to implement the solution-Summary of why this is important-What makes this implementation work perfectly:">What makes this implementation work perfectly:</a></h4></div>
+
+<ul>
+<li>
+<code>await MainActor.run { ... }</code>: Because <code>ViewModel</code> is a plain background class using <code>async/await</code>, modifying properties like pages or <code>loadingState</code> must explicitly happen on the <code>@MainActor</code> thread so SwiftUI knows to instantly redraw the screen.
+
+<li>
+The <code>_viewModel</code> setup: By passing your custom <code>ViewModel(location: location)</code> directly inside the structural wrapper <code>State(initialValue:)</code>, you ensure the network call instantly uses the correct coordinates when <code>.task</code> starts running.
+
+</ul>
+ 
 <p>
 <hr>
 <br>
