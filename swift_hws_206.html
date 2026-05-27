@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_206</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_205.html">Hacking With Swift - 205 - Challenge 1</a>
+
+</ul>
+<div id="Hacking With Swift - 206 - Challenge 2"><h1 id="Hacking With Swift - 206 - Challenge 2" class="header"><a href="#Hacking With Swift - 206 - Challenge 2">Hacking With Swift - 206 - Challenge 2</a></h1></div>
+
+<div id="Hacking With Swift - 206 - Challenge 2-Challenge 2"><h2 id="Challenge 2" class="header"><a href="#Hacking With Swift - 206 - Challenge 2-Challenge 2">Challenge 2</a></h2></div>
+
+<p>
+Our app silently fails when errors occur during biometric authentication, so add code to show those errors in an alert.
+</p>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I've temporarily disabled the Face ID authentication, as it's very slow to run the app in the simulator. Once enabled, my next challenge in Paul Hudson's course is to do this:
+</p>
+
+<p>
+"Our app silently fails when errors occur during biometric authentication, so add code to show those errors in an alert."
+</p>
+
+<p>
+What kind of errors am I expecting? And how to implement the solution?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+When testing biometric authentication in the iOS Simulator, it can definitely slow down your momentum, so temporarily bypassing it is a smart move!
+</p>
+
+<p>
+When you do flip that authentication switch back on, dealing with biometric errors is a crucial step. The <code>LAContext</code> API doesn't just return a simple "yes or no"—it throws highly specific errors when things go sideways.
+</p>
+
+<p>
+Here is a breakdown of what errors to expect and how to implement a clean alert system to handle them.
+</p>
+
+<div id="Ai Insight-What Kind of Errors to Expect"><h2 id="What Kind of Errors to Expect" class="header"><a href="#Ai Insight-What Kind of Errors to Expect">What Kind of Errors to Expect</a></h2></div>
+
+<p>
+The <code>evaluatePolicy</code> method returns errors wrapped in a native type called <code>LAError</code>. The most common errors you will encounter fall into two main categories:
+</p>
+
+<div id="Ai Insight-What Kind of Errors to Expect-1. User-Driven Failures"><h3 id="1. User-Driven Failures" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-1. User-Driven Failures">1. User-Driven Failures</a></h3></div>
+
+<ul>
+<li>
+<code>.authenticationFailed</code>: The user scanned their face or finger, but the device didn't recognize it (e.g., a mismatched fingerprint or face look).
+
+<li>
+<code>.userCancel</code>: The user explicitly tapped the "Cancel" button inside the system Face ID/Touch ID popup.
+
+<li>
+<code>.userFallback</code>: The user tapped the "Enter Password" fallback button inside the biometric popup.
+
+</ul>
+<div id="Ai Insight-What Kind of Errors to Expect-2. Device Configuration Failures"><h3 id="2. Device Configuration Failures" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-2. Device Configuration Failures">2. Device Configuration Failures</a></h3></div>
+
+<ul>
+<li>
+<code>.biometryNotAvailable</code>: The device doesn't have biometric hardware (like an old iPhone or a simulator that hasn't had Face ID turned on in the top menu).
+
+<li>
+<code>.biometryNotEnrolled</code>: The device supports biometrics, but the user hasn't set up any faces or fingerprints in their iOS Settings.
+
+<li>
+<code>.biometryLockout</code>: The user failed too many biometric attempts in a row, and the system has completely locked them out (requiring the device passcode to re-enable it).
+
+</ul>
+<div id="Ai Insight-What Kind of Errors to Expect-How to Implement the Solution"><h3 id="How to Implement the Solution" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-How to Implement the Solution">How to Implement the Solution</a></h3></div>
+
+<p>
+To cleanly surface these errors to the user via a SwiftUI <code>.alert()</code>, we need to track two new states in our <code>ViewModel</code>: a boolean to trigger the alert, and a string to hold the specific error message.
+</p>
+
+<div id="Ai Insight-What Kind of Errors to Expect-Step 1: Update the ViewModel"><h3 id="Step 1: Update the ViewModel" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-Step 1: Update the ViewModel">Step 1: Update the ViewModel</a></h3></div>
+
+<p>
+Open your <code>ContentView-ViewModel.swift</code> file. Update your properties and modify the <code>authenticate()</code> function to catch the incoming error, parse its type, and pass a friendly message back to the main thread:
+</p>
+
+<pre swift>
+@Observable
+class ViewModel {
+    // --- Existing properties ---
+    private(set) var locations: [Location]
+    var selectedPlace: Location?
+    var isUnlocked = false
+    
+    // --- NEW: Error Alert States ---
+    var showAuthAlert = false
+    var authAlertMessage = ""
+    
+    // ... your init and existing functions ...
+
+    func authenticate() {
+        let context = LAContext()
+        var error: NSError?
+        
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+            let reason = "Please authenticate yourself to unlock your places"
+            
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                if success {
+                    Task { @MainActor in
+                        self.isUnlocked = true
+                    }
+                } else if let laError = authenticationError as? LAError {
+                    // Catch and parse the biometric error
+                    Task { @MainActor in
+                        self.authAlertMessage = self.errorMessage(for: laError)
+                        self.showAuthAlert = true
+                    }
+                }
+            }
+        } else if let nsError = error as? LAError {
+            // Catch errors if the device can't even evaluate biometrics at all
+            self.authAlertMessage = self.errorMessage(for: nsError)
+            self.showAuthAlert = true
+        } else {
+            // General fallback error
+            self.authAlertMessage = "Biometric authentication is not supported on this device."
+            self.showAuthAlert = true
+        }
+    }
+    
+    // HELPER: Convert confusing system codes into plain English rules
+    private func errorMessage(for error: LAError) -&gt; String {
+        switch error.code {
+        case .authenticationFailed:
+            return "Identity could not be verified. Please try again."
+        case .userCancel:
+            return "Authentication was cancelled."
+        case .userFallback:
+            return "Fallback password option selected."
+        case .biometryNotAvailable:
+            return "Biometric authentication is not available on this device."
+        case .biometryNotEnrolled:
+            return "No Face ID or Touch ID profiles are enrolled on this device. Please check your system Settings."
+        case .biometryLockout:
+            return "Too many failed attempts. Face ID is locked out. Please lock and unlock your device with your passcode to reset."
+        default: // &lt;-- Change this to a standard default case to satisfy the compiler
+            return "An unknown authentication error occurred: \(error.localizedDescription)"
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-What Kind of Errors to Expect-Step 2: Attach the Alert Modifier to ContentView"><h3 id="Step 2: Attach the Alert Modifier to ContentView" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-Step 2: Attach the Alert Modifier to ContentView">Step 2: Attach the Alert Modifier to ContentView</a></h3></div>
+
+<p>
+Now, head back into your <code>ContentView.swift</code>. Go to the very bottom block where your commented-out "Unlock Places" button lives, and attach an <code>.alert</code> modifier bound directly to your new view-model states:
+</p>
+
+<pre swift>
+// ... at the very bottom of your ContentView body block:
+} else {
+    Button("Unlock Places", action: viewModel.authenticate)
+        .padding()
+        .background(.blue)
+        .foregroundStyle(.white)
+        .clipShape(.capsule)
+        // MONITOR THE ERROR STATES HERE
+        .alert("Authentication Failed", isPresented: $viewModel.showAuthAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(viewModel.authAlertMessage)
+        }
+}
+</pre>
+
+<div id="Ai Insight-What Kind of Errors to Expect-Pro-Tip for Simulator Testing 💡"><h3 id="Pro-Tip for Simulator Testing 💡" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-Pro-Tip for Simulator Testing 💡">Pro-Tip for Simulator Testing 💡</a></h3></div>
+
+<p>
+When you turn authentication back on, you don't have to suffer through slow manual inputs! You can test all of these error states using the Simulator hardware tools:
+</p>
+
+<ul>
+<li>
+Launch your app in the Simulator.
+
+<li>
+In the Mac menu bar at the top of the screen, navigate to Features ➔ Face ID (or Touch ID).
+
+<li>
+Check Enrolled to simulate a device that has a setup profile.
+
+<li>
+Hit your "Unlock Places" button. When the Face ID prompt pops up, go back to Features ➔ Face ID and toggle Matching Face to simulate success, or Non-Matching Face to instantly trigger your new <code>.authenticationFailed</code> alert!
+
+</ul>
+<div id="Ai Insight-What Kind of Errors to Expect-In Context"><h3 id="In Context" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-In Context">In Context</a></h3></div>
+
+<div id="Ai Insight-What Kind of Errors to Expect-In Context-ContentView-ViewModel.swift"><h4 id="ContentView-ViewModel.swift" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-In Context-ContentView-ViewModel.swift">ContentView-ViewModel.swift</a></h4></div>
+
+<pre swift>
+import CoreLocation
+import Foundation
+import LocalAuthentication
+import MapKit
+import SwiftUI
+
+// Make extension to keep ViewModel easy to call.
+// Just call it within the ContentView in this case.
+extension ContentView {
+    @Observable
+    class ViewModel {
+        // 1. Define custom map style choices
+        enum MapStyleOption: String, CaseIterable, Identifiable {
+            case standard = "Standard"
+            case imagery = "Satellite"
+            case hybrid = "Hybrid"
+            
+            var id: String { self.rawValue }
+            
+            var nativeStyle: MapStyle {
+                switch self {
+                case .standard: return .standard
+                case .imagery:  return .imagery
+                case .hybrid:   return .hybrid
+                }
+            }
+        }
+        
+        // 2. Track the active style selection
+        var selectedStyle: MapStyleOption = .standard
+        
+        // 'private(set)' means other parts of the code can read it, but can't set it
+        private(set) var locations: [Location]
+        var selectedPlace: Location?
+        var isUnlocked = false
+        
+        // --- NEW: Error Alert States ---
+        var showAuthAlert = false
+        var authAlertMessage = ""
+        
+        let savePath = URL.documentsDirectory.appending(path: "SavedPlaces")
+        
+        init() {
+            do {
+                let data = try Data(contentsOf: savePath)
+                locations = try JSONDecoder().decode([Location].self, from: data)
+            } catch {
+                locations = []
+            }
+        }
+        
+        func save() {
+            do {
+                let data = try JSONEncoder().encode(locations)
+                try data.write(to: savePath, options: [.atomic, .completeFileProtection])
+            } catch {
+                print("Unable to save data.")
+            }
+        }
+        func addLocation(at point: CLLocationCoordinate2D) {
+            let newLocation = Location(
+                id: UUID(),
+                name: "New location",
+                description: "",
+                latitude: point.latitude,
+                longitude: point.longitude
+            )
+            locations.append(newLocation)
+            save()
+        }
+        
+        func update(location: Location) {
+            guard let selectedPlace else { return }
+            
+            if let index = locations.firstIndex(of: selectedPlace) {
+                locations[index] = location
+                save()
+            }
+        }
+        
+        func authenticate() {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+                let reason = "Please authenticate yourself to unlock your places"
+                
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                    if success {
+                        Task { @MainActor in
+                            self.isUnlocked = true
+                        }
+                    } else if let laError = authenticationError as? LAError {
+                        // Catch and parse the biometric error
+                        Task { @MainActor in
+                            self.authAlertMessage = self.errorMessage(for: laError)
+                            self.showAuthAlert = true
+                        }
+                    }
+                }
+            } else if let nsError = error as? LAError {
+                // Catch errors if the device can't even evaluate biometrics at all
+                self.authAlertMessage = self.errorMessage(for: nsError)
+                self.showAuthAlert = true
+            } else {
+                // General fallback error
+                self.authAlertMessage = "Biometric authentication is not supported on this device."
+                self.showAuthAlert = true
+            }
+        }
+        
+        // HELPER: Convert confusing system codes into plain English rules
+        private func errorMessage(for error: LAError) -&gt; String {
+            switch error.code {
+            case .authenticationFailed:
+                return "Identity could not be verified. Please try again."
+            case .userCancel:
+                return "Authentication was cancelled."
+            case .userFallback:
+                return "Fallback password option selected."
+            case .biometryNotAvailable:
+                return "Biometric authentication is not available on this device."
+            case .biometryNotEnrolled:
+                return "No Face ID or Touch ID profiles are enrolled on this device. Please check your system Settings."
+            case .biometryLockout:
+                return "Too many failed attempts. Face ID is locked out. Please lock and unlock your device with your passcode to reset."
+            default: // &lt;-- Change this to a standard default case to satisfy the compiler
+                return "An unknown authentication error occurred: \(error.localizedDescription)"
+            }
+        }
+        
+        // Challenge zero - option dialog
+        func delete(location: Location) {
+            if let index = locations.firstIndex(of: location) {
+                locations.remove(at: index)
+                save() // Keep your local storage synchronized!
+            }
+        }
+        
+    }
+}
+</pre>
+
+<div id="Ai Insight-What Kind of Errors to Expect-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Ai Insight-What Kind of Errors to Expect-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import MapKit
+import SwiftUI
+
+struct ContentView: View {
+    let startPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: 56,
+                longitude: -3),
+            span: MKCoordinateSpan(
+                latitudeDelta: 10,
+                longitudeDelta: 10)
+        )
+    )
+    
+    @State private var viewModel = ViewModel()
+    @State private var showingOptions = false // Controls the dialog menu
+    @State private var placeToEdit: Location? // Controls the final edit sheet
+    
+    var body: some View {
+        if viewModel.isUnlocked {
+            ZStack { // 1. Changed to a standard neutral ZStack
+                MapReader { proxy in
+                    Map(initialPosition: startPosition) {
+                        ForEach(viewModel.locations) { location in
+                            Annotation(
+                                location.name,
+                                coordinate: location.coordinates) {
+                                    Image(systemName: "star.circle")
+                                        .resizable()
+                                        .foregroundStyle(.red)
+                                        .frame(width: 44, height: 44)
+                                        .background(.white)
+                                        .clipShape(.circle)
+                                        .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                                            .onEnded { _ in
+                                                // 1. Lock in the active location choice
+                                                viewModel.selectedPlace = location
+                                                // 2. Trigger the options dialog menu
+                                                showingOptions.toggle()
+                                            }
+                                        )
+                                }
+                        }
+                    }
+                    // --- FIXED: Only one dynamic map style listener remains ---
+                    .mapStyle(viewModel.selectedStyle.nativeStyle)
+                    .mapControls {
+                        // Leaving this blank completely hides all native controls!
+                    }
+                    .onTapGesture { position in
+                        if let coordinate = proxy.convert(position, from: .local) {
+                            // Run the addLocation function in the viewModel
+                            viewModel.addLocation(at: coordinate)
+                        }
+                    }
+                    // MARK: - 1. The Options Menu Dialog
+                    .confirmationDialog(
+                        "Manage Location",
+                        isPresented: $showingOptions,
+                        titleVisibility: .visible,
+                        presenting: viewModel.selectedPlace
+                    ) { place in
+                        Button("Edit Details") {
+                            placeToEdit = place // Hands off to the sheet
+                        }
+                        
+                        Button("Delete Pin", role: .destructive) {
+                            viewModel.delete(location: place)
+                            viewModel.selectedPlace = nil // Reset state cleanup
+                        }
+                        
+                        Button("Cancel", role: .cancel) {
+                            viewModel.selectedPlace = nil // Reset state cleanup
+                        }
+                    } message: { place in
+                        Text("What would you like to do with \(place.name)?")
+                    }
+                    // MARK: - 2. The Final Edit Sheet
+                    .sheet(item: $placeToEdit) { place in
+                        EditView(location: place) {
+                            viewModel.update(location: $0)
+                            viewModel.selectedPlace = nil // Final pipeline cleanup
+                        }
+                    }
+                }
+                // 3. NEW FLOATING UTILITY COLUMN
+                // We push this container up and out to the top-right using Spacers
+                VStack {
+                    HStack {
+                        Spacer() // Pushes items to the right side
+                        
+                        VStack(spacing: 12) { // Vertically stacks the controls with a clean gap
+                            
+                            // A. NATIVE COMPASS CONTROL (Now behaves as an explicit view element!)
+                            MapCompass()
+                                .mapControlVisibility(.automatic) // Only displays if the map is actually rotated
+                            
+                            // B. YOUR CUSTOM STYLE MENU BUTTON
+                            Menu {
+                                Picker("Map Style", selection: $viewModel.selectedStyle) {
+                                    ForEach(ViewModel.MapStyleOption.allCases) { option in
+                                        Text(option.rawValue).tag(option)
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "map.circle.fill")
+                                    .font(.system(size: 44))
+                                    .foregroundStyle(.primary)
+                                    .background(.white)
+                                    .clipShape(.circle)
+                                    .shadow(radius: 4)
+                            }
+                        }
+                        .padding(.trailing, 12) // Safe padding distance away from the right screen edge
+                        .padding(.top, 60)      // Safe padding distance down to avoid hitting the iPhone notch / status bar
+                    }
+                    Spacer() // Pushes the entire row assembly to the top of the screen
+                }
+            }
+        } else {
+            Button("Unlock Places", action: viewModel.authenticate)
+                .padding()
+                .background(.blue)
+                .foregroundStyle(.white)
+                .clipShape(.capsule)
+                // MONITOR THE ERROR STATES HERE
+                .alert("Authentication Failed", isPresented: $viewModel.showAuthAlert) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text(viewModel.authAlertMessage)
+                }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+<ul>
+<li>
+<a href="swift_hws_207.html">Hacking With Swift - 207 - Challenge 3</a>
+
+</ul>
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

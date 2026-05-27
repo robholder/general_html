@@ -334,97 +334,646 @@ struct ContentView: View {
     @State private var placeToEdit: Location? // Controls the final edit sheet
     
     var body: some View {
-        // Un-commenting your authentication block so it aligns correctly with the layout
-        if viewModel.isUnlocked {
-            ZStack(alignment: .topTrailing) { // Aligns the floating menu icon to the top right
-                
-                MapReader { proxy in
-                    Map(initialPosition: startPosition) {
-                        ForEach(viewModel.locations) { location in
-                            Annotation(
-                                location.name,
-                                coordinate: location.coordinates) {
-                                    Image(systemName: "star.circle")
-                                        .resizable()
-                                        .foregroundStyle(.red)
-                                        .frame(width: 44, height: 44)
-                                        .background(.white)
-                                        .clipShape(.circle)
-                                        .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
-                                            .onEnded { _ in
-                                                viewModel.selectedPlace = location
-                                                showingOptions.toggle()
-                                            }
-                                        )
-                                }
-                        }
-                    }
-                    // 1. DYNAMICALLY BIND THE MAP STYLE HERE
-                    .mapStyle(viewModel.selectedStyle.nativeStyle)
-                    .onTapGesture { position in
-                        if let coordinate = proxy.convert(position, from: .local) {
-                            viewModel.addLocation(at: coordinate)
-                        }
-                    }
-                    .confirmationDialog(
-                        "Manage Location",
-                        isPresented: $showingOptions,
-                        titleVisibility: .visible,
-                        presenting: viewModel.selectedPlace
-                    ) { place in
-                        Button("Edit Details") {
-                            placeToEdit = place
-                        }
-                        
-                        Button("Delete Pin", role: .destructive) {
-                            viewModel.delete(location: place)
-                            viewModel.selectedPlace = nil
-                        }
-                        
-                        Button("Cancel", role: .cancel) {
-                            viewModel.selectedPlace = nil
-                        }
-                    } message: { place in
-                        Text("What would you like to do with \(place.name)?")
-                    }
-                    .sheet(item: $placeToEdit) { place in
-                        EditView(location: place) {
-                            viewModel.update(location: $0)
-                            viewModel.selectedPlace = nil
-                        }
+        //if viewModel.isUnlocked {
+        ZStack(alignment: .topTrailing) {
+            MapReader { proxy in
+                Map(initialPosition: startPosition) {
+                    ForEach(viewModel.locations) { location in
+                        Annotation(
+                            location.name,
+                            coordinate: location.coordinates) {
+                                Image(systemName: "star.circle")
+                                    .resizable()
+                                    .foregroundStyle(.red)
+                                    .frame(width: 44, height: 44)
+                                    .background(.white)
+                                    .clipShape(.circle)
+                                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                                        .onEnded { _ in
+                                            // 1. Lock in the active location choice
+                                            viewModel.selectedPlace = location
+                                            // 2. Trigger the options dialog menu
+                                            showingOptions.toggle()
+                                        }
+                                    )
+                            }
                     }
                 }
-                
-                // 2. THE FLOATING MAP OPTIONS POPUP MENU
-                Menu {
-                    Picker("Map Style", selection: $viewModel.selectedStyle) {
-                        ForEach(ViewModel.MapStyleOption.allCases) { option in
-                            Text(option.rawValue).tag(option)
-                        }
+                // --- FIXED: Only one dynamic map style listener remains ---
+                .mapStyle(viewModel.selectedStyle.nativeStyle)
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local) {
+                        // Run the addLocation function in the viewModel
+                        viewModel.addLocation(at: coordinate)
                     }
-                } label: {
-                    Image(systemName: "map.circle.fill")
-                        .font(.system(size: 44)) // Matches normal Apple map button sizes
-                        .foregroundStyle(.primary)
-                        .background(.white)
-                        .clipShape(.circle)
-                        .shadow(radius: 4)
-                        .padding() // Keeps it safely out of the status bar area
+                }
+                // MARK: - 1. The Options Menu Dialog
+                .confirmationDialog(
+                    "Manage Location",
+                    isPresented: $showingOptions,
+                    titleVisibility: .visible,
+                    presenting: viewModel.selectedPlace
+                ) { place in
+                    Button("Edit Details") {
+                        placeToEdit = place // Hands off to the sheet
+                    }
+                    
+                    Button("Delete Pin", role: .destructive) {
+                        viewModel.delete(location: place)
+                        viewModel.selectedPlace = nil // Reset state cleanup
+                    }
+                    
+                    Button("Cancel", role: .cancel) {
+                        viewModel.selectedPlace = nil // Reset state cleanup
+                    }
+                } message: { place in
+                    Text("What would you like to do with \(place.name)?")
+                }
+                // MARK: - 2. The Final Edit Sheet
+                .sheet(item: $placeToEdit) { place in
+                    EditView(location: place) {
+                        viewModel.update(location: $0)
+                        viewModel.selectedPlace = nil // Final pipeline cleanup
+                    }
                 }
             }
-        } else {
-            // Displays if the application state is locked
-            Button("Unlock Places", action: viewModel.authenticate)
-                .padding()
-                .background(.blue)
-                .foregroundStyle(.white)
-                .clipShape(.capsule)
+            
+            // 2. THE FLOATING MAP OPTIONS POPUP MENU
+            Menu {
+                Picker("Map Style", selection: $viewModel.selectedStyle) {
+                    ForEach(ViewModel.MapStyleOption.allCases) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+            } label: {
+                Image(systemName: "map.circle.fill")
+                    .font(.system(size: 44)) // Matches normal Apple map button sizes
+                    .foregroundStyle(.primary)
+                    .background(.white)
+                    .clipShape(.circle)
+                    .shadow(radius: 4)
+                    .padding() // Keeps it safely out of the status bar area
+            }
         }
+        // } else {
+        //     Button("Unlock Places", action: viewModel.authenticate)
+        //         .padding()
+        //         .background(.blue)
+        //         .foregroundStyle(.white)
+        //         .clipShape(.capsule)
+        // }
     }
 }
 
 #Preview {
     ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-QUESTION">QUESTION</a></h2></div>
+
+<p>
+One issue is that now the map style drop-down menu sits directly on the existing compass icon. Can we separate them in screen space?
+</p>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER">ANSWER</a></h2></div>
+
+<p>
+What you are seeing with the overlapping icons is very common. By default, MapKit drops its native utility overlays (like the Compass and the Zoom/Scale controls) directly into the top corners of the screen context. When we drop a floating <code>Menu</code> button into the exact same <code>.topTrailing</code> slot of our <code>ZStack</code>, they collide.
+</p>
+
+<p>
+To fix this natively in SwiftUI, we can use the mapControls modifier. This lets us do two things at once:
+</p>
+
+<ul>
+<li>
+Hide MapKit's automatic compass overlay.
+
+<li>
+Control exactly where it appears by turning it into a regular view element that we can layout side-by-side with our custom menu button!
+
+</ul>
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-The Layout Fix"><h3 id="The Layout Fix" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-The Layout Fix">The Layout Fix</a></h3></div>
+
+<p>
+Instead of relying on the <code>ZStack</code> alignment to position our menu, we will change the <code>ZStack</code> alignment to a neutral position, build a dedicated vertical spacing container (<code>VStack</code>), and place both the native <code>MapCompass</code> and our <code>Menu</code> button inside it.
+</p>
+
+<p>
+Here is how your updated <code>ContentView.swift</code> layout block should look:
+</p>
+
+<pre swift>
+var body: some View {
+    //if viewModel.isUnlocked {
+    ZStack { // 1. Changed to a standard neutral ZStack
+        MapReader { proxy in
+            Map(initialPosition: startPosition) {
+                ForEach(viewModel.locations) { location in
+                    // ... your existing Annotation code remains identical
+                }
+            }
+            .mapStyle(viewModel.selectedStyle.nativeStyle)
+            // 2. THIS IS THE MAGIC FILTER: It tells the map to hide the default compass overlay
+            .mapControls {
+                // Leaving this blank completely hides all native controls!
+            }
+            .onTapGesture { position in
+                if let coordinate = proxy.convert(position, from: .local) {
+                    viewModel.addLocation(at: coordinate)
+                }
+            }
+            .confirmationDialog("Manage Location", isPresented: $showingOptions, titleVisibility: .visible, presenting: viewModel.selectedPlace) {
+                // ... your existing dialog code remains identical
+            }
+            .sheet(item: $placeToEdit) { place in
+                // ... your existing sheet code remains identical
+            }
+        }
+        
+        // 3. NEW FLOATING UTILITY COLUMN
+        // We push this container up and out to the top-right using Spacers
+        VStack {
+            HStack {
+                Spacer() // Pushes items to the right side
+                
+                VStack(spacing: 12) { // Vertically stacks the controls with a clean gap
+                    
+                    // A. NATIVE COMPASS CONTROL (Now behaves as an explicit view element!)
+                    MapCompass()
+                        .mapControlVisibility(.automatic) // Only displays if the map is actually rotated
+                    
+                    // B. YOUR CUSTOM STYLE MENU BUTTON
+                    Menu {
+                        Picker("Map Style", selection: $viewModel.selectedStyle) {
+                            ForEach(ViewModel.MapStyleOption.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "map.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundStyle(.primary)
+                            .background(.white)
+                            .clipShape(.circle)
+                            .shadow(radius: 4)
+                    }
+                }
+                .padding(.trailing, 12) // Safe padding distance away from the right screen edge
+                .padding(.top, 60)      // Safe padding distance down to avoid hitting the iPhone notch / status bar
+            }
+            Spacer() // Pushes the entire row assembly to the top of the screen
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-Why this works so beautifully"><h3 id="Why this works so beautifully" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-Why this works so beautifully">Why this works so beautifully</a></h3></div>
+
+<ul>
+<li>
+<code>.mapControls { }</code>: By declaring an empty control configuration block on your <code>Map</code>, you effectively cut off the automatic generation layout logic. This prevents Apple from drawing its own rogue compass over your design.
+
+<li>
+<code>MapCompass()</code> <span id="Hacking With Swift - 205 - Challenge 1-ANSWER-Why this works so beautifully-View"></span><strong id="View">View</strong>: MapKit exports its core utilities as modular standalone views. By putting <code>MapCompass()</code> directly into your layout hierarchy, it still maintains all its complex internal logic (spinning, pointing north, disappearing when the map is flat, and resetting orientation when tapped), but it obeys your custom <code>VStack</code> layout spacing guidelines!
+
+</ul>
+<p>
+Give this a try, and watch how cleanly the compass moves over to stack up neatly above your custom selector button.
+</p>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-BucketListApp.swift"><h4 id="BucketListApp.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-BucketListApp.swift">BucketListApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct BucketListApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import MapKit
+import SwiftUI
+
+struct ContentView: View {
+    let startPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: 56,
+                longitude: -3),
+            span: MKCoordinateSpan(
+                latitudeDelta: 10,
+                longitudeDelta: 10)
+        )
+    )
+    
+    @State private var viewModel = ViewModel()
+    @State private var showingOptions = false // Controls the dialog menu
+    @State private var placeToEdit: Location? // Controls the final edit sheet
+    
+    var body: some View {
+        //if viewModel.isUnlocked {
+        ZStack { // 1. Changed to a standard neutral ZStack
+            MapReader { proxy in
+                Map(initialPosition: startPosition) {
+                    ForEach(viewModel.locations) { location in
+                        Annotation(
+                            location.name,
+                            coordinate: location.coordinates) {
+                                Image(systemName: "star.circle")
+                                    .resizable()
+                                    .foregroundStyle(.red)
+                                    .frame(width: 44, height: 44)
+                                    .background(.white)
+                                    .clipShape(.circle)
+                                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.2)
+                                        .onEnded { _ in
+                                            // 1. Lock in the active location choice
+                                            viewModel.selectedPlace = location
+                                            // 2. Trigger the options dialog menu
+                                            showingOptions.toggle()
+                                        }
+                                    )
+                            }
+                    }
+                }
+                // --- FIXED: Only one dynamic map style listener remains ---
+                .mapStyle(viewModel.selectedStyle.nativeStyle)
+                .mapControls {
+                    // Leaving this blank completely hides all native controls!
+                }
+                .onTapGesture { position in
+                    if let coordinate = proxy.convert(position, from: .local) {
+                        // Run the addLocation function in the viewModel
+                        viewModel.addLocation(at: coordinate)
+                    }
+                }
+                // MARK: - 1. The Options Menu Dialog
+                .confirmationDialog(
+                    "Manage Location",
+                    isPresented: $showingOptions,
+                    titleVisibility: .visible,
+                    presenting: viewModel.selectedPlace
+                ) { place in
+                    Button("Edit Details") {
+                        placeToEdit = place // Hands off to the sheet
+                    }
+                    
+                    Button("Delete Pin", role: .destructive) {
+                        viewModel.delete(location: place)
+                        viewModel.selectedPlace = nil // Reset state cleanup
+                    }
+                    
+                    Button("Cancel", role: .cancel) {
+                        viewModel.selectedPlace = nil // Reset state cleanup
+                    }
+                } message: { place in
+                    Text("What would you like to do with \(place.name)?")
+                }
+                // MARK: - 2. The Final Edit Sheet
+                .sheet(item: $placeToEdit) { place in
+                    EditView(location: place) {
+                        viewModel.update(location: $0)
+                        viewModel.selectedPlace = nil // Final pipeline cleanup
+                    }
+                }
+            }
+            // 3. NEW FLOATING UTILITY COLUMN
+            // We push this container up and out to the top-right using Spacers
+            VStack {
+                HStack {
+                    Spacer() // Pushes items to the right side
+                    
+                    VStack(spacing: 12) { // Vertically stacks the controls with a clean gap
+                        
+                        // A. NATIVE COMPASS CONTROL (Now behaves as an explicit view element!)
+                        MapCompass()
+                            .mapControlVisibility(.automatic) // Only displays if the map is actually rotated
+                        
+                        // B. YOUR CUSTOM STYLE MENU BUTTON
+                        Menu {
+                            Picker("Map Style", selection: $viewModel.selectedStyle) {
+                                ForEach(ViewModel.MapStyleOption.allCases) { option in
+                                    Text(option.rawValue).tag(option)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "map.circle.fill")
+                                .font(.system(size: 44))
+                                .foregroundStyle(.primary)
+                                .background(.white)
+                                .clipShape(.circle)
+                                .shadow(radius: 4)
+                        }
+                    }
+                    .padding(.trailing, 12) // Safe padding distance away from the right screen edge
+                    .padding(.top, 60)      // Safe padding distance down to avoid hitting the iPhone notch / status bar
+                }
+                Spacer() // Pushes the entire row assembly to the top of the screen
+            }
+        }
+        // } else {
+        //     Button("Unlock Places", action: viewModel.authenticate)
+        //         .padding()
+        //         .background(.blue)
+        //         .foregroundStyle(.white)
+        //         .clipShape(.capsule)
+        // }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-ContentView-ViewModel.swift"><h4 id="ContentView-ViewModel.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-ContentView-ViewModel.swift">ContentView-ViewModel.swift</a></h4></div>
+
+<pre swift>
+import CoreLocation
+import Foundation
+import LocalAuthentication
+import MapKit
+import SwiftUI
+
+// Make extension to keep ViewModel easy to call.
+// Just call it within the ContentView in this case.
+extension ContentView {
+    @Observable
+    class ViewModel {
+        // 1. Define custom map style choices
+        enum MapStyleOption: String, CaseIterable, Identifiable {
+            case standard = "Standard"
+            case imagery = "Satellite"
+            case hybrid = "Hybrid"
+            
+            var id: String { self.rawValue }
+            
+            var nativeStyle: MapStyle {
+                switch self {
+                case .standard: return .standard
+                case .imagery:  return .imagery
+                case .hybrid:   return .hybrid
+                }
+            }
+        }
+        
+        // 2. Track the active style selection
+        var selectedStyle: MapStyleOption = .standard
+        
+        // 'private(set)' means other parts of the code can read it, but can't set it
+        private(set) var locations: [Location]
+        var selectedPlace: Location?
+        var isUnlocked = false
+        
+        let savePath = URL.documentsDirectory.appending(path: "SavedPlaces")
+        
+        init() {
+            do {
+                let data = try Data(contentsOf: savePath)
+                locations = try JSONDecoder().decode([Location].self, from: data)
+            } catch {
+                locations = []
+            }
+        }
+        
+        func save() {
+            do {
+                let data = try JSONEncoder().encode(locations)
+                try data.write(to: savePath, options: [.atomic, .completeFileProtection])
+            } catch {
+                print("Unable to save data.")
+            }
+        }
+        func addLocation(at point: CLLocationCoordinate2D) {
+            let newLocation = Location(
+                id: UUID(),
+                name: "New location",
+                description: "",
+                latitude: point.latitude,
+                longitude: point.longitude
+            )
+            locations.append(newLocation)
+            save()
+        }
+        
+        func update(location: Location) {
+            guard let selectedPlace else { return }
+            
+            if let index = locations.firstIndex(of: selectedPlace) {
+                locations[index] = location
+                save()
+            }
+        }
+        
+        func authenticate() {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &amp;error) {
+                let reason = "Please authenticate yourself to unlock your places"
+                
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
+                    if success {
+                        // Force the UI update to hop back to the safe main thread
+                        Task { @MainActor in
+                            self.isUnlocked = true
+                        }
+                    } else {
+                        // error handling
+                    }
+                }
+            } else {
+                // no biometrics
+            }
+        }
+        
+        // Challenge zero - option dialog
+        func delete(location: Location) {
+            if let index = locations.firstIndex(of: location) {
+                locations.remove(at: index)
+                save() // Keep your local storage synchronized!
+            }
+        }
+
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-EditView.swift"><h4 id="EditView.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-EditView.swift">EditView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct EditView: View {
+    
+    enum LoadingState {
+        case loading, loaded, failed
+    }
+    
+    @Environment(\.dismiss) var dismiss
+    var location: Location
+    
+    @State private var name: String
+    @State private var description: String
+    var onSave: (Location) -&gt; Void
+   
+    @State private var loadingState = LoadingState.loading
+    @State private var pages = [Page]()
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Place name", text: $name)
+                    TextField("Description", text: $description)
+                }
+                
+                Section("Nearby…") {
+                    switch loadingState {
+                    case .loaded:
+                        ForEach(pages, id: \.pageid) { page in
+                            //Text("**\(page.title)**: *Page description here*")
+                            Text("**\(page.title)**: *\(page.description)*")
+                        }
+                    case .loading:
+                        Text("Loading…")
+                    case .failed:
+                        Text("Please try again later.")
+                    }
+                }
+            }
+            .navigationTitle("Place Details")
+            .toolbar {
+                Button("Save") {
+                    var newLocation = location
+                    newLocation.id = UUID()
+                    newLocation.name = name
+                    newLocation.description = description
+                    
+                    onSave(newLocation)
+                    dismiss()
+                }
+            }
+        }
+        .task {
+            await fetchNearbyPlaces()
+        }
+    }
+    
+    init(location: Location, onSave: @escaping (Location) -&gt; Void) {
+        self.location = location
+        self.onSave = onSave
+        
+        _name = State(initialValue: location.name)
+        _description = State(initialValue: location.description)
+    }
+    func fetchNearbyPlaces() async {
+        let urlString = "https://en.wikipedia.org/w/api.php?ggscoord=\(location.latitude)%7C\(location.longitude)&amp;action=query&amp;prop=coordinates%7Cpageimages%7Cpageterms&amp;colimit=50&amp;piprop=thumbnail&amp;pithumbsize=500&amp;pilimit=50&amp;wbptterms=description&amp;generator=geosearch&amp;ggsradius=10000&amp;ggslimit=50&amp;format=json"
+        
+        guard let url = URL(string: urlString) else {
+            print("Bad URL: \(urlString)")
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            // we got some data back!
+            let items = try JSONDecoder().decode(Result.self, from: data)
+            
+            // success – convert the array values to our pages array
+            //pages = items.query.pages.values.sorted { $0.title &lt; $1.title }
+            pages = items.query.pages.values.sorted()
+            loadingState = .loaded
+        } catch {
+            // if we're still here it means the request failed somehow
+            loadingState = .failed
+        }
+    }
+}
+
+#Preview {
+    EditView(location: .example) { _ in }
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-Location.swift"><h4 id="Location.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-Location.swift">Location.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import MapKit
+
+struct Location: Codable, Equatable, Identifiable {
+    var id: UUID
+    var name: String
+    var description: String
+    var latitude: Double
+    var longitude: Double
+    
+    // Computed Property
+    var coordinates: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+    
+    // Return 'equal' if IDs are the same.
+    static func ==(lhs: Location, rhs: Location) -&gt; Bool {
+        lhs.id == rhs.id
+    }
+    
+    #if DEBUG
+    // Example Location
+    static let example = Location(
+        id: UUID(),
+        name: "Buckingham Palace",
+        description: "Lit by over 40,000 lightbulbs.",
+        latitude: 51.501,
+        longitude: -0.141
+    )
+    #endif
+}
+</pre>
+
+<div id="Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-Result.swift"><h4 id="Result.swift" class="header"><a href="#Hacking With Swift - 205 - Challenge 1-ANSWER-In Context-Result.swift">Result.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct Result: Codable {
+    let query: Query
+}
+
+struct Query: Codable {
+    // dictionary with Int as Key, Page as value
+    let pages: [Int: Page]
+}
+
+struct Page: Codable, Comparable {
+    let pageid: Int
+    let title: String
+    // dictionary with String as key and a String array as value (optional also)
+    let terms: [String: [String]]?
+    
+    var description: String {
+        terms?["description"]?.first ?? "No further information"
+    }
+    
+    // The '&lt;' function allows for parameterless '.sorted()' method
+    static func &lt;(lhs: Page, rhs: Page) -&gt; Bool {
+        lhs.title &lt; rhs.title
+    }
 }
 </pre>
 
@@ -434,7 +983,11 @@ struct ContentView: View {
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_206.html">Hacking With Swift - 206 - Challenge 2</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
