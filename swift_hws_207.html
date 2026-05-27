@@ -368,7 +368,141 @@ The Swift compiler secretly expands that line into <span id="Another Approach-1.
 <code>viewModel</code> (<span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-1. What @State Actually Generates-The Trapdoor/Computed Property"></span><strong id="The Trapdoor/Computed Property">The Trapdoor/Computed Property</strong>): A plain-looking variable name that you use in your code. Whenever you read or write to <code>viewModel</code>, Swift intercepts it and redirects it inside the container (<code>_viewModel.wrappedValue</code>).
 
 </ul>
-<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-2. Why the Underscore (_) is Required in init"><h4 id="2. Why the Underscore (_) is Required in init" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-2. Why the Underscore (_) is Required in init">2. Why the Underscore (_) is Required in init</a></h4></div>
+<p>
+Q: I'm not seeing where <code>_viewModel</code> and <code>viewModel</code> are in the process.
+</p>
+
+<p>
+I guess:
+</p>
+
+<p>
+<code>@State private var viewModel: ViewModel</code>
+</p>
+
+<p>
+...sets up <code>viewModel</code> as a computed property - and is that the computed result of the <code>EditView-ViewModel.swift</code> code?
+</p>
+
+<p>
+So what is _viewModel? A container with what in it?
+</p>
+
+<p>
+A: You are hitting on the exact mechanism that makes this feel like "magic." Let's pull back the curtain entirely and map these exact terms directly to your two new files: <code>EditView.swift</code> (the View) and <code>EditView-ViewModel.swift</code> (the ViewModel).
+</p>
+
+<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-1. Where do viewModel and _viewModel actually live?"><h4 id="1. Where do viewModel and _viewModel actually live?" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-1. Where do viewModel and _viewModel actually live?">1. Where do viewModel and _viewModel actually live?</a></h4></div>
+
+<p>
+They both live entirely inside <code>EditView.swift</code>. Your ViewModel file (<code>EditView-ViewModel.swift</code>) doesn't know they exist; it is just a plain blueprint for data.
+</p>
+
+<p>
+When you write this line in <code>EditView.swift</code>:
+</p>
+
+<pre swift>
+@State private var viewModel: ViewModel
+</pre>
+
+<p>
+Swift splits that line into two distinct entities behind the scenes. Let's look at exactly what is inside each one:
+</p>
+
+<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-What is _viewModel? (The Container)"><h4 id="What is _viewModel? (The Container)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-What is _viewModel? (The Container)">What is _viewModel? (The Container)</a></h4></div>
+
+<p>
+<code>_viewModel</code> is an actual structural container created by SwiftUI.
+</p>
+
+<ul>
+<li>
+What is inside it? It contains a memory pointer (a reference) pointing to the <code>ViewModel</code> class instance living out in your heap memory. It also contains the internal SwiftUI logic needed to monitor that class.
+
+<li>
+Why do we need it? Because EditView is a struct, it is destroyed and recreated constantly. <code>_viewModel</code> is the anchor that stays attached to SwiftUI's core system, ensuring your actual data doesn't get wiped out when the view blinks.
+
+</ul>
+<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-What is viewModel? (The Computed Property/Facade)"><h4 id="What is viewModel? (The Computed Property/Facade)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-What is viewModel? (The Computed Property/Facade)">What is viewModel? (The Computed Property/Facade)</a></h4></div>
+
+<p>
+You guessed it perfectly: <code>viewModel</code> acts as a computed property! It is a convenient facade or "trapdoor" that Swift gives you so you don't have to look at the ugly container math.
+</p>
+
+<ul>
+<li>
+When you read <code>viewModel.name</code>: Swift secretly executes code that goes into the <code>_viewModel</code> container, follows the pointer to your class instance in <code>EditView-ViewModel.swift</code>, and fetches the string.
+
+<li>
+When you write <code>viewModel.name = "Paris"</code>: Swift goes through the container, modifies the class instance, and because the class is <code>@Observable</code>, SwiftUI immediately schedules a screen refresh.
+
+</ul>
+<div id="Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process"><h3 id="2. Tracking Them Through the Code Process" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process">2. Tracking Them Through the Code Process</a></h3></div>
+
+<p>
+Let's look at how these two hidden variables handle the work inside your code line-by-line.
+</p>
+
+<div id="Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process-Phase 1: The Birth (init)"><h4 id="Phase 1: The Birth (init)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process-Phase 1: The Birth (init)">Phase 1: The Birth (init)</a></h4></div>
+
+<p>
+When your app decides to show <code>EditView</code>, it calls the initializer. At this exact moment, the view is a blank slate. The computed property <code>viewModel</code> cannot be used yet because the storage container hasn't been built.
+</p>
+
+<pre swift>
+init(location: Location, onSave: @escaping (Location) -&gt; Void) {
+    self.onSave = onSave
+    
+    // 1. You allocate memory for the blueprint in EditView-ViewModel.swift:
+    let newClassInstance = ViewModel(location: location)
+    
+    // 2. You manually build the container (_viewModel) and drop the instance inside:
+    self._viewModel = State(initialValue: newClassInstance)
+}
+</pre>
+
+<div id="Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process-Phase 2: Rendering the UI (body)"><h4 id="Phase 2: Rendering the UI (body)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process-Phase 2: Rendering the UI (body)">Phase 2: Rendering the UI (body)</a></h4></div>
+
+<p>
+Now the view is initialized and ready to draw. From this point forward, you never use <code>_viewModel</code> again. You only use the computed <code>viewModel</code> facade.
+</p>
+
+<pre swift>
+TextField("Place name", text: $viewModel.name)
+</pre>
+
+<ul>
+<li>
+What's happening: The <code>＄</code> symbol tells SwiftUI to create a two-way binding.
+
+<li>
+The connection: The <code>TextField</code> reads from the computed <code>viewModel.name</code> to display the text. When the user types a letter, it writes back through the <code>viewModel</code> facade, altering the data inside your <code>EditView-ViewModel.swift</code> class.
+
+</ul>
+<div id="Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process-Phase 3: Background Tasks (.task)"><h4 id="Phase 3: Background Tasks (.task)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-2. Tracking Them Through the Code Process-Phase 3: Background Tasks (.task)">Phase 3: Background Tasks (.task)</a></h4></div>
+
+<pre swift>
+.task {
+    await viewModel.fetchNearbyPlaces()
+}
+</pre>
+
+<ul>
+<li>
+The connection: The view uses the computed <code>viewModel</code> property to call the network function located in <code>EditView-ViewModel.swift</code>.
+
+<li>
+When the network data arrives, the code inside the ViewModel updates <code>self.pages</code>. Because the view is watching the class <em>through</em> that initial <code>_viewModel</code> container connection, it spots the change and automatically repaints the screen with your new places.
+
+</ul>
+<div id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:"><h3 id="To Say It In One Sentence:" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:">To Say It In One Sentence:</a></h3></div>
+
+<p>
+<code>_viewModel</code> is the <span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-invisible physical box"></span><strong id="invisible physical box">invisible physical box</strong> holding onto your data's location so it doesn't get lost, while <code>viewModel</code> is the <span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-convenient handle"></span><strong id="convenient handle">convenient handle</strong> on the outside of the box that your View code pulls on to read and write data to <code>EditView-ViewModel.swift</code>.
+</p>
+
+<div id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-2. Why the Underscore (_) is Required in init"><h4 id="2. Why the Underscore (_) is Required in init" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-2. Why the Underscore (_) is Required in init">2. Why the Underscore (_) is Required in init</a></h4></div>
 
 <p>
 In SwiftUI, a <code>View</code> is a <code>struct</code>. Structs are value types, meaning they are destroyed and recreated constantly whenever the screen updates.
@@ -382,7 +516,7 @@ Because the <code>View</code> struct is temporary, it cannot safely hold onto da
 To solve this, SwiftUI holds your data in an external, permanent memory space. The <code>State</code> container (<code>_viewModel</code>) is the bridge that connects your temporary View to that permanent memory.
 </p>
 
-<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The Initialization Timeline Dilemma"><h4 id="The Initialization Timeline Dilemma" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The Initialization Timeline Dilemma">The Initialization Timeline Dilemma</a></h4></div>
+<div id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The Initialization Timeline Dilemma"><h4 id="The Initialization Timeline Dilemma" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The Initialization Timeline Dilemma">The Initialization Timeline Dilemma</a></h4></div>
 
 <p>
 When your View’s <code>init()</code> is running, the View struct is currently being born. Because of Swift’s strict safety rules:
@@ -390,10 +524,10 @@ When your View’s <code>init()</code> is running, the View struct is currently 
 
 <ul>
 <li>
-You <span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The Initialization Timeline Dilemma-cannot"></span><strong id="cannot">cannot</strong> use the plain <code>viewModel</code> trapdoor yet, because the underlying <code>State</code> storage container hasn't been fully set up or connected to SwiftUI's memory graph.
+You <span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The Initialization Timeline Dilemma-cannot"></span><strong id="cannot">cannot</strong> use the plain <code>viewModel</code> trapdoor yet, because the underlying <code>State</code> storage container hasn't been fully set up or connected to SwiftUI's memory graph.
 
 <li>
-The only way to set things up is to create and initialize the storage container <span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The Initialization Timeline Dilemma-first"></span><strong id="first">first</strong>.
+The only way to set things up is to create and initialize the storage container <span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The Initialization Timeline Dilemma-first"></span><strong id="first">first</strong>.
 
 </ul>
 <p>
@@ -410,19 +544,19 @@ init(location: Location, onSave: @escaping (Location) -&gt; Void) {
 }
 </pre>
 
-<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-3. The struct vs. class Connection"><h4 id="3. The struct vs. class Connection" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-3. The struct vs. class Connection">3. The struct vs. class Connection</a></h4></div>
+<div id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-3. The struct vs. class Connection"><h4 id="3. The struct vs. class Connection" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-3. The struct vs. class Connection">3. The struct vs. class Connection</a></h4></div>
 
 <p>
 This brings us to why your ViewModel must be a <code>class</code> (marked with <code>@Observable</code>) while your View is a <code>struct</code>.
 </p>
 
-<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The View is a Struct (Value Type)"><h4 id="The View is a Struct (Value Type)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The View is a Struct (Value Type)">The View is a Struct (Value Type)</a></h4></div>
+<div id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The View is a Struct (Value Type)"><h4 id="The View is a Struct (Value Type)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The View is a Struct (Value Type)">The View is a Struct (Value Type)</a></h4></div>
 
 <p>
 If you change a property inside a struct, Swift considers the <em>entire struct</em> to have changed. If your ViewModel were a struct, every time a user typed a single letter into the <code>TextField</code> (<code>viewModel.name</code>), the entire <code>viewModel</code> struct would be recreated, forcing the <code>State</code> container to trigger a heavy re-render loop.
 </p>
 
-<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The ViewModel is a Class (Reference Type)"><h4 id="The ViewModel is a Class (Reference Type)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The ViewModel is a Class (Reference Type)">The ViewModel is a Class (Reference Type)</a></h4></div>
+<div id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The ViewModel is a Class (Reference Type)"><h4 id="The ViewModel is a Class (Reference Type)" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The ViewModel is a Class (Reference Type)">The ViewModel is a Class (Reference Type)</a></h4></div>
 
 <p>
 A class lives in a fixed spot in your device's memory. When you pass a class instance around, you aren't copying the data; you are just passing pointers (references) to that same spot in memory.
@@ -434,23 +568,23 @@ When we combine them in MVVM:
 
 <ul>
 <li>
-<span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The ViewModel is a Class (Reference Type)-The Container"></span><strong id="The Container">The Container</strong> (<code>@State</code>): Lives inside the View struct. It holds a <em>pointer</em> to the ViewModel class.
+<span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The ViewModel is a Class (Reference Type)-The Container"></span><strong id="The Container">The Container</strong> (<code>@State</code>): Lives inside the View struct. It holds a <em>pointer</em> to the ViewModel class.
 
 <li>
-<span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-The ViewModel is a Class (Reference Type)-The View Body"></span><strong id="The View Body">The View Body</strong>: Observes the class. Because your ViewModel class is marked with <code>@Observable</code>, it gains the ability to whisper directly to SwiftUI: <em>"Hey, the user just typed a character in name. Only repaint the specific TextFields that care about name."</em>
+<span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-The ViewModel is a Class (Reference Type)-The View Body"></span><strong id="The View Body">The View Body</strong>: Observes the class. Because your ViewModel class is marked with <code>@Observable</code>, it gains the ability to whisper directly to SwiftUI: <em>"Hey, the user just typed a character in name. Only repaint the specific TextFields that care about name."</em>
 
 </ul>
-<div id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-Putting It All Together"><h4 id="Putting It All Together" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-Putting It All Together">Putting It All Together</a></h4></div>
+<div id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-Putting It All Together"><h4 id="Putting It All Together" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-Putting It All Together">Putting It All Together</a></h4></div>
 
 <ul>
 <li>
-<span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-Putting It All Together-The Class"></span><strong id="The Class">The Class</strong> (<code>ViewModel</code>): Holds your actual, shifting data and networking logic safely in one persistent spot in memory.
+<span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-Putting It All Together-The Class"></span><strong id="The Class">The Class</strong> (<code>ViewModel</code>): Holds your actual, shifting data and networking logic safely in one persistent spot in memory.
 
 <li>
-<span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-Putting It All Together-The State Wrapper"></span><strong id="The State Wrapper">The State Wrapper</strong> (<code>_viewModel</code>): Acts as the glue anchor inside the View struct, keeping a firm grip on that Class instance so it doesn't vanish when the View re-renders.
+<span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-Putting It All Together-The State Wrapper"></span><strong id="The State Wrapper">The State Wrapper</strong> (<code>_viewModel</code>): Acts as the glue anchor inside the View struct, keeping a firm grip on that Class instance so it doesn't vanish when the View re-renders.
 
 <li>
-<span id="Another Approach-1. The Big Concepts Simplified-Demystifying the Underscore (_) Trick-Putting It All Together-The Underscore"></span><strong id="The Underscore">The Underscore</strong> (<code>_</code>): Your one-time pass inside the <code>init()</code> method to build that glue anchor before the rest of the View turns on.
+<span id="Another Approach-1. The Big Concepts Simplified-To Say It In One Sentence:-Putting It All Together-The Underscore"></span><strong id="The Underscore">The Underscore</strong> (<code>_</code>): Your one-time pass inside the <code>init()</code> method to build that glue anchor before the rest of the View turns on.
 
 </ul>
 <div id="Another Approach-1. The Big Concepts Simplified-Again"><h3 id="Again" class="header"><a href="#Another Approach-1. The Big Concepts Simplified-Again">Again</a></h3></div>
