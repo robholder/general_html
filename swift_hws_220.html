@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_220</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_219.html">Hacking With Swift - 219 - What you learned</a>
+
+</ul>
+<div id="Hacking With Swift - 220 - Key points"><h1 id="Hacking With Swift - 220 - Key points" class="header"><a href="#Hacking With Swift - 220 - Key points">Hacking With Swift - 220 - Key points</a></h1></div>
+
+<div id="Hacking With Swift - 220 - Key points-Key Points"><h2 id="Key Points" class="header"><a href="#Hacking With Swift - 220 - Key points-Key Points">Key Points</a></h2></div>
+
+<p>
+There are two topics I want to dive into more today, both of which are quite advanced but both are things that I know will really help deepen your understanding of what was covered in the previous three projects.
+</p>
+
+<div id="Hacking With Swift - 220 - Key points-Operator overloading"><h2 id="Operator overloading" class="header"><a href="#Hacking With Swift - 220 - Key points-Operator overloading">Operator overloading</a></h2></div>
+
+<p>
+When we added a custom conformance to <code>Comparable</code> we need to add one method called <code>&lt;</code>. This in turn allows Swift to compare expressions such as <code>a &lt; b</code>, which is what gave us access to a version of <code>sorted()</code> that took no parameters.
+</p>
+
+<p>
+This is called <em>operator overloading</em>, and it’s what allows us to add two integers or join two strings using the same <code>+</code> operator. You can define your own operators if you want, but it’s also easy to extend existing operators to do new things.
+</p>
+
+<p>
+As an example, we could add some extensions to <code>Int</code> that lets us multiply an <code>Int</code> and a <code>Double</code> - something that Swift doesn’t allow by default, which can be annoying:
+</p>
+
+<pre swift>
+extension Int {
+    static func *(lhs: Int, rhs: Double) -&gt; Double {
+        return Double(lhs) * rhs
+    }
+}
+</pre>
+
+<p>
+Pay particular attention to the parameters: it uses an <code>Int</code> as the left-hand operand and a <code>Double</code> as the right-hand operand, which means it <em>won’t</em> work if you swap those two around. So, if you want to be complete - if you want either order to work - you need to define the method twice.
+</p>
+
+<p>
+However, if you want to be <em>really</em> complete then extending <code>Int</code> is the wrong choice: we should go up to a protocol that wraps Int as well as other integer types such as the <code>Int16</code> we used with Core Data. Swift puts all integer types into a single protocol called <code>BinaryInteger</code>, and if we write an extension on that then <code>Self</code> (with a capital S) refers to whatever specific type is being used. So, if it’s used on an <code>Int</code> then <code>Self</code> means <code>Int</code>, and if it’s used on an <code>Int16</code> then it means that instead.
+</p>
+
+<p>
+Here’s an extension that adds <code>*</code> between any kind of integer and <code>Double</code>, regardless of whether the integer is on the left or on the right:
+</p>
+
+<pre swift>
+extension BinaryInteger {
+    static func *(lhs: Self, rhs: Double) -&gt; Double {
+        return Double(lhs) * rhs
+    }
+
+    static func *(lhs: Double, rhs: Self) -&gt; Double {
+        return lhs * Double(rhs)
+    }
+}
+</pre>
+
+<p>
+If you were wondering, there is a reason Swift doesn’t enable these operators for us: it’s not guaranteed to be as accurate as you might hope. As a simple example, try this:
+</p>
+
+<pre swift>
+let exampleInt: Int64 = 50_000_000_000_000_001
+print(exampleInt)
+
+let result = exampleInt * 1.0
+print(String(format: "%.0f", result))
+</pre>
+
+<p>
+That creates a 64-bit integer holding 50 quadrillion and one. It then multiplies it by the <code>Double</code> 1.0 using our custom extension, which in theory means the number that comes back should be identical to the <code>Int</code>. However, that <code>String(format:_:)</code> call asks for the number to be printed with no decimal places, and you’ll see it isn’t the same as the integer: it is 50 quadrillion without the 1. Now, you might ask “what’s 1 when you’re working with 50 quadrillion”, and that’s fine - I’m not here to tell you what’s right and wrong, only to say that if you want absolute accuracy you should avoid using these kinds of helper methods.
+</p>
+
+<p>
+More generally, I want to give you a warning about operator overloading. When I introduced it back in project 14 I said operator overloading “can be both a blessing and a curse,” and I want to touch briefly on why that is.
+</p>
+
+<p>
+Consider code like this:
+</p>
+
+<pre swift>
+let paul = User()
+let swift = Language()
+
+let result = paul + swift
+</pre>
+
+<p>
+What type of data is <code>result</code>? I can think of several possibilities:
+</p>
+
+<ul>
+<li>
+Maybe it’s another <code>User</code> object, now modified so that it has Swift in its array of known languages.
+
+<li>
+Maybe it’s a <code>Programmer</code> object combining a user and a language.
+
+<li>
+Maybe it’s a weird remake of the classic horror movie The Fly.
+
+</ul>
+<p>
+The point is that we don’t know, and we can’t really tell without reading into the source code for the relevant <code>+</code> operator.
+</p>
+
+<p>
+Now consider this code:
+</p>
+
+<pre swift>
+let paul = User()
+let swift = Language()
+paul.learn(swift)
+</pre>
+
+<p>
+This is much clearer, I think: we’re now running a simple method on an object, and you’d probably guess that we’re mutating <code>paul</code> to include Swift in the array of programming languages.
+</p>
+
+<p>
+Any good developer will tell you that clarity is one of the most important features of well-written code - we need to make our meaning clear in what we write, because it will be read dozens or hundreds of times in the future.
+</p>
+
+<p>
+So, by all means add operator overloading to your arsenal of skills that you can deploy to solve problems, and indeed I go into way more detail about them in my book Pro Swift, but always use them with care.
+</p>
+
+<div id="Hacking With Swift - 220 - Key points-Custom property wrappers"><h2 id="Custom property wrappers" class="header"><a href="#Hacking With Swift - 220 - Key points-Custom property wrappers">Custom property wrappers</a></h2></div>
+
+<p>
+You’ve seen that property wrappers are really just some sleight of hand: they take a simple value and wrap it in another another value so that some extra functionality can be added. This might be the way SwiftUI uses <code>@State</code> to store values elsewhere, or how it uses <code>@Environment</code> to read values from a shared data source, but the principle is the same: it takes a simple value and gives it super-powers somehow.
+</p>
+
+<p>
+We can use property wrappers in our own code, and there are lots of reasons why you might want to do so. As with operator overloading you’ll understand more about how things work if you try them out, but it’s also worth using them thoughtfully: if they are the first thing you reach for you’re probably making a mistake.
+</p>
+
+<p>
+To demonstrate property wrappers, I want to start with a simple struct that wraps some kind of <code>BinaryInteger</code> value. We’re going to give this thing some custom code when it comes to setting its wrapped value, so that if the new value is below 0 we instead make it exactly 0 so that this struct can never be negative.
+</p>
+
+<p>
+Our code would look like this:
+</p>
+
+<pre swift>
+struct NonNegative&lt;Value: BinaryInteger&gt; {
+    var value: Value
+
+    init(wrappedValue: Value) {
+        if wrappedValue &lt; 0 {
+            value = 0
+        } else {
+            value = wrappedValue
+        }
+    }
+
+    var wrappedValue: Value {
+        get { value }
+        set {
+            if newValue &lt; 0 {
+                value = 0
+            } else {
+                value = newValue
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+We can now create that with an integer, but if that integer drops below 0 then it will be clamped to 0. So, this will print 0:
+</p>
+
+<pre swift>
+var example = NonNegative(wrappedValue: 5)
+example.wrappedValue -= 10
+print(example.wrappedValue)
+</pre>
+
+<p>
+What property wrappers let us do is use that for any kind of property in a struct or class. Even better, it only takes one step: writing <code>@propertyWrapper</code> before the <code>NonNegative</code> struct, like this:
+</p>
+
+<pre swift>
+@propertyWrapper
+struct NonNegative&lt;Value: BinaryInteger&gt; {
+</pre>
+
+<p>
+That’s it - we now have our own property wrapper!
+</p>
+
+<p>
+In case you hadn’t guessed from their name, property wrappers can only be used on <em>properties</em> rather than plain variables or constants, so to try ours out we’re going to put it inside a <code>User</code> struct like this:
+</p>
+
+<pre swift>
+struct User {
+    @NonNegative var score = 0
+}
+</pre>
+
+<p>
+And now we can create a user and add or remove points freely, knowing for sure the score will never go below 0:
+</p>
+
+<pre swift>
+var user = User()
+user.score += 10
+print(user.score)
+
+user.score -= 20
+print(user.score)
+</pre>
+
+<p>
+As you can see, there really is no magic here: not only are property wrappers just syntactic sugar that causes one piece of data to be wrapped around another, but we can also make them ourselves if needed.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
