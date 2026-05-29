@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_215</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_214.html">Hacking With Swift - 214 - Fixing Word Scramble</a>
+
+</ul>
+<div id="Hacking With Swift - 215 - Fixing Bookworm"><h1 id="Hacking With Swift - 215 - Fixing Bookworm" class="header"><a href="#Hacking With Swift - 215 - Fixing Bookworm">Hacking With Swift - 215 - Fixing Bookworm</a></h1></div>
+
+<p>
+In project 11 we built Bookworm, an app that lets users store ratings and descriptions for books they had read, and we also introduced a custom <code>RatingView</code> UI component that showed star ratings from 1 to 5.
+</p>
+
+<p>
+Again, most of the app does well with VoiceOver, but that rating control is a hard fail - it uses a lot of individual buttons to add functionality, which doesn't convey the fact that they are supposed to represent ratings. For example, if I tap one of the stars, VoiceOver reads out to me, “favorite, button, favorite button, favorite button”, etc - it’s really not useful at all.
+</p>
+
+<p>
+That in itself is a problem, but it’s extra problematic because our <code>RatingView</code> is designed to be reusable - it’s the kind of thing you can take from this project and use in a dozen other projects, and that just means you end up polluting many apps with poor accessibility.
+</p>
+
+<p>
+We’re going to tackle this one in an unusual way: first with a simpler set of modifiers that do an okay job, but then by seeing how we can use <code>accessibilityAdjustableAction()</code> to get a more optimal result.
+</p>
+
+<p>
+Our initial approach will use two modifiers, each added to the star buttons. First, we need to add one that provides a meaningful label for each star, like this:
+</p>
+
+<pre swift>
+.accessibilityLabel("\(number == 1 ? "1 star" : "\(number) stars")")
+</pre>
+
+<p>
+Now we can make VoiceOver add a second trait, <code>.isSelected</code>, if the star is already highlighted.
+</p>
+
+<p>
+So, add this final modifier beneath the previous two:
+</p>
+
+<pre swift>
+.accessibilityAddTraits(number &gt; rating ? [] : [.isSelected])
+</pre>
+
+<p>
+It only took two small changes, but this improved component is much better than what we had before.
+</p>
+
+<p>
+This initial approach works well enough, and it’s certainly the easiest to take because it builds on all the skills you’ve used elsewhere. However, there’s a second approach that I want to look at, because I think it yields a far more <em>useful</em> result - it works more efficiently for folks relying on VoiceOver and other tools.
+</p>
+
+<p>
+First, remove the two modifiers we just added, and instead add these four to the <code>HStack</code>:
+</p>
+
+<pre swift>
+.accessibilityElement()
+.accessibilityLabel(label)
+.accessibilityValue(rating == 1 ? "1 star" : "\(rating) stars")
+.accessibilityAdjustableAction { direction in
+    switch direction {
+    case .increment:
+        if rating &lt; maximumRating { rating += 1 }
+    case .decrement:
+        if rating &gt; 1 { rating -= 1 }
+    default:
+        break
+    }
+}
+</pre>
+
+<p>
+That groups all its children together, applies the label “Rating”, but then adds a value based on the current stars. It also allows that rating value to be adjusted up or down using swipes, which is much better than trying to work through lots of individual images.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
