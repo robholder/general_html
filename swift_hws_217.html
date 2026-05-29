@@ -38,12 +38,118 @@
 The <code>CheckoutView</code> in Cupcake Corner uses an image and loading spinner that don’t add anything to the UI, so find a way to make the screenreader not read them out.
 
 </ul>
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I tried an accessibilityHidden(true) modifier, but that doesn't work. How can I achieve this?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+It is completely understandable why you expected <code>.accessibilityHidden(true)</code> to work here! It feels like the absolute right tool.
+</p>
+
+<p>
+The reason it failed is due to how SwiftUI wraps <code>AsyncImage</code>.
+</p>
+
+<p>
+<code>AsyncImage</code> isn’t a single visual element; it is a <span id="Ai Insight-ANSWER-structural container"></span><strong id="structural container">structural container</strong> that swaps things out under the hood. When you attach <code>.accessibilityHidden(true)</code> to the outer container, it doesn't always automatically push that setting down into the individual <code>Image</code> or <code>ProgressView</code> elements inside the closure.
+</p>
+
+<p>
+To hide it from VoiceOver, you have to apply accessibility modifiers to the <span id="Ai Insight-ANSWER-internal items"></span><strong id="internal items">internal items</strong> inside the closures, or tell SwiftUI to bypass the whole block. Here are the best ways to achieve this.
+</p>
+
+<div id="Ai Insight-ANSWER-Solution 1: Define the image as decorative (Most Elegant)"><h3 id="Solution 1: Define the image as decorative (Most Elegant)" class="header"><a href="#Ai Insight-ANSWER-Solution 1: Define the image as decorative (Most Elegant)">Solution 1: Define the image as decorative (Most Elegant)</a></h3></div>
+
+<p>
+Since the main cupcake image is purely decorative and doesn't convey critical text data, you can declare the image explicitly as a <span id="Ai Insight-ANSWER-Solution 1: Define the image as decorative (Most Elegant)-decorative image"></span><strong id="decorative image">decorative image</strong>.
+</p>
+
+<p>
+The <code>Image(decorative:)</code> initializer tells iOS to completely ignore the image for accessibility. Then, we apply <code>.accessibilityHidden(true)</code> explicitly to the <code>ProgressView</code> in the placeholder block:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/cupcakes@3x.jpg"), scale: 3) { phase in
+    switch phase {
+    case .success(let image):
+        // 1. Force the layout to treat the actual downloaded image as decorative
+        Image(uiImage: image.asUIImage()) // Or convert via the phase directly
+            .resizable()
+            .scaledToFit()
+    case .failure, .empty:
+        // 2. Hide the spinner explicitly
+        ProgressView()
+            .accessibilityHidden(true)
+    @unknown default:
+        EmptyView()
+    }
+}
+.frame(height: 233)
+</pre>
+
+<p>
+<em>Note: Since standard AsyncImage syntax abstracts the raw image away, a slightly cleaner alternative for the standard closure looks like Solution 2 below.</em>
+</p>
+
+<div id="Ai Insight-ANSWER-Solution 2: The Element Ignorer (Simplest Fix)"><h3 id="Solution 2: The Element Ignorer (Simplest Fix)" class="header"><a href="#Ai Insight-ANSWER-Solution 2: The Element Ignorer (Simplest Fix)">Solution 2: The Element Ignorer (Simplest Fix)</a></h3></div>
+
+<p>
+If you don't want to change your standard <code>AsyncImage</code> structure, you can force SwiftUI's accessibility engine to completely disregard the entire layout block by applying <code>.accessibilityElement(children: .ignore)</code> directly to the outer boundaries.
+</p>
+
+<p>
+Replace your current <code>AsyncImage</code> block with this:
+</p>
+
+<pre swift>
+AsyncImage(url: URL(string: "https://hws.dev/img/cupcakes@3x.jpg"), scale: 3) { image in
+    image
+        .resizable()
+        .scaledToFit()
+} placeholder: {
+    ProgressView()
+}
+.frame(height: 233)
+// This line tells VoiceOver: "Ignore absolutely everything inside this layout element"
+.accessibilityElement(children: .ignore) 
+</pre>
+
+<div id="Ai Insight-ANSWER-Why this works:"><h3 id="Why this works:" class="header"><a href="#Ai Insight-ANSWER-Why this works:">Why this works:</a></h3></div>
+
+<p>
+Instead of trying to hide the individual components inside, <code>.accessibilityElement(children: .ignore)</code> creates a shield over the entire <code>AsyncImage</code> box. When VoiceOver crawls down your screen, it encounters this container, sees the instruction to ignore all children, and skips clean over it directly to your "Your total is..." text.
+</p>
+
+<div id="Ai Insight-ANSWER-Why this works:-Side Note: Fix a Small Currency Typos"><h4 id="Side Note: Fix a Small Currency Typos" class="header"><a href="#Ai Insight-ANSWER-Why this works:-Side Note: Fix a Small Currency Typos">Side Note: Fix a Small Currency Typos</a></h4></div>
+
+<p>
+While looking over your code, I noticed a tiny typo in your currency text string:
+</p>
+
+<pre swift>
+Text("Your total is \(order.cost, format: .currency(code: "UDS"))")
+</pre>
+
+<p>
+You have written <code>"UDS"</code>. You'll want to swap that to <code>"USD"</code> for United States Dollars so the local device can render the <code>＄</code> symbol and format the cents correctly!
+</p>
+
 <p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_218.html">Hacking With Swift - 218 - Challenge 2</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
