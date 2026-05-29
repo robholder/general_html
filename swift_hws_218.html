@@ -38,12 +38,96 @@
 Fix the list rows in <code>iExpense</code> so they read out the name and value in one single VoiceOver label, and their type in a hint.
 
 </ul>
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<p>
+This is a classic SwiftUI accessibility challenge. By default, VoiceOver treats separate <code>Text</code> views inside a row as distinct focal points, which makes the user swipe multiple times just to read a single expense item (e.g., Swipe 1: <code>"Business Lunch"</code>, Swipe 2: <code>"$42.50"</code>).
+</p>
+
+<p>
+To solve Paul's challenge, we want to combine them so VoiceOver treats the entire row as <span id="Ai Insight-one single element"></span><strong id="one single element">one single element</strong>, reads the name and value right away, and then adds the expense type (Personal/Business) as a "hint" if the user pauses.
+</p>
+
+<p>
+Since you've cleanly separated your row layout into an <code>ExpenseRow(item: item)</code> view component, that is exactly where we need to apply the accessibility modifiers!
+</p>
+
+<div id="Ai Insight-The Solution"><h3 id="The Solution" class="header"><a href="#Ai Insight-The Solution">The Solution</a></h3></div>
+
+<p>
+You need to apply three specific accessibility modifiers to the layout inside your row:
+</p>
+
+<ul>
+<li>
+<code>.accessibilityElement(children: .ignore)</code> – Tell VoiceOver to stop looking at the individual internal Text pieces.
+
+<li>
+<code>.accessibilityLabel(...)</code> – Provide our custom combined string ("Name, Amount").
+
+<li>
+<code>.accessibilityHint(...)</code> – Provide the extra context ("Type: Business").
+
+</ul>
+<p>
+Assuming your <code>ExpenseRow</code> looks something like a standard <code>HStack</code>, here is how you implement it:
+</p>
+
+<pre swift>
+struct ExpenseRow: View {
+    let item: ExpenseItem
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(item.name)
+                    .font(.headline)
+                Text(item.type)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+            
+            // Format your amount currency properly
+            Text(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+        }
+        // --- ACCESSIBILITY MODIFIERS START HERE ---
+        // 1. Group the row components into a single VoiceOver element
+        .accessibilityElement(children: .ignore)
+        
+        // 2. Read out the name and amount cleanly in one breath
+        .accessibilityLabel("\(item.name), \(item.amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))")
+        
+        // 3. Add the classification category as a supplementary hint
+        .accessibilityHint("Category: \(item.type)")
+    }
+}
+</pre>
+
+<div id="Ai Insight-Why This Specific Order Matters"><h3 id="Why This Specific Order Matters" class="header"><a href="#Ai Insight-Why This Specific Order Matters">Why This Specific Order Matters</a></h3></div>
+
+<ul>
+<li>
+<code>children: .ignore</code>: Without this, VoiceOver might read out your custom label, but then still let the user swipe onto the internal name text or currency text. This completely clears out the inner elements so only your custom label exists.
+
+<li>
+<span id="Ai Insight-Why This Specific Order Matters-String Interpolation with Formatting"></span><strong id="String Interpolation with Formatting">String Interpolation with Formatting</strong>: Notice that inside <code>.accessibilityLabel</code>, we pass the exact same <code>.currency</code> format configuration used in your visual text view. If you just pass <code>\(item.amount)</code>, VoiceOver will awkwardly read out literal decimals (e.g., <em>"Forty-two point five"</em>) instead of a natural financial sentence (e.g., <em>"Forty-two dollars and fifty cents"</em>).
+
+<li>
+<span id="Ai Insight-Why This Specific Order Matters-The Hint"></span><strong id="The Hint">The Hint</strong>: Hints are spoken with a slight delay after the label. This means power-users scrolling quickly down their expense list will only hear the names and prices, avoiding unnecessary information fatigue unless they pause on a specific row!
+
+</ul>
 <p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_219.html">Hacking With Swift - 219 - What you learned</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
