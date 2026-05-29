@@ -68,7 +68,7 @@ However, if you want to be <em>really</em> complete then extending <code>Int</co
 </p>
 
 <p>
-Here’s an extension that adds <code>*</code> between any kind of integer and <code>Double</code>, regardless of whether the integer is on the left or on the right:
+Here’s an extension that adds <code>*</code> between any kind of <span id="Hacking With Swift - 220 - Key points-Operator overloading-integer"></span><strong id="integer">integer</strong> and <code>Double</code>, regardless of whether the integer is on the left or on the right:
 </p>
 
 <pre swift>
@@ -169,9 +169,57 @@ We can use property wrappers in our own code, and there are lots of reasons why 
 To demonstrate property wrappers, I want to start with a simple struct that wraps some kind of <code>BinaryInteger</code> value. We’re going to give this thing some custom code when it comes to setting its wrapped value, so that if the new value is below 0 we instead make it exactly 0 so that this struct can never be negative.
 </p>
 
+<div id="Ai Insight - BinaryIntegers"><h1 id="Ai Insight - BinaryIntegers" class="header"><a href="#Ai Insight - BinaryIntegers">Ai Insight - BinaryIntegers</a></h1></div>
+
+<div id="Ai Insight - BinaryIntegers-The Flexible BinaryInteger"><h2 id="The Flexible BinaryInteger" class="header"><a href="#Ai Insight - BinaryIntegers-The Flexible BinaryInteger">The Flexible BinaryInteger</a></h2></div>
+
+<p>
+By changing your extension to use <code>BinaryInteger</code> instead of <code>Int</code>, you break down a barrier. You are telling Swift: <em>"I don't care how many bits this number is, or if it's signed or unsigned. As long as it's a whole number, allow it."</em>
+</p>
+
+<p>
+Here is how you write that using generics:
+</p>
+
+<pre swift>
+extension View {
+    // T can be an Int, Int16, UInt64, UInt8, etc.
+    func itemBadge&lt;T: BinaryInteger&gt;(count: T) -&gt; some View {
+        Text("\(Int(count))") // We convert it inside the engine, so the user doesn't have to
+            .padding(5)
+            .background(.red)
+            .clipShape(.circle)
+    }
+}
+</pre>
+
+<div id="Ai Insight - BinaryIntegers-The Flexible BinaryInteger-Why this is a superpower:"><h4 id="Why this is a superpower:" class="header"><a href="#Ai Insight - BinaryIntegers-The Flexible BinaryInteger-Why this is a superpower:">Why this is a superpower:</a></h4></div>
+
+<p>
+Now, your layout code is completely agnostic to the underlying database architecture. A developer can write all three of these lines cleanly without a single compiler error:
+</p>
+
+<pre swift>
+ItemRow().itemBadge(count: standardInt)       // Works! (Int)
+ItemRow().itemBadge(count: smallCartQuantity) // Works! (Int16)
+ItemRow().itemBadge(count: massiveDatabaseID) // Works! (UInt64)
+</pre>
+
+<div id="Ai Insight - BinaryIntegers-The Flexible BinaryInteger-Summary Checklist"><h4 id="Summary Checklist" class="header"><a href="#Ai Insight - BinaryIntegers-The Flexible BinaryInteger-Summary Checklist">Summary Checklist</a></h4></div>
+
+<ul>
+<li>
+Use <code>Int</code> when you are declaring actual variables, storing properties in your models/ViewModels, or doing standard math loop calculations.
+
+<li>
+Look for / Use <code>BinaryInteger</code> when you are writing reusable utility functions, math extensions, or architectural framework tools that need to accept diverse integer types seamlessly.
+
+</ul>
 <p>
 Our code would look like this:
 </p>
+
+<div id="Ai Insight - BinaryIntegers-The Flexible BinaryInteger-Back to tutorial"><h4 id="Back to tutorial" class="header"><a href="#Ai Insight - BinaryIntegers-The Flexible BinaryInteger-Back to tutorial">Back to tutorial</a></h4></div>
 
 <pre swift>
 struct NonNegative&lt;Value: BinaryInteger&gt; {
@@ -197,6 +245,113 @@ struct NonNegative&lt;Value: BinaryInteger&gt; {
     }
 }
 </pre>
+
+<div id="Ai Insight (the struct above)"><h1 id="Ai Insight (the struct above)" class="header"><a href="#Ai Insight (the struct above)">Ai Insight (the struct above)</a></h1></div>
+
+<p>
+The struct above is a <span id="Ai Insight (the struct above)-textbook example of Generics!"></span><strong id="textbook example of Generics!">textbook example of Generics!</strong> In fact, it is an incredibly clever and useful one.
+</p>
+
+<p>
+You are looking at the foundational pattern for a custom <span id="Ai Insight (the struct above)-Property Wrapper"></span><strong id="Property Wrapper">Property Wrapper</strong> (similar to how <code>@State</code> or <code>@AppStorage</code> work under the hood) that automatically safeguards numbers from ever dropping below zero.
+</p>
+
+<p>
+Let’s demystify that exact syntax <code>&lt;Value: BinaryInteger&gt;</code> so you can see why it's written that way and how the "placeholder" mechanics work.
+</p>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>"><h2 id="Breaking Down the Syntax: <Value: BinaryInteger>" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>">Breaking Down the Syntax: <Value: BinaryInteger></a></h2></div>
+
+<p>
+Think of this syntax as a two-part contract for a structural blueprint:
+</p>
+
+<pre swift>
+struct NonNegative&lt;Value: BinaryInteger&gt; { ... }
+//                └──┬─┘ └──────┬──────┘
+//             Placeholder    The Constraint (Rule)
+</pre>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-1. The Placeholder (Value)"><h3 id="1. The Placeholder (Value)" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-1. The Placeholder (Value)">1. The Placeholder (Value)</a></h3></div>
+
+<p>
+The word <code>Value</code> inside the angle brackets is a <span id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-1. The Placeholder (Value)-generic type placeholder"></span><strong id="generic type placeholder">generic type placeholder</strong>. It doesn't exist yet as a real data type. It is simply a temporary label saying: _"A real whole-number type will be plugged in here later when this struct is actually born."
+</p>
+
+<table>
+<tr>
+<td>
+Note: You can name this anything! You could name it <code>&lt;T&gt;</code>, <code>&lt;Number&gt;</code>, or <code>&lt;Eggplant&gt;</code>. Paul Hudson and Apple developers tend to use Value or T by convention.
+</td>
+</tr>
+</table>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-2. The Type Constraint (: BinaryInteger)"><h3 id="2. The Type Constraint (: BinaryInteger)" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-2. The Type Constraint (: BinaryInteger)">2. The Type Constraint (: BinaryInteger)</a></h3></div>
+
+<p>
+The colon <code>:</code> followed by <code>BinaryInteger</code> acts as a strict guardrail. It tells Swift: <em>"The developer can plug in any data type they want for Value, BUT it absolutely must conform to the BinaryInteger protocol."</em>
+</p>
+
+<p>
+Without this guardrail, Swift would refuse to compile your code. Why? Look inside your initializer:
+</p>
+
+<pre swift>
+if wrappedValue &lt; 0 { ... }
+</pre>
+
+<p>
+If <code>Value</code> could be absolutely anything, someone might try to create a <code>NonNegative&lt;String&gt;</code> or a <code>NonNegative&lt;CUPCAKE&gt;</code>. Swift looks at that and asks: <em>"How am I supposed to check if a String or a Cupcake is less than zero (&lt; 0)?"</em> By constraining <code>Value</code> to <code>BinaryInteger</code>, you guarantee to the Swift compiler that whatever type is passed in will natively understand basic mathematical comparisons like <code>&lt; 0</code>.
+</p>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-How it works in practice (The Blueprint Multiplier)"><h3 id="How it works in practice (The Blueprint Multiplier)" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-How it works in practice (The Blueprint Multiplier)">How it works in practice (The Blueprint Multiplier)</a></h3></div>
+
+<p>
+Because of generics, you only had to write this code <span id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-How it works in practice (The Blueprint Multiplier)-once"></span><strong id="once">once</strong>, but you can now use it to manufacture completely different concrete structures based on your data needs.
+</p>
+
+<p>
+Behind the scenes, when you use it, Swift substitutes your <code>Value</code> placeholder with a real, concrete type:
+</p>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-How it works in practice (The Blueprint Multiplier)-Example A: A standard Player Score"><h4 id="Example A: A standard Player Score" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-How it works in practice (The Blueprint Multiplier)-Example A: A standard Player Score">Example A: A standard Player Score</a></h4></div>
+
+<pre swift>
+// Swift reads this and replaces every instance of 'Value' with 'Int'
+var score = NonNegative&lt;Int&gt;(wrappedValue: 10)
+score.wrappedValue -= 15 
+print(score.wrappedValue) // Output: 0 (Safely clamped!)
+</pre>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-How it works in practice (The Blueprint Multiplier)-Example B: A tiny space-saving Bluetooth age tracker"><h4 id="Example B: A tiny space-saving Bluetooth age tracker" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-How it works in practice (The Blueprint Multiplier)-Example B: A tiny space-saving Bluetooth age tracker">Example B: A tiny space-saving Bluetooth age tracker</a></h4></div>
+
+<pre swift>
+// Swift reads this and replaces every instance of 'Value' with 'UInt8'
+var userAge = NonNegative&lt;UInt8&gt;(wrappedValue: 25)
+</pre>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-Why this is so elegant"><h3 id="Why this is so elegant" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-Why this is so elegant">Why this is so elegant</a></h3></div>
+
+<p>
+If Swift didn't have generics combined with <code>BinaryInteger</code>, you would have to copy and paste this exact same logic over and over again to support different number architectures:
+</p>
+
+<ul>
+<li>
+<code>struct NonNegativeInt</code>
+
+<li>
+<code>struct NonNegativeInt16</code>
+
+<li>
+<code>struct NonNegativeUInt32</code>
+
+</ul>
+<p>
+Instead, your single generic <code>NonNegative</code> struct acts as a chameleon blueprint, adapting itself perfectly to whatever integer type your app's architecture requires!
+</p>
+
+<div id="Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-Why this is so elegant-Back to tutorial"><h4 id="Back to tutorial" class="header"><a href="#Ai Insight (the struct above)-Breaking Down the Syntax: <Value: BinaryInteger>-Why this is so elegant-Back to tutorial">Back to tutorial</a></h4></div>
 
 <p>
 We can now create that with an integer, but if that integer drops below 0 then it will be clamped to 0. So, this will print 0:
