@@ -44,8 +44,17 @@ That in itself is a problem, but it’s extra problematic because our <code>Rati
 </p>
 
 <p>
-We’re going to tackle this one in an unusual way: first with a simpler set of modifiers that do an okay job, but then by seeing how we can use <code>accessibilityAdjustableAction()</code> to get a more optimal result.
+We’re going to tackle this one in an unusual way:
 </p>
+<ul>
+<li>
+First with a simpler set of modifiers that do an okay job,
+
+<li>
+Then by seeing how we can use <code>accessibilityAdjustableAction()</code> to get a more optimal result.
+
+</ul>
+<div id="Hacking With Swift - 215 - Fixing Bookworm-First Approach"><h2 id="First Approach" class="header"><a href="#Hacking With Swift - 215 - Fixing Bookworm-First Approach">First Approach</a></h2></div>
 
 <p>
 Our initial approach will use two modifiers, each added to the star buttons. First, we need to add one that provides a meaningful label for each star, like this:
@@ -71,9 +80,65 @@ So, add this final modifier beneath the previous two:
 It only took two small changes, but this improved component is much better than what we had before.
 </p>
 
+<div id="Hacking With Swift - 215 - Fixing Bookworm-First Approach-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 215 - Fixing Bookworm-First Approach-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 215 - Fixing Bookworm-First Approach-In Context-RatingView.swift"><h4 id="RatingView.swift" class="header"><a href="#Hacking With Swift - 215 - Fixing Bookworm-First Approach-In Context-RatingView.swift">RatingView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct RatingView: View {
+    @Binding var rating: Int
+    
+    var label = ""
+    var maximumRating = 5
+    
+    var offImage: Image?
+    var onImage = Image(systemName: "star.fill")
+    
+    var offColor = Color.gray
+    var onColor = Color.yellow
+    
+    var body: some View {
+        HStack {
+            if label.isEmpty == false {
+                Text(label)
+            }
+            
+            ForEach(1..&lt;maximumRating + 1, id: \.self) { number in
+                Button {
+                    rating = number
+                } label: {
+                    image(for: number)
+                        .foregroundStyle(number &gt; rating ? offColor : onColor)
+                }
+                .accessibilityLabel("\(number == 1 ? "1 star" : "\(number) stars")")
+                .accessibilityAddTraits(number &gt; rating ? [] : [.isSelected])
+            }
+        }
+        .buttonStyle(.plain)
+    }
+    
+    func image(for number: Int) -&gt; Image {
+        if number &gt; rating {
+            offImage ?? onImage
+        } else {
+            onImage
+        }
+    }
+}
+
+#Preview {
+    RatingView(rating: .constant(4))
+}
+</pre>
+
 <p>
 This initial approach works well enough, and it’s certainly the easiest to take because it builds on all the skills you’ve used elsewhere. However, there’s a second approach that I want to look at, because I think it yields a far more <em>useful</em> result - it works more efficiently for folks relying on VoiceOver and other tools.
 </p>
+
+<div id="Hacking With Swift - 215 - Fixing Bookworm-Second Approach"><h2 id="Second Approach" class="header"><a href="#Hacking With Swift - 215 - Fixing Bookworm-Second Approach">Second Approach</a></h2></div>
 
 <p>
 First, remove the two modifiers we just added, and instead add these four to the <code>HStack</code>:
@@ -99,6 +164,71 @@ First, remove the two modifiers we just added, and instead add these four to the
 That groups all its children together, applies the label “Rating”, but then adds a value based on the current stars. It also allows that rating value to be adjusted up or down using swipes, which is much better than trying to work through lots of individual images.
 </p>
 
+<div id="Hacking With Swift - 215 - Fixing Bookworm-Second Approach-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 215 - Fixing Bookworm-Second Approach-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 215 - Fixing Bookworm-Second Approach-In Context-RatingView.swift"><h4 id="RatingView.swift" class="header"><a href="#Hacking With Swift - 215 - Fixing Bookworm-Second Approach-In Context-RatingView.swift">RatingView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct RatingView: View {
+    @Binding var rating: Int
+    
+    var label = ""
+    var maximumRating = 5
+    
+    var offImage: Image?
+    var onImage = Image(systemName: "star.fill")
+    
+    var offColor = Color.gray
+    var onColor = Color.yellow
+    
+    var body: some View {
+        HStack {
+            if label.isEmpty == false {
+                Text(label)
+            }
+            
+            ForEach(1..&lt;maximumRating + 1, id: \.self) { number in
+                Button {
+                    rating = number
+                } label: {
+                    image(for: number)
+                        .foregroundStyle(number &gt; rating ? offColor : onColor)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement()
+        .accessibilityLabel(label)
+        .accessibilityValue(rating == 1 ? "1 star" : "\(rating) stars")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                if rating &lt; maximumRating { rating += 1 }
+            case .decrement:
+                if rating &gt; 1 { rating -= 1 }
+            default:
+                break
+            }
+        }
+
+    }
+    
+    func image(for number: Int) -&gt; Image {
+        if number &gt; rating {
+            offImage ?? onImage
+        } else {
+            onImage
+        }
+    }
+}
+
+#Preview {
+    RatingView(rating: .constant(4))
+}
+</pre>
 <p>
 <hr>
 <br>
