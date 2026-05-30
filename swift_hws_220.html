@@ -753,6 +753,103 @@ If Swift didn't have generics combined with <code>BinaryInteger</code>, you woul
 Instead, your single generic <code>NonNegative</code> struct acts as a chameleon blueprint, adapting itself perfectly to whatever integer type your app's architecture requires!
 </p>
 
+<div id="Ai Insight - Propery Wrappers"><h1 id="Ai Insight - Propery Wrappers" class="header"><a href="#Ai Insight - Propery Wrappers">Ai Insight - Propery Wrappers</a></h1></div>
+
+<div id="Ai Insight - Propery Wrappers-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight - Propery Wrappers-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Are all 'property wrappers' basically structs?
+</p>
+
+<div id="Ai Insight - Propery Wrappers-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight - Propery Wrappers-ANSWER">ANSWER</a></h2></div>
+
+<p>
+The short answer is <span id="Ai Insight - Propery Wrappers-ANSWER-no, but almost all the ones you build yourself will be."></span><strong id="no, but almost all the ones you build yourself will be.">no, but almost all the ones you build yourself will be.</strong>
+</p>
+
+<p>
+In Swift, a property wrapper is not fundamentally a <code>struct</code>. Instead, a property wrapper is <span id="Ai Insight - Propery Wrappers-ANSWER-any type"></span><strong id="any type">any type</strong> (a <code>struct</code>, a <code>class</code>, or even an <code>enum</code>) that has been annotated with the <code>@propertyWrapper</code> attribute and contains a <code>wrappedValue</code> property.
+</p>
+
+<p>
+Because <code>structs</code> are lightweight, value-copied, and incredibly fast, they are the overwhelming default choice for 95% of custom property wrappers. However, choosing between a <code>struct</code> or a <code>class</code> completely changes how your wrapper manages data behind the scenes.
+</p>
+
+<div id="Ai Insight - Propery Wrappers-ANSWER-1. Struct Property Wrappers (Value Storage)"><h3 id="1. Struct Property Wrappers (Value Storage)" class="header"><a href="#Ai Insight - Propery Wrappers-ANSWER-1. Struct Property Wrappers (Value Storage)">1. Struct Property Wrappers (Value Storage)</a></h3></div>
+
+<p>
+When you build a property wrapper as a <code>struct</code>, the data is stored <span id="Ai Insight - Propery Wrappers-ANSWER-1. Struct Property Wrappers (Value Storage)-directly inside the view or object that calls it."></span><strong id="directly inside the view or object that calls it.">directly inside the view or object that calls it.</strong>
+</p>
+
+<p>
+Your <code>NonNegative</code> wrapper from earlier is a perfect example:
+</p>
+
+<pre swift>
+@propertyWrapper
+struct NonNegative&lt;T: BinaryInteger&gt; {
+    var value: T
+    var wrappedValue: T { ... }
+}
+</pre>
+
+<p>
+If you put <code>@NonNegative var score = 10</code> inside a SwiftUI View, that integer lives right inside the View’s own memory footprint. If the View gets destroyed or redrawn, the wrapper's lifecycle is tied directly to it.
+</p>
+
+<div id="Ai Insight - Propery Wrappers-ANSWER-2. Class Property Wrappers (Reference Storage)"><h3 id="2. Class Property Wrappers (Reference Storage)" class="header"><a href="#Ai Insight - Propery Wrappers-ANSWER-2. Class Property Wrappers (Reference Storage)">2. Class Property Wrappers (Reference Storage)</a></h3></div>
+
+<p>
+Sometimes, you don't want the data to be copied or destroyed with a single view. You want multiple parts of your app to point to the exact same live data pool in memory. This is where a <code>class</code> property wrapper is required.
+</p>
+
+<p>
+Think about SwiftUI's built-in <code>@StateObject</code> or <code>@EnvironmentObject</code>. Under the hood, these cannot be structs. They are <span id="Ai Insight - Propery Wrappers-ANSWER-2. Class Property Wrappers (Reference Storage)-classes"></span><strong id="classes">classes</strong> because they need to maintain a single, persistent reference to a view model, regardless of how many times a SwiftUI view destroys and rebuilds its structural layout.
+</p>
+
+<p>
+If you were to build a custom wrapper that logs data to a cloud database every time a value changes, you would likely use a <code>class</code>:
+</p>
+
+<pre swift>
+@propertyWrapper
+class CloudSynced {
+    var value: String
+    
+    var wrappedValue: String {
+        get { value }
+        set { 
+            value = newValue
+            sendToServer(newValue) // Shared network connection logic
+        }
+    }
+    
+    init(wrappedValue: String) {
+        self.value = wrappedValue
+    }
+}
+</pre>
+
+<div id="Ai Insight - Propery Wrappers-ANSWER-3. Enum Property Wrappers (State-Based Storage)"><h3 id="3. Enum Property Wrappers (State-Based Storage)" class="header"><a href="#Ai Insight - Propery Wrappers-ANSWER-3. Enum Property Wrappers (State-Based Storage)">3. Enum Property Wrappers (State-Based Storage)</a></h3></div>
+
+<p>
+Though quite rare, you can even make an <code>enum</code> a property wrapper! This is useful when a property's storage can only exist in a few strict states (like a multi-theme setting or a user permission clearance level).
+</p>
+
+<div id="Ai Insight - Propery Wrappers-ANSWER-Summary Checklist"><h3 id="Summary Checklist" class="header"><a href="#Ai Insight - Propery Wrappers-ANSWER-Summary Checklist">Summary Checklist</a></h3></div>
+
+<p>
+Think of <code>@propertyWrapper</code> as a <span id="Ai Insight - Propery Wrappers-ANSWER-Summary Checklist-behavior capsule"></span><strong id="behavior capsule">behavior capsule</strong>, not a specific data structure:
+</p>
+
+<ul>
+<li>
+Use a <code>struct</code> if your wrapper is just doing quick validation, formatting, or local calculation saving (like clamping numbers or saving to <code>UserDefaults</code>).
+
+<li>
+Use a <code>class</code> if your wrapper needs to manage shared states, live database connections, or network resources that shouldn't be duplicated when copied.
+
+</ul>
 <div id="Ai Insight - Multiple Operator Overload Functions"><h1 id="Ai Insight - Multiple Operator Overload Functions" class="header"><a href="#Ai Insight - Multiple Operator Overload Functions">Ai Insight - Multiple Operator Overload Functions</a></h1></div>
 
 <p>
