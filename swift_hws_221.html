@@ -89,14 +89,144 @@ That tells SwiftData not to save the image data directly inside its database, bu
 Remember, you already know everything you need to make this work - good luck!
 </p>
 
+<p>
+<hr>
+</p>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-@Attribute"><h2 id="@Attribute" class="header"><a href="#Ai Insight-@Attribute">@Attribute</a></h2></div>
+
+<p>
+Let’s unpack this line completely. This single line of code is actually packed with a ton of advanced Swift architecture.
+</p>
+
+<p>
+To understand what each component is doing, we have to look at how SwiftData transforms a standard variable into a managed database column.
+</p>
+
+<div id="Ai Insight-@Attribute-1. Breaking Down the Components"><h3 id="1. Breaking Down the Components" class="header"><a href="#Ai Insight-@Attribute-1. Breaking Down the Components">1. Breaking Down the Components</a></h3></div>
+
+<p>
+Here is the role of every single word in that line:
+</p>
+
+<pre swift>
+    @Attribute(.externalStorage) var  photo: Data
+//  └───┬───┘ └──────┬───────┘  └─┬─┘ └─┬─┘ └─┬┘
+//    Macro      Configuration Variable Name Type
+</pre>
+
+<div id="Ai Insight-@Attribute-1. Breaking Down the Components-@Attribute (The Macro)"><h4 id="@Attribute (The Macro)" class="header"><a href="#Ai Insight-@Attribute-1. Breaking Down the Components-@Attribute (The Macro)">@Attribute (The Macro)</a></h4></div>
+
+<p>
+This is a <span id="Ai Insight-@Attribute-1. Breaking Down the Components-@Attribute (The Macro)-Macro"></span><strong id="Macro">Macro</strong> (introduced in Swift 5.9). Think of a macro as a code-generation robot. When you compile your app, Xcode reads <code>@Attribute</code> and automatically writes dozens of lines of hidden code behind the scenes. It intercepts this property and teaches SwiftData how to map it to a database database schema.
+</p>
+
+<div id="Ai Insight-@Attribute-1. Breaking Down the Components-(.externalStorage) (The Configuration Option)"><h4 id="(.externalStorage) (The Configuration Option)" class="header"><a href="#Ai Insight-@Attribute-1. Breaking Down the Components-(.externalStorage) (The Configuration Option)">(.externalStorage) (The Configuration Option)</a></h4></div>
+
+<p>
+This is an <span id="Ai Insight-@Attribute-1. Breaking Down the Components-(.externalStorage) (The Configuration Option)-enum case"></span><strong id="enum case">enum case</strong> passed as a parameter into the macro. It configures the macro's behavior. Because Swift knows that <code>@Attribute</code> expects an option from the <code>Attribute.Options</code> enum, you can use the shorthand dot-syntax <code>.externalStorage</code> instead of typing out the full <code>Attribute.Options.externalStorage</code>.
+</p>
+
+<div id="Ai Insight-@Attribute-1. Breaking Down the Components-var photo: Data (The Property)"><h4 id="var photo: Data (The Property)" class="header"><a href="#Ai Insight-@Attribute-1. Breaking Down the Components-var photo: Data (The Property)">var photo: Data (The Property)</a></h4></div>
+
+<p>
+This is the standard Swift part you already know. It creates a mutable variable named photo that holds raw binary data (<code>Data</code>), which is how computers represent files like images, audio, or PDFs.
+</p>
+
+<div id="Ai Insight-@Attribute-2. What exactly is .externalStorage?"><h3 id="2. What exactly is .externalStorage?" class="header"><a href="#Ai Insight-@Attribute-2. What exactly is .externalStorage?">2. What exactly is .externalStorage?</a></h3></div>
+
+<p>
+Mechanically, <code>.externalStorage</code> is a <span id="Ai Insight-@Attribute-2. What exactly is .externalStorage?-static property/enum case"></span><strong id="static property/enum case">static property/enum case</strong> acting as a configuration flag.
+</p>
+
+<p>
+Conceptually, it completely changes <span id="Ai Insight-@Attribute-2. What exactly is .externalStorage?-where"></span><strong id="where">where</strong> your image is saved on the user's device.
+</p>
+
+<div id="Ai Insight-@Attribute-2. What exactly is .externalStorage?-Without .externalStorage (The Default Behavior)"><h4 id="Without .externalStorage (The Default Behavior)" class="header"><a href="#Ai Insight-@Attribute-2. What exactly is .externalStorage?-Without .externalStorage (The Default Behavior)">Without .externalStorage (The Default Behavior)</a></h4></div>
+
+<p>
+By default, SwiftData saves everything inside a single, monolithic database file (a SQLite file) in your app's sandbox. If you import ten 5MB photos, your database file suddenly swells to 50MB.
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight-@Attribute-2. What exactly is .externalStorage?-Without .externalStorage (The Default Behavior)-The Problem"></span><strong id="The Problem">The Problem</strong>: Databases are built to search text and numbers quickly. They get incredibly slow and bloated when they have to lug giant blobs of raw image binaries around every time you perform a simple text search or sort a list.
+
+</ul>
+<div id="Ai Insight-@Attribute-2. What exactly is .externalStorage?-With .externalStorage"><h4 id="With .externalStorage" class="header"><a href="#Ai Insight-@Attribute-2. What exactly is .externalStorage?-With .externalStorage">With .externalStorage</a></h4></div>
+
+<p>
+When you add this flag, you are telling SwiftData: <em>"Keep this property in my data model, but do not stuff the raw image bytes inside the SQL database file."</em>
+</p>
+
+<p>
+Instead, SwiftData does two things automatically:
+</p>
+
+<ul>
+<li>
+It carves out a private, secure folder right next to your database on the iPhone's hard drive.
+
+<li>
+It saves your image as a standalone file in that folder, and then writes a tiny, lightweight text path (a reference pointer) inside the actual database.
+
+</ul>
+<div id="Ai Insight-@Attribute-Why this is a Superpower"><h3 id="Why this is a Superpower" class="header"><a href="#Ai Insight-@Attribute-Why this is a Superpower">Why this is a Superpower</a></h3></div>
+
+<p>
+When you scroll through your <code>List</code> of named photos, SwiftData only has to read the text names from the database file, making your scrolling buttery smooth. It only reaches out to read the heavy image file from the external disk at the exact millisecond that specific row is drawn on the screen! You get all the organizational benefits of a database without any of the performance lag.
+</p>
+
+<div id="Ai Insight-More on @Attribute Configuration Options"><h2 id="More on @Attribute Configuration Options" class="header"><a href="#Ai Insight-More on @Attribute Configuration Options">More on @Attribute Configuration Options</a></h2></div>
+
+<p>
+Here is a quick bulleted breakdown of the most common and useful configuration options you can pass into the <code>@Attribute</code> macro in SwiftData:
+</p>
+
+<ul>
+<li>
+<code>.unique</code> Ensures that no two entries in the database can share the same value for this property. If a duplicate is inserted, it can trigger an overwrite or a conflict crash. Perfect for user IDs, email addresses, or SKU numbers.
+
+<li>
+<code>.encrypt</code> Tells SwiftData to automatically scramble and encrypt the data when writing it to disk, and decrypt it on the fly when loading it into memory. Ideal for highly sensitive user information like passwords or personal health metrics.
+
+<li>
+<code>originalName: "string"</code> Allows you to map a Swift property name to a different column name inside the underlying database file. This is incredibly helpful if you are renaming a variable in your code but need to map it to an older database to prevent losing existing user data.
+
+<li>
+<code>.preserveValueOnDeletion</code> Tells SwiftData to keep a record of this specific property's historical data in the persistent store's undo/redo history logs, even if the model instance itself gets completely deleted by the user.
+
+<li>
+<code>.transient</code>: (Though sometimes used via <code>@Transient</code> directly) Tells SwiftData to completely ignore this variable when saving to the database. It exists purely while the app is actively running in memory (like a temporary calculated layout state).
+
+</ul>
+<p>
+<hr>
+</p>
 <div id="Ai Build"><h1 id="Ai Build" class="header"><a href="#Ai Build">Ai Build</a></h1></div>
 
 <div id="Ai Build-Names"><h2 id="Names" class="header"><a href="#Ai Build-Names">Names</a></h2></div>
 
 <p>
-This is the classic "Name that Photo" challenge from the 100 Days of SwiftUI! It ties together a lot of advanced skills: handling permissions with <code>PhotosPicker</code>, managing asynchronous data loading, prompting the user with an alert text field, and persisting files.
+This is the classic "Name that Photo" challenge from the 100 Days of SwiftUI! It ties together a lot of advanced skills:
 </p>
+<ul>
+<li>
+Handling permissions with <code>PhotosPicker</code>,
 
+<li>
+Managing asynchronous data loading,
+
+<li>
+Prompting the user with an alert text field, and
+
+<li>
+Persisting files.
+
+</ul>
 <p>
 Since the challenge tip mentions it, using <span id="Ai Build-Names-SwiftData"></span><strong id="SwiftData">SwiftData</strong> is by far the most elegant and modern way to handle this. It handles both the database storage and the sorting requirements automatically, meaning we don't have to manually code JSON document directory paths or write a custom <code>Comparable</code> extension.
 </p>
