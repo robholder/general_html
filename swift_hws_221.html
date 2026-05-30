@@ -89,6 +89,196 @@ That tells SwiftData not to save the image data directly inside its database, bu
 Remember, you already know everything you need to make this work - good luck!
 </p>
 
+<div id="Ai Build"><h1 id="Ai Build" class="header"><a href="#Ai Build">Ai Build</a></h1></div>
+
+<div id="Ai Build-Names"><h2 id="Names" class="header"><a href="#Ai Build-Names">Names</a></h2></div>
+
+<p>
+This is the classic "Name that Photo" challenge from the 100 Days of SwiftUI! It ties together a lot of advanced skills: handling permissions with <code>PhotosPicker</code>, managing asynchronous data loading, prompting the user with an alert text field, and persisting files.
+</p>
+
+<p>
+Since the challenge tip mentions it, using <span id="Ai Build-Names-SwiftData"></span><strong id="SwiftData">SwiftData</strong> is by far the most elegant and modern way to handle this. It handles both the database storage and the sorting requirements automatically, meaning we don't have to manually code JSON document directory paths or write a custom <code>Comparable</code> extension.
+</p>
+
+<p>
+Here is a complete, working implementation split into the <span id="Ai Build-Names-Data Model"></span><strong id="Data Model">Data Model</strong>, the <span id="Ai Build-Names-Detail View"></span><strong id="Detail View">Detail View</strong>, and the <span id="Ai Build-Names-Main View"></span><strong id="Main View">Main View</strong>.
+</p>
+
+<div id="Ai Build-Names-1. The Data Model (NamedPhoto.swift)"><h3 id="1. The Data Model (NamedPhoto.swift)" class="header"><a href="#Ai Build-Names-1. The Data Model (NamedPhoto.swift)">1. The Data Model (NamedPhoto.swift)</a></h3></div>
+
+<p>
+First, we create our SwiftData model. As the challenge suggested, we use <code>@Attribute(.externalStorage)</code> on the image data so the database stays small and performant.
+</p>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+class NamedPhoto {
+    var id: UUID
+    var name: String
+    
+    // This tells SwiftData to save the raw image data as a separate file outside the DB
+    @Attribute(.externalStorage) var photoData: Data
+    
+    init(name: String, photoData: Data) {
+        self.id = UUID()
+        self.name = name
+        self.photoData = photoData
+    }
+}
+</pre>
+
+<div id="Ai Build-Names-2. The Detail Screen (PhotoDetailView.swift)"><h3 id="2. The Detail Screen (PhotoDetailView.swift)" class="header"><a href="#Ai Build-Names-2. The Detail Screen (PhotoDetailView.swift)">2. The Detail Screen (PhotoDetailView.swift)</a></h3></div>
+
+<p>
+This simple view takes the selected item and displays the image at a larger size, making use of safe area rules to look great.
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct PhotoDetailView: View {
+    let namedPhoto: NamedPhoto
+    
+    var body: some View {
+        VStack {
+            if let uiImage = UIImage(data: namedPhoto.photoData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(.rect(cornerRadius: 12))
+                    .padding()
+            } else {
+                ContentUnavailableView("Loading Image Failed", systemImage: "xmark.circle")
+            }
+            
+            Spacer()
+        }
+        .navigationTitle(namedPhoto.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+</pre>
+
+<div id="Ai Build-Names-3. The Main Screen (ContentView.swift)"><h3 id="3. The Main Screen (ContentView.swift)" class="header"><a href="#Ai Build-Names-3. The Main Screen (ContentView.swift)">3. The Main Screen (ContentView.swift)</a></h3></div>
+
+<p>
+This is where the magic happens. It coordinates the <code>PhotosPicker</code>, watches for a selection change, intercepts the raw data, triggers a naming prompt alert, and saves the final product to SwiftData.
+</p>
+
+<pre swift>
+import PhotosUI
+import SwiftData
+import SwiftUI
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    // Automatically fetches items from SwiftData, pre-sorted alphabetically by name
+    @Query(sort: \NamedPhoto.name) var photos: [NamedPhoto]
+    
+    // PhotosPicker States
+    @State private var selectedPickerItem: PhotosPickerItem? = nil
+    @State private var temporaryPhotoData: Data? = nil
+    
+    // Alert States for naming the photo
+    @State private var showingNamePrompt = false
+    @State private var newPhotoName = ""
+    
+    var body: some View {
+        NavigationStack {
+            List(photos) { item in
+                NavigationLink(destination: PhotoDetailView(namedPhoto: item)) {
+                    HStack(spacing: 16) {
+                        if let uiImage = UIImage(data: item.photoData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .clipShape(.rect(cornerRadius: 8))
+                        }
+                        
+                        Text(item.name)
+                            .font(.headline)
+                    }
+                }
+            }
+            .navigationTitle("Photo Collector")
+            .overlay {
+                if photos.isEmpty {
+                    ContentUnavailableView("No Photos", systemImage: "photo.on.rectangle.angled", description: Text("Tap the button below to import your first photo!"))
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .bottomBar) {
+                    // 1. The Picker Button
+                    PhotosPicker(selection: $selectedPickerItem, matching: .images) {
+                        Label("Import Photo", systemImage: "photo.badge.plus")
+                            .font(.headline)
+                    }
+                }
+            }
+            // 2. Listen for when the user successfully chooses a photo from the library
+            .onChange(of: selectedPickerItem) { _, newItem in
+                Task {
+                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                        temporaryPhotoData = data
+                        newPhotoName = "" // Reset text field
+                        showingNamePrompt = true // Trigger the naming alert immediately
+                    }
+                }
+            }
+            // 3. Intercept the flow and ask the user to input a name
+            .alert("Name Your Photo", isPresented: $showingNamePrompt) {
+                TextField("Enter name", text: $newPhotoName)
+                
+                Button("Save") {
+                    saveItem()
+                }
+                .disabled(newPhotoName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                
+                Button("Cancel", role: .cancel) {
+                    temporaryPhotoData = nil
+                }
+            } message: {
+                Text("Please give a descriptive name to the picture you just imported.")
+            }
+        }
+    }
+    
+    // 4. Commit the paired Name and Data into SwiftData permanent memory
+    func saveItem() {
+        guard let data = temporaryPhotoData else { return }
+        
+        let newPhoto = NamedPhoto(name: newPhotoName, photoData: data)
+        modelContext.insert(newPhoto)
+        
+        // Clean up state tracking values
+        temporaryPhotoData = nil
+        selectedPickerItem = nil
+    }
+}
+4. Don't Forget Your App Entrance Setup!
+Because we are using SwiftData, your core App file (YourAppNameApp.swift) must inject the model container context into the view tree window, like this:
+
+Swift
+import SwiftData
+import SwiftUI
+
+@main
+struct PhotoCollectorApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .modelContainer(for: NamedPhoto.self) // Sets up the DB environment
+        }
+    }
+}
+</pre>
+
 <p>
 <hr>
 <br>
