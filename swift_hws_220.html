@@ -850,6 +850,113 @@ Use a <code>struct</code> if your wrapper is just doing quick validation, format
 Use a <code>class</code> if your wrapper needs to manage shared states, live database connections, or network resources that shouldn't be duplicated when copied.
 
 </ul>
+<div id="Ai Insight - wrappedValue"><h1 id="Ai Insight - wrappedValue" class="header"><a href="#Ai Insight - wrappedValue">Ai Insight - wrappedValue</a></h1></div>
+
+<div id="Ai Insight - wrappedValue-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight - wrappedValue-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Does the value variable have to be named wrappedValue in a Property Wrapper?
+</p>
+
+<div id="Ai Insight - wrappedValue-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight - wrappedValue-ANSWER">ANSWER</a></h2></div>
+
+<p>
+No, the internal storage variable does <span id="Ai Insight - wrappedValue-ANSWER-not"></span><strong id="not">not</strong> have to be named <code>wrappedValue</code>. You can name your storage variable absolutely anything you like - <code>value</code>, <code>internalStorage</code>, <code>secretSafe</code>, or <code>pizza</code>.
+</p>
+
+<p>
+However, <span id="Ai Insight - wrappedValue-ANSWER-there is one massive catch"></span><strong id="there is one massive catch">there is one massive catch</strong>: your property wrapper must contain at <em>least</em> one property named exactly <code>wrappedValue</code>.
+</p>
+
+<p>
+The confusion usually comes from the fact that developers often use <code>wrappedValue</code> in two different places inside the same struct (as both the input parameter name and the computed property name). Let’s look at exactly what is flexible and what is strictly mandatory.
+</p>
+
+<div id="Ai Insight - wrappedValue-ANSWER-What is Mandatory vs. What is Flexible"><h3 id="What is Mandatory vs. What is Flexible" class="header"><a href="#Ai Insight - wrappedValue-ANSWER-What is Mandatory vs. What is Flexible">What is Mandatory vs. What is Flexible</a></h3></div>
+
+<p>
+In your code, you had three distinct variables/parameters interacting. Here is how the Swift compiler rules apply to each one:
+</p>
+
+<pre swift>
+@propertyWrapper
+struct NonNegative&lt;T: BinaryInteger&gt; {
+    var value: T                 // 1. FLEXIBLE! (Internal storage)
+    
+    init(wrappedValue: T) {      // 2. MANDATORY NAME! (The initializer argument)
+        self.value = wrappedValue 
+    }
+    
+    var wrappedValue: T {        // 3. MANDATORY NAME! (The computed property gateway)
+        get { value }
+        set { value = newValue }
+    }
+}
+</pre>
+
+<div id="Ai Insight - wrappedValue-ANSWER-1. The Internal Storage (var value: T) - FLEXIBLE"><h3 id="1. The Internal Storage (var value: T) - FLEXIBLE" class="header"><a href="#Ai Insight - wrappedValue-ANSWER-1. The Internal Storage (var value: T) - FLEXIBLE">1. The Internal Storage (var value: T) - FLEXIBLE</a></h3></div>
+
+<p>
+This is purely your personal property. The compiler doesn’t care about this variable at all. It only cares that you have some place to save your data. If you wanted to change this to <code>var underlyingData</code>, it is completely legal:
+</p>
+
+<pre swift>
+var underlyingData: T
+// inside init: self.underlyingData = wrappedValue
+// inside get/set: use underlyingData instead of value
+</pre>
+
+<div id="Ai Insight - wrappedValue-ANSWER-2. The Initializer Argument (wrappedValue: T) - MANDATORY"><h3 id="2. The Initializer Argument (wrappedValue: T) - MANDATORY" class="header"><a href="#Ai Insight - wrappedValue-ANSWER-2. The Initializer Argument (wrappedValue: T) - MANDATORY">2. The Initializer Argument (wrappedValue: T) - MANDATORY</a></h3></div>
+
+<p>
+When you use a property wrapper like this: <code>@NonNegative var score = 10</code>, Swift translates that under the hood into an initializer call. It implicitly looks for an initializer named exactly <code>init(wrappedValue:)</code>. If you change this argument name to something else, Swift won't know how to assign that initial <code>= 10</code> value automatically.
+</p>
+
+<div id="Ai Insight - wrappedValue-ANSWER-3. The Computed Property (var wrappedValue: T) - MANDATORY"><h3 id="3. The Computed Property (var wrappedValue: T) - MANDATORY" class="header"><a href="#Ai Insight - wrappedValue-ANSWER-3. The Computed Property (var wrappedValue: T) - MANDATORY">3. The Computed Property (var wrappedValue: T) - MANDATORY</a></h3></div>
+
+<p>
+This is the core requirement of the <code>@propertyWrapper</code> attribute. The compiler reads this exact name to hook up your custom logic to the outside world. If you rename this property, Xcode will throw a compiler error stating: <em>Property wrapper</em> type 'NonNegative' does not contain a 'wrappedValue' property._
+</p>
+
+<div id="Ai Insight - wrappedValue-ANSWER-3. The Computed Property (var wrappedValue: T) - MANDATORY-To Prove the Point: Let's Rename It!"><h4 id="To Prove the Point: Let's Rename It!" class="header"><a href="#Ai Insight - wrappedValue-ANSWER-3. The Computed Property (var wrappedValue: T) - MANDATORY-To Prove the Point: Let's Rename It!">To Prove the Point: Let's Rename It!</a></h4></div>
+
+<p>
+Here is your exact same <code>NonNegative</code> wrapper working flawlessly with the storage variable renamed to <code>storageTank</code>:
+</p>
+
+<pre swift>
+@propertyWrapper
+struct NonNegative&lt;T: BinaryInteger&gt; {
+    // 1. Renamed to whatever we want!
+    var storageTank: T 
+
+    // 2. Kept 'wrappedValue' here so "= 10" works on creation
+    init(wrappedValue: T) {
+        if wrappedValue &lt; 0 {
+            storageTank = 0
+        } else {
+            storageTank = wrappedValue
+        }
+    }
+
+    // 3. Kept 'wrappedValue' here because the @propertyWrapper rule demands it
+    var wrappedValue: T {
+        get { storageTank }
+        set {
+            if newValue &lt; 0 {
+                storageTank = 0
+            } else {
+                storageTank = newValue
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+By keeping <code>storageTank</code> distinct from <code>wrappedValue</code>, it actually makes it much easier to read the code because you can instantly tell the difference between your <span id="Ai Insight - wrappedValue-ANSWER-3. The Computed Property (var wrappedValue: T) - MANDATORY-To Prove the Point: Let's Rename It!-private storage"></span><strong id="private storage">private storage</strong> and your <span id="Ai Insight - wrappedValue-ANSWER-3. The Computed Property (var wrappedValue: T) - MANDATORY-To Prove the Point: Let's Rename It!-public interface!"></span><strong id="public interface!">public interface!</strong>
+</p>
+
 <div id="Ai Insight - Multiple Operator Overload Functions"><h1 id="Ai Insight - Multiple Operator Overload Functions" class="header"><a href="#Ai Insight - Multiple Operator Overload Functions">Ai Insight - Multiple Operator Overload Functions</a></h1></div>
 
 <p>
