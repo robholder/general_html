@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_documents_directory</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Documents Directory"><h1 id="Swift - Documents Directory" class="header"><a href="#Swift - Documents Directory">Swift - Documents Directory</a></h1></div>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI"><h2 id="The Complete Guide to the iOS Documents Directory in SwiftUI" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI">The Complete Guide to the iOS Documents Directory in SwiftUI</a></h2></div>
+
+<p>
+When building iOS apps, you will eventually encounter data that is too complex for <code>UserDefaults</code> but doesn't require a full relational database like <code>SwiftData</code>. This is where the <span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Documents Directory"></span><strong id="Documents Directory">Documents Directory</strong> shines.
+</p>
+
+<p>
+The Documents Directory is a dedicated folder inside your app's private filesystem sandbox. It is the perfect home for user-generated content like text files, custom JSON logs, exported data, or media files that need to persist permanently.
+</p>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-1. What is the Documents Directory?"><h3 id="1. What is the Documents Directory?" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-1. What is the Documents Directory?">1. What is the Documents Directory?</a></h3></div>
+
+<p>
+Every iOS app lives inside its own isolated container called a <span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-1. What is the Documents Directory?-Sandbox"></span><strong id="Sandbox">Sandbox</strong>. Your app cannot look at other apps' files, and other apps cannot look at yours.
+</p>
+
+<p>
+Inside your sandbox, iOS provides a few standard directories:
+</p>
+
+<ul>
+<li>
+<span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-1. What is the Documents Directory?-Temporary"></span><strong id="Temporary">Temporary</strong> (<code>/tmp</code>): For files you need right now, but iOS can purge when disk space is low.
+
+<li>
+<span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-1. What is the Documents Directory?-Caches"></span><strong id="Caches">Caches</strong> (<code>/Library/Caches</code>): For files that can be re-downloaded if deleted.
+
+<li>
+<span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-1. What is the Documents Directory?-Documents"></span><strong id="Documents">Documents</strong> (<code>/Documents</code>): <span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-1. What is the Documents Directory?-The Holy Grail"></span><strong id="The Holy Grail">The Holy Grail</strong>. Files saved here are permanent, automatically backed up to iCloud (unless configured otherwise), and will never be deleted by the operating system.
+
+</ul>
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-2. Locating the Documents Directory in Swift"><h3 id="2. Locating the Documents Directory in Swift" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-2. Locating the Documents Directory in Swift">2. Locating the Documents Directory in Swift</a></h3></div>
+
+<p>
+Because the exact filepath to an app's sandbox changes every single time the app is launched or updated, you must never hardcode a path string. Instead, you ask the system's <code>FileManager</code> to dynamically find it for you.
+</p>
+
+<p>
+Here is the standard, reusable helper extension most iOS developers use to find this directory:
+</p>
+
+<pre swift>
+import Foundation
+
+extension FileManager {
+    static var documentsDirectory: URL {
+        // Find the Documents directory for the current user
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        
+        // Return the first path found (there will only ever be one on iOS)
+        return paths[0]
+    }
+}
+</pre>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection"><h3 id="3. Advanced Writing Configurations: .atomic and .completeFileProtection" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection">3. Advanced Writing Configurations: .atomic and .completeFileProtection</a></h3></div>
+
+<p>
+When writing raw data (<code>Data</code>) to disk using Swift's <code>data.write(to: options:)</code> method, you can pass writing options to ensure data integrity and security. Two options are critical for production apps:
+</p>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection-Option A: .atomic (The Safety Net)"><h4 id="Option A: .atomic (The Safety Net)" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection-Option A: .atomic (The Safety Net)">Option A: .atomic (The Safety Net)</a></h4></div>
+
+<p>
+Imagine your app is halfway through writing a massive 10MB file to disk, and the user's phone suddenly dies, or they force-quit the app. If you write directly to the file destination, that file is now corrupted and unreadable.
+</p>
+
+<ul>
+<li>
+<span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection-Option A: .atomic (The Safety Net)-How"></span><strong id="How">How</strong> <code>.atomic</code> <span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection-Option A: .atomic (The Safety Net)-fixes this"></span><strong id="fixes this">fixes this</strong>: Swift writes your data to a hidden auxiliary temporary file first. Once the write is 100% successful, it instantly swaps that temporary file into the final destination. If the write fails halfway through, your original file remains completely untouched and uncorrupted.
+
+</ul>
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection-Option B: .completeFileProtection (The Digital Vault)"><h4 id="Option B: .completeFileProtection (The Digital Vault)" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection-Option B: .completeFileProtection (The Digital Vault)">Option B: .completeFileProtection (The Digital Vault)</a></h4></div>
+
+<p>
+iOS features hardware-level encryption. By passing <code>.completeFileProtection</code>, you tell the operating system to strongly encrypt the file on the flash drive using a key derived from the user's passcode.
+</p>
+
+<ul>
+<li>
+<span id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-3. Advanced Writing Configurations: .atomic and .completeFileProtection-Option B: .completeFileProtection (The Digital Vault)-How it behaves"></span><strong id="How it behaves">How it behaves</strong>: The file becomes completely unreadable while the device is locked or booting up. It is only decrypted on the fly when the user unlocks their device. This is essential for protecting private user records or sensitive data.
+
+</ul>
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Other Options"><h3 id="Other Options" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Other Options">Other Options</a></h3></div>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Other Options-The File Security Spectrum (Data Protection Options)"><h4 id="The File Security Spectrum (Data Protection Options)" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Other Options-The File Security Spectrum (Data Protection Options)">The File Security Spectrum (Data Protection Options)</a></h4></div>
+
+<ul>
+<li>
+<code>.completeFileProtection</code>
+ (see above)
+
+<li>
+<code>.completeFileProtectionUnlessOpen</code>
+
+</ul>
+<p>
+This encrypts the file on disk, but if your app manages to open a data stream to the file while the phone is unlocked, the system allows your app to keep reading and writing to that file even if the user subsequently locks their device.
+</p>
+
+<p>
+Best for: Long-running background data uploads or media processing pipelines.
+</p>
+
+<ul>
+<li>
+<code>.completeFileProtectionUntilFirstUserAuthentication</code>
+
+</ul>
+<p>
+This is the default standard behavior for modern iOS apps. The file is heavily encrypted and inaccessible from the millisecond the phone boots up until the very first time the user unlocks their phone with FaceID or a passcode. After that first unlock, the file stays decrypted and accessible to your app until the phone is completely restarted again.
+</p>
+
+<p>
+Best for: General app data that background widgets or notifications might need to touch while the phone is locked in a pocket.
+</p>
+
+<ul>
+<li>
+<code>.noFileProtection</code>
+
+</ul>
+<p>
+This strips away the passcode-linked encryption completely, saving the file with basic sandbox permissions. The file is readable even if the device hasn't been unlocked since a system reboot.
+</p>
+
+<p>
+Best for: System logs or assets that are completely non-sensitive but are strictly required immediately upon an unexpected device reboot.
+</p>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Other Options-File Creation and Overwriting Rules"><h4 id="File Creation and Overwriting Rules" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Other Options-File Creation and Overwriting Rules">File Creation and Overwriting Rules</a></h4></div>
+
+<ul>
+<li>
+<code>.withoutOverwriting</code>
+
+</ul>
+<p>
+By default, if you write a file named notes.json to the Documents folder and a file with that name already exists, Swift will silently vaporize the old file and replace it with the new one.
+Passing .withoutOverwriting acts as a safety shield. If a file already exists at that destination path, the write operation will instantly halt, fail, and throw an error.
+</p>
+
+<p>
+Best for: Creating brand-new files where accidentally overwriting a user's previous work would cause catastrophic data loss.
+</p>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON"><h3 id="4. Implementation Blueprint: Saving and Loading JSON" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON">4. Implementation Blueprint: Saving and Loading JSON</a></h3></div>
+
+<p>
+Here is a complete, self-contained implementation showing how to save a custom Swift struct to a JSON file inside the Documents Directory and read it back.
+</p>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON-Step 1: Define a Codable Model"><h4 id="Step 1: Define a Codable Model" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON-Step 1: Define a Codable Model">Step 1: Define a Codable Model</a></h4></div>
+
+<p>
+Your data structure must conform to the <code>Codable</code> protocol so Swift knows how to serialize it into JSON text.
+</p>
+
+<pre swift>
+import Foundation
+
+struct AppNotes: Codable {
+    var title: String
+    var content: String
+    var lastUpdated: Date
+}
+</pre>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON-Step 2: The Document Manager Manager Class"><h4 id="Step 2: The Document Manager Manager Class" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON-Step 2: The Document Manager Manager Class">Step 2: The Document Manager Manager Class</a></h4></div>
+
+<p>
+This manager encapsulates the file saving and loading workflow, utilizing both <code>.atomic</code> and <code>.completeFileProtection</code>.
+</p>
+
+<pre swift>
+import Foundation
+
+class DocumentDataManager {
+    // Define the specific file destination name
+    private static let fileName = "user_notes.json"
+    
+    private static var fileURL: URL {
+        FileManager.documentsDirectory.appendingPathComponent(fileName)
+    }
+    
+    // SAVE FUNCTION
+    static func save(notes: AppNotes) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601 // Keep dates clean in JSON
+        
+        do {
+            // 1. Convert the Swift Object into raw JSON bytes
+            let data = try encoder.encode(notes)
+            
+            // 2. Write the data with modern safety options
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            print("Successfully saved to: \(fileURL.lastPathComponent)")
+        } catch {
+            print("Failed to write file: \(error.localizedDescription)")
+        }
+    }
+    
+    // LOAD FUNCTION
+    static func load() -&gt; AppNotes? {
+        do {
+            // 1. Read the raw data bytes from the secure disk path
+            let data = try Data(contentsOf: fileURL)
+            
+            // 2. Decode the JSON bytes back into our Swift Struct
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let notes = try decoder.decode(AppNotes.self, from: data)
+            return notes
+        } catch {
+            print("No existing data found or decoding failed: \(error.localizedDescription)")
+            return nil // Return nil so the view can substitute default values
+        }
+    }
+}
+</pre>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON-Step 3: Integrating with a SwiftUI View"><h4 id="Step 3: Integrating with a SwiftUI View" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-4. Implementation Blueprint: Saving and Loading JSON-Step 3: Integrating with a SwiftUI View">Step 3: Integrating with a SwiftUI View</a></h4></div>
+
+<p>
+Now, hook this manager up to a standard SwiftUI text field interface using standard lifecycle modifiers:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct DocumentsDirectoryPrimerView: View {
+    @State private var noteTitle = ""
+    @State private var noteContent = ""
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Note Title", text: $noteTitle)
+                    .font(.headline)
+                
+                TextEditor(text: $noteContent)
+                    .frame(height: 150)
+                
+                Button(action: saveCurrentData) {
+                    Label("Save Securely to Disk", systemImage: "arrow.down.doc.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .navigationTitle("Secure Notepad")
+            // Load the data automatically when the screen appears
+            .onAppear(perform: loadExistingData)
+        }
+    }
+    
+    private func saveCurrentData() {
+        let currentNotes = AppNotes(title: noteTitle, content: noteContent, lastUpdated: Date())
+        DocumentDataManager.save(notes: currentNotes)
+    }
+    
+    private func loadExistingData() {
+        if let savedNotes = DocumentDataManager.load() {
+            noteTitle = savedNotes.title
+            noteContent = savedNotes.content
+        }
+    }
+}
+</pre>
+
+<div id="Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Summary Checklist for Storage Formats"><h3 id="Summary Checklist for Storage Formats" class="header"><a href="#Swift - Documents Directory-The Complete Guide to the iOS Documents Directory in SwiftUI-Summary Checklist for Storage Formats">Summary Checklist for Storage Formats</a></h3></div>
+
+<ul>
+<li>
+Use <code>UserDefaults</code> for basic flags, user preferences, and simple integers/booleans.
+
+<li>
+Use <code>SwiftData</code> if you need complex sorting, database relationships, filtering, or handling thousands of unique objects.
+
+<li>
+Use the <code>Documents Directory</code> directly when you want absolute control over file formats, when saving single large configuration blocks (like a custom game layout file), or when writing media files directly to the filesystem.
+
+</ul>
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_userdefaults</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<div id="[[index]]"><h1 id="[[index]]" class="header"><a href="#[[index]]"><a href="index.html">index</a></a></h1></div>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - UserDefaults"><h1 id="Swift - UserDefaults" class="header"><a href="#Swift - UserDefaults">Swift - UserDefaults</a></h1></div>
+
+<div id="Swift - UserDefaults-What is UserDefaults?"><h2 id="What is UserDefaults?" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?">What is UserDefaults?</a></h2></div>
+
+<p>
+<code>UserDefaults</code> is a lightweight, persistent key-value store built into iOS and macOS. Think of it as a <span id="Swift - UserDefaults-What is UserDefaults?-digital ledger"></span><strong id="digital ledger">digital ledger</strong> where your app can quickly write down small pieces of information and read them back the next time the app launches.
+</p>
+
+<p>
+It is designed for saving simple user configuration settings, such as:
+</p>
+
+<ul>
+<li>
+App themes (e.g., Dark Mode vs. Light Mode)
+
+<li>
+Volume sliders or sound toggle preferences
+
+<li>
+"Remember Me" switches or onboarding completion flags
+<table>
+<tr>
+<td>
+⚠️ <span id="Swift - UserDefaults-What is UserDefaults?-The Golden Rule of UserDefaults"></span><strong id="The Golden Rule of UserDefaults">The Golden Rule of UserDefaults</strong>: Only store <span id="Swift - UserDefaults-What is UserDefaults?-small amounts of non-sensitive data"></span><strong id="small amounts of non-sensitive data">small amounts of non-sensitive data</strong> (numbers, strings, booleans). Because the entire file is loaded into your phone's memory when the app launches, storing large items like images or PDFs will severely degrade your app's performance.
+</td>
+</tr>
+</table>
+
+</ul>
+<div id="Swift - UserDefaults-What is UserDefaults?-How it Works Under the Hood"><h3 id="How it Works Under the Hood" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-How it Works Under the Hood">How it Works Under the Hood</a></h3></div>
+
+<p>
+Behind the scenes, iOS creates a simple, unencrypted <span id="Swift - UserDefaults-What is UserDefaults?-How it Works Under the Hood-XML text file"></span><strong id="XML text file">XML text file</strong> (known as a <code>.plist</code> or <span id="Swift - UserDefaults-What is UserDefaults?-How it Works Under the Hood-Property List"></span><strong id="Property List">Property List</strong> file) inside your app’s secure sandbox directory.
+</p>
+
+<p>
+When you save something, you must provide a <span id="Swift - UserDefaults-What is UserDefaults?-How it Works Under the Hood-Key"></span><strong id="Key">Key</strong> (a unique string that acts as the address) and a <span id="Swift - UserDefaults-What is UserDefaults?-How it Works Under the Hood-Value"></span><strong id="Value">Value</strong> (the piece of data). If you write a new value to an existing key, the old value is instantly overwritten.
+</p>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Implementing UserDefaults in SwiftUI"><h3 id="Implementing UserDefaults in SwiftUI" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Implementing UserDefaults in SwiftUI">Implementing UserDefaults in SwiftUI</a></h3></div>
+
+<p>
+SwiftUI provides a dedicated property wrapper called <code>@AppStorage</code>. This wrapper completely automates reading and writing to <code>UserDefaults</code> while forcing your SwiftUI views to update instantly whenever the saved data changes.
+</p>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Implementing UserDefaults in SwiftUI-1. The Standard Implementation"><h4 id="1. The Standard Implementation" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Implementing UserDefaults in SwiftUI-1. The Standard Implementation">1. The Standard Implementation</a></h4></div>
+
+<p>
+Here is a self-contained layout demonstrating how to track an onboarding status and a sound preference:
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct SettingsView: View {
+    // 1. Declare variables using the @AppStorage property wrapper
+    // Format: @AppStorage("UNIQUE_KEY") var variableName = DEFAULT_VALUE
+    @AppStorage("isSoundEnabled") private var isSoundEnabled = true
+    @AppStorage("themeColor") private var themeColor = "Blue"
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Audio Settings") {
+                    // 2. Interacting with the variable updates UserDefaults automatically
+                    Toggle("Enable Sound Effects", isOn: $isSoundEnabled)
+                }
+                
+                Section("Theme Customization") {
+                    Picker("Theme Color", selection: $themeColor) {
+                        Text("Blue").tag("Blue")
+                        Text("Green").tag("Green")
+                        Text("Red").tag("Red")
+                    }
+                    .pickerStyle(.segmented)
+                }
+                
+                Section("Debug Info") {
+                    Text("Saved values: Sound is \(isSoundEnabled ? "ON" : "OFF"), Theme is \(themeColor)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Preferences")
+        }
+    }
+}
+</pre>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Implementing UserDefaults in SwiftUI-2. How to Read from UserDefaults Anywhere Else"><h4 id="2. How to Read from UserDefaults Anywhere Else" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Implementing UserDefaults in SwiftUI-2. How to Read from UserDefaults Anywhere Else">2. How to Read from UserDefaults Anywhere Else</a></h4></div>
+
+<p>
+If you need to check a value on a completely different screen (for example, reading the sound preference on your main game loop screen), you just declare the exact same <code>@AppStorage</code> key combination again:
+</p>
+
+<pre swift>
+struct GamePlayView: View {
+    // Re-declaring this hooks into the exact same file location on disk
+    @AppStorage("isSoundEnabled") private var isSoundEnabled = true
+
+    var body: some View {
+        VStack {
+            Text("Game Screen")
+            if isSoundEnabled {
+                Text("🔊 [Playing background music...]")
+            } else {
+                Text("🔇 [Audio Muted]")
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Advanced Tip: Best Practices for Keys"><h3 id="Advanced Tip: Best Practices for Keys" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Advanced Tip: Best Practices for Keys">Advanced Tip: Best Practices for Keys</a></h3></div>
+
+<p>
+Typing hardcoded string keys like <code>"isSoundEnabled"</code> in multiple files is risky; a single typo (like <code>"issoundEnabled"</code>) will cause your app to read from the wrong location without showing a compiler error.
+</p>
+
+<p>
+To solve this, organize your keys inside an <code>enum</code> or a <code>struct</code> extension to make them safe and auto-completable:
+</p>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Extension Solution"><h3 id="Extension Solution" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Extension Solution">Extension Solution</a></h3></div>
+
+<pre swift>
+// Create an extension for centralized management
+extension String {
+    static let isSoundEnabled = "isSoundEnabled"
+    static let themeColor = "themeColor"
+}
+
+// Usage inside your views:
+@AppStorage(.isSoundEnabled) private var isSoundEnabled = true
+</pre>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Enum Solution"><h3 id="Enum Solution" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Enum Solution">Enum Solution</a></h3></div>
+
+<p>
+While the <code>String</code> extension trick is clever, many iOS developers actually prefer using an <code>enum</code> because it creates a strict, isolated container that is completely separated from normal text strings.
+</p>
+
+<p>
+To use an enum with <code>@AppStorage</code>, your enum must conform to <code>String</code> (known as a <span id="Swift - UserDefaults-What is UserDefaults?-Enum Solution-Raw-Value Enum"></span><strong id="Raw-Value Enum">Raw-Value Enum</strong>). This tells Swift that every case represents a matching string under the hood.
+</p>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Enum Solution-Step 1: Define the Keys Enum"><h4 id="Step 1: Define the Keys Enum" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Enum Solution-Step 1: Define the Keys Enum">Step 1: Define the Keys Enum</a></h4></div>
+
+<pre swift>
+enum StorageKeys: String {
+    case isSoundEnabled // Automatically stands for the string "isSoundEnabled"
+    case themeColor     // Automatically stands for the string "themeColor"
+}
+</pre>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Enum Solution-Step 2: Use it inside your Views"><h4 id="Step 2: Use it inside your Views" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Enum Solution-Step 2: Use it inside your Views">Step 2: Use it inside your Views</a></h4></div>
+
+<p>
+Because <code>@AppStorage</code> natively expects a raw <code>String</code>, not a custom <code>StorageKeys</code> type, you have to read the enum case's <code>.rawValue</code> property when assigning it:
+</p>
+
+<pre swift>
+struct SettingsView: View {
+    // We pass the string value wrapped inside the enum case
+    @AppStorage(StorageKeys.isSoundEnabled.rawValue) private var isSoundEnabled = true
+    @AppStorage(StorageKeys.themeColor.rawValue) private var themeColor = "Blue"
+
+    var body: some View {
+        Toggle("Sound", isOn: $isSoundEnabled)
+    }
+}
+</pre>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Implicit Raw Values"><h3 id="Implicit Raw Values" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Implicit Raw Values">Implicit Raw Values</a></h3></div>
+
+<p>
+Why couldn't we just declare the enum case explicitly with a string assignment like this?
+</p>
+
+<pre swift>
+enum StorageKeys: String {
+    case isSoundEnabled = "isSoundEnabled"
+}
+</pre>
+
+<p>
+You absolutely <em>can</em> write it that way, but Swift has a built-in feature called <span id="Swift - UserDefaults-What is UserDefaults?-Implicit Raw Values-Implicit Raw Values"></span><strong id="Implicit Raw Values">Implicit Raw Values</strong>.
+</p>
+
+<p>
+If you conform an enum to String, Swift automatically assumes that the string value matches the case name exactly. Writing = <code>"isSoundEnabled"</code> is redundant because the compiler writes that code for you behind the scenes.
+</p>
+
+<div id="Swift - UserDefaults-What is UserDefaults?-Extension vs. Enum: Which is better?"><h3 id="Extension vs. Enum: Which is better?" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-Extension vs. Enum: Which is better?">Extension vs. Enum: Which is better?</a></h3></div>
+
+<p>
+Both approaches are designed to solve the exact same problem: preventing you from making a spelling typo that breaks your app configuration file layout.
+</p>
+
+<ul>
+<li>
+<span id="Swift - UserDefaults-What is UserDefaults?-Extension vs. Enum: Which is better?-The Extension Way"></span><strong id="The Extension Way">The Extension Way</strong> (<code>.isSoundEnabled</code>): Cleaner to type inside your views because you get to use the ultra-short dot notation syntax, but it pollutes the global <code>String</code> namespace with keys meant only for storage.
+
+<li>
+<span id="Swift - UserDefaults-What is UserDefaults?-Extension vs. Enum: Which is better?-The Enum Way"></span><strong id="The Enum Way">The Enum Way</strong> (<code>StorageKeys.isSoundEnabled.rawValue</code>): Slightly more verbose to type, but it is vastly safer and more organized because all your app settings keys are securely boxed inside their own custom data type!
+
+</ul>
+<div id="Swift - UserDefaults-What is UserDefaults?-When to Upgrade from UserDefaults to SwiftData"><h3 id="When to Upgrade from UserDefaults to SwiftData" class="header"><a href="#Swift - UserDefaults-What is UserDefaults?-When to Upgrade from UserDefaults to SwiftData">When to Upgrade from UserDefaults to SwiftData</a></h3></div>
+
+<p>
+Because <code>UserDefaults</code> is so easy to use, it can be tempting to use it for everything. Use this checklist to decide if it's the right tool for the job:
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Data Requirement
+</th>
+<th>
+Best Tool
+</th>
+<th>
+Why?
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Simple switches, numbers, strings
+</td>
+<td>
+<code>UserDefaults</code> <code>(@AppStorage)</code>
+</td>
+<td>
+Lightweight, zero setup required.
+</td>
+</tr>
+<tr>
+<td>
+Sensitive user tokens or passwords
+</td>
+<td>
+<code>Keychain</code> storage
+</td>
+<td>
+UserDefaults is saved in plain, unencrypted text. Anyone with physical backup access can read it.
+</td>
+</tr>
+<tr>
+<td>
+Complex objects, lists, or relational items
+</td>
+<td>
+<code>SwiftData</code>
+</td>
+<td>
+UserDefaults cannot easily filter, sort, or link multi-property datasets together without slow, custom encoding.
+</td>
+</tr>
+</tbody>
+</table>
+<p>
+<hl>
+<br>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
