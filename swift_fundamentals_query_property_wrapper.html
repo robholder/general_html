@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_query_property_wrapper</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - @Query Property Wrapper"><h1 id="Swift - @Query Property Wrapper" class="header"><a href="#Swift - @Query Property Wrapper">Swift - @Query Property Wrapper</a></h1></div>
+
+<div id="Swift - @Query Property Wrapper-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Swift - @Query Property Wrapper-Ai Insight">Ai Insight</a></h2></div>
+
+<div id="Swift - @Query Property Wrapper-QUESTION"><h2 id="QUESTION" class="header"><a href="#Swift - @Query Property Wrapper-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I'm comparing two examples of the @Query property wrapper (is that the correct term?), and wondering if the sort function is available in all cases:
+</p>
+
+<pre swift>
+@Query(sort: \NamedPhoto.name) var photos: [NamedPhoto]
+</pre>
+
+<p>
+...and:
+</p>
+
+<pre swift>
+@Query var students: [Student]
+</pre>
+
+<div id="Swift - @Query Property Wrapper-ANSWER"><h2 id="ANSWER" class="header"><a href="#Swift - @Query Property Wrapper-ANSWER">ANSWER</a></h2></div>
+
+<p>
+First, to answer your parenthetical question: Yes, <code>@Query</code> <em>is</em> <span id="Swift - @Query Property Wrapper-ANSWER-absolutely a Property Wrapper!"></span><strong id="absolutely a Property Wrapper!">absolutely a Property Wrapper!</strong> You are using the exact correct terminology. It is a custom macro-powered property wrapper provided by the SwiftData framework to handle fetching database records dynamically.
+</p>
+
+<p>
+To answer your main question: <span id="Swift - @Query Property Wrapper-ANSWER-Yes, the sorting functionality is always technically available, but how you apply it changes completely depending on how you write that line."></span><strong id="Yes, the sorting functionality is always technically available, but how you apply it changes completely depending on how you write that line.">Yes, the sorting functionality is always technically available, but how you apply it changes completely depending on how you write that line.</strong>
+</p>
+
+<p>
+Here is the difference between your two examples and how you can add sorting to the second one when your app's needs grow.
+</p>
+
+<div id="Swift - @Query Property Wrapper-ANSWER-Example 1: Compile-Time (Hardcoded) Sorting"><h3 id="Example 1: Compile-Time (Hardcoded) Sorting" class="header"><a href="#Swift - @Query Property Wrapper-ANSWER-Example 1: Compile-Time (Hardcoded) Sorting">Example 1: Compile-Time (Hardcoded) Sorting</a></h3></div>
+
+<pre swift>
+@Query(sort: \NamedPhoto.name) var photos: [NamedPhoto]
+</pre>
+
+<p>
+In this first version, you are passing the sorting instructions directly into the property wrapper's initializer configurations.
+</p>
+
+<ul>
+<li>
+<span id="Swift - @Query Property Wrapper-ANSWER-Example 1: Compile-Time (Hardcoded) Sorting-How it works"></span><strong id="How it works">How it works</strong>: This hardcodes a permanent sorting rule right at compile-time. Every single time this view loads, SwiftData will automatically sort the data alphabetically by the <code>.name</code> property before it even hands the array to your layout.
+
+<li>
+<span id="Swift - @Query Property Wrapper-ANSWER-Example 1: Compile-Time (Hardcoded) Sorting-The Downside"></span><strong id="The Downside">The Downside</strong>: This is rigid. Because it is baked directly into the property wrapper declaration, you cannot easily change this sort order dynamically at runtime based on a user clicking a button (e.g., swapping from "Sort by Name" to "Sort by Date Created").
+
+</ul>
+<div id="Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting"><h3 id="Example 2: Dynamic (Runtime) Sorting" class="header"><a href="#Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting">Example 2: Dynamic (Runtime) Sorting</a></h3></div>
+
+<pre swift>
+@Query var students: [Student]
+</pre>
+
+<p>
+In your second version, you aren't passing any configurations to <code>@Query</code>. By default, SwiftData will fetch the students in whatever random order they happen to exist inside the database file (usually the order they were created).
+</p>
+
+<p>
+However, <span id="Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting-the ability to sort is not gone."></span><strong id="the ability to sort is not gone.">the ability to sort is not gone.</strong> You have two ways to sort this collection:
+</p>
+
+<div id="Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting-Option A: Swift-Side Sorting (In-Memory)"><h4 id="Option A: Swift-Side Sorting (In-Memory)" class="header"><a href="#Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting-Option A: Swift-Side Sorting (In-Memory)">Option A: Swift-Side Sorting (In-Memory)</a></h4></div>
+
+<p>
+You can let <code>@Query</code> fetch the messy, unsorted array, and then use standard Swift array methods right inside your SwiftUI body to display them cleanly:
+</p>
+
+<pre swift>
+// Inside your List layout:
+List(students.sorted(by: { $0.lastName &lt; $1.lastName })) { student in
+    Text(student.firstName)
+}
+</pre>
+
+<p>
+<em>Note: This works great for small collections, but for thousands of database rows, sorting things in your phone's live memory can cause frame-rate drops.</em>
+</p>
+
+<div id="Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting-Option B: The Advanced Initializer Pattern (The SwiftData Way)"><h4 id="Option B: The Advanced Initializer Pattern (The SwiftData Way)" class="header"><a href="#Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting-Option B: The Advanced Initializer Pattern (The SwiftData Way)">Option B: The Advanced Initializer Pattern (The SwiftData Way)</a></h4></div>
+
+<p>
+If you want the database engine to sort the students dynamically based on a user's picker selection, you move the sorting rule out of the property wrapper declaration and inject it through the view's <span id="Swift - @Query Property Wrapper-ANSWER-Example 2: Dynamic (Runtime) Sorting-Option B: The Advanced Initializer Pattern (The SwiftData Way)-initializer"></span><strong id="initializer">initializer</strong> (<code>init</code>).
+</p>
+
+<p>
+Remember how we dynamically built the database rule in your <code>ExpenseListView</code> challenge earlier? You can do the exact same thing with a sort descriptor!
+</p>
+
+<pre swift>
+struct StudentListView: View {
+    @Query var students: [Student]
+
+    // We accept a dynamic sorting rule from the parent screen
+    init(sortOrder: SortDescriptor&lt;Student&gt;) {
+        // We inject that rule directly into the underlying query storage wrapper
+        _students = Query(sort: [sortOrder])
+    }
+    
+    var body: some View {
+        List(students) { student in ... }
+    }
+}
+</pre>
+
+<div id="Swift - @Query Property Wrapper-ANSWER-Summary Checklist"><h3 id="Summary Checklist" class="header"><a href="#Swift - @Query Property Wrapper-ANSWER-Summary Checklist">Summary Checklist</a></h3></div>
+
+<ul>
+<li>
+<span id="Swift - @Query Property Wrapper-ANSWER-Summary Checklist-Is sorting always available?"></span><strong id="Is sorting always available?">Is sorting always available?</strong> Yes.
+
+<li>
+Use <code>@Query(sort: ...)</code> if your list will <span id="Swift - @Query Property Wrapper-ANSWER-Summary Checklist-always"></span><strong id="always">always</strong> be ordered the exact same way for the entire lifecycle of the app.
+
+<li>
+Use a blank <code>@Query</code> if your data collection is tiny enough to sort with standard <code>.sorted()</code> on the fly, or if you plan to build a configuration screen that changes the database sorting rules dynamically at runtime via the <code>init()</code> configuration injection method!
+
+</ul>
+<p>
+<hr>
+<br>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

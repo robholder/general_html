@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_model_macro</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - @Model Macro"><h1 id="Swift - @Model Macro" class="header"><a href="#Swift - @Model Macro">Swift - @Model Macro</a></h1></div>
+
+<div id="Swift - @Model Macro-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Swift - @Model Macro-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+To understand how SwiftData works, looking at <code>@Query</code> is only seeing half the equation. If <code>@Query</code> is the claw crane that reaches into the machine to pull out your data, <code>@Model</code> is the factory blueprint that defines exactly what those data prizes look like.
+</p>
+
+<p>
+However, there is one critical vocabulary distinction to make right out of the gate: <code>@Model</code> is a <span id="Swift - @Model Macro-Ai Insight-Macro"></span><strong id="Macro">Macro</strong>, not a Property Wrapper. While a property wrapper (like <code>@Query</code>) manages an individual variable inside a view, a macro (like <code>@Model</code>) completely transforms an <span id="Swift - @Model Macro-Ai Insight-entire Swift class"></span><strong id="entire Swift class">entire Swift class</strong> into a living database table.
+</p>
+
+<p>
+Here is the blueprint layout of how you use it to set up your SwiftData storage.
+</p>
+
+<div id="Swift - @Model Macro-Ai Insight-The Anatomy of a @Model Class"><h3 id="The Anatomy of a @Model Class" class="header"><a href="#Swift - @Model Macro-Ai Insight-The Anatomy of a @Model Class">The Anatomy of a @Model Class</a></h3></div>
+
+<p>
+To turn any standard Swift class into a managed SwiftData storage object, you simply type <code>@Model</code> directly above the class definition.
+</p>
+
+<p>
+Here is a complete, annotated blueprint for a hypothetical <code>Student</code> storage object:
+</p>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model 
+class Student {
+    // 1. Storage attributes (Configurations)
+    @Attribute(.unique) var studentID: String
+    
+    // 2. Standard persistent properties
+    var firstName: String
+    var lastName: String
+    var enrollmentDate: Date
+    
+    // 3. Relationships (Linking tables together)
+    @Relationship(deleteRule: .cascade) var grades: [Grade] = []
+    
+    // 4. A standard Swift initializer is required
+    init(studentID: String, firstName: String, lastName: String, enrollmentDate: Date = .now) {
+        self.studentID = studentID
+        self.firstName = firstName
+        self.lastName = lastName
+        self.enrollmentDate = enrollmentDate
+    }
+}
+</pre>
+
+<div id="Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes"><h3 id="What @Model Is Doing Behind the Scenes" class="header"><a href="#Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes">What @Model Is Doing Behind the Scenes</a></h3></div>
+
+<p>
+When the compiler reads that <code>@Model</code> tag, your code-generation robot goes to work. It radically alters how that class behaves in your app's memory:
+</p>
+
+<div id="Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes-1. Automatic Table Schema Generation"><h4 id="1. Automatic Table Schema Generation" class="header"><a href="#Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes-1. Automatic Table Schema Generation">1. Automatic Table Schema Generation</a></h4></div>
+
+<p>
+SwiftData looks at every variable inside your class (<code>String</code>, <code>Date</code>, <code>Int</code>, etc.) and automatically constructs a corresponding column inside a hidden SQLite database file. You don't have to write a single line of SQL database schema setup.
+</p>
+
+<div id="Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes-2. Conformance to PersistentModel"><h4 id="2. Conformance to PersistentModel" class="header"><a href="#Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes-2. Conformance to PersistentModel">2. Conformance to PersistentModel</a></h4></div>
+
+<p>
+The macro forces your class to conform to SwiftData's internal <code>PersistentModel</code> protocol. This injects hidden tracking mechanics into your variables. The exact millisecond you change a student's name in your app (<code>student.firstName = "Alex"</code>), SwiftData detects the mutation and queues it up to be saved to disk automatically.
+</p>
+
+<div id="Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes-3. Conformance to Identifiable"><h4 id="3. Conformance to Identifiable" class="header"><a href="#Swift - @Model Macro-Ai Insight-What @Model Is Doing Behind the Scenes-3. Conformance to Identifiable">3. Conformance to Identifiable</a></h4></div>
+
+<p>
+It automatically synthesizes a unique internal database identifier (<code>PersistentIdentifier</code>) for every single object instance. This is why you can pass a <code>@Model</code> array straight into a SwiftUI <code>List</code> or <code>ForEach</code> block without having to manually define an <code>id: \.id</code> parameter!
+</p>
+
+<div id="Swift - @Model Macro-Ai Insight-The Companion Companions: Core Companions for @Model"><h3 id="The Companion Companions: Core Companions for @Model" class="header"><a href="#Swift - @Model Macro-Ai Insight-The Companion Companions: Core Companions for @Model">The Companion Companions: Core Companions for @Model</a></h3></div>
+
+<p>
+When configuring properties inside your <code>@Model</code> class, you have three major structural modifiers available to fine-tune your storage database engine:
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Modifier / Macro
+</th>
+<th>
+What It Instantly Tells the Database Engine
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>@Attribute</code>
+</td>
+<td>
+Set specific constraints or rules on a column (like <code>.unique</code> for tracking IDs, or <code>.externalStorage</code> for binary image optimization).
+</td>
+</tr>
+<tr>
+<td>
+<code>@Relationship</code>
+</td>
+<td>
+Connects this table to another class table (e.g., matching a <code>Student</code> to an array of <code>Grade</code> objects). The <code>.cascade</code> rule means if a student is deleted, all their grades are automatically scrubbed too!
+</td>
+</tr>
+<tr>
+<td>
+<code>@Transient</code>	Tells SwiftData to completely ignore this specific property when saving to disk. It lives temporarily in RAM only while the app is actively running.
+</td>
+<td>
+&nbsp;
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Swift - @Model Macro-Ai Insight-How @Model and @Query Talk to Each Other"><h3 id="How @Model and @Query Talk to Each Other" class="header"><a href="#Swift - @Model Macro-Ai Insight-How @Model and @Query Talk to Each Other">How @Model and @Query Talk to Each Other</a></h3></div>
+
+<p>
+The entire system relies on these two macros matching perfectly.
+</p>
+
+<p>
+When you write <code>@Query var students: [Student]</code>, SwiftUI looks at the type inside the array brackets (<code>Student</code>). It checks the database directory for a schema registered under that exact name by the <code>@Model</code> macro, pulls out the data rows, converts them back into native Swift objects, and streams them smoothly into your screen layouts!
+</p>
+
+<div id="Swift - @Model Macro-Blueprints into Storage"><h2 id="Blueprints into Storage" class="header"><a href="#Swift - @Model Macro-Blueprints into Storage">Blueprints into Storage</a></h2></div>
+
+<p>
+To turn those blueprints into real physical storage on the user's device, you need <code>modelContainer</code> and <code>modelContext</code>. These two components set up the active database factory environment that links <code>@Model</code> and <code>@Query</code> together.
+</p>
+
+<div id="Swift - @Model Macro-Blueprints into Storage-The SwiftData Trinity"><h3 id="The SwiftData Trinity" class="header"><a href="#Swift - @Model Macro-Blueprints into Storage-The SwiftData Trinity">The SwiftData Trinity</a></h3></div>
+
+<p>
+To make SwiftData work in any app, you need three interconnected components. Think of them as a factory hierarchy:
+</p>
+
+<ul>
+<li>
+<code>@Model</code> (<span id="Swift - @Model Macro-Blueprints into Storage-The SwiftData Trinity-The Blueprint"></span><strong id="The Blueprint">The Blueprint</strong>): Defines what the data structure looks like.
+
+<li>
+<code>ModelContainer</code> (<span id="Swift - @Model Macro-Blueprints into Storage-The SwiftData Trinity-The Factory Building"></span><strong id="The Factory Building">The Factory Building</strong>): The actual persistent storage database file on the hard drive. It reads your blueprints and creates the real tables on disk.
+
+<li>
+<code>ModelContext</code> (<span id="Swift - @Model Macro-Blueprints into Storage-The SwiftData Trinity-The Assembly Line Worker"></span><strong id="The Assembly Line Worker">The Assembly Line Worker</strong>): The active, running memory space where you add, edit, or delete items. It watches for changes and pushes them into the Container.
+
+</ul>
+<div id="Swift - @Model Macro-Blueprints into Storage-The SwiftData Trinity-Step 1: Setting up the Factory (.modelContainer)"><h4 id="Step 1: Setting up the Factory (.modelContainer)" class="header"><a href="#Swift - @Model Macro-Blueprints into Storage-The SwiftData Trinity-Step 1: Setting up the Factory (.modelContainer)">Step 1: Setting up the Factory (.modelContainer)</a></h4></div>
+
+<p>
+Before any view can use <code>@Query</code> to fetch data, you must initialize the backend database file. You do this at the absolute root of your app using the <code>.modelContainer(for:)</code> view modifier.
+</p>
+
+<p>
+Open your main app file (the one with the <code>@main</code> attribute) and pass your <code>@Model</code> classes into the window group:
+</p>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@main
+struct StudentTrackerApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                // This builds the database file on disk for the Student blueprint
+                .modelContainer(for: Student.self) 
+        }
+    }
+}
+</pre>
+
+<div id="Swift - @Model Macro-Blueprints into Storage-What this modifier does automatically:"><h3 id="What this modifier does automatically:" class="header"><a href="#Swift - @Model Macro-Blueprints into Storage-What this modifier does automatically:">What this modifier does automatically:</a></h3></div>
+
+<ul>
+<li>
+It looks at the <code>Student</code> class layout and provisions a physical SQLite database file inside your app's protected sandbox directory.
+
+<li>
+It sets up an active <code>ModelContext</code> assembly line.
+
+<li>
+It injects that entire database environment deep into the SwiftUI environment tree, making it available to <code>ContentView</code> and <em>every single subview down the line.</em>
+
+</ul>
+<div id="Swift - @Model Macro-Blueprints into Storage-What this modifier does automatically:-Step 2: Modifying Data via the Assembly Line (modelContext)"><h4 id="Step 2: Modifying Data via the Assembly Line (modelContext)" class="header"><a href="#Swift - @Model Macro-Blueprints into Storage-What this modifier does automatically:-Step 2: Modifying Data via the Assembly Line (modelContext)">Step 2: Modifying Data via the Assembly Line (modelContext)</a></h4></div>
+
+<p>
+Once the container is running at the top of your app, <code>@Query</code> will seamlessly start pulling data out of it. But what happens when you want to <span id="Swift - @Model Macro-Blueprints into Storage-What this modifier does automatically:-Step 2: Modifying Data via the Assembly Line (modelContext)-add"></span><strong id="add">add</strong> a new student or <span id="Swift - @Model Macro-Blueprints into Storage-What this modifier does automatically:-Step 2: Modifying Data via the Assembly Line (modelContext)-delete"></span><strong id="delete">delete</strong> an existing one?
+</p>
+
+<p>
+You need to call upon the context (the worker). You grab the active context out of SwiftUI's environment using the <code>\.modelContext</code> key path:
+</p>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ContentView: View {
+    // 1. Grab the active worker out of the environment
+    @Environment(\.modelContext) var modelContext
+    
+    // 2. Stream the live data out of the container
+    @Query var students: [Student]
+
+    var body: some View {
+        NavigationStack {
+            List(students) { student in
+                Text("\(student.firstName) \(student.lastName)")
+            }
+            .toolbar {
+                Button("Add Student", systemImage: "plus") {
+                    addExampleStudent()
+                }
+            }
+        }
+    }
+
+    func addExampleStudent() {
+        // Create a new instance using your @Model blueprint
+        let newStudent = Student(studentID: "123", firstName: "Harry", lastName: "Potter")
+        
+        // 3. Hand the new object to the worker to insert it into the database container
+        modelContext.insert(newStudent)
+        
+        // No need to call a "save()" method! The context automatically syncs 
+        // changes to disk periodically behind the scenes.
+    }
+}
+</pre>
+
+<div id="Swift - @Model Macro-Blueprints into Storage-Summary Checklist"><h3 id="Summary Checklist" class="header"><a href="#Swift - @Model Macro-Blueprints into Storage-Summary Checklist">Summary Checklist</a></h3></div>
+
+<p>
+Without setting up these layers, trying to use <code>@Query</code> will cause your app to crash immediately with a message like: <em>"No ModelContext found in the environment."</em>
+</p>
+
+<ul>
+<li>
+<code>@Model</code>: Put this above your class to turn it into a database blueprint.
+
+<li>
+<code>.modelContainer(for:)</code>: Attach this to your main <code>App</code> struct file window to spin up the actual database engine on disk.
+
+<li>
+<code>@Environment(\.modelContext)</code>: Pull this variable into any view where you need to manually <code>.insert()</code> or <code>.delete()</code> data entries!
+
+</ul>
+<p>
+<hl>
+<br>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
