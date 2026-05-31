@@ -289,6 +289,10 @@ Note: If this key configuration string is missing when your code executes <code>
 </tr>
 </table>
 
+<p>
+<hr>
+</p>
+
 <div id="Observations On The Minutiae"><h1 id="Observations On The Minutiae" class="header"><a href="#Observations On The Minutiae">Observations On The Minutiae</a></h1></div>
 
 <p>
@@ -299,115 +303,68 @@ It is completely normal to look at a production-grade class and feel like you've
 Let's demystify these mechanics one by one so you can understand the exact architectural purpose behind the minutiae.
 </p>
 
-<ol>
-<li>
-Why use private let manager instead of bare var?
+<div id="Observations On The Minutiae-1. Why use private let manager instead of bare var?"><h3 id="1. Why use private let manager instead of bare var?" class="header"><a href="#Observations On The Minutiae-1. Why use private let manager instead of bare var?">1. Why use private let manager instead of bare var?</a></h3></div>
 
-</ol>
 <p>
-In your tutorial, writing let manager = CLLocationManager() is completely valid code, but adding private is an industry best practice known as Encapsulation.
+As seen in some tutorials, writing <code>let manager = CLLocationManager()</code> is completely valid code, but adding <code>private</code> is an industry best practice known as Encapsulation.
 </p>
 
-<p>
-Swift
+<pre swift>
 private let manager = CLLocationManager()
-By marking the manager as private, you are telling the compiler: "Nobody outside of this specific class file is allowed to touch or modify the GPS hardware instance directly."
+</pre>
+
+<p>
+By marking the manager as <code>private</code>, you are telling the compiler: <em>"Nobody outside of this specific class file is allowed to touch or modify the GPS hardware instance directly."</em>
 </p>
 
 <p>
-Imagine if you didn't use private. Another developer working on a different screen in your app could write code like this:
+Imagine if you didn't use <code>private</code>. Another developer working on a different screen in your app could write code like this:
 </p>
 
-<p>
-Swift
+<pre swift>
 // Catastrophe! Another screen turns off your hardware tracking without you knowing
 universalView.liveGPS.manager.stopUpdatingLocation() 
-Using private locks the front door. If another view wants to interact with the location manager, it is forced to use your official, secure methods like .startTracking().
+</pre>
+
+<p>
+Using <code>private</code> locks the front door. If another view wants to interact with the location manager, it is forced to use your official, secure methods like <code>.startTracking()</code>.
 </p>
 
 <p>
-Additionally, changing var to let makes the variable a constant. Since you only ever need one engine chip controller instance for the lifetime of this class, making it a constant prevents your code from accidentally destroying or re-instantiating the hardware pipeline later.
+Additionally, changing <code>var</code> to <code>let</code> makes the variable a constant. Since you only ever need one engine chip controller instance for the lifetime of this class, making it a constant prevents your code from accidentally destroying or re-instantiating the hardware pipeline later.
 </p>
 
-<ol>
-<li>
-What is the @Published property wrapper?
+<div id="Observations On The Minutiae-2. The override init() and super.init() Handshake"><h3 id="2. The override init() and super.init() Handshake" class="header"><a href="#Observations On The Minutiae-2. The override init() and super.init() Handshake">2. The override init() and super.init() Handshake</a></h3></div>
 
-</ol>
 <p>
-Inside a standard Swift class, variables are silent. If a variable changes from nil to a GPS coordinate, your SwiftUI views have absolutely no idea that anything happened, so the screen remains blank.
+This is how Swift manages the initialization chain when inheriting from Apple's base classes.
 </p>
 
-<p>
-The @Published wrapper turns a variable into a Broadcaster.
-</p>
-
-<p>
-Whenever the location hardware feeds a new coordinate into lastKnownLocation, @Published instantly rings a giant alarm bell that yells to the entire app: "Hey! This data just changed! Anyone displaying this coordinate needs to redraw themselves right now!"
-</p>
-
-<p>
-SwiftUI hears that broadcast, automatically re-runs your view's body layout property, and smoothly snaps the new pin onto your map file layout.
-</p>
-
-<ol>
-<li>
-The override init() and super.init() Handshake
-
-</ol>
-<p>
-Your guess is spot on! This is exactly how Swift manages the initialization chain when inheriting from Apple's base classes.
-</p>
-
-<p>
-Swift
+<pre swift>
 override init() {
-</p>
-<pre><code>super.init()
-manager.delegate = self
-</code></pre>
-<p>
+    super.init()
+    manager.delegate = self
 }
-Because LiveLocationEngine inherits from NSObject, it inherits all of NSObject’s internal setup instructions.
-</p>
+</pre>
 
 <p>
-override init(): This tells the compiler, "I know my parent class (NSObject) has its own blueprint setup instructions, but I need to add some custom, extra steps of my own right here."
+Because <code>LiveLocationEngine</code> inherits from <code>NSObject</code>, it inherits all of <code>NSObject</code>’s internal setup instructions.
 </p>
 
-<p>
-super.init(): This tells Swift to jump up to the parent class (super) and run all of its original foundational memory allocation code first.
-</p>
-
-<p>
-Think of it like building an extension onto a house. You call super.init() to lay down the original concrete foundation, and then you add your custom wall framing (manager.delegate = self) immediately afterward.
-</p>
-
-<ol>
+<ul>
 <li>
-What is the @StateObject property wrapper?
+<code>override init()</code>: This tells the compiler, <em>"I know my parent class (NSObject) has its own blueprint setup instructions, but I need to add some custom, extra steps of my own right here."</em>
 
-</ol>
+<li>
+<code>super.init()</code>: This tells Swift to jump up to the parent class (<code>super</code>) and run all of its original foundational memory allocation code first.
+
+</ul>
 <p>
-To understand @StateObject, we have to look at how SwiftUI views work under the hood. SwiftUI views are lightweight structs that are destroyed and recreated constantly whenever the screen updates or layout shifts occur.
+Think of it like building an extension onto a house. You call <code>super.init()</code> to lay down the original concrete foundation, and then you add your custom wall framing (<code>manager.delegate = self</code>) immediately afterward.
 </p>
 
 <p>
-If you initialized your tracking engine like a normal variable inside a view, your engine would get wiped out and restarted from scratch every single time the view redrew itself:
-</p>
-
-<p>
-Swift
-// ❌ CRASH LOOP: Every view update destroys and recreates this tracker!
-var liveGPS = LiveLocationEngine() 
-@StateObject creates a permanent storage vault inside the device memory that is entirely decoupled from the view's volatile layout lifecycle.
-</p>
-
-<p>
-Swift
-@StateObject private var liveGPS = LiveLocationEngine()
-When SwiftUI recreates your view layout struct for a redraw, it looks at the @StateObject tag and says, "Ah, don't allocate a new engine. Keep pointing to that exact same live tracking instance we put in the vault earlier." It guarantees your data stream remains unbroken, continuous, and safe from unexpected memory deallocations!
-<hl>
+<hr>
 <br>
 </p>
 
