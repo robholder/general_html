@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_ondelete</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Swipe Delete"><h1 id="Swift - Swipe Delete" class="header"><a href="#Swift - Swipe Delete">Swift - Swipe Delete</a></h1></div>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-A Complete Guide to Implementing Swipe-to-Delete in SwiftUI"><h2 id="A Complete Guide to Implementing Swipe-to-Delete in SwiftUI" class="header"><a href="#Ai Insight-A Complete Guide to Implementing Swipe-to-Delete in SwiftUI">A Complete Guide to Implementing Swipe-to-Delete in SwiftUI</a></h2></div>
+
+<p>
+Swipe-to-delete is one of the most intuitive user interaction patterns in iOS. In SwiftUI, enabling this behavior requires a precise marriage of view hierarchy and data management.
+</p>
+
+<p>
+This guide breaks down how to implement an <code>onDelete</code> system in two parts: first using a <span id="Ai Insight-A Complete Guide to Implementing Swipe-to-Delete in SwiftUI-standard, memory-based array, and second, migrating that logic into a SwiftData persistent storage database context."></span><strong id="standard, memory-based array, and second, migrating that logic into a SwiftData persistent storage database context.">standard, memory-based array, and second, migrating that logic into a SwiftData persistent storage database context.</strong>
+</p>
+
+<div id="Ai Insight-Part 1: The Core Foundation (Standard In-Memory Arrays)"><h2 id="Part 1: The Core Foundation (Standard In-Memory Arrays)" class="header"><a href="#Ai Insight-Part 1: The Core Foundation (Standard In-Memory Arrays)">Part 1: The Core Foundation (Standard In-Memory Arrays)</a></h2></div>
+
+<p>
+To understand swipe-to-delete, you must understand a golden rule of SwiftUI layout mechanics:
+</p>
+
+<table>
+<tr>
+<td>
+The Structural Rule: You cannot attach an <code>.onDelete</code> modifier directly to a <code>List</code>. You must attach it to a <code>ForEach</code> loop inside a <code>List</code>.
+</td>
+</tr>
+</table>
+
+<p>
+The <code>List</code> view controls the outer visual container (scroll indicators, row separation lines, and grouping styles). The <code>ForEach</code> view is responsible for managing the dynamic generation of individual rows, meaning it is the only component capable of tracking swipe gestures on specific indices.
+</p>
+
+<div id="Ai Insight-Part 1: The Core Foundation (Standard In-Memory Arrays)-Step 1: The Code Implementation"><h3 id="Step 1: The Code Implementation" class="header"><a href="#Ai Insight-Part 1: The Core Foundation (Standard In-Memory Arrays)-Step 1: The Code Implementation">Step 1: The Code Implementation</a></h3></div>
+
+<p>
+Here is a self-contained layout tracking a basic array of strings.
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct StandardDeleteView: View {
+    // 1. The source of truth (Mutable state array)
+    @State private var items = ["Apple", "Banana", "Cherry", "Date", "Elderberry"]
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                // 2. ForEach loops through rows inside the List container
+                ForEach(items, id: \.self) { item in
+                    Text(item)
+                        .font(.body)
+                        .padding(.vertical, 4)
+                }
+                // 3. Attach onDelete directly to the ForEach view
+                .onDelete(perform: deleteItem)
+            }
+            .navigationTitle("Fruit Inventory")
+            .toolbar {
+                EditButton() // Automatically toggles a multi-select delete mode
+            }
+        }
+    }
+    
+    // 4. The deletion handler method
+    func deleteItem(at offsets: IndexSet) {
+        items.remove(atOffsets: offsets)
+    }
+}
+</pre>
+
+<div id="Ai Insight-Part 1: The Core Foundation (Standard In-Memory Arrays)-How the Mechanics Work:"><h3 id="How the Mechanics Work:" class="header"><a href="#Ai Insight-Part 1: The Core Foundation (Standard In-Memory Arrays)-How the Mechanics Work:">How the Mechanics Work:</a></h3></div>
+
+<ul>
+<li>
+<code>IndexSet</code>: When a user swipes and confirms a deletion, SwiftUI bundles the numerical positions of the targeted row(s) into an <code>IndexSet</code> collection type.
+
+<li>
+<code>.remove(atOffsets:)</code>: Standard Swift arrays feature a built-in method designed specifically to consume an <code>IndexSet</code> and erase those matching positions in a single pass.
+
+<li>
+<code>EditButton</code>: Adding this system component to your toolbar provides an alternate layout mode, adding red minus indicators to the left of your rows automatically.
+
+</ul>
+<div id="Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)"><h2 id="Part 2: Persistent Storage (The SwiftData Architecture)" class="header"><a href="#Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)">Part 2: Persistent Storage (The SwiftData Architecture)</a></h2></div>
+
+<p>
+When you upgrade your application to use <code>SwiftData</code>, the code layout rules stay exactly the same, but the data mutability mechanics change completely.
+</p>
+
+<p>
+Because a <code>@Query</code> property wrapper is a <span id="Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-read-only view reflection"></span><strong id="read-only view reflection">read-only view reflection</strong> of an external database on disk, you cannot run <code>photos.remove(atOffsets:)</code> directly on it. Doing so will cause a compiler crash. Instead, you must intercept the index, identify the underlying model instance, and instruct the <code>ModelContext</code> worker to delete it from disk.
+</p>
+
+<div id="Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-The Architecture Workflow"><h3 id="The Architecture Workflow" class="header"><a href="#Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-The Architecture Workflow">The Architecture Workflow</a></h3></div>
+
+<div id="Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-The Architecture Workflow-Step 1: The Data Model"><h4 id="Step 1: The Data Model" class="header"><a href="#Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-The Architecture Workflow-Step 1: The Data Model">Step 1: The Data Model</a></h4></div>
+
+<p>
+Ensure your data object is declared as a <code>@Model</code> class.
+</p>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+class NamedPhoto {
+    var name: String
+    @Attribute(.externalStorage) var photoData: Data
+    
+    init(name: String, photoData: Data) {
+        self.name = name
+        self.photoData = photoData
+    }
+}
+</pre>
+
+<div id="Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-The Architecture Workflow-Step 2: The View &amp; Context Management"><h4 id="Step 2: The View &amp; Context Management" class="header"><a href="#Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-The Architecture Workflow-Step 2: The View &amp; Context Management">Step 2: The View &amp; Context Management</a></h4></div>
+
+<p>
+Here is the complete implementation of the persistent deletion system:
+</p>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct PersistentDeleteView: View {
+    // 1. Establish your active database worker
+    @Environment(\.modelContext) private var modelContext
+    
+    // 2. Stream the live, sorted database array
+    @Query(sort: \NamedPhoto.name) private var photos: [NamedPhoto]
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                // 3. ForEach isolates the records for gesture tracking
+                ForEach(photos) { item in
+                    HStack(spacing: 16) {
+                        if let uiImage = UIImage(data: item.photoData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 50, height: 50)
+                                .clipShape(.rect(cornerRadius: 6))
+                        }
+                        Text(item.name)
+                            .font(.headline)
+                    }
+                }
+                // 4. Attach onDelete to the ForEach view loop
+                .onDelete(perform: removePhoto)
+            }
+            .navigationTitle("Photo Collector")
+        }
+    }
+    
+    // 5. Intercept the offset index and map to database deletion
+    func removePhoto(at offsets: IndexSet) {
+        for index in offsets {
+            // Find the precise model object instance occupying that row position
+            let photoToDelete = photos[index]
+            
+            // Command the database manager to scrub the entry from disk
+            modelContext.delete(photoToDelete)
+        }
+        
+        // Note: You do not need to call a save function manually. SwiftData 
+        // autosaves this mutation, and @Query automatically cascades the UI 
+        // animation updating the list rows.
+    }
+}
+</pre>
+
+<div id="Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-Troubleshooting Quick-Reference"><h3 id="Troubleshooting Quick-Reference" class="header"><a href="#Ai Insight-Part 2: Persistent Storage (The SwiftData Architecture)-Troubleshooting Quick-Reference">Troubleshooting Quick-Reference</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+The Error Scenario
+</th>
+<th>
+The Cause
+</th>
+<th>
+The Correction
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Value of type 'List&lt;...&gt;' has no member 'onDelete'</code>
+</td>
+<td>
+The <code>.onDelete</code> modifier is attached to the parent <code>List</code> element container.
+</td>
+<td>
+Move the <code>.onDelete</code> modifier down so it hooks directly onto the closing bracket of your <code>ForEach</code> view.
+</td>
+</tr>
+<tr>
+<td>
+<code>Cannot use mutating member on immutable value: 'photos' is a get-only property</code>
+</td>
+<td>
+You tried to use <code>.remove(atOffsets:)</code> directly on an array fetched via a <code>@Query</code> wrapper.
+</td>
+<td>
+Use the loop approach inside your function to resolve <code>photos[index]</code>, and pass that target entity to <code>modelContext.delete()</code>.
+</td>
+</tr>
+<tr>
+<td>
+Swipe-to-delete animation stutters or drops frames.
+</td>
+<td>
+Heavy data (like binary images) is being stored natively inside the main SQL database file block.
+</td>
+<td>
+Add the <code>@Attribute(.externalStorage)</code> macro option wrapper to your data property inside your <code>@Model</code> file schema blueprint to isolate file writes.
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<hr>
+<br>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

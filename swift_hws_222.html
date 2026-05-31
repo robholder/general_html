@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_222</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_221.html">Hacking With Swift - 221 - Challenge</a>
+
+</ul>
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks"><h1 id="Hacking With Swift - 222 - Challenge - My own tweaks" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks">Hacking With Swift - 222 - Challenge - My own tweaks</a></h1></div>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-Delete Photo Row"><h2 id="Delete Photo Row" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-Delete Photo Row">Delete Photo Row</a></h2></div>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I tried adding <code>.onDelete</code> to the List in <code>ContentView</code> to allow for photo item deletion. But it doesn't compile.
+</p>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You stumbled into one of the trickiest syntactic speed bumps in SwiftUI!
+</p>
+
+<p>
+Your logic is perfectly sound, but you ran into two roadblocks: a placement error that confuses the compiler, and a SwiftData restriction that prevents you from manipulating a <code>@Query</code> array directly.
+</p>
+
+<p>
+Here is exactly why it didn't compile, followed by how to fix both pieces.
+</p>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-Roadblock 1: The Placement Error"><h3 id="Roadblock 1: The Placement Error" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-Roadblock 1: The Placement Error">Roadblock 1: The Placement Error</a></h3></div>
+
+<p>
+In SwiftUI, you <span id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-Roadblock 1: The Placement Error-cannot"></span><strong id="cannot">cannot</strong> attach <code>.onDelete</code> directly to a <code>List</code>.
+</p>
+
+<p>
+Instead, <code>.onDelete</code> must always be attached to a <code>ForEach</code> block inside the <code>List</code>. The <code>List</code> view container handles the scrolling layout, but it relies on a <code>ForEach</code> loop to keep track of the dynamic rows that are eligible for swipe-to-delete behaviors.
+</p>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-Roadblock 2: The @Query Rule"><h3 id="Roadblock 2: The @Query Rule" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-Roadblock 2: The @Query Rule">Roadblock 2: The @Query Rule</a></h3></div>
+
+<p>
+You tried to do <code>photos.remove(atOffsets: offsets)</code>.
+</p>
+
+<p>
+Because <code>photos</code> is managed by the <code>@Query</code> property wrapper, it is a <span id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-Roadblock 2: The @Query Rule-read-only reflection"></span><strong id="read-only reflection">read-only reflection</strong> of whatever is inside the database. You cannot manually pluck items out of that array. Instead, you have to tell your <code>modelContext</code> assembly worker to delete the object from disk. Once the item is deleted from the database, <code>@Query</code> will instantly spot the change and update your list view automatically.
+</p>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-The Solution: Code Implementation"><h3 id="The Solution: Code Implementation" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-The Solution: Code Implementation">The Solution: Code Implementation</a></h3></div>
+
+<p>
+Here is how you adjust your view body and your deletion function to play nicely with SwiftData:
+</p>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-The Solution: Code Implementation-1. Update the View Layout (Adding ForEach)"><h4 id="1. Update the View Layout (Adding ForEach)" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-The Solution: Code Implementation-1. Update the View Layout (Adding ForEach)">1. Update the View Layout (Adding ForEach)</a></h4></div>
+
+<p>
+Wrap your <code>NavigationLink</code> row template inside a <code>ForEach</code> container, and attach the <code>.onDelete</code> modifier to that <code>ForEach</code>:
+</p>
+
+<pre swift>
+var body: some View {
+    NavigationStack {
+        List { // 1. List turns into a static container
+            ForEach(photos) { item in // 2. ForEach loops through the data rows
+                NavigationLink(destination: PhotoDetailView(namedPhoto: item)) {
+                    HStack(spacing: 16) {
+                        if let uiImage = UIImage(data: item.photoData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .clipShape(.rect(cornerRadius: 8))
+                        }
+                        
+                        Text(item.name)
+                            .font(.headline)
+                    }
+                }
+            }
+            .onDelete(perform: removePhoto) // 3. Attached directly to the ForEach!
+        }
+        .navigationTitle("Photo Collector")
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-The Solution: Code Implementation-2. Update the Deletion Function"><h4 id="2. Update the Deletion Function" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-The Solution: Code Implementation-2. Update the Deletion Function">2. Update the Deletion Function</a></h4></div>
+
+<p>
+Rewrite your <code>removePhoto</code> function to fetch the object from the index, and hand it over to the <code>modelContext</code> to delete:
+</p>
+
+<pre swift>
+func removePhoto(at offsets: IndexSet) {
+    for index in offsets {
+        // Find the specific item the user swiped on
+        let photoToDelete = photos[index]
+        
+        // Tell the database context worker to destroy it
+        modelContext.delete(photoToDelete)
+    }
+    
+    // Tip: SwiftData automatically saves this deletion behind the scenes, 
+    // causing the UI list row to smoothly disappear.
+}
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-NamesApp.swift"><h4 id="NamesApp.swift" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-NamesApp.swift">NamesApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@main
+struct PhotoCollectorApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .modelContainer(for: NamedPhoto.self) // Sets up the DB environment
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-NamedPhoto.swift"><h4 id="NamedPhoto.swift" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-NamedPhoto.swift">NamedPhoto.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+class NamedPhoto {
+    var id: UUID
+    var name: String
+    
+    // This tells SwiftData to save the raw image data as a separate file outside the DB
+    @Attribute(.externalStorage) var photoData: Data
+    
+    init(name: String, photoData: Data) {
+        self.id = UUID()
+        self.name = name
+        self.photoData = photoData
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-PhotoDetailView.swift"><h4 id="PhotoDetailView.swift" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-PhotoDetailView.swift">PhotoDetailView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct PhotoDetailView: View {
+    let namedPhoto: NamedPhoto
+    
+    var body: some View {
+        VStack {
+            if let uiImage = UIImage(data: namedPhoto.photoData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(.rect(cornerRadius: 12))
+                    .padding()
+            } else {
+                ContentUnavailableView("Loading Image Failed", systemImage: "xmark.circle")
+            }
+            
+            Spacer()
+        }
+        .navigationTitle(namedPhoto.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 222 - Challenge - My own tweaks-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import PhotosUI
+import SwiftData
+import SwiftUI
+
+struct ContentView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    // Automatically fetches items from SwiftData, pre-sorted alphabetically by name
+    @Query(sort: \NamedPhoto.name) var photos: [NamedPhoto]
+    
+    // PhotosPicker States
+    @State private var selectedPickerItem: PhotosPickerItem? = nil
+    @State private var temporaryPhotoData: Data? = nil
+    
+    // Alert States for naming the photo
+    @State private var showingNamePrompt = false
+    @State private var newPhotoName = ""
+    
+    var body: some View {
+        NavigationStack {
+            List { // 1. List turns into a static container
+                ForEach(photos) { item in // 2. ForEach loops through the data rows
+                    NavigationLink(destination: PhotoDetailView(namedPhoto: item)) {
+                        HStack(spacing: 16) {
+                            if let uiImage = UIImage(data: item.photoData) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(.rect(cornerRadius: 8))
+                            }
+                            
+                            Text(item.name)
+                                .font(.headline)
+                        }
+                    }
+                }
+                .onDelete(perform: removePhoto) // 3. Attached directly to the ForEach!
+            }
+            .navigationTitle("Photo Collector")
+            .overlay {
+                if photos.isEmpty {
+                    ContentUnavailableView("No Photos", systemImage: "photo.on.rectangle.angled", description: Text("Tap the button below to import your first photo!"))
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .bottomBar) {
+                    // 1. The Picker Button
+                    PhotosPicker(selection: $selectedPickerItem, matching: .images) {
+                        Label("Import Photo", systemImage: "photo.badge.plus")
+                            .font(.headline)
+                    }
+                }
+            }
+            // 2. Listen for when the user successfully chooses a photo from the library
+            .onChange(of: selectedPickerItem) { _, newItem in
+                Task {
+                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                        temporaryPhotoData = data
+                        newPhotoName = "" // Reset text field
+                        showingNamePrompt = true // Trigger the naming alert immediately
+                    }
+                }
+            }
+            // 3. Intercept the flow and ask the user to input a name
+            .alert("Name Your Photo", isPresented: $showingNamePrompt) {
+                TextField("Enter name", text: $newPhotoName)
+                
+                Button("Save") {
+                    saveItem()
+                }
+                .disabled(newPhotoName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                
+                Button("Cancel", role: .cancel) {
+                    temporaryPhotoData = nil
+                }
+            } message: {
+                Text("Please give a descriptive name to the picture you just imported.")
+            }
+        }
+    }
+    
+    // 4. Commit the paired Name and Data into SwiftData permanent memory
+    func saveItem() {
+        guard let data = temporaryPhotoData else { return }
+        
+        let newPhoto = NamedPhoto(name: newPhotoName, photoData: data)
+        modelContext.insert(newPhoto)
+        
+        // Clean up state tracking values
+        temporaryPhotoData = nil
+        selectedPickerItem = nil
+    }
+    
+    func removePhoto(at offsets: IndexSet) {
+        for index in offsets {
+            // Find the specific item the user swiped on
+            let photoToDelete = photos[index]
+            
+            // Tell the database context worker to destroy it
+            modelContext.delete(photoToDelete)
+        }
+        
+        // Tip: SwiftData automatically saves this deletion behind the scenes,
+        // causing the UI list row to smoothly disappear.
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
