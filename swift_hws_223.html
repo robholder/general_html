@@ -104,6 +104,104 @@ If you’re using the simulator rather than a real device, you can fake a locati
 And now it’s over to you: can you add the feature your boss wants, and bring MapKit and SwiftUI together in a single app?
 </p>
 
+<div id="Ai Insight - Class (first line)"><h1 id="Ai Insight - Class (first line)" class="header"><a href="#Ai Insight - Class (first line)">Ai Insight - Class (first line)</a></h1></div>
+
+<div id="Ai Insight - Class (first line)-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight - Class (first line)-QUESTION">QUESTION</a></h2></div>
+
+<p>
+In the class definition above, are those protocols on the first line of the class?
+</p>
+
+<pre swift>
+class LocationFetcher: NSObject, CLLocationManagerDelegate {
+</pre>
+
+<div id="Ai Insight - Class (first line)-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight - Class (first line)-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You have spotted a very specific architectural detail of how Swift handles inheritance and protocols on the declaration line!
+</p>
+
+<p>
+The short answer is: <span id="Ai Insight - Class (first line)-ANSWER-One of them is a base class, and one of them is a protocol"></span><strong id="One of them is a base class, and one of them is a protocol">One of them is a base class, and one of them is a protocol</strong>. In Swift, when you are defining a new class, everything after the colon <code>:</code> is written in a comma-separated list. However, that list follows a strict hierarchy: <span id="Ai Insight - Class (first line)-ANSWER-The Superclass must always come first, followed by any Protocols."></span><strong id="The Superclass must always come first, followed by any Protocols.">The Superclass must always come first, followed by any Protocols.</strong>
+</p>
+
+<p>
+Here is the breakdown of exactly what those two items are doing on that first line:
+</p>
+
+<pre swift>
+class LocationFetcher: NSObject, CLLocationManagerDelegate
+//                     └──┬───┘  └──────────┬───────────┘
+//                     1. Class        2. Protocol
+</pre>
+
+<div id="Ai Insight - Class (first line)-ANSWER-1. NSObject (The Superclass)"><h3 id="1. NSObject (The Superclass)" class="header"><a href="#Ai Insight - Class (first line)-ANSWER-1. NSObject (The Superclass)">1. NSObject (The Superclass)</a></h3></div>
+
+<p>
+<code>NSObject</code> is a <span id="Ai Insight - Class (first line)-ANSWER-1. NSObject (The Superclass)-Class"></span><strong id="Class">Class</strong>, not a protocol. Specifically, it is the granddaddy foundational base class for almost all Objective-C and Apple system frameworks.
+</p>
+
+<p>
+By inheriting from <code>NSObject</code>, your <code>LocationFetcher</code> class gains access to the core runtime plumbing of Apple's ecosystem (which includes things like memory management hooks and key-value observing).
+</p>
+
+<div id="Ai Insight - Class (first line)-ANSWER-1. NSObject (The Superclass)-Why do you need it here?"><h4 id="Why do you need it here?" class="header"><a href="#Ai Insight - Class (first line)-ANSWER-1. NSObject (The Superclass)-Why do you need it here?">Why do you need it here?</a></h4></div>
+
+<p>
+Notice further down in your code where you override the initializer: <code>override init() { super.init() }</code>. You can only use the <code>override</code> and <code>super</code> keywords if your class is inheriting from a parent class!
+</p>
+
+<div id="Ai Insight - Class (first line)-ANSWER-2. CLLocationManagerDelegate (The Protocol)"><h3 id="2. CLLocationManagerDelegate (The Protocol)" class="header"><a href="#Ai Insight - Class (first line)-ANSWER-2. CLLocationManagerDelegate (The Protocol)">2. CLLocationManagerDelegate (The Protocol)</a></h3></div>
+
+<p>
+This one <span id="Ai Insight - Class (first line)-ANSWER-2. CLLocationManagerDelegate (The Protocol)-is a Protocol"></span><strong id="is a Protocol">is a Protocol</strong>.
+</p>
+
+<p>
+In Apple's frameworks, whenever you see the word <code>Delegate</code> at the end of a type name, it is almost always a protocol. A delegate protocol is basically a job description or a contract.
+</p>
+
+<p>
+By listing <code>CLLocationManagerDelegate</code> on the first line, your class is signing a contract saying: <em>"I promise that I know how to handle location events sent to me by the phone's GPS hardware."</em>
+</p>
+
+<div id="Ai Insight - Class (first line)-ANSWER-2. CLLocationManagerDelegate (The Protocol)-Why are both required to work together?"><h4 id="Why are both required to work together?" class="header"><a href="#Ai Insight - Class (first line)-ANSWER-2. CLLocationManagerDelegate (The Protocol)-Why are both required to work together?">Why are both required to work together?</a></h4></div>
+
+<p>
+This is where the plot thickens. The reason you are forced to include the <code>NSObject</code> class just to use the <code>CLLocationManagerDelegate</code> protocol comes down to Apple's internal rules.
+</p>
+
+<p>
+If you look at the hidden source code definition for <code>CLLocationManagerDelegate</code>, Apple wrote it like this:
+</p>
+
+<pre swift>
+protocol CLLocationManagerDelegate : NSObjectProtocol
+</pre>
+
+<p>
+The protocol itself requires whoever adopts it to be an Objective-C compatible object (<code>NSObjectProtocol</code>). Because a pure, native Swift class doesn't speak Objective-C out of the box, you have to inherit from <code>NSObject</code> to give your class that compatibility.
+</p>
+
+<div id="Ai Insight - Class (first line)-ANSWER-2. CLLocationManagerDelegate (The Protocol)-The Lifecycle Chain Reaction:"><h4 id="The Lifecycle Chain Reaction:" class="header"><a href="#Ai Insight - Class (first line)-ANSWER-2. CLLocationManagerDelegate (The Protocol)-The Lifecycle Chain Reaction:">The Lifecycle Chain Reaction:</a></h4></div>
+
+<ul>
+<li>
+You make your class inherit from <code>NSObject</code> so it can speak the system language.
+
+<li>
+You adopt <code>CLLocationManagerDelegate</code> to declare you can handle GPS updates.
+
+<li>
+Inside your initializer, you type <code>manager.delegate = self</code>. This tells the GPS manager, <em>"Hey, look at me, I'm the one handling the events now!"</em>
+
+</ul>
+<p>
+When the phone receives a new GPS coordinate, it looks at the delegate (<code>self</code>) and calls your <code>locationManager(_:didUpdateLocations:)</code> function to deliver the data!
+</p>
+
+
 <p>
 <hr>
 <br>
