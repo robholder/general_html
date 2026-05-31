@@ -100,6 +100,14 @@ struct ContentView: View {
 If you’re using the simulator rather than a real device, you can fake a location by going to the Debug menu and choosing Location &gt; Apple.
 </p>
 
+<table>
+<tr>
+<td>
+NOTE: Current version of Simulator - Features &gt; Location &gt; Apple (or choice of 5 options)
+</td>
+</tr>
+</table>
+
 <p>
 And now it’s over to you: can you add the feature your boss wants, and bring MapKit and SwiftUI together in a single app?
 </p>
@@ -305,6 +313,130 @@ It gives you the best of both worlds: elegant, expressive sentences for the API 
 
 <p>
 <hr>
+<br>
+</p>
+
+
+<div id="Two Buttons?"><h1 id="Two Buttons?" class="header"><a href="#Two Buttons?">Two Buttons?</a></h1></div>
+
+<div id="Two Buttons?-QUESTION"><h2 id="QUESTION" class="header"><a href="#Two Buttons?-QUESTION">QUESTION</a></h2></div>
+
+<p>
+In this proposed demonstration of the location features, there are two buttons - one of which 'starts' the location tracking. Does this need to be explicit? Can it be combined with the location access action?
+</p>
+
+<div id="Two Buttons?-ANSWER"><h2 id="ANSWER" class="header"><a href="#Two Buttons?-ANSWER">ANSWER</a></h2></div>
+
+<p>
+No, it absolutely does not need to be explicit, and in a real production app, you almost <em>never</em> want to make the user press one button just to authorize/start tracking and a second button to actually read the data. That creates unnecessary friction.
+</p>
+
+<p>
+You can absolutely combine these actions. To understand how to do it cleanly, we need to look at how iOS handles the <code>requestWhenInUseAuthorization()</code> method inside your <code>locationFetcher.start()</code> function.
+</p>
+
+<div id="Two Buttons?-ANSWER-How iOS Handles Authorization Behind the Scenes"><h3 id="How iOS Handles Authorization Behind the Scenes" class="header"><a href="#Two Buttons?-ANSWER-How iOS Handles Authorization Behind the Scenes">How iOS Handles Authorization Behind the Scenes</a></h3></div>
+
+<p>
+When your code calls <code>requestWhenInUseAuthorization()</code>, iOS checks the current permission status of your app:
+</p>
+
+<ul>
+<li>
+<span id="Two Buttons?-ANSWER-How iOS Handles Authorization Behind the Scenes-If the user has never been asked"></span><strong id="If the user has never been asked">If the user has never been asked</strong>: iOS pauses your app's execution flow, pops up the native system alert asking for permission, and then immediately lets the code continue once they tap "Allow".
+
+<li>
+<span id="Two Buttons?-ANSWER-How iOS Handles Authorization Behind the Scenes-If the user already granted permission previously"></span><strong id="If the user already granted permission previously">If the user already granted permission previously</strong>: iOS ignores the request completely and lets the code sail straight through instantly.
+
+</ul>
+<p>
+Because iOS is smart about caching that permission, you can treat your <code>.start()</code> function as a safe <em>"Ensure Tracking is Active"</em> command and run it automatically right before you read the data.
+</p>
+
+<div id="Two Buttons?-ANSWER-Combined Solution 1: The &quot;All-in-One&quot; Button"><h3 id="Combined Solution 1: The &quot;All-in-One&quot; Button" class="header"><a href="#Two Buttons?-ANSWER-Combined Solution 1: The &quot;All-in-One&quot; Button">Combined Solution 1: The "All-in-One" Button</a></h3></div>
+
+<p>
+If you want a single button that triggers the authorization, starts the hardware sensors, and displays the coordinates all at once, you can compress your code down to this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let locationFetcher = LocationFetcher()
+    @State private var locationMessage = "Location unknown"
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text(locationMessage)
+                .font(.headline)
+            
+            Button("Get My Location") {
+                // 1. Kick off authorization and hardware tracking
+                locationFetcher.start()
+                
+                // 2. Immediately try to read the coordinate
+                if let location = locationFetcher.lastKnownLocation {
+                    locationMessage = "Lat: \(location.latitude), Lon: \(location.longitude)"
+                } else {
+                    // Note: The very first time a user taps this, the hardware 
+                    // takes a split-second to warm up, landing here.
+                    locationMessage = "Fetching GPS lock... tap again in a second."
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+}
+</pre>
+
+<div id="Two Buttons?-ANSWER-The &quot;First-Tap&quot; Speed Bump (And How to Fix It)"><h3 id="The &quot;First-Tap&quot; Speed Bump (And How to Fix It)" class="header"><a href="#Two Buttons?-ANSWER-The &quot;First-Tap&quot; Speed Bump (And How to Fix It)">The "First-Tap" Speed Bump (And How to Fix It)</a></h3></div>
+
+<p>
+If you use the combined button approach above, you will notice a slight quirk the very first time you test it: when you tap the button, it might say <em>"Fetching GPS lock..."</em>, and you have to tap it a second time to see the numbers.
+</p>
+
+<p>
+This happens because <code>manager.startUpdatingLocation()</code> runs asynchronously. It takes the physical GPS chip inside the iPhone a few hundred milliseconds to wake up, talk to satellites, and stream the coordinates back to your <code>lastKnownLocation</code> variable.
+</p>
+
+<p>
+If you want a truly seamless app experience where the user doesn't have to push any tracking buttons, the industry standard is to trigger the setup automatically using SwiftUI's <code>.onAppear</code> modifier.
+</p>
+
+<div id="Two Buttons?-ANSWER-Combined Solution 2: Automated Activation (The Industry Standard)"><h3 id="Combined Solution 2: Automated Activation (The Industry Standard)" class="header"><a href="#Two Buttons?-ANSWER-Combined Solution 2: Automated Activation (The Industry Standard)">Combined Solution 2: Automated Activation (The Industry Standard)</a></h3></div>
+
+<p>
+By moving <code>locationFetcher.start()</code> into <code>.onAppear</code>, the prompt appears the moment the screen loads. Once authorized, the GPS chip tracks the location silently in the background, making the "Read Location" button instantly responsive on the very first tap.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let locationFetcher = LocationFetcher()
+    @State private var locationMessage = "Press below to check coordinates"
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text(locationMessage)
+                .font(.subheadline)
+            
+            Button("Read Location") {
+                if let location = locationFetcher.lastKnownLocation {
+                    locationMessage = "Your location is \(location.latitude), \(location.longitude)"
+                } else {
+                    locationMessage = "GPS signal not acquired yet."
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        // As soon as this view appears on screen, prepare the engine
+        .onAppear {
+            locationFetcher.start()
+        }
+    }
+}
+</pre>
+
+<p>
+<hl>
 <br>
 </p>
 
