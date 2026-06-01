@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gimp_plugins_resize_to_square</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="gimp_index.html">Gimp</a>
+</p>
+
+<div id="Gimp Plug-ins - Resize to Square Canvas"><h1 id="Gimp Plug-ins - Resize to Square Canvas" class="header"><a href="#Gimp Plug-ins - Resize to Square Canvas">Gimp Plug-ins - Resize to Square Canvas</a></h1></div>
+
+<p>
+Here is a Python script. It dynamically finds the largest side, expands the canvas to match that side (making it a perfect square), centers the image, adds a solid black background layer underneath, and flattens everything into a single layer.
+</p>
+
+
+<pre python>
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from gimpfu import *
+
+def make_canvas_square_black(img, drawable):
+    # Start undo group so you can undo this entire action with Cmd+Z
+    pdb.gimp_image_undo_group_start(img)
+
+    # 1. Get current dimensions and determine the longest side
+    width = img.width
+    height = img.height
+    square_size = max(width, height)
+
+    # 2. Calculate offsets to perfectly center the original image
+    offset_x = (square_size - width) / 2
+    offset_y = (square_size - height) / 2
+
+    # 3. Resize the canvas to a square
+    pdb.gimp_image_resize(img, square_size, square_size, int(offset_x), int(offset_y))
+
+    # 4. Create a new black background layer sized to the new square canvas
+    # (0 is the background fill type for GIMP_FILL_BACKGROUND, but we will explicitly fill with black)
+    black_layer = pdb.gimp_layer_new(img, square_size, square_size, RGB_IMAGE, "Black Background", 100, LAYER_MODE_NORMAL)
+    
+    # Insert the black layer at the very bottom of the layer stack
+    pdb.gimp_image_insert_layer(img, black_layer, None, len(img.layers))
+    
+    # Set the GIMP context background color to black and fill the layer
+    pdb.gimp_context_push()
+    pdb.gimp_context_set_background((0, 0, 0)) # RGB Black
+    pdb.gimp_drawable_fill(black_layer, FILL_BACKGROUND)
+    pdb.gimp_context_pop()
+
+    # 5. Flatten the image (combines all layers into one and drops transparency)
+    pdb.gimp_image_flatten(img)
+
+    # End undo group
+    pdb.gimp_image_undo_group_end(img)
+
+register(
+    "python_fu_make_canvas_square_black",
+    "Make canvas square based on longest axis and fill background with black",
+    "Expands canvas to a square, centers the image, adds black background, and flattens.",
+    "AI Assistant",
+    "AI Assistant",
+    "2026",
+    "&lt;Image&gt;/Python-Fu/Make Canvas Square Black", # This will appear in your top menu
+    "*", # Works on any image type (RGB, Grayscale, etc.)
+    [],
+    [],
+    make_canvas_square_black
+)
+
+main()
+</pre>
+
+<div id="To Export Automatically"><h1 id="To Export Automatically" class="header"><a href="#To Export Automatically">To Export Automatically</a></h1></div>
+
+<p>
+To add automatic exporting, the script needs to know where to save the file. The cleanest way to do this in GIMP is to read the image's original file path, modify the filename so it does not overwrite your original file, and export it as a JPEG or PNG right next to the original.
+</p>
+
+<p>
+Here is the updated script. It performs the square adjustment, asks GIMP for the original file path, creates a new file named [original_name]_squared.jpg in the exact same folder, and saves it automatically.
+</p>
+
+<pre python>
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from gimpfu import *
+
+def make_canvas_square_black(img, drawable):
+    # Start undo group so you can undo this entire action with Cmd+Z
+    pdb.gimp_image_undo_group_start(img)
+
+    try:
+        # 1. Get current dimensions and determine the longest side
+        width = img.width
+        height = img.height
+        square_size = max(width, height)
+
+        # 2. Calculate offsets to perfectly center the original image
+        offset_x = (square_size - width) / 2
+        offset_y = (square_size - height) / 2
+
+        # 3. Resize the canvas to a square
+        pdb.gimp_image_resize(img, square_size, square_size, int(offset_x), int(offset_y))
+
+        # 4. Detect the base image type to avoid type mismatch errors
+        # (img.base_type returns RGB [0], GRAY [1], or INDEXED [2])
+        image_type = img.base_type
+
+        # If the image is indexed, the new layer must match the active indexed type
+        if image_type == INDEXED:
+            layer_type = INDEXED_IMAGE
+        elif image_type == GRAY:
+            layer_type = GRAY_IMAGE
+        else:
+            layer_type = RGB_IMAGE
+
+        # Create the new background layer with the dynamically matched type
+        black_layer = pdb.gimp_layer_new(img, square_size, square_size, layer_type, "Black Background", 100, LAYER_MODE_NORMAL)
+
+        # Insert the black layer at the very bottom of the layer stack
+        pdb.gimp_image_insert_layer(img, black_layer, None, len(img.layers))
+
+        # Set the GIMP context background color to black and fill the layer
+        pdb.gimp_context_push()
+        pdb.gimp_context_set_background((0, 0, 0)) # RGB/Grayscale/Indexed black
+        pdb.gimp_drawable_fill(black_layer, FILL_BACKGROUND)
+        pdb.gimp_context_pop()
+
+        # 5. Flatten the image (combines all layers into one)
+        pdb.gimp_image_flatten(img)
+
+    finally:
+        # This block ALWAYS runs, even if the script crashes, safely closing the undo group
+        pdb.gimp_image_undo_group_end(img)
+
+register(
+    "python_fu_make_canvas_square_black_v2", # Forced cache flush
+    "Make canvas square based on longest axis and fill background with black",
+    "Expands canvas to a square, centers the image, adds black background, and flattens.",
+    "AI Assistant",
+    "AI Assistant",
+    "2026",
+    "&lt;Image&gt;/Python-Fu/Make Canvas Square Black",
+    "*",
+    [],
+    [],
+    make_canvas_square_black
+)
+
+main()
+</pre>
+
+<div id="To Export Automatically-How the Export System Works"><h2 id="How the Export System Works" class="header"><a href="#To Export Automatically-How the Export System Works">How the Export System Works</a></h2></div>
+
+<ul>
+<li>
+Safeguard against overwriting: By using basename + "_squared.jpg", your original file remains completely safe and untouched.
+
+<li>
+<code>pdb.gimp_image_get_filename(img)</code>: This grabs the active file's location. Note that if you create a brand new, empty file inside GIMP that has never been saved to your hard drive yet, the script will show a warning text at the bottom because no target directory path exists.
+
+<li>
+<code>pdb.file_jpeg_save</code>: This native GIMP encoder handles saving the project directly to your macOS directory. Because it flattens the document first, JPEG is used to optimize file size.
+
+</ul>
+<p>
+Installation Instructions
+</p>
+
+<ul>
+<li>
+Replace your previous script text with this code block.
+
+<li>
+Restart GIMP entirely.
+
+<li>
+Open an existing image from your Mac file system and click Python-Fu &gt; Make Canvas Square Black &amp; Save.
+
+<li>
+Check your original file folder; a new _squared.jpg version will instantly appear.
+
+</ul>
+<div id="To Export Automatically-Folder Automation"><h2 id="Folder Automation" class="header"><a href="#To Export Automatically-Folder Automation">Folder Automation</a></h2></div>
+
+<p>
+To process an entire folder automatically, we need to change how the script registers with GIMP.
+</p>
+
+<p>
+Instead of attaching the script to an open image using <Image>, we will register it as a standalone tool under the Filters menu. It will pop up a window asking you to choose a source folder, then it will quietly open, process, save, and close each image in the background without cluttering your screen.
+</p>
+
+<div id="To Export Automatically-Folder Automation-The Batch Folder Script"><h3 id="The Batch Folder Script" class="header"><a href="#To Export Automatically-Folder Automation-The Batch Folder Script">The Batch Folder Script</a></h3></div>
+
+<p>
+Replace the contents of your script file with this updated version:
+</p>
+
+
+<pre python>
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import os
+from gimpfu import *
+
+def batch_square_black_folder(input_folder):
+    # Support common image extensions
+    valid_extensions = ('.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.bmp')
+    processed_count = 0
+
+    files = os.listdir(input_folder)
+
+    for filename in files:
+        if filename.lower().endswith(valid_extensions):
+            if "_squared" in filename:
+                continue
+
+            input_path = os.path.join(input_folder, filename)
+            
+            try:
+                # 1. Load image in background
+                img = pdb.gimp_file_load(input_path, input_path)
+                
+                # 2. Get dimensions
+                width = img.width
+                height = img.height
+                square_size = max(width, height)
+
+                # 3. Offsets
+                offset_x = (square_size - width) / 2
+                offset_y = (square_size - height) / 2
+
+                # 4. Resize canvas
+                pdb.gimp_image_resize(img, square_size, square_size, int(offset_x), int(offset_y))
+
+                # 5. Create black layer
+                black_layer = pdb.gimp_layer_new(img, square_size, square_size, RGB_IMAGE, "Black Background", 100, LAYER_MODE_NORMAL)
+                pdb.gimp_image_insert_layer(img, black_layer, None, len(img.layers))
+                
+                pdb.gimp_context_push()
+                pdb.gimp_context_set_background((0, 0, 0)) 
+                pdb.gimp_drawable_fill(black_layer, FILL_BACKGROUND)
+                pdb.gimp_context_pop()
+
+                # 6. Flatten
+                final_layer = pdb.gimp_image_flatten(img)
+
+                # 7. Filename
+                basename, ext = os.path.splitext(filename)
+                new_filename = basename + "_squared.jpg"
+                export_path = os.path.join(input_folder, new_filename)
+
+                # 8. Save
+                pdb.file_jpeg_save(img, final_layer, export_path, export_path, 0.9, 0, 1, 1, "Batch Squared", 0, 1, 0, 0)
+                
+                # 9. Free memory
+                pdb.gimp_image_delete(img)
+                processed_count += 1
+
+            except Exception as e:
+                continue
+
+    gimp.message("Batch complete! Successfully processed " + str(processed_count) + " images.")
+
+register(
+    "python_fu_batch_square_black_folder_v2", # Changed this name to force GIMP to flush the cache
+    "Batch resize all images in a folder to square with black fill",
+    "Select a folder. The script will automatically square, center, fill with black, and export every image inside.",
+    "AI Assistant",
+    "AI Assistant",
+    "2026",
+    "&lt;Image&gt;/Filters/Languages/Python-Fu/Batch Square Images Folder...",
+    "*", 
+    [
+        (PF_DIRNAME, "input_folder", "Select Input Folder", "")
+    ],
+    [],
+    batch_square_black_folder
+)
+
+main()
+</pre>
+
+<div id="To Export Automatically-Folder Automation-How to Use It"><h3 id="How to Use It" class="header"><a href="#To Export Automatically-Folder Automation-How to Use It">How to Use It</a></h3></div>
+
+<ul>
+<li>
+Overwrite your script file with this new code and restart GIMP completely.
+
+<li>
+You do not need to open any images first. Simply go to Filters &gt; Languages &gt; Python-Fu &gt; Batch Square Images Folder...
+
+<li>
+A small dialog box will appear. Click the folder icon to select the target folder on your Mac containing your photos.
+
+<li>
+Click OK.
+
+<li>
+GIMP will process the folder in the background. A confirmation message window will pop up to tell you exactly how many files were successfully converted.
+
+</ul>
+<p>
+Would you like to adjust this script to save the squared copies into a brand new subfolder instead of saving them right next to the original files?
+</p>
+
+
+<p>
+<a href="gimp_index.html">Gimp</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

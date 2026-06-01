@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gimp_3_plugins_resize_to_square</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="gimp_index.html">Gimp</a>
+</p>
+
+<div id="Gimp 3.0 Plug-ins - Resize to Square Canvas"><h1 id="Gimp 3.0 Plug-ins - Resize to Square Canvas" class="header"><a href="#Gimp 3.0 Plug-ins - Resize to Square Canvas">Gimp 3.0 Plug-ins - Resize to Square Canvas</a></h1></div>
+
+<p>
+GIMP 3 dropped the old gimpfu engine entirely and uses Python 3 along with GObject Introspection (gi.repository).
+</p>
+
+<p>
+The modern GIMP 3 API requires scripts to be written as Python classes that register a distinct "Procedure" with GIMP's plug-in manager.
+</p>
+
+<p>
+Here are both the Interactive and Batch Folder scripts fully updated and restructured to run on GIMP 3.2 on macOS.
+</p>
+
+<p>
+Script 1: The Interactive Script (For an Open Image)Save this code in a text editor as make_square.py.
+</p>
+
+<pre python>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import gi
+gi.require_version('Gimp', '3.0')
+from gi.repository import Gimp
+from gi.repository import GObject
+from gi.repository import GLib
+import sys
+
+def make_canvas_square_black(procedure, run_mode, image, drawables, config, data):
+    # Start the undo group safely
+    image.undo_group_start()
+
+    try:
+        # 1. Get properties
+        width = image.get_width()
+        height = image.get_height()
+        square_size = max(width, height)
+
+        # 2. Calculate offsets to center the image
+        offset_x = int((square_size - width) / 2)
+        offset_y = int((square_size - height) / 2)
+
+        # 3. Resize canvas via the GIMP 3 core PDB
+        Gimp.get_pdb().run_procedure('gimp-image-resize', [image, square_size, square_size, offset_x, offset_y])
+
+        # 4. Detect original image type and safely match colorspace
+        base_type = image.get_base_type()
+        if base_type == Gimp.ImageBaseType.INDEXED:
+            layer_type = Gimp.ImageType.INDEXED_IMAGE
+        elif base_type == Gimp.ImageBaseType.GRAY:
+            layer_type = Gimp.ImageType.GRAY_IMAGE
+        else:
+            layer_type = Gimp.ImageType.RGB_IMAGE
+
+        # 5. Create new black background layer
+        black_layer = Gimp.Layer.new(image, "Black Background", square_size, square_size, layer_type, 100, Gimp.LayerMode.NORMAL)
+        
+        # Insert at the bottom of the layer stack
+        image.insert_layer(black_layer, None, len(image.get_layers()))
+
+        # 6. Push context and fill background with black
+        Gimp.context_push()
+        Gimp.context_set_background(Gimp.RGB()) # Default constructor builds black (0,0,0)
+        Gimp.get_pdb().run_procedure('gimp-drawable-fill', [black_layer, Gimp.FillType.BACKGROUND])
+        Gimp.context_pop()
+
+        # 7. Flatten everything
+        image.flatten()
+
+    finally:
+        # Always run to ensure GIMP undo history doesn't break
+        image.undo_group_end()
+
+    return procedure.new_return_values(Gimp.PdbStatusType.SUCCESS, GLib.Error())
+
+class MakeSquarePlugin(Gimp.PlugIn):
+    def do_query_procedures(self):
+        return ["python-fu-make-canvas-square-black-v3"]
+
+    def do_create_procedure(self, name):
+        procedure = Gimp.ImageProcedure.new(self, name, Gimp.PdbProcType.PLUGIN, make_canvas_square_black, None)
+        procedure.set_image_types("*")
+        procedure.set_sensitivity_mask(Gimp.ProcedureSensitivityMask.DRAWABLE)
+        procedure.set_documentation("Make Canvas Square Black", "Resizes canvas to square, adds black background, and flattens.", name)
+        procedure.set_menu_label("Make Canvas Square Black")
+        procedure.add_menu_path("&lt;Image&gt;/Filters/Languages/Python-Fu")
+        return procedure
+
+Gimp.main(MakeSquarePlugin.__gtype__, sys.argv)
+</pre>
+
+<div id="Gimp 3.0 Plug-ins - Resize to Square Canvas-Script 2: The Batch Script (For an Entire Folder)"><h2 id="Script 2: The Batch Script (For an Entire Folder)" class="header"><a href="#Gimp 3.0 Plug-ins - Resize to Square Canvas-Script 2: The Batch Script (For an Entire Folder)">Script 2: The Batch Script (For an Entire Folder)</a></h2></div>
+
+<p>
+Save this code in a text editor as batch_square.py.
+</p>
+
+<pre python>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import sys
+import gi
+gi.require_version('Gimp', '3.0')
+from gi.repository import Gimp
+from gi.repository import GObject
+from gi.repository import GLib
+
+def batch_square_black_folder(procedure, run_mode, config, data):
+    # Retrieve the input folder path from our UI configurations
+    input_folder = config.get_property('input-folder')
+    
+    valid_extensions = ('.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp', '.bmp')
+    processed_count = 0
+
+    if not os.path.exists(input_folder):
+        return procedure.new_return_values(Gimp.PdbStatusType.EXECUTION_ERROR, GLib.Error())
+
+    files = os.listdir(input_folder)
+
+    for filename in files:
+        if filename.lower().endswith(valid_extensions):
+            if "_squared" in filename:
+                continue
+
+            input_path = os.path.join(input_folder, filename)
+
+            try:
+                # 1. Load image silently
+                image = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(input_path))
+                if not image:
+                    continue
+                    
+                image.undo_disable()
+
+                # 2. Geometry calculations
+                width = image.get_width()
+                height = image.get_height()
+                square_size = max(width, height)
+
+                offset_x = int((square_size - width) / 2)
+                offset_y = int((square_size - height) / 2)
+
+                # 3. Canvas adjustment
+                Gimp.get_pdb().run_procedure('gimp-image-resize', [image, square_size, square_size, offset_x, offset_y])
+
+                # 4. Colorspace check
+                base_type = image.get_base_type()
+                if base_type == Gimp.ImageBaseType.INDEXED:
+                    layer_type = Gimp.ImageType.INDEXED_IMAGE
+                elif base_type == Gimp.ImageBaseType.GRAY:
+                    layer_type = Gimp.ImageType.GRAY_IMAGE
+                else:
+                    layer_type = Gimp.ImageType.RGB_IMAGE
+
+                # 5. Build background layer
+                black_layer = Gimp.Layer.new(image, "Black Background", square_size, square_size, layer_type, 100, Gimp.LayerMode.NORMAL)
+                image.insert_layer(black_layer, None, len(image.get_layers()))
+
+                Gimp.context_push()
+                Gimp.context_set_background(Gimp.RGB())
+                Gimp.get_pdb().run_procedure('gimp-drawable-fill', [black_layer, Gimp.FillType.BACKGROUND])
+                Gimp.context_pop()
+
+                # 6. Flatten
+                final_layer = image.flatten()
+
+                # 7. Generate export filename paths
+                basename, ext = os.path.splitext(filename)
+                new_filename = basename + "_squared.jpg"
+                export_path = os.path.join(input_folder, new_filename)
+
+                # 8. GIMP 3 Native JPEG Save API
+                Gimp.get_pdb().run_procedure('file-jpeg-save', [
+                    image, final_layer, Gio.File.new_for_path(export_path), 
+                    0.9, 0.0, 1, 1, "Batch Squared", 0, 1, 0, 0
+                ])
+
+                # 9. Clear backend image references
+                image.delete()
+                processed_count += 1
+
+            except Exception:
+                continue
+
+    # Pop an onscreen note on the Mac system interface when finished
+    Gimp.get_pdb().run_procedure('gimp-message', [f"Batch complete! Processed {processed_count} images."])
+    return procedure.new_return_values(Gimp.PdbStatusType.SUCCESS, GLib.Error())
+
+class BatchSquarePlugin(Gimp.PlugIn):
+    def do_query_procedures(self):
+        return ["python-fu-batch-square-folder-v3"]
+
+    def do_create_procedure(self, name):
+        procedure = Gimp.Procedure.new(self, name, Gimp.PdbProcType.PLUGIN, batch_square_black_folder, None)
+        procedure.set_documentation("Batch Square Folder", "Select folder to process images into black-filled squares.", name)
+        procedure.set_menu_label("Batch Square Images Folder...")
+        procedure.add_menu_path("&lt;Image&gt;/Filters/Languages/Python-Fu")
+        
+        # Register the modern GIMP 3 directory string picker parameter
+        procedure.add_string_argument("input-folder", "Input Folder", "Select folder to square", True, "")
+        return procedure
+
+Gimp.main(BatchSquarePlugin.__gtype__, sys.argv)
+
+</pre>
+
+<div id="Gimp 3.0 Plug-ins - Resize to Square Canvas-How to Install on macOS for GIMP 3.2"><h2 id="How to Install on macOS for GIMP 3.2" class="header"><a href="#Gimp 3.0 Plug-ins - Resize to Square Canvas-How to Install on macOS for GIMP 3.2">How to Install on macOS for GIMP 3.2</a></h2></div>
+
+
+<p>
+GIMP 3 introduces a strict requirement: Every plug-in must sit inside its own subfolder named exactly like the script file.
+</p>
+
+<ul>
+<li>
+Go to your user plug-ins directory in macOS:
+
+<ul>
+<li>
+<code>~/Library/Application Support/GIMP/3.2/plug-ins/</code>
+
+</ul>
+<li>
+Create a folder named make_square.
+
+<ul>
+<li>
+Drop your make_square.py script inside it.
+
+</ul>
+<li>
+Create a folder named batch_square.
+
+<ul>
+<li>
+Drop your batch_square.py script inside it.
+
+</ul>
+<li>
+Make them executable: Open the macOS Terminal, paste the commands below, and hit Enter:
+
+</ul>
+  
+<pre bash>
+chmod +x ~/Library/Application\ Support/GIMP/3.2/plug-ins/make_square/make_square.py
+chmod +x ~/Library/Application\ Support/GIMP/3.2/plug-ins/batch_square/batch_square.py
+</pre>
+
+<ul>
+<li>
+Relaunch GIMP 3.2. Both options will be listed under Filters &gt; Languages &gt; Python-Fu.
+
+</ul>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
