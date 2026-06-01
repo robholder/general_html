@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_226</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_225.html">Hacking With Swift - 225 - Letting users select items in a List</a>
+
+</ul>
+<div id="Hacking With Swift - 226 - Creating tabs with TabView and tabItem()"><h1 id="Hacking With Swift - 226 - Creating tabs with TabView and tabItem()" class="header"><a href="#Hacking With Swift - 226 - Creating tabs with TabView and tabItem()">Hacking With Swift - 226 - Creating tabs with TabView and tabItem()</a></h1></div>
+
+<p>
+Navigation stacks are great for letting us create hierarchical stacks of views that let users drill down into data, but they don’t work so well for showing unrelated data. For that we need to use SwiftUI’s <code>TabView</code>, which creates a button strip across the bottom of the screen, where tapping each button shows a different view.
+</p>
+
+<p>
+Placing tabs inside a <code>TabView</code> is as simple as listing them out one by one, like this:
+</p>
+
+<pre swift>
+TabView {
+    Text("Tab 1")
+    Text("Tab 2")
+}
+</pre>
+
+<p>
+However, in practice you will always want to customize the way the tabs are shown - in the code above the tab bar will be an empty gray space. Although you can tap on the left and right parts of that gray space to activate the two tabs, it’s a pretty terrible user experience.
+</p>
+
+<p>
+Instead, it’s a better idea to attach the <code>tabItem()</code> modifier to each view that’s inside a <code>TabView</code>. This lets you customize the way the view is shown in the tab bar, providing an image and some text to show next to it like this:
+</p>
+
+<pre swift>
+TabView {
+    Text("Tab 1")
+        .tabItem {
+            Label("One", systemImage: "star")
+        }
+
+    Text("Tab 2")
+        .tabItem {
+            Label("Two", systemImage: "circle")
+        }
+}
+</pre>
+
+<p>
+As well as letting the user switch views by tapping on their tab item, SwiftUI also allows us to control the current view programmatically using state. This takes four steps:
+</p>
+
+<ul>
+<li>
+Create an <code>@State</code> property to track the tab that is currently showing.
+
+<li>
+Modify that property to a new value whenever we want to jump to a different tab.
+
+<li>
+Pass that as a binding into the <code>TabView</code>, so it will be tracked automatically.
+
+<li>
+Tell SwiftUI which tab should be shown for each value of that property.
+
+</ul>
+<p>
+The first three of those are simple enough, so let’s get them out of the way. First, we need some state to track the current tab, so add this as a property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var selectedTab = "One"
+</pre>
+
+<p>
+Second, we need to modify that somewhere, which will ask SwiftUI to switch tabs. In our little demo we could make our text be a button instead, like this:
+</p>
+
+<pre swift>
+Button("Show Tab 2") {
+    selectedTab = "Two"
+}
+.tabItem {
+    Label("One", systemImage: "star")
+}
+</pre>
+
+<p>
+Third, we need to bind the selection of the <code>TabView</code> to <code>＄selectedTab</code>. This is passed as a parameter when we create the <code>TabView</code>, so update your code to this:
+</p>
+
+<pre swift>
+TabView(selection: $selectedTab) {
+</pre>
+
+<p>
+Now for the interesting part: when we say <code>selectedTab = "Two"</code> how does SwiftUI know which tab that represents? You might think that the tabs could be treated as an array, in which case the second tab would be at index 1, but that causes all sorts of problems: what if we move that tab to a different position in the tab view?
+</p>
+
+<p>
+At a deeper level, it also breaks one of the core SwiftUI concepts: that we should be able to compose views freely. If our button was able to say "go to the second tab in the array", it means it has intimate knowledge of how its parent, the <code>TabView</code>, is configured - it has to know the exact tab structure of its parent.
+</p>
+
+<p>
+This is A Very Bad Idea, and so SwiftUI offers a better solution: we can attach a unique identifier to each view, and use <em>that</em> for the selected tab. These identifiers are called tags, and are attached using the <code>tag()</code> modifier like this:
+</p>
+
+<pre swift>
+Text("Tab 2")
+    .tabItem {
+        Image(systemName: "circle")
+        Text("Two")
+    }
+    .tag("Two")
+</pre>
+
+<p>
+So, our entire view would be this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var selectedTab = "One"
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            Button("Show Tab 2") {
+                selectedTab = "Two"
+            }
+            .tabItem {
+                Label("One", systemImage: "star")
+            }
+            .tag("One")
+
+            Text("Tab 2")
+                .tabItem {
+                    Label("Two", systemImage: "circle")
+                }
+                .tag("Two")
+        }
+    }
+}
+</pre>
+
+<p>
+And now that code works: you can switch between tabs by pressing on their tab items, or by activating our button in the first tab.
+</p>
+
+<p>
+Of course, just using “One” and “Two” isn’t ideal - those values are fixed and so it solves the problem of views being moved around, but they aren’t easy to remember. Fortunately, you can use whatever values you like instead: give each view a string tag that is unique and reflects its purpose, then use that for your @State property. This is much easier to work with in the long term, and is recommended over integers.
+</p>
+
+<p>
+Tip: It’s common to want to use <code>NavigationStack</code> and <code>TabView</code> at the same time, but you should be careful: <code>TabView</code> should be the parent view, with the tabs inside it having a <code>NavigationStack</code> as necessary, rather than the other way around.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
