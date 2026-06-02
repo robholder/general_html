@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_227</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_226.html">Hacking With Swift - 226 - Creating tabs with TabView and tabItem()</a>
+
+</ul>
+<div id="Hacking With Swift - 227 - Understanding Swift's Result type"><h1 id="Hacking With Swift - 227 - Understanding Swift's Result type" class="header"><a href="#Hacking With Swift - 227 - Understanding Swift's Result type">Hacking With Swift - 227 - Understanding Swift's Result type</a></h1></div>
+
+<div id="Hacking With Swift - 227 - Understanding Swift's Result type-Result"><h2 id="Result" class="header"><a href="#Hacking With Swift - 227 - Understanding Swift's Result type-Result">Result</a></h2></div>
+
+<p>
+Swift provides a special type called <code>Result</code>.
+</p>
+
+<p>
+It allows us to encapsulate either a <span id="Hacking With Swift - 227 - Understanding Swift's Result type-Result-successful value"></span><strong id="successful value">successful value</strong> or some kind of <span id="Hacking With Swift - 227 - Understanding Swift's Result type-Result-error type"></span><strong id="error type">error type</strong>, all in a single piece of data.
+</p>
+
+<p>
+So, in the same way that an 'optional' might hold a string or might hold nothing at all, <code>Result</code> might hold a string or might hold an error.
+</p>
+
+<p>
+The syntax for using it is a little odd at first, but it does have an important part to play in our projects.
+</p>
+
+<p>
+To see <code>Result</code> in action, we could start by writing a method that downloads an array of data readings from a server, like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var output = ""
+
+    var body: some View {
+        Text(output)
+            .task {
+                await fetchReadings()
+            }
+    }
+
+    func fetchReadings() async {
+        do {
+            let url = URL(string: "https://hws.dev/readings.json")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let readings = try JSONDecoder().decode([Double].self, from: data)
+            output = "Found \(readings.count) readings"
+        } catch {
+            print("Download error")
+        }
+    }
+}
+</pre>
+
+<p>
+The output of the above is a string across the screen saying:
+</p>
+
+<pre text>
+Found 1000 readings
+</pre>
+
+<p>
+That code works just fine, but it doesn’t give us a lot of flexibility - what if we want to stash the work away somewhere and do something else while it’s running? What if we want to read its result at some point in the future, perhaps handling any errors somewhere else entirely? Or what if we just want to cancel the work because it’s no longer needed?
+</p>
+
+<p>
+Well, we can get all that by using <code>Result</code>, and it’s actually available through an API you’ve met previously: <code>Task</code>. We could rewrite the above code to this:
+</p>
+
+<pre swift>
+func fetchReadings() async {
+    let fetchTask = Task {
+        let url = URL(string: "https://hws.dev/readings.json")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let readings = try JSONDecoder().decode([Double].self, from: data)
+        return "Found \(readings.count) readings"
+    }
+}
+</pre>
+
+<p>
+We’ve used <code>Task</code> before to launch pieces of work, but here we’ve given the <code>Task</code> object the name of <code>fetchTask</code> - that’s what gives us the extra flexibility to pass it around, or cancel it if needed. And notice how our <code>Task</code> closure returns a value now? That value gets stored in our <code>Task</code> instance so that we can read it in the future when we’re ready.
+</p>
+
+<p>
+More importantly, that <code>Task</code> might have thrown an error if the network fetch failed, or if the data decoding failed, and that’s where <code>Result</code> comes in: the result of our task might be a string saying “Found 10000 readings”, but it might also contain an error. The only way to find out is to look inside - it’s very similar to optionals.
+</p>
+
+<p>
+To read the result from a <code>Task</code>, read its <code>result</code> property like this:
+</p>
+
+<pre swift>
+let result = await fetchTask.result
+</pre>
+
+<p>
+Notice how we haven’t used <code>try</code> to read the <code>Result</code> out? That’s because <code>Result</code> holds it inside itself - an error might have been thrown, but we don’t have to worry about it now unless we want to.
+</p>
+
+<p>
+If you look at the type of <code>result</code>, you’ll see it’s a <code>Result&lt;String, Error&gt;</code> - if it succeeded it will contain a string, but it might also have failed and will contain an error.
+</p>
+
+<p>
+You can read the successful value directly from the <code>Result</code> if you want, but you’ll need to make sure and handle errors appropriately, like this:
+</p>
+
+<pre swift>
+do {
+    output = try result.get()
+} catch {
+    output = "Error: \(error.localizedDescription)"
+}
+</pre>
+
+<p>
+Alternatively, you can <code>switch</code> on the <code>Result</code>, and write code to check for both the success and failure cases. Each of those cases have their values inside (the string for success, and an error for failure), so Swift lets us read those values out using a specially crafted <code>case</code> match:
+</p>
+
+<pre swift>
+switch result {
+    case .success(let str):
+        output = str
+    case .failure(let error):
+        output = "Error: \(error.localizedDescription)"
+}
+</pre>
+
+<p>
+Regardless of how you handle it, the advantage of <code>Result</code> is that it lets us store the whole success or failure of some work in a single value, pass that around wherever we need, and read the error only when we’re ready.
+</p>
+
+<div id="Ai Insight - .task"><h1 id="Ai Insight - .task" class="header"><a href="#Ai Insight - .task">Ai Insight - .task</a></h1></div>
+
+<div id="Ai Insight - .task-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight - .task-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I tried an example from Paul Hudson's 100 Days of SwiftUI, and I was surprised that it ran without having to tap anything to trigger the function. I assumed '.task' needed to be triggered. I guess I'm wrong. What is going on in fact?
+</p>
+
+<div id="Ai Insight - .task-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight - .task-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You are definitely not the first person to be surprised by this! It is a very common point of confusion when learning SwiftUI.
+</p>
+
+<p>
+Your assumption that it needs a user action (like a tap) to trigger is actually how buttons or gesture modifiers work, but <code>.task</code> belongs to a different family of modifiers: <span id="Ai Insight - .task-ANSWER-lifecycle modifiers"></span><strong id="lifecycle modifiers">lifecycle modifiers</strong>.
+</p>
+
+<p>
+Here is exactly what is going on behind the scenes.
+</p>
+
+<div id="Ai Insight - .task-ANSWER-The Short Answer"><h3 id="The Short Answer" class="header"><a href="#Ai Insight - .task-ANSWER-The Short Answer">The Short Answer</a></h3></div>
+
+<p>
+In SwiftUI, the <code>.task</code> modifier triggers its code <span id="Ai Insight - .task-ANSWER-The Short Answer-automatically as soon as the view appears on the screen."></span><strong id="automatically as soon as the view appears on the screen.">automatically as soon as the view appears on the screen.</strong> You don't need to tap anything because the mere act of the <code>ContentView</code> loading and rendering is what fires the function.
+</p>
+
+<div id="Ai Insight - .task-ANSWER-How .task Actually Works"><h3 id="How .task Actually Works" class="header"><a href="#Ai Insight - .task-ANSWER-How .task Actually Works">How .task Actually Works</a></h3></div>
+
+<p>
+The <code>.task</code> modifier is essentially a modern, asynchronous version of the older <code>.onAppear</code> modifier.
+</p>
+
+<p>
+When SwiftUI builds your user interface, it goes through a specific lifecycle:
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight - .task-ANSWER-How .task Actually Works-Initialization"></span><strong id="Initialization">Initialization</strong>: The view struct (<code>ContentView</code>) is created.
+
+<li>
+<span id="Ai Insight - .task-ANSWER-How .task Actually Works-Appearance"></span><strong id="Appearance">Appearance</strong>: The view is rendered on the screen.
+
+<li>
+<span id="Ai Insight - .task-ANSWER-How .task Actually Works-The Trigger"></span><strong id="The Trigger">The Trigger</strong>: The moment the <code>Text</code> view appears on the screen, SwiftUI says, <em>"Hey, I see a .task attached to this view. Let me spin up a background task and run this code right now."</em>
+
+<li>
+<span id="Ai Insight - .task-ANSWER-How .task Actually Works-Disappearance"></span><strong id="Disappearance">Disappearance</strong>: If the user navigates away and the view leaves the screen, SwiftUI will automatically <span id="Ai Insight - .task-ANSWER-How .task Actually Works-cancel"></span><strong id="cancel">cancel</strong> the task if it hasn't finished yet.
+
+</ul>
+<p>
+Because your <code>ContentView</code> is the very first thing that loads when your app opens, <code>fetchReadings()</code> runs immediately on launch.
+</p>
+
+<div id="Ai Insight - .task-ANSWER-Why use .task instead of a button?"><h3 id="Why use .task instead of a button?" class="header"><a href="#Ai Insight - .task-ANSWER-Why use .task instead of a button?">Why use .task instead of a button?</a></h3></div>
+
+<p>
+You would use <code>.task</code> for data that your view <em>absolutely needs</em> the moment the user looks at it.
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight - .task-ANSWER-Why use .task instead of a button?-Good use cases for"></span><strong id="Good use cases for">Good use cases for</strong> <code>.task</code>: Fetching a user's profile info, loading a news feed, or downloading current weather data on launch.
+
+<li>
+<span id="Ai Insight - .task-ANSWER-Why use .task instead of a button?-Good use cases for a button/tap"></span><strong id="Good use cases for a button/tap">Good use cases for a button/tap</strong>: Submitting a form, liking a post, or deleting an item.
+
+</ul>
+<div id="Ai Insight - .task-ANSWER-Why use .task instead of a button?-If you wanted it to trigger on a tap..."><h4 id="If you wanted it to trigger on a tap..." class="header"><a href="#Ai Insight - .task-ANSWER-Why use .task instead of a button?-If you wanted it to trigger on a tap...">If you wanted it to trigger on a tap...</a></h4></div>
+
+<p>
+If your goal actually was to wait for a user to tap the text before downloading the data, you would remove <code>.task</code> and use a <code>.onTapGesture</code> combined with a manual Task block like this:
+</p>
+
+<pre swift>
+Text(output.isEmpty ? "Tap to load data" : output)
+    .onTapGesture {
+        // Manually start an async task when tapped
+        Task {
+            await fetchReadings()
+        }
+    }
+</pre>
+
+<p>
+So, you aren't wrong about how interactive triggers work - you just stumbled onto a lifestyle trigger instead! Paul Hudson loves using <code>.task</code> early in his courses because it's the cleanest way to get data onto your screen the second the app opens.
+</p>
+
+<div id="Ai Insight - .task-.task vs .onAppear"><h2 id=".task vs .onAppear" class="header"><a href="#Ai Insight - .task-.task vs .onAppear">.task vs .onAppear</a></h2></div>
+
+<p>
+For the vast majority of use cases, <code>.task</code> <span id="Ai Insight - .task-.task vs .onAppear-has effectively superseded"></span><strong id="has effectively superseded">has effectively superseded</strong> <code>.onAppear</code> when it comes to fetching data or running asynchronous code.
+</p>
+
+<p>
+Apple introduced <code>.task</code> in iOS 15 specifically to solve the clunkiness of using <code>.onAppear</code> with Swift's modern Concurrency (<code>async/await</code>).
+</p>
+
+<p>
+Here is a breakdown of why <code>.task</code> is now the go-to choice, and the few edge cases where <code>.onAppear</code> is still relevant.
+</p>
+
+<div id="Ai Insight - .task-.task vs .onAppear-Why .task is Better (The &quot;Superpowers&quot;)"><h3 id="Why .task is Better (The &quot;Superpowers&quot;)" class="header"><a href="#Ai Insight - .task-.task vs .onAppear-Why .task is Better (The &quot;Superpowers&quot;)">Why .task is Better (The "Superpowers")</a></h3></div>
+
+<p>
+Before <code>.task</code>, if you wanted to load data when a view appeared, you had to use <code>.onAppear</code>. Because <code>.onAppear</code> is synchronous, you had to manually bridge it to the async world.
+</p>
+
+<p>
+Here is how they compare side-by-side:
+</p>
+
+<div id="Ai Insight - .task-.task vs .onAppear-1. Automatic Cancellation (The Biggest Win)"><h3 id="1. Automatic Cancellation (The Biggest Win)" class="header"><a href="#Ai Insight - .task-.task vs .onAppear-1. Automatic Cancellation (The Biggest Win)">1. Automatic Cancellation (The Biggest Win)</a></h3></div>
+
+<p>
+If a user visits a screen that triggers a slow network download, and then they immediately hit the "Back" button, what happens to that download?
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight - .task-.task vs .onAppear-1. Automatic Cancellation (The Biggest Win)-With"></span><strong id="With">With</strong> <code>.onAppear</code>: The network request keeps running in the background, wasting data and battery power, because you have to manually write code to cancel it.
+
+<li>
+<span id="Ai Insight - .task-.task vs .onAppear-1. Automatic Cancellation (The Biggest Win)-With"></span><strong id="With">With</strong> <code>.task</code>: SwiftUI <span id="Ai Insight - .task-.task vs .onAppear-1. Automatic Cancellation (The Biggest Win)-automatically cancels"></span><strong id="automatically cancels">automatically cancels</strong> the asynchronous task the exact millisecond the view disappears from the screen.
+
+</ul>
+<div id="Ai Insight - .task-.task vs .onAppear-2. Cleaner, Modern Syntax"><h3 id="2. Cleaner, Modern Syntax" class="header"><a href="#Ai Insight - .task-.task vs .onAppear-2. Cleaner, Modern Syntax">2. Cleaner, Modern Syntax</a></h3></div>
+
+<p>
+Look at how much boilerplate code <code>.task</code> removes:
+</p>
+
+<pre swift>
+// ❌ The Old Way (.onAppear)
+Text("Hello")
+    .onAppear {
+        Task { // Forced to manually create a Task block
+            await fetchData()
+        }
+    }
+
+//  The New Way (.task)
+Text("Hello")
+    .task {
+        await fetchData() // Works out of the box
+    }
+</pre>
+
+<div id="Ai Insight - .task-.task vs .onAppear-3. It Listens for ID Changes"><h3 id="3. It Listens for ID Changes" class="header"><a href="#Ai Insight - .task-.task vs .onAppear-3. It Listens for ID Changes">3. It Listens for ID Changes</a></h3></div>
+
+<p>
+The <code>.task</code> modifier has a special superpower: it can watch a variable. If that variable changes, .task will cancel its current work and restart itself. This is incredibly useful for things like search bars:
+</p>
+
+<pre swift>
+// Every time the user types a new search query, 
+// the old search task is canceled and a new one starts automatically.
+Text("Search Results")
+    .task(id: searchQuery) {
+        await performSearch(for: searchQuery)
+    }
+</pre>
+
+<div id="Ai Insight - .task-.task vs .onAppear-Does .onAppear still have a purpose?"><h3 id="Does .onAppear still have a purpose?" class="header"><a href="#Ai Insight - .task-.task vs .onAppear-Does .onAppear still have a purpose?">Does .onAppear still have a purpose?</a></h3></div>
+
+<p>
+Yes! <code>.onAppear</code> is not deprecated, because it was never meant to be a data-fetching tool; it was meant for <span id="Ai Insight - .task-.task vs .onAppear-Does .onAppear still have a purpose?-UI lifecycle events"></span><strong id="UI lifecycle events">UI lifecycle events</strong>.
+</p>
+
+<p>
+You should still use <code>.onAppear</code> for <span id="Ai Insight - .task-.task vs .onAppear-Does .onAppear still have a purpose?-synchronous, non-async UI actions"></span><strong id="synchronous, non-async UI actions">synchronous, non-async UI actions</strong>, such as:
+</p>
+
+<ul>
+<li>
+Triggering a Haptic Feedback vibration when a view shows up.
+
+</ul>
+<p>
+*Starting a standard UI animation.
+</p>
+<ul>
+<li>
+Analytics tracking (e.g., logging <code>Analytics.logEvent("opened_homescreen")</code>).
+
+<li>
+Focusing a text field automatically when the screen loads.
+
+</ul>
+<div id="Ai Insight - .task-.task vs .onAppear-Does .onAppear still have a purpose?-Summary Cheat Sheet"><h4 id="Summary Cheat Sheet" class="header"><a href="#Ai Insight - .task-.task vs .onAppear-Does .onAppear still have a purpose?-Summary Cheat Sheet">Summary Cheat Sheet</a></h4></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Use Case
+</th>
+<th>
+Best Modifier
+</th>
+<th>
+Why?
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Fetching JSON from the web
+</td>
+<td>
+<code>.task</code>
+</td>
+<td>
+Built-in async support and auto-cancellation.
+</td>
+</tr>
+<tr>
+<td>
+Loading data from a database
+</td>
+<td>
+<code>.task</code>
+</td>
+<td>
+Keeps the UI responsive during heavy reads.
+</td>
+</tr>
+<tr>
+<td>
+Making the phone vibrate on load
+</td>
+<td>
+<code>.onAppear</code>
+</td>
+<td>
+It's instant, synchronous, and purely visual/tactile.
+</td>
+</tr>
+<tr>
+<td>
+Restarting a fetch when a variable changes
+</td>
+<td>
+<code>.task(id:)</code>
+</td>
+<td>
+Automatically handles the reset logic for you.
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<span id="Ai Insight - .task-.task vs .onAppear-Does .onAppear still have a purpose?-Summary Cheat Sheet-The Bottom Line"></span><strong id="The Bottom Line">The Bottom Line</strong>: If you are writing <code>async/await</code> code inside a view lifecycle, always reach for <code>.task</code>. It writes less code, prevents memory/network leaks, and is the modern standard in SwiftUI.
+</p>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
