@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_result</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Result"><h1 id="Swift - Result" class="header"><a href="#Swift - Result">Swift - Result</a></h1></div>
+
+<div id="Swift - Result-Understanding the Result Type in Swift"><h2 id="Understanding the Result Type in Swift" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift">Understanding the Result Type in Swift</a></h2></div>
+
+<p>
+In Swift, functions that can fail usually use the <code>throws</code> keyword, forcing you to handle errors immediately using a <code>do-catch</code> block. However, there are times when you don't want to handle an error <em>right away</em> - you want to store the success or failure in a variable and pass it around your app to be unpacked later.
+</p>
+
+<p>
+This is exactly what the <code>Result</code> type is for. It captures either a successful value or a failure error into a single, neat package.
+</p>
+
+<div id="Swift - Result-Understanding the Result Type in Swift-What is the Result Type?"><h3 id="What is the Result Type?" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-What is the Result Type?">What is the Result Type?</a></h3></div>
+
+<p>
+At its core, <code>Result</code> is a standard library enum with two cases:
+</p>
+
+<ul>
+<li>
+<code>.success(Value)</code> – Contains the data you actually wanted.
+
+<li>
+<code>.failure(Error)</code> – Contains the error that occurred.
+
+</ul>
+<p>
+Because it is an enum, it enforces <span id="Swift - Result-Understanding the Result Type in Swift-What is the Result Type?-compile-time safety"></span><strong id="compile-time safety">compile-time safety</strong>. You cannot accidentally access the success data if the operation failed, and you cannot ignore the error if it occurred.
+</p>
+
+<pre swift>
+// Under the hood, Swift defines it like this:
+enum Result&lt;Success, Failure: Error&gt; {
+    case success(Success)
+    case failure(Failure)
+}
+</pre>
+
+<div id="Swift - Result-Understanding the Result Type in Swift-Why and When to Use It"><h3 id="Why and When to Use It" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-Why and When to Use It">Why and When to Use It</a></h3></div>
+
+<p>
+While Swift's modern <code>async/await</code> has reduced the need for <code>Result</code> in simple network calls, <code>Result</code> is still incredibly useful in specific scenarios:
+</p>
+
+<ul>
+<li>
+<span id="Swift - Result-Understanding the Result Type in Swift-Why and When to Use It-Asynchronous Completion Handlers"></span><strong id="Asynchronous Completion Handlers">Asynchronous Completion Handlers</strong>: Passing the outcome of a background task back to the main thread (very common in older Swift code and external libraries).
+
+<li>
+<span id="Swift - Result-Understanding the Result Type in Swift-Why and When to Use It-Pre-loading and Storing States"></span><strong id="Pre-loading and Storing States">Pre-loading and Storing States</strong>: Saving the outcome of an operation in a <code>@State</code> variable to dictate what the UI should look like (e.g., showing a loading spinner, an error view, or the actual data).
+
+<li>
+<span id="Swift - Result-Understanding the Result Type in Swift-Why and When to Use It-Delayed Error Handling"></span><strong id="Delayed Error Handling">Delayed Error Handling</strong>: Catching an error now, but waiting to process or present it to the user until a later time.
+
+</ul>
+<div id="Swift - Result-Understanding the Result Type in Swift-The Fundamental Lifecycle: Creating and Unpacking"><h3 id="The Fundamental Lifecycle: Creating and Unpacking" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-The Fundamental Lifecycle: Creating and Unpacking">The Fundamental Lifecycle: Creating and Unpacking</a></h3></div>
+
+<p>
+Using <code>Result</code> always follows a three-step pattern: <span id="Swift - Result-Understanding the Result Type in Swift-The Fundamental Lifecycle: Creating and Unpacking-Define, Generate, and Unpack."></span><strong id="Define, Generate, and Unpack.">Define, Generate, and Unpack.</strong>
+</p>
+
+<div id="Swift - Result-Understanding the Result Type in Swift-The Fundamental Lifecycle: Creating and Unpacking-1. Generating a Result"><h4 id="1. Generating a Result" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-The Fundamental Lifecycle: Creating and Unpacking-1. Generating a Result">1. Generating a Result</a></h4></div>
+
+<p>
+You can manually create a <code>Result</code> by returning <code>.success</code> or <code>.failure</code>. Alternatively, Swift allows you to initialize a <code>Result</code> directly from a throwing expression using <code>Result { try ... }</code>.
+</p>
+
+<div id="Swift - Result-Understanding the Result Type in Swift-The Fundamental Lifecycle: Creating and Unpacking-2. Unpacking a Result"><h4 id="2. Unpacking a Result" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-The Fundamental Lifecycle: Creating and Unpacking-2. Unpacking a Result">2. Unpacking a Result</a></h4></div>
+
+<p>
+To get the data out of a <code>Result</code>, you must "unwrap" it. This is most commonly done using a <code>switch</code> block (the cleanest and most idiomatic way) or a <code>do-catch</code> block combined with <code>.get()</code>.
+</p>
+
+<p>
+Here is a complete, standalone example demonstrating both methods.
+</p>
+
+<pre swift>
+import Foundation
+
+// Define a custom error type
+enum NetworkError: Error {
+    case badConnection
+    case dataCorrupted
+}
+
+// 1. A function that returns a Result type
+func fetchUserData(isOnline: Bool) -&gt; Result&lt;String, NetworkError&gt; {
+    if isOnline {
+        return .success("User Profile: Jane Doe")
+    } else {
+        return .failure(.badConnection)
+    }
+}
+
+// Generate a result instance
+let fetchOutcome = fetchUserData(isOnline: false)
+</pre>
+
+<div id="Swift - Result-Understanding the Result Type in Swift-Unpacking Method A: The switch Block (Recommended)"><h3 id="Unpacking Method A: The switch Block (Recommended)" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-Unpacking Method A: The switch Block (Recommended)">Unpacking Method A: The switch Block (Recommended)</a></h3></div>
+
+<p>
+The <code>switch</code> statement is the preferred way to unpack a <code>Result</code> because it forces you to handle both cases explicitly.
+</p>
+
+<pre swift>
+switch fetchOutcome {
+case .success(let profileData):
+    print("Success! Data received: \(profileData)")
+    
+case .failure(let error):
+    switch error {
+    case .badConnection:
+        print("Please check your internet connection.")
+    case .dataCorrupted:
+        print("The data received from the server was bad.")
+    }
+}
+</pre>
+
+<div id="Swift - Result-Understanding the Result Type in Swift-Unpacking Method B: The do-catch Block"><h3 id="Unpacking Method B: The do-catch Block" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-Unpacking Method B: The do-catch Block">Unpacking Method B: The do-catch Block</a></h3></div>
+
+<p>
+If you prefer not to use a switch statement, <code>Result</code> has a built-in <code>.get()</code> method. This method will either instantly return the success value, or it will <code>throw</code> the error, allowing you to use a standard <code>do-catch</code> routine.
+</p>
+
+<pre swift>
+do {
+    // .get() will either extract the string or throw the NetworkError
+    let profileData = try fetchOutcome.get()
+    print("Success! Data received: \(profileData)")
+} catch let error as NetworkError {
+    print("Failed with network error: \(error)")
+} catch {
+    print("An unknown error occurred: \(error.localizedDescription)")
+}
+</pre>
+
+<div id="Swift - Result-Understanding the Result Type in Swift-Cheat Sheet Summary"><h3 id="Cheat Sheet Summary" class="header"><a href="#Swift - Result-Understanding the Result Type in Swift-Cheat Sheet Summary">Cheat Sheet Summary</a></h3></div>
+
+
+<table>
+<thead>
+<tr>
+<th>
+Feature
+</th>
+<th>
+<code>do-catch</code> (Standard Throws)
+</th>
+<th>
+<code>Result</code> Type
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Nature
+</td>
+<td>
+Control-flow mechanism
+</td>
+<td>
+Data type (Enum)
+</td>
+</tr>
+<tr>
+<td>
+Timing
+</td>
+<td>
+Must handle the error immediately	Can be stored in a variable and handled later
+</td>
+<td>
+&nbsp;
+</td>
+</tr>
+<tr>
+<td>
+Typing
+</td>
+<td>
+Errors are untyped (<code>any Error</code>)
+</td>
+<td>
+Errors can be strongly typed (e.g., <code>NetworkError</code>)
+</td>
+</tr>
+<tr>
+<td>
+Best For
+</td>
+<td>
+Synchronous, immediate code execution
+</td>
+<td>
+Passing outcomes between functions or views
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<hr>
+<br>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
