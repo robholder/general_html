@@ -89,6 +89,8 @@ Found 1000 readings
 That code works just fine, but it doesn’t give us a lot of flexibility - what if we want to stash the work away somewhere and do something else while it’s running? What if we want to read its result at some point in the future, perhaps handling any errors somewhere else entirely? Or what if we just want to cancel the work because it’s no longer needed?
 </p>
 
+<div id="Hacking With Swift - 227 - Understanding Swift's Result type-Task"><h2 id="Task" class="header"><a href="#Hacking With Swift - 227 - Understanding Swift's Result type-Task">Task</a></h2></div>
+
 <p>
 Well, we can get all that by using <code>Result</code>, and it’s actually available through an API you’ve met previously: <code>Task</code>. We could rewrite the above code to this:
 </p>
@@ -157,6 +159,53 @@ switch result {
 Regardless of how you handle it, the advantage of <code>Result</code> is that it lets us store the whole success or failure of some work in a single value, pass that around wherever we need, and read the error only when we’re ready.
 </p>
 
+<div id="Hacking With Swift - 227 - Understanding Swift's Result type-Task-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 227 - Understanding Swift's Result type-Task-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 227 - Understanding Swift's Result type-Task-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 227 - Understanding Swift's Result type-Task-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    @State private var output = ""
+    
+    var body: some View {
+        Text(output)
+            .task {
+                await fetchReadings()
+            }
+    }
+    
+    func fetchReadings() async {
+        let fetchTask = Task {
+            let url = URL(string: "https://hws.dev/readings.json")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let readings = try JSONDecoder().decode([Double].self, from: data)
+            return "Found \(readings.count) readings"
+        }
+        let result = await fetchTask.result
+        
+//      // Solution One:
+//        do {
+//            output = try result.get()
+//        } catch {
+//            output = "Error: \(error.localizedDescription)"
+//        }
+        
+        // Solution Two:
+        switch result {
+        case .success(let str):
+            output = str
+        case .failure(let error):
+            output = "Error: \(error.localizedDescription)"
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 <div id="Ai Insight - .task"><h1 id="Ai Insight - .task" class="header"><a href="#Ai Insight - .task">Ai Insight - .task</a></h1></div>
 
 <div id="Ai Insight - .task-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight - .task-QUESTION">QUESTION</a></h2></div>
