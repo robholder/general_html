@@ -231,9 +231,16 @@ It is completely normal to find <code>UserNotifications</code> overwhelming at f
 </p>
 
 <p>
-To make sense of it, you only need to understand <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-two core concepts"></span><strong id="two core concepts">two core concepts</strong>: asking for a hall pass (Permissions) and building a package to ship later (Scheduling).
+To make sense of it, you only need to understand <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-two core concepts"></span><strong id="two core concepts">two core concepts</strong>:
 </p>
+<ul>
+<li>
+asking for a hall pass (Permissions) and
 
+<li>
+building a package to ship later (Scheduling).
+
+</ul>
 <p>
 Here is the high-level flow of what your code is doing under the hood, followed by the fully commented version to tie it all together.
 </p>
@@ -366,6 +373,60 @@ Note on testing: If you run this in the Simulator or on your phone, click "Reque
 </blockquote>
 </p>
 
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String"><h2 id="Ai Insight - UUID -&gt; String" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String">Ai Insight - UUID -&gt; String</a></h2></div>
+
+<p>
+Why do we need the <code>.uuidString</code> method?
+</p>
+
+<p>
+In short, <code>UUID().uuidString</code> generates a <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-guaranteed unique, random 36-character tracking"></span><strong id="guaranteed unique, random 36-character tracking">guaranteed unique, random 36-character tracking</strong> number for that specific notification.
+</p>
+
+<p>
+Here is exactly how to break that tiny piece of code down into two parts:
+</p>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-1. UUID()"><h3 id="1. UUID()" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-1. UUID()">1. UUID()</a></h3></div>
+
+<p>
+This creates a brand new <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-1. UUID()-Universally Unique Identifier"></span><strong id="Universally Unique Identifier">Universally Unique Identifier</strong>. It is an industry-standard cryptographic random number generator. Every single time you call <code>UUID()</code>, Apple’s system generates a sequence that is so mathematically random, the chances of it ever generating the same number twice anywhere on earth is effectively zero.
+</p>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-2. .uuidString"><h3 id="2. .uuidString" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-2. .uuidString">2. .uuidString</a></h3></div>
+
+<p>
+The <code>UUID()</code> function actually spits out a complex data object. Adding <code>.uuidString</code> simply translates that object into a standard, readable Swift text string (<code>String</code>) that looks something like this:
+</p>
+<ul>
+<li>
+<code>"E621E1F8-C36C-495A-93FC-0C247A3E6E5F"</code>
+
+</ul>
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-Why does iOS need this? (The Tracking Number)"><h3 id="Why does iOS need this? (The Tracking Number)" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-Why does iOS need this? (The Tracking Number)">Why does iOS need this? (The Tracking Number)</a></h3></div>
+
+<p>
+iOS requires every notification request to have a unique <code>identifier</code> string. Think of it like a <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-Why does iOS need this? (The Tracking Number)-package tracking number"></span><strong id="package tracking number">package tracking number</strong>.
+</p>
+
+<p>
+Because you used a random UUID, if a user mashes your "Schedule Notification" button 5 times in a row, iOS will successfully queue up 5 separate notifications because they all have different tracking numbers.
+</p>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-When would you NOT use a random UUID?"><h3 id="When would you NOT use a random UUID?" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-When would you NOT use a random UUID?">When would you NOT use a random UUID?</a></h3></div>
+
+<p>
+You only use <code>UUID().uuidString</code> if you want a "fire and forget" notification. If you want to be able to <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-When would you NOT use a random UUID?-update"></span><strong id="update">update</strong> or <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-When would you NOT use a random UUID?-cancel"></span><strong id="cancel">cancel</strong> a notification later, you should use a fixed, custom string instead.
+</p>
+
+<ul>
+<li>
+<span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-When would you NOT use a random UUID?-Updating a notification"></span><strong id="Updating a notification">Updating a notification</strong>: If you send a notification with the identifier <code>"daily-reminder"</code>, and then send <em>another</em> one 2 minutes later with the exact same identifier <code>"daily-reminder"</code>, iOS will instantly overwrite the old one.
+
+<li>
+<span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight - UUID -&gt; String-When would you NOT use a random UUID?-Canceling a notification"></span><strong id="Canceling a notification">Canceling a notification</strong>: If the user feeds the cat early, you can tell iOS: <em>'Hey, delete the pending notification with the ID "daily-reminder".'</em> If you used a random <code>UUID().uuidString</code>, you wouldn't easily know what tracking number to tell iOS to look for!
+
+</ul>
 <p>
 <hr>
 <br>
