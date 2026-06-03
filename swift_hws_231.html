@@ -42,10 +42,10 @@ We have two types of notifications to work with, and they differ depending on wh
 </p>
 <ul>
 <li>
-Local notifications are ones we schedule locally, and
+Local notifications - scheduled locally
 
 <li>
-Remote notifications (commonly called <em>push</em> notifications) are sent from a server somewhere.
+Remote notifications (commonly called <em>push</em> notifications) - sent from a server somewhere.
 
 </ul>
 <p>
@@ -94,6 +94,8 @@ VStack {
     }
 }
 </pre>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Request Authorization"><h2 id="Request Authorization" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Request Authorization">Request Authorization</a></h2></div>
 
 <p>
 OK, that’s our setup complete so let’s turn our focus to the first of two important pieces of work: requesting authorization to show alerts.
@@ -169,6 +171,199 @@ If you run your app now, press the first button to request notification permissi
 
 <p>
 Now for the important part: once your notification has been added press Cmd+L in the simulator to lock the screen. After a few seconds have passed the device should wake up with a sound, and show our message - nice!
+</p>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Request Authorization-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Request Authorization-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Request Authorization-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Request Authorization-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+import UserNotifications
+
+struct ContentView: View {
+    @State private var backgroundColor = Color.red
+    
+    var body: some View {
+        VStack {
+            Button("Request Permission") {
+                UNUserNotificationCenter.current().requestAuthorization(
+                    options: [.alert, .badge, .sound]
+                ) { success, error in
+                    if success {
+                        print("All set!")
+                    } else if let error {
+                        print(error.localizedDescription)
+                    }
+                }
+            }
+            Button("Schedule Notification") {
+                let content = UNMutableNotificationContent()
+                content.title = "Feed the cat"
+                content.subtitle = "It looks hungry"
+                content.sound = UNNotificationSound.default
+                
+                // show this notification five seconds from now
+                let trigger = UNTimeIntervalNotificationTrigger(
+                    timeInterval: 5,
+                    repeats: false
+                )
+                
+                // choose a random identifier
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+                
+                // add our notification request
+                UNUserNotificationCenter.current().add(request)
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+It is completely normal to find <code>UserNotifications</code> overwhelming at first! SwiftUI is highly declarative ("make a button look like this"), whereas iOS's notification system relies on an older, imperative framework. You are essentially shifting gears into telling iOS to handle a multi-step background task.
+</p>
+
+<p>
+To make sense of it, you only need to understand <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-two core concepts"></span><strong id="two core concepts">two core concepts</strong>: asking for a hall pass (Permissions) and building a package to ship later (Scheduling).
+</p>
+
+<p>
+Here is the high-level flow of what your code is doing under the hood, followed by the fully commented version to tie it all together.
+</p>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow"><h3 id="The High-Level Flow" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow">The High-Level Flow</a></h3></div>
+
+<pre text>
+[ Your App ]
+     │
+     ├── Step 1: Request Permission ──&gt; (System shows popup to User)
+     │                                        │
+     │                            If approved, you can now send notifications!
+     │
+     └── Step 2: Schedule Notification
+               │
+               ├── 1. Content  (What does it say? "Feed the cat")
+               ├── 2. Trigger  (When does it fire? 5 seconds from now)
+               └── 3. Request  (Pack Content + Trigger together with a unique ID)
+                       │
+                       └──&gt; Sent to UNUserNotificationCenter (iOS takes over)
+</pre>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-1. Requesting Permission"><h4 id="1. Requesting Permission" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-1. Requesting Permission">1. Requesting Permission</a></h4></div>
+
+<p>
+Before your app can send <em>any</em> alerts, sounds, or badges, Apple forces you to ask the user explicitly.
+</p>
+
+<ul>
+<li>
+Your first button speaks to <code>UNUserNotificationCenter.current()</code> - this is the iOS background manager in charge of all notifications.
+
+<li>
+It throws up the system alert. If the user clicks "Allow", your app receives a <code>success</code> flag, unlocking the ability to schedule alerts.
+
+</ul>
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-2. Scheduling the Notification"><h4 id="2. Scheduling the Notification" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-2. Scheduling the Notification">2. Scheduling the Notification</a></h4></div>
+
+<p>
+Think of scheduling a notification like mailing a package to the future. You have to build three components:
+</p>
+
+<ul>
+<li>
+<span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-2. Scheduling the Notification-The Content"></span><strong id="The Content">The Content</strong> (<code>UNMutableNotificationContent</code>): The physical box and what's inside it (Title, subtitle, sound).
+
+<li>
+<span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-2. Scheduling the Notification-The Trigger"></span><strong id="The Trigger">The Trigger</strong> (<code>UNTimeIntervalNotificationTrigger</code>): The delivery date. In your case, a countdown timer set to 5 seconds.
+
+<li>
+<span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-2. Scheduling the Notification-The Request"></span><strong id="The Request">The Request</strong> (<code>UNNotificationRequest</code>): The shipping label. You take your <em>Content</em>, your <em>Trigger</em>, and slap a unique tracking number (<code>UUID</code>) on it so iOS can keep track of it.
+
+</ul>
+<p>
+Finally, you hand that completed request over to <code>UNUserNotificationCenter.current().add(request)</code>. At that exact moment, iOS takes the package. <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-The High-Level Flow-2. Scheduling the Notification-Even if the user closes your app completely"></span><strong id="Even if the user closes your app completely">Even if the user closes your app completely</strong>, iOS will count down the 5 seconds and fire the alert.
+</p>
+
+<div id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-Your Code, Fully Commented"><h3 id="Your Code, Fully Commented" class="header"><a href="#Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-Your Code, Fully Commented">Your Code, Fully Commented</a></h3></div>
+
+<p>
+Here is your exact code with inline explanations pulling all of these concepts together:
+</p>
+
+<pre swift>
+import SwiftUI
+// Import the Apple framework responsible for handling local and push notifications
+import UserNotifications
+
+struct ContentView: View {
+    @State private var backgroundColor = Color.red
+    
+    var body: some View {
+        VStack {
+            // MARK: - BUTTON 1: ASK FOR PERMISSION
+            Button("Request Permission") {
+                // Fetch the shared iOS Notification Manager and ask the user for permission
+                UNUserNotificationCenter.current().requestAuthorization(
+                    options: [.alert, .badge, .sound] // What types of notifications we want to send
+                ) { success, error in
+                    // This closure (completion handler) runs AFTER the user makes a choice
+                    if success {
+                        print("All set! User allowed notifications.")
+                    } else if let error {
+                        print("Permission denied or error occurred: \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+            // MARK: - BUTTON 2: SCHEDULE THE ALERT
+            Button("Schedule Notification") {
+                // 1. Create the PACKAGE (Content)
+                // We use "Mutable" because we want to modify its properties (title, subtitle, etc.)
+                let content = UNMutableNotificationContent()
+                content.title = "Feed the cat"
+                content.subtitle = "It looks hungry"
+                content.sound = UNNotificationSound.default // Use the standard iOS notification ding
+                
+                // 2. Create the TIMING (Trigger)
+                // Tell iOS to wait 5 seconds. 'repeats: false' means it only happens once.
+                let trigger = UNTimeIntervalNotificationTrigger(
+                    timeInterval: 5,
+                    repeats: false
+                )
+                
+                // 3. Create the SHIPPING LABEL (Request)
+                // We combine our Content and Trigger together.
+                // We give it a random UUID string as a unique ID so we could cancel it later if we wanted to.
+                let request = UNNotificationRequest(
+                    identifier: UUID().uuidString, 
+                    content: content, 
+                    trigger: trigger
+                )
+                
+                // 4. HAND IT OVER TO THE SYSTEM
+                // We pass our completed request to iOS. The system takes over counting down the 5 seconds.
+                UNUserNotificationCenter.current().add(request)
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<p>
+<blockquote>
+Note on testing: If you run this in the Simulator or on your phone, click "Request Permission" first, then click "Schedule Notification". Lock your phone or go to the home screen immediately. <span id="Hacking With Swift - 231 - Scheduling local notifications-Ai Insight-Your Code, Fully Commented-By default, iOS will not display a banner notification if the app is already open and running in the foreground!"></span><strong id="By default, iOS will not display a banner notification if the app is already open and running in the foreground!">By default, iOS will not display a banner notification if the app is already open and running in the foreground!</strong>
+</blockquote>
 </p>
 
 <p>
