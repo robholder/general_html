@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_236</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_235.html">Hacking With Swift - 235 - Dynamically filtering our SwiftData query</a>
+
+</ul>
+<div id="Hacking With Swift - 236 - Generating and scaling up our QR code"><h1 id="Hacking With Swift - 236 - Generating and scaling up our QR code" class="header"><a href="#Hacking With Swift - 236 - Generating and scaling up our QR code">Hacking With Swift - 236 - Generating and scaling up our QR code</a></h1></div>
+
+<div id="Hacking With Swift - 236 - Generating and scaling up our QR code-Project 16, part 5"><h2 id="Project 16, part 5" class="header"><a href="#Hacking With Swift - 236 - Generating and scaling up our QR code-Project 16, part 5">Project 16, part 5</a></h2></div>
+
+<p>
+There’s a classic computer science book called <em>Structure and Interpretation of Computer Programs</em>, and in the preface the authors write some important words:
+</p>
+
+<p>
+<blockquote>
+"Programs must be written for people to read, and only incidentally for machines to execute."
+</blockquote>
+</p>
+
+<p>
+It’s worth reading that a few times, because it has a massive impact on the way we write software. Why do we force ourselves to use data types when languages such as JavaScript let you mix and match strings, integers, and even arrays freely? Why do we add comments to our code? Why do we try to break things up into functions? Why do we have access control?
+</p>
+
+<p>
+All those and many more can be answered by that single quote: because our goal must <em>always</em> be to make our intent clear to ourselves and other developers. The CPU running our code doesn’t care about data types, comments, access control, and more, but if you want to write great software that is scalable, testable, and maintainable, you need to add some rules.
+</p>
+
+<p>
+So, perhaps today try and think a little more about the way you write your code - would adding some more comments help you remember a topic in a few months? Writing good comments is as much of a skill as writing good code!
+</p>
+
+<div id="Hacking With Swift - 236 - Generating and scaling up our QR code-Generating And Scaling Up Our Qr Code"><h2 id="Generating And Scaling Up Our Qr Code" class="header"><a href="#Hacking With Swift - 236 - Generating and scaling up our QR code-Generating And Scaling Up Our Qr Code">Generating And Scaling Up Our Qr Code</a></h2></div>
+
+<p>
+Core Image lets us generate a QR code from any input string, and do so extremely quickly. However, there’s a problem: the image it generates is very small because it’s only as big as the pixels required to show its data.
+</p>
+
+<p>
+It’s trivial to make the QR code larger, but to make it look <em>good</em> we also need to adjust SwiftUI’s image interpolation. So, in this step we’re going to ask the user to enter their name and email address in a form, use those two pieces of information to generate a QR code identifying them, and scale up the code without making it fuzzy.
+</p>
+
+<p>
+We already have a simple <code>MeView</code> struct that we made as a placeholder earlier, so our first job will be to add a couple of text fields and their string bindings.
+</p>
+
+<p>
+First, add these two new pieces of state to hold a name and email address:
+</p>
+
+<pre swift>
+@AppStorage("name") private var name = "Anonymous"
+@AppStorage("emailAddress") private var emailAddress = "you@yoursite.com"
+</pre>
+
+<p>
+When it comes to the body of the view we’re going to use two text fields with large fonts, but this time we’re going to attach a small but useful modifier to the text fields called <code>textContentType()</code> - it tells iOS what kind of information we’re asking the user for. This should allow iOS to provide autocomplete data on behalf of the user, which makes the app nicer to use.
+</p>
+
+<p>
+Replace your current body with this:
+</p>
+
+<pre swift>
+NavigationStack {
+    Form {
+        TextField("Name", text: $name)
+            .textContentType(.name)
+            .font(.title)
+
+        TextField("Email address", text: $emailAddress)
+            .textContentType(.emailAddress)
+            .font(.title)
+    }
+    .navigationTitle("Your code")
+}
+</pre>
+
+<p>
+We’re going to use the name and email address fields to generate a QR code, which is a square collection of black and white pixels that can be scanned by phones and other devices. Core Image has a filter for this built in, and as you’ve learned how to use Core Image filters previously you’ll find this is very similar.
+</p>
+
+<p>
+First, we need to bring in all the Core Image filters using a new import:
+</p>
+
+<pre swift>
+import CoreImage.CIFilterBuiltins
+</pre>
+
+<p>
+Second, we need two properties to store an active Core Image context and an instance of Core Image’s QR code generator filter. So, add these two to <code>MeView</code>:
+</p>
+
+<pre swift>
+let context = CIContext()
+let filter = CIFilter.qrCodeGenerator()
+</pre>
+
+<p>
+Now for the interesting part: making the QR code itself. If you remember, working with Core Image filters requires us to provide some input data, then convert the output <code>CIImage</code> into a <code>CGImage</code>, then that <code>CGImage</code> into a <code>UIImage</code>. We’ll be following the same steps here, except:
+</p>
+
+<ul>
+<li>
+Our input for the filter will be a string, but the input for the filter is <code>Data</code>, so we need to convert that.
+
+<li>
+If conversion fails for any reason we’ll send back the "xmark.circle" image from SF Symbols.
+
+<li>
+If <em>that</em> can’t be read - which is theoretically possible because SF Symbols is stringly typed - then we’ll send back an empty <code>UIImage</code>.
+
+</ul>
+<p>
+So, add this method to the <code>MeView</code> struct now:
+</p>
+
+<pre swift>
+func generateQRCode(from string: String) -&gt; UIImage {
+    filter.message = Data(string.utf8)
+
+    if let outputImage = filter.outputImage {
+        if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
+            return UIImage(cgImage: cgImage)
+        }
+    }
+
+    return UIImage(systemName: "xmark.circle") ?? UIImage()
+}
+</pre>
+
+<p>
+Isolating all that functionality in a method works really well in SwiftUI, because it means the code we put in the <code>body</code> property stays as simple as possible. In fact, we can just use <code>Image(uiImage:)</code> directly with a call to <code>generateQRCode(from:)</code>, then scale it up to a sensible size onscreen - SwiftUI will make sure the method gets called every time <code>name</code> or <code>emailAddress</code> changes.
+</p>
+
+<p>
+In terms of the string to pass in to <code>generateQRCode(from:)</code>, we’ll be using the name and email address entered by the user, separated by a line break. This is a nice and simple format, and it’s easy to reverse when it comes to scanning these codes later on.
+</p>
+
+<p>
+Add this new <code>Image</code> view directly below the second text field:
+</p>
+
+<pre swift>
+Image(uiImage: generateQRCode(from: "\(name)\n\(emailAddress)"))
+    .resizable()
+    .scaledToFit()
+    .frame(width: 200, height: 200)
+</pre>
+
+<p>
+If you run the code you’ll see it works pretty well - you’ll see a default QR code, but you can also type into either of the two text fields to make the QR code change dynamically.
+</p>
+
+<p>
+However, take a close look at the QR code - do you notice how it’s fuzzy? This is because Core Image is generating a tiny image, and SwiftUI is trying to smooth out the pixels as we scale it up.
+</p>
+
+<p>
+Line art like QR codes and bar codes is a great candidate for disabling image interpolation. Try adding this modifier to the image to see what I mean:
+</p>
+
+<pre swift>
+.interpolation(.none)
+</pre>
+
+<p>
+Now the QR code will be rendered nice and sharp, because SwiftUI will just repeat pixels rather than try to blend them neatly. I would imagine cameras don’t care which gets used, but it looks better to users!
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
