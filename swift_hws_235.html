@@ -184,6 +184,99 @@ struct ProspectsView: View {
 }
 </pre>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-Initializer Block and '_prospects'"><h3 id="Initializer Block and '_prospects'" class="header"><a href="#Ai Insight-Initializer Block and '_prospects'">Initializer Block and '_prospects'</a></h3></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+In the initializer, can you explain why we have '_prospects' and why Query isn't @Query?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is one of the most common points of confusion when working with SwiftUI and SwiftData! It feels like you are breaking the rules of SwiftUI by typing that underscore.
+</p>
+
+<p>
+To understand why this happens, we have to look at what Swift is doing under the hood. When you type <code>@Query</code>, Swift actually creates <code>two separate</code> things behind the scenes.
+</p>
+
+<p>
+Here is exactly what those two things are and why you need the underscore inside the initializer.
+</p>
+
+<div id="Ai Insight-ANSWER-The Secret Double Life of Property Wrappers"><h3 id="The Secret Double Life of Property Wrappers" class="header"><a href="#Ai Insight-ANSWER-The Secret Double Life of Property Wrappers">The Secret Double Life of Property Wrappers</a></h3></div>
+
+<p>
+Whenever you use a property wrapper like <code>@Query</code>, <code>@State</code>, or <code>@Environment</code>, Swift automatically generates two variables for you:
+</p>
+
+<ul>
+<li>
+<code>prospects</code> (<span id="Ai Insight-ANSWER-The Secret Double Life of Property Wrappers-No Underscore"></span><strong id="No Underscore">No Underscore</strong>): This is the <span id="Ai Insight-ANSWER-The Secret Double Life of Property Wrappers-wrapped value"></span><strong id="wrapped value">wrapped value</strong>. It gives you direct access to the data itself (the array of <code>[Prospect]</code>).
+
+<li>
+<code>_prospects</code> (<span id="Ai Insight-ANSWER-The Secret Double Life of Property Wrappers-With an Underscore"></span><strong id="With an Underscore">With an Underscore</strong>): This is the actual struct wrapper itself (the <code>Query</code> engine that goes to the database, filters things, and fetches the data).
+
+</ul>
+<div id="Ai Insight-ANSWER-Why can't we use @Query inside the initializer?"><h3 id="Why can't we use @Query inside the initializer?" class="header"><a href="#Ai Insight-ANSWER-Why can't we use @Query inside the initializer?">Why can't we use @Query inside the initializer?</a></h3></div>
+
+<p>
+You cannot type <code>@Query</code> inside a function or initializer because it is a compiler directive meant only for declaring properties at the top of your struct.
+</p>
+
+<p>
+By default, if you don't write an initializer, Swift sets up <code>@Query</code> to fetch <em>everything</em>. But in your case, you need to change how that query behaves based on the <code>filter</code> passed into the view.
+</p>
+
+<p>
+Because the raw array (<code>prospects</code>) is read-only, you cannot change the query by assigning a new array to it. <span id="Ai Insight-ANSWER-Why can't we use @Query inside the initializer?-You have to overwrite the entire query engine itself."></span><strong id="You have to overwrite the entire query engine itself.">You have to overwrite the entire query engine itself.</strong> To talk to the engine, you must use the underscore version: _prospects.
+</p>
+
+<div id="Ai Insight-ANSWER-Breaking Down Your Code"><h3 id="Breaking Down Your Code" class="header"><a href="#Ai Insight-ANSWER-Breaking Down Your Code">Breaking Down Your Code</a></h3></div>
+
+<p>
+Look at how your initializer is directly swapping out the engine:
+</p>
+
+<pre swift>
+init(filter: FilterType) {
+    self.filter = filter
+    
+    if filter != .none {
+        let showContactedOnly = filter == .contacted
+        
+        // You are assigning a brand new Query struct directly to the wrapper configuration.
+        // Notice we use "Query(...)" as a normal struct initializer here, not "@Query"
+        _prospects = Query(filter: #Predicate {
+            $0.isContacted == showContactedOnly
+        }, sort: [SortDescriptor(\Prospect.name)])
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-What about the else (.none) condition?"><h3 id="What about the else (.none) condition?" class="header"><a href="#Ai Insight-ANSWER-What about the else (.none) condition?">What about the else (.none) condition?</a></h3></div>
+
+<p>
+You might notice that your <code>if</code> statement only handles <code>filter != .none</code>. If the filter is <code>.none</code>, your custom initializer completely skips assigning anything to <code>_prospects</code>.
+</p>
+
+<p>
+When that happens, Swift falls back to the default rule you wrote at the top of your view:
+</p>
+
+<pre swift>
+@Query(sort: \Prospect.name) var prospects: [Prospect]
+</pre>
+
+<p>
+So, if <code>filter</code> is <code>.none</code>, you get the default unfiltered query. If <code>filter</code> is anything else, your initializer steps in, targets <code>_prospects</code>, and completely replaces the default engine with a shiny new, filtered one.
+</p>
+
+
 <p>
 <hr>
 <br>
