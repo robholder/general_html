@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_techniques_qrcodes</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - QR Codes"><h1 id="Swift - QR Codes" class="header"><a href="#Swift - QR Codes">Swift - QR Codes</a></h1></div>
+
+<p>
+Creating a QR code in iOS feels a bit like using an old-school darkroom photo lab. Your code is actually a perfect snapshot of how Apple’s Core Image framework handles this.
+</p>
+
+<p>
+Core Image is an incredibly powerful, hardware-accelerated image processing engine. It doesn't just "draw" shapes; it uses a recipe-based system. You hand it raw data, it processes it through a mathematical filter, and then you have to manually "render" the final image.
+</p>
+
+<p>
+Here is a breakdown of how the whole technique works, mapping your code directly to the real-world process.
+</p>
+
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy"><h2 id="The Big Picture: The Photo Lab Analogy" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy">The Big Picture: The Photo Lab Analogy</a></h2></div>
+
+<p>
+To understand why we need things like a context and a filter, think of the process like this:
+</p>
+
+<pre text>
+[ Your Text String ] ──&gt; Convert to Raw Bytes (Data)
+                                 │
+                                 ▼
+                     ┌───────────────────────┐
+                     │   CIFilter (Recipe)   │ &lt;── Dictates how the squares are arranged
+                     └───────────────────────┘
+                                 │
+                                 ▼
+                     ┌───────────────────────┐
+                     │ CIImage (Blueprint)   │ &lt;── Pure math; cannot be displayed yet
+                     └───────────────────────┘
+                                 │
+                                 ▼
+                     ┌───────────────────────┐
+                     │  CIContext (Lab/GPU)  │ &lt;── Renders the math into actual pixels
+                     └───────────────────────┘
+                                 │
+                                 ▼
+                     ┌───────────────────────┐
+                     │   UIImage (The Photo) │ &lt;── Ready to display in SwiftUI
+                     └───────────────────────┘
+</pre>
+
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique"><h3 id="Step-by-Step Breakdown of the Technique" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique">Step-by-Step Breakdown of the Technique</a></h3></div>
+
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-1. Setting up the Lab Equipment"><h4 id="1. Setting up the Lab Equipment" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-1. Setting up the Lab Equipment">1. Setting up the Lab Equipment</a></h4></div>
+
+<pre swift>
+let context  = CIContext()
+let filter = CIFilter.qrCodeGenerator()
+</pre>
+
+<ul>
+<li>
+<code>CIFilter.qrCodeGenerator()</code> (<span id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-1. Setting up the Lab Equipment-The Recipe"></span><strong id="The Recipe">The Recipe</strong>): A filter is an object that knows the mathematical rules of how to transform input data into an output image. By calling <code>.qrCodeGenerator()</code>, you are loading up Apple’s built-in mathematical engine specifically designed to turn text into those iconic black-and-white square matrix patterns.
+
+<li>
+<code>CIContext()</code> (<span id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-1. Setting up the Lab Equipment-The Digital Darkroom"></span><strong id="The Digital Darkroom">The Digital Darkroom</strong>): This is the heavy lifter. Creating a context prepares the phone's GPU/processor to do the actual image rendering. It is resource-heavy to create, which is why you declare it <span id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-1. Setting up the Lab Equipment-outside"></span><strong id="outside">outside</strong> the function once, rather than recreating it every time a QR code is generated.
+
+</ul>
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-2. Preparing the Input Data"><h4 id="2. Preparing the Input Data" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-2. Preparing the Input Data">2. Preparing the Input Data</a></h4></div>
+
+<pre swift>
+filter.message = Data(string.utf8)
+</pre>
+
+<p>
+A QR code filter cannot read a standard Swift <code>String</code> like "Hello World". It requires raw, binary computer bytes. <code>Data(string.utf8)</code> translates your text string into a stream of 1s and 0s using UTF-8 encoding. You feed those bytes into the filter's <code>.message</code> property.
+</p>
+
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-3. Fetching the Mathematical Blueprint"><h4 id="3. Fetching the Mathematical Blueprint" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-3. Fetching the Mathematical Blueprint">3. Fetching the Mathematical Blueprint</a></h4></div>
+
+<pre swift>
+if let outputImage = filter.outputImage {
+</pre>
+
+<p>
+When you ask the filter for its <code>outputImage</code>, it returns a <code>CIImage</code>.
+</p>
+
+<ul>
+<li>
+<span id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-3. Fetching the Mathematical Blueprint-Crucial Concept"></span><strong id="Crucial Concept">Crucial Concept</strong>: A <code>CIImage</code> is not an actual image file made of pixels. It is merely a "recipe" or a mathematical blueprint. It says, <em>"If you ever decide to render me, I will look like a QR code with these specific dimensions."</em> Because no pixels have been drawn yet, this step happens instantly.
+
+</ul>
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-4. Developing the Photo (The Render)"><h4 id="4. Developing the Photo (The Render)" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-4. Developing the Photo (The Render)">4. Developing the Photo (The Render)</a></h4></div>
+
+<pre swift>
+if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
+</pre>
+
+<p>
+This is where the magic happens. You hand your mathematical blueprint (<code>outputImage</code>) and its boundaries (<code>outputImage.extent</code>) over to your darkroom (<code>context</code>).
+</p>
+
+<ul>
+<li>
+The <code>CIContext</code> fires up the graphics processor, executes the math, and renders raw pixels out into a <code>CGImage</code> (Core Graphics image). A <code>CGImage</code> is a concrete, bitmap array of pixels living in memory.
+
+</ul>
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-5. Framing it for SwiftUI / UIKit"><h4 id="5. Framing it for SwiftUI / UIKit" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy-Step-by-Step Breakdown of the Technique-5. Framing it for SwiftUI / UIKit">5. Framing it for SwiftUI / UIKit</a></h4></div>
+
+<pre swift>
+return UIImage(cgImage: cgImage)
+</pre>
+
+<p>
+Finally, while a <code>CGImage</code> is great for computers, iOS views prefer a <code>UIImage</code> wrapper to display things nicely on screen. You wrap the pixel data into a <code>UIImage</code> and send it on its way. If anything in this multi-step process fails, your code safely falls back to a default "X" icon (<code>xmark.circle</code>).
+</p>
+
+<div id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-A Common Gotcha with this Technique"><h3 id="A Common Gotcha with this Technique" class="header"><a href="#Swift - QR Codes-The Big Picture: The Photo Lab Analogy-A Common Gotcha with this Technique">A Common Gotcha with this Technique</a></h3></div>
+
+<p>
+If you display this generated <code>UIImage</code> directly in SwiftUI, you might notice it looks incredibly <span id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-A Common Gotcha with this Technique-blurry or pixelated"></span><strong id="blurry or pixelated">blurry or pixelated</strong>.
+</p>
+
+<p>
+This is because Core Image generates a QR code where <span id="Swift - QR Codes-The Big Picture: The Photo Lab Analogy-A Common Gotcha with this Technique-1 module (square) = exactly 1 pixel"></span><strong id="1 module (square) = exactly 1 pixel">1 module (square) = exactly 1 pixel</strong>. The blueprint it outputs is incredibly tiny (often just 27×27 pixels!). When SwiftUI stretches that tiny image to fill a large <code>Image</code> view, iOS tries to smooth it out, making it blurry.
+</p>
+
+<p>
+To fix it in SwiftUI, you usually want to tell the image view to skip the smoothing and keep the edges sharp:
+</p>
+
+<pre swift>
+Image(uiImage: qrCodeImage)
+    .interpolation(.none) // &lt;--- Keeps the QR code crisp and blocky!
+    .resizable()
+    .frame(width: 200, height: 200)
+</pre>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
