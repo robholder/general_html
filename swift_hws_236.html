@@ -183,7 +183,7 @@ However, take a close look at the QR code - do you notice how it’s fuzzy? This
 </p>
 
 <p>
-Line art like QR codes and bar codes is a great candidate for disabling image interpolation. Try adding this modifier to the image to see what I mean:
+Line art like QR codes and bar codes is a great candidate for disabling image interpolation. Try adding this modifier to the image (<em>before</em> the other modifier lines) to see what I mean:
 </p>
 
 <pre swift>
@@ -194,6 +194,58 @@ Line art like QR codes and bar codes is a great candidate for disabling image in
 Now the QR code will be rendered nice and sharp, because SwiftUI will just repeat pixels rather than try to blend them neatly. I would imagine cameras don’t care which gets used, but it looks better to users!
 </p>
 
+<div id="Hacking With Swift - 236 - Generating and scaling up our QR code-Generating And Scaling Up Our Qr Code-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 236 - Generating and scaling up our QR code-Generating And Scaling Up Our Qr Code-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 236 - Generating and scaling up our QR code-Generating And Scaling Up Our Qr Code-In Context-MeView.swift"><h4 id="MeView.swift" class="header"><a href="#Hacking With Swift - 236 - Generating and scaling up our QR code-Generating And Scaling Up Our Qr Code-In Context-MeView.swift">MeView.swift</a></h4></div>
+
+<pre swift>
+import CoreImage.CIFilterBuiltins
+import SwiftUI
+
+struct MeView: View {
+    @AppStorage("name") private var name = "Anonymous"
+    @AppStorage("emailAddress") private var emailAddress = "you@yoursite.com"
+    
+    let context  = CIContext()
+    let filter = CIFilter.qrCodeGenerator()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+                    .textContentType(.name)
+                    .font(.title)
+                
+                TextField("Email address", text: $emailAddress)
+                    .textContentType(.emailAddress)
+                    .font(.title)
+                
+                Image(uiImage: generateQRCode(from: "\(name)\n\(emailAddress)"))
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 200, height: 200)
+            }
+            .navigationTitle("Your code")
+        }
+    }
+    func generateQRCode(from string: String) -&gt; UIImage {
+        filter.message = Data(string.utf8)
+        
+        if let outputImage = filter.outputImage {
+            if let cgImage  = context.createCGImage(outputImage, from: outputImage.extent) {
+                return UIImage(cgImage: cgImage)
+            }
+        }
+        
+        return UIImage(systemName: "xmark.circle") ?? UIImage()
+    }
+}
+
+#Preview {
+    MeView()
+}
+</pre>
 
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
