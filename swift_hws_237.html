@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_237</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_236.html">Hacking With Swift - 236 - Generating and scaling up our QR code</a>
+
+</ul>
+<div id="Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]"><h1 id="Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]" class="header"><a href="#Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]">Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]</a></h1></div>
+
+<p>
+Scanning a QR code - or indeed any kind of visible code such as barcodes - can be done by Apple’s AVFoundation library. This doesn’t integrate into SwiftUI terribly smoothly, so to skip over a whole lot of pain I’ve packaged up a QR code reader into a Swift package that we can add and use directly inside Xcode.
+</p>
+
+<p>
+My package is called CodeScanner, and it's available on GitHub under the MIT license at:
+</p>
+<ul>
+<li>
+<a href="https://github.com/twostraws/CodeScanner">ExternalLink - TwoStraws-CodeScanner</a>
+
+</ul>
+<p>
+You’re welcome to inspect and/or edit the source code if you want.
+</p>
+
+<p>
+Here, though, we’re just going to add it to Xcode by following these steps:
+</p>
+
+<ul>
+<li>
+Go to File &gt; Add Package Dependencies.
+
+<li>
+Enter <code>https://github.com/twostraws/CodeScanner</code> as the package repository URL.
+
+<li>
+For the version rules, leave “Up to Next Major” selected, which means you’ll get any bug fixes and additional features but <em>not</em> any breaking changes.
+
+<li>
+Press Add Package to import the finished package into your project.
+
+</ul>
+<p>
+The CodeScanner package gives us one <code>CodeScannerView</code> SwiftUI view to use, which can be presented in a sheet and handle code scanning in a clean, isolated way. I know I keep repeating myself, but I hope you can see the continuing theme: the best way to write SwiftUI is to isolate functionality in discrete methods and wrappers, so that all you expose to your SwiftUI layouts is clean, clear, and unambiguous.
+</p>
+
+<p>
+We already have a “Scan” button in <code>ProspectsView</code>, and we’re going to use that trigger QR scanning. So, start by adding this new <code>@State</code> property to <code>ProspectsView</code>:
+</p>
+
+<pre swift>
+@State private var isShowingScanner = false
+</pre>
+
+<p>
+Earlier we added some test functionality to the “Scan” button so we could insert some sample data, but we don’t need that any more because we’re about to scan real QR codes. So, replace the action code for the toolbar button with this:
+</p>
+
+<pre swift>
+isShowingScanner = true
+</pre>
+
+<p>
+When it comes to handling the result of the QR scanning, I’ve made the CodeScanner package do literally all the work of figuring out what the code is and how to send it back, so all we need to do here is catch the result and process it somehow.
+</p>
+
+<p>
+When the <code>CodeScannerView</code> finds a code, it will call a completion closure with a <code>Result</code> instance either containing details about the code that was found or an error saying what the problem was - perhaps the camera wasn’t available, or the camera wasn’t able to scan codes, for example. Regardless of what code or error comes back, we’re just going to dismiss the view; we’ll add more code shortly to do more work.
+</p>
+
+<p>
+Start by adding this new import near the top of <code>ProspectsView.swift</code>:
+</p>
+
+<pre swift>
+import CodeScanner
+Now add this method to ProspectsView:
+
+func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+   isShowingScanner = false
+   // more code to come
+}
+</pre>
+
+<p>
+Before we show the scanner and try to handle its result, we need to ask the user for permission to use the camera:
+</p>
+
+<ul>
+<li>
+Go to your target’s configuration options under its Info tab.
+
+<li>
+Right-click on an existing key and select Add Row.
+
+<li>
+Select “Privacy - Camera Usage Description” for the key.
+
+<li>
+For the value enter “We need to scan QR codes.”
+
+</ul>
+<p>
+And now we’re ready to scan some QR codes! We already have the <code>isShowingScanner</code> state that determines whether to show a code scanner or not, so we can now attach a <code>sheet()</code> modifier to present our scanner UI.
+</p>
+
+<p>
+Creating a <code>CodeScannerView</code> takes at least three parameters:
+</p>
+
+<ul>
+<li>
+An array of the types of codes we want to scan. We’re only scanning QR codes in this app so <code>[.qr]</code> is fine, but iOS supports lots of other types too.
+
+<li>
+A string to use as simulated data. Xcode’s simulator doesn’t support using the camera to scan codes, so <code>CodeScannerView</code> automatically presents a replacement UI so we can still test that things work. This replacement UI will automatically send back whatever we pass in as simulated data.
+
+<li>
+A completion function to use. This could be a closure, but we just wrote the <code>handleScan()</code> method so we’ll use that.
+
+</ul>
+<p>
+So, add this below the existing <code>toolbar()</code> modifier in <code>ProspectsView</code>:
+</p>
+
+<pre swift>
+.sheet(isPresented: $isShowingScanner) {
+    CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+}
+</pre>
+
+<p>
+That’s enough to get most of this screen working, but there is one last step: replacing the <code>// more code to come</code> comment in <code>handleScan()</code> with some actual functionality to process the data we found.
+</p>
+
+<p>
+If you recall, the QR codes we’re generating are a name, then a line break, then an email address, so if our scanning result comes back successfully then we can pull apart the code string into those components and use them to create a new <code>Prospect</code>. If code scanning failed, we’ll just print an error - you’re welcome to show some more interesting UI if you want!
+</p>
+
+<p>
+Replace the <code>// more code to come</code> comment with this:
+</p>
+
+<pre swift>
+switch result {
+case .success(let result):
+    let details = result.string.components(separatedBy: "\n")
+    guard details.count == 2 else { return }
+
+    let person = Prospect(name: details[0], emailAddress: details[1], isContacted: false)
+
+    modelContext.insert(person)
+case .failure(let error):
+    print("Scanning failed: \(error.localizedDescription)")
+}
+</pre>
+
+<p>
+Go ahead and run the code now. If you’re using the simulator you’ll see a test UI appear, and tapping anywhere will dismiss the view and send back our simulated data.
+</p>
+
+<p>
+If you’re using a real device you’ll see a permission message asking the user to allow camera use, and you grant that you’ll see a scanner view. To test out scanning on a real device, simultaneously launch the app in the simulator and switch to the Me tab - your phone should be able to scan the simulator screen on your computer.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
