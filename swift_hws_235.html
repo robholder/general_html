@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_235</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_234.html">Hacking With Swift - 234 - Storing our data with SwiftData</a>
+
+</ul>
+<div id="Hacking With Swift - 235 - Dynamically filtering our SwiftData query"><h1 id="Hacking With Swift - 235 - Dynamically filtering our SwiftData query" class="header"><a href="#Hacking With Swift - 235 - Dynamically filtering our SwiftData query">Hacking With Swift - 235 - Dynamically filtering our SwiftData query</a></h1></div>
+
+<p>
+Our basic SwiftData query looks like this:
+</p>
+
+<pre swift>
+@Query(sort: \Prospect.name) var prospects: [Prospect]
+</pre>
+
+<p>
+By default that will load all <code>Prospect</code> model objects, sorting them by name, and while that's fine for the <code>Everyone</code> tab, it's not enough for the other two.
+</p>
+
+<p>
+In our app, we have three instances of <code>ProspectsView</code> that vary only according to the <code>FilterType</code> property that gets passed in from our tab view. We’re already using that to set the title of each view, but we can also use it to filter our query.
+</p>
+
+<p>
+Yes, we already have a default query in place, but if we add an initializer we can override that when a filter is set.
+</p>
+
+<p>
+Add this initializer to <code>ProspectsView</code> now:
+</p>
+
+<pre swift>
+init(filter: FilterType) {
+    self.filter = filter
+
+    if filter != .none {
+        let showContactedOnly = filter == .contacted
+
+        _prospects = Query(filter: #Predicate {
+            $0.isContacted == showContactedOnly
+        }, sort: [SortDescriptor(\Prospect.name)])
+    }
+}
+</pre>
+
+<p>
+We've looked at creating queries manually previously, but there is one line that really stands out:
+</p>
+
+<pre swift>
+let showContactedOnly = filter == .contacted 
+</pre>
+
+<p>
+If that made you do a double take, break it down into two parts. First, this check:
+</p>
+
+<pre swift>
+filter == .contacted 
+</pre>
+
+<p>
+That will return true if <code>filter</code> is equal to <code>.contacted</code>, or false otherwise. And now this part:
+</p>
+
+<pre swift>
+let showContactedOnly =
+</pre>
+
+<p>
+That will assign the result of <code>filter == .contacted</code> to a new constant called <code>showContactedOnly</code>. So, if we read the whole line, it means "set <code>showContactedOnly</code> to true if our filter is set to <code>.contacted</code>." This makes our SwiftData predicate easy, because we can compare that constant directly against <code>isContacted</code>.
+</p>
+
+<p>
+With that initializer in place, we can now create a <code>List</code> to loop over the resulting array. This will show both the title and email address for each prospect using a <code>VStack</code> - replace the existing text view in <code>ProspectsView</code> with this:
+</p>
+
+<pre swift>
+List(prospects) { prospect in
+    VStack(alignment: .leading) {
+        Text(prospect.name)
+            .font(.headline)
+        Text(prospect.emailAddress)
+            .foregroundStyle(.secondary)
+    }
+}
+</pre>
+
+<p>
+If you run the app again you’ll see things are starting to look much better.
+</p>
+
+<div id="Hacking With Swift - 235 - Dynamically filtering our SwiftData query-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 235 - Dynamically filtering our SwiftData query-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 235 - Dynamically filtering our SwiftData query-In Context-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Hacking With Swift - 235 - Dynamically filtering our SwiftData query-In Context-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \Prospect.name) var prospects: [Prospect]
+    
+    enum FilterType {
+        case none, contacted, uncontacted
+    }
+    
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none:
+            "Everyone"
+        case .contacted:
+            "Contacted people"
+        case .uncontacted:
+            "Uncontacted people"
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List(prospects) { prospect in
+                VStack(alignment: .leading) {
+                    Text(prospect.name)
+                        .font(.headline)
+                    Text(prospect.emailAddress)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+                .navigationTitle(title)
+                .toolbar {
+                    Button("Scan", systemImage: "qrcode.viewfinder") {
+                        let prospect = Prospect(name: "Paul Hudson", emailAddress: "paul@hackingwithswift.com", isContacted: false)
+                        modelContext.insert(prospect)
+                    }
+                }
+        }
+    }
+    init(filter: FilterType) {
+        self.filter = filter
+        
+        if filter != .none {
+            let showContactedOnly = filter == .contacted
+            
+            _prospects = Query(filter: #Predicate {
+                $0.isContacted == showContactedOnly
+            }, sort: [SortDescriptor(\Prospect.name)])
+        }
+    }
+}
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
