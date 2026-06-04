@@ -216,7 +216,148 @@ struct ProspectsView: View {
 }
 </pre>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
 <p>
+I'm looking at this setup:
+</p>
+
+<pre swift>
+@main
+struct HotProspectsApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // THIS LINE
+        .modelContainer(for: Prospect.self)
+    }
+}
+</pre>
+
+<pre swift>
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    // THIS LINE
+    @Query(sort: \Prospect.name) var prospects: [Prospect]
+    
+    // Stuff...
+    
+                        let prospect = Prospect(name: "Paul Hudson", emailAddress: "paul@hackingwithswift.com", isContacted: false)
+                        // THIS LINE
+                        modelContext.insert(prospect)
+                    }
+                }
+    // Stuff...
+        }
+</pre>
+
+<p>
+...And I'm wondering why the modelContainer is 'for' the Prospect class item, yet this line seems to be setting up an array of 'prospect' items. How is all this working?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is one of the coolest parts of SwiftData, but it can absolutely feel like magic (or a disconnect) when you first look at it.
+</p>
+
+<p>
+You are asking the exact right question: <span id="Ai Insight-ANSWER-How does telling the app to watch a single class"></span><strong id="How does telling the app to watch a single class">How does telling the app to watch a single class</strong> (<code>Prospect</code>) <span id="Ai Insight-ANSWER-automatically give a view a dynamically updating array"></span><strong id="automatically give a view a dynamically updating array">automatically give a view a dynamically updating array</strong> (<code>[Prospect]</code>) <span id="Ai Insight-ANSWER-of data?"></span><strong id="of data?">of data?</strong>
+</p>
+
+<p>
+It all comes down to SwiftData's architecture. The <code>.modelContainer</code> is setting up the database structure, while <code>@Query</code> is fetching the <em>database contents</em>.
+</p>
+
+<p>
+Here is exactly how these pieces connect.
+</p>
+
+<div id="Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet"><h3 id="The Big Picture: Think of it like a Spreadsheet" class="header"><a href="#Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet">The Big Picture: Think of it like a Spreadsheet</a></h3></div>
+
+<p>
+To make sense of this, imagine your app is managing a standard spreadsheet file.
+</p>
+
+<div id="Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet-1. The Model (Prospect.swift)"><h4 id="1. The Model (Prospect.swift)" class="header"><a href="#Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet-1. The Model (Prospect.swift)">1. The Model (Prospect.swift)</a></h4></div>
+
+<p>
+This is your blueprint. By adding <code>@Model</code>, you are telling SwiftData: <em>"Hey, I want to create a database table. Every row in this table represents a single person, and the columns will be name, emailAddress, and isContacted."</em>
+</p>
+
+<div id="Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet-2. The Model Container (.modelContainer(for: Prospect.self))"><h4 id="2. The Model Container (.modelContainer(for: Prospect.self))" class="header"><a href="#Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet-2. The Model Container (.modelContainer(for: Prospect.self))">2. The Model Container (.modelContainer(for: Prospect.self))</a></h4></div>
+
+<p>
+When you pass <code>Prospect.self</code> to the <code>.modelContainer</code> modifier in your App struct, you are telling iOS to initialize the database storage for that blueprint.
+</p>
+
+<ul>
+<li>
+Notice you pass <code>Prospect.self</code> (with a capital P). The <code>.self</code> keyword means you are passing the <code>type</code> itself, not an actual person.
+
+<li>
+This line tells iOS: <em>"Create a database on the user's phone that is perfectly shaped to hold Prospect rows."</em>
+
+</ul>
+<div id="Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet-3. The Query (@Query var prospects: [Prospect])"><h4 id="3. The Query (@Query var prospects: [Prospect])" class="header"><a href="#Ai Insight-ANSWER-The Big Picture: Think of it like a Spreadsheet-3. The Query (@Query var prospects: [Prospect])">3. The Query (@Query var prospects: [Prospect])</a></h4></div>
+
+<p>
+This is where your array comes from. <code>@Query</code> is a macro that acts as a real-time pipeline directly into that database container you set up in the App struct.
+</p>
+
+<p>
+When <code>ProspectsView</code> loads, <code>@Query</code>:
+</p>
+
+<ul>
+<li>
+Looks into the active database container.
+
+<li>
+Finds the table meant for <code>Prospect</code> objects.
+
+<li>
+Grabs all the rows currently saved there.
+
+<li>
+Sorts them by name (<code>sort: \Prospect.name</code>).
+
+<li>
+Packs them neatly into a standard Swift array (<code>[Prospect]</code>) for your view to read.
+
+</ul>
+<div id="Ai Insight-ANSWER-Connecting the Flow: What happens when you click &quot;Scan&quot;?"><h3 id="Connecting the Flow: What happens when you click &quot;Scan&quot;?" class="header"><a href="#Ai Insight-ANSWER-Connecting the Flow: What happens when you click &quot;Scan&quot;?">Connecting the Flow: What happens when you click "Scan"?</a></h3></div>
+
+<p>
+Let's trace exactly how a new person moves through your code when you press the button:
+</p>
+
+<pre swift>
+Button("Scan", systemImage: "qrcode.viewfinder") {
+    // 1. You create ONE new Prospect object in memory
+    let prospect = Prospect(name: "Paul Hudson", emailAddress: "...", isContacted: false)
+    
+    // 2. You hand that single object over to the modelContext
+    modelContext.insert(prospect)
+}
+</pre>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-Connecting the Flow: What happens when you click &quot;Scan&quot;?-The Context"></span><strong id="The Context">The Context</strong> (<code>modelContext</code>): Think of this as the "scratchpad" or the delivery truck for your database. When you call <code>.insert(prospect)</code>, you are tossing that new single person into the truck.
+
+<li>
+<span id="Ai Insight-ANSWER-Connecting the Flow: What happens when you click &quot;Scan&quot;?-The Auto-Save"></span><strong id="The Auto-Save">The Auto-Save</strong>: SwiftData automatically drives that truck to the database container and saves the new row into the permanent storage file.
+
+<li>
+<span id="Ai Insight-ANSWER-Connecting the Flow: What happens when you click &quot;Scan&quot;?-The Infinite Loop of Awesomeness"></span><strong id="The Infinite Loop of Awesomeness">The Infinite Loop of Awesomeness</strong>: The moment the database changes, <code>@Query</code> notices it <span id="Ai Insight-ANSWER-Connecting the Flow: What happens when you click &quot;Scan&quot;?-instantly"></span><strong id="instantly">instantly</strong>. It re-runs its search, grabs the newly updated list of people, reconstructs the array (<code>[Prospect]</code>), and tells SwiftUI to redraw the screen.
+
+</ul>
+<p>
+That's why you don't have to manually write code to append the new prospect to an array! The view just sits back, listens to the database through <code>@Query</code>, and lets SwiftData handle the heavy lifting.
 <hr>
 <br>
 </p>
