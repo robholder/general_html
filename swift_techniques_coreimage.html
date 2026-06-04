@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_techniques_coreimage</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Images: The CoreImage and UIKit Pipeline"><h1 id="Swift - Images: The CoreImage and UIKit Pipeline" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline">Swift - Images: The CoreImage and UIKit Pipeline</a></h1></div>
+
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline"><h2 id="Images: The Core Image &amp; UIKit Pipeline" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline">Images: The Core Image &amp; UIKit Pipeline</a></h2></div>
+
+<p>
+Processing images programmatically on iOS requires shifting gears from how we simply "display" a picture to how the hardware actually constructs, edits, and renders graphical data.
+</p>
+
+<p>
+Whether you are applying a sepia filter, blurring a background, or generating artwork from scratch, Apple uses a hardware-accelerated framework called <span id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Core Image"></span><strong id="Core Image">Core Image</strong>. Much like an old-school photographic darkroom, Core Image uses a recipe-based pipeline where images aren't merely copied - they are chemically "developed" from math into pixels.
+</p>
+
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-The Big Picture: The Image Pipeline Architecture"><h3 id="The Big Picture: The Image Pipeline Architecture" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-The Big Picture: The Image Pipeline Architecture">The Big Picture: The Image Pipeline Architecture</a></h3></div>
+
+<p>
+To manipulate images efficiently without lagging the device's user interface, iOS separates the <code>instructions</code> for an image from the <em>actual pixel data.</em>
+</p>
+
+<p>
+The pipeline moves sequentially through four core stages:
+</p>
+
+<pre text>
+[ Raw Input Data ] ──&gt; Create a Virtual Recipe (CIImage)
+                               │
+                               ▼
+                   ┌───────────────────────┐
+                   │   CIFilter (Recipe)   │ &lt;── Modifies color, math, or geometry
+                   └───────────────────────┘
+                               │
+                               ▼
+                   ┌───────────────────────┐
+                   │ CIImage (Blueprint)   │ &lt;── Pure logic; no pixels rendered yet
+                   └───────────────────────┘
+                               │
+                               ▼
+                   ┌───────────────────────┐
+                   │  CIContext (Lab/GPU)  │ &lt;── Renders the math into physical bitmap
+                   └───────────────────────┘
+                               │
+                               ▼
+                   ┌───────────────────────┐
+                   │  CGImage &amp; UIImage    │ &lt;── Wrapped and optimized for the UI
+                   └───────────────────────┘
+</pre>
+
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements"><h3 id="Step-by-Step Breakdown of the Pipeline Elements" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements">Step-by-Step Breakdown of the Pipeline Elements</a></h3></div>
+
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-1. The Equipment Setup"><h4 id="1. The Equipment Setup" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-1. The Equipment Setup">1. The Equipment Setup</a></h4></div>
+
+<p>
+Before any processing happens, you must initialize the environment.
+</p>
+
+<pre swift>
+let context = CIContext()
+</pre>
+
+<ul>
+<li>
+<code>CIContext</code> (<span id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-1. The Equipment Setup-The Digital Darkroom"></span><strong id="The Digital Darkroom">The Digital Darkroom</strong>): This is the heavy lifter of the framework. It manages the communication with the device's graphics processor (GPU) or CPU. Because spinning up a context requires allocating significant hardware resources, it should be created once and reused across your app, rather than recreated inside a function.
+
+</ul>
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-2. Loading the Raw Data (CIImage)"><h4 id="2. Loading the Raw Data (CIImage)" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-2. Loading the Raw Data (CIImage)">2. Loading the Raw Data (CIImage)</a></h4></div>
+
+<pre swift>
+let inputImage = CIImage(image: uiImage)
+</pre>
+
+<ul>
+<li>
+<code>CIImage</code> (<span id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-2. Loading the Raw Data (CIImage)-The Vector Blueprint"></span><strong id="The Vector Blueprint">The Vector Blueprint</strong>): You cannot apply filters directly to a standard display image (<code>UIImage</code>). You must convert it into a <code>CIImage</code>.
+
+<li>
+<span id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-2. Loading the Raw Data (CIImage)-Crucial Concept"></span><strong id="Crucial Concept">Crucial Concept</strong>: A <code>CIImage</code> contains absolutely no pixel bitmap data. It is purely a lightweight, mathematical representation of an image. It stores the <em>intent</em> to look a certain way.
+
+</ul>
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-3. Applying the Transformation (CIFilter)"><h4 id="3. Applying the Transformation (CIFilter)" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-3. Applying the Transformation (CIFilter)">3. Applying the Transformation (CIFilter)</a></h4></div>
+
+<pre swift>
+let filter = CIFilter.sepiaTone()
+filter.inputImage = inputImage
+filter.intensity = 0.8
+</pre>
+
+<ul>
+<li>
+<code>CIFilter</code> (<span id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-3. Applying the Transformation (CIFilter)-The Recipe"></span><strong id="The Recipe">The Recipe</strong>): A filter is an immutable configuration object. It takes one or more <code>CIImage</code> inputs, reads their mathematical definitions, and alters those rules based on properties you set (like brightness, contrast, or blur radius).
+
+<li>
+When you request <code>filter.outputImage</code>, Core Image does not perform any actual image processing yet. It simply appends your new rules to the existing blueprint chain. This makes chaining multiple filters together incredibly fast.
+
+</ul>
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-4. Developing the Photo (CGImage)"><h4 id="4. Developing the Photo (CGImage)" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-4. Developing the Photo (CGImage)">4. Developing the Photo (CGImage)</a></h4></div>
+
+<pre swift>
+if let outputImage = filter.outputImage {
+    if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
+        // Pixel data now physically exists in memory
+    }
+}
+</pre>
+
+<ul>
+<li>
+<code>context.createCGImage(_:from:)</code> (<span id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-4. Developing the Photo (CGImage)-The Render"></span><strong id="The Render">The Render</strong>): This is the exact moment the pipeline executes. You pass your final blueprint (<code>outputImage</code>) and its coordinate boundaries (extent) to your darkroom context.
+
+<li>
+The <code>CIContext</code> hands the instructions over to the GPU, evaluates the stacked mathematical operations for every single coordinate, and bakes them into a <code>CGImage</code> (Core Graphics image). A <code>CGImage</code> is a raw, physical bitmap array of pixels sitting explicitly in memory.
+
+</ul>
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-5. Packaging for the User Interface (UIImage)"><h4 id="5. Packaging for the User Interface (UIImage)" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-5. Packaging for the User Interface (UIImage)">5. Packaging for the User Interface (UIImage)</a></h4></div>
+
+<pre swift>
+let finalDisplayImage = UIImage(cgImage: cgImage)
+</pre>
+
+<ul>
+<li>
+<code>UIImage</code> (<span id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Step-by-Step Breakdown of the Pipeline Elements-5. Packaging for the User Interface (UIImage)-The Display Frame"></span><strong id="The Display Frame">The Display Frame</strong>): While <code>CGImage</code> is perfect for raw pixel manipulation and graphics hardware, SwiftUI and <code>UIKit</code> views cannot render it natively without a wrapper. Wrapping the pixel data into a standard <code>UIImage</code> makes it ready to be placed inside a SwiftUI Image view or cached in memory.
+
+</ul>
+<div id="Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Summary of Framework Roles"><h3 id="Summary of Framework Roles" class="header"><a href="#Swift - Images: The CoreImage and UIKit Pipeline-Images: The Core Image &amp; UIKit Pipeline-Summary of Framework Roles">Summary of Framework Roles</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Class
+</th>
+<th>
+Analogy
+</th>
+<th>
+State of Data
+</th>
+<th>
+Resource Cost
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>CIImage</code>
+</td>
+<td>
+The Photographic Negative
+</td>
+<td>
+Pure Math / Instruction
+</td>
+<td>
+Extremely Cheap
+</td>
+</tr>
+<tr>
+<td>
+<code> CIFilter</code>
+</td>
+<td>
+The Lens / Lens Filter
+</td>
+<td>
+Mathematical Ruleset
+</td>
+<td>
+Cheap
+</td>
+</tr>
+<tr>
+<td>
+<code>CIContext</code>
+</td>
+<td>
+The Darkroom Processing Lab
+</td>
+<td>
+Execution Engine
+</td>
+<td>
+Very Expensive (Reuse this!)
+</td>
+</tr>
+<tr>
+<td>
+<code>CGImage</code>
+</td>
+<td>
+The Developed Photo Print
+</td>
+<td>
+Raw Bitmapped Pixels
+</td>
+<td>
+High Memory Footprint
+</td>
+</tr>
+<tr>
+<td>
+<code>UIImage</code>
+</td>
+<td>
+The Picture Frame
+</td>
+<td>
+UI-Ready Wrapper
+</td>
+<td>
+Cheap (Wraps the CGImage)
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
