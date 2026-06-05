@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_238</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_237.html">Hacking With Swift - 237 - Scanning QR codes with SwiftUI</a>
+
+</ul>
+<div id="Hacking With Swift - 238 - Adding options with swipe actions"><h1 id="Hacking With Swift - 238 - Adding options with swipe actions" class="header"><a href="#Hacking With Swift - 238 - Adding options with swipe actions">Hacking With Swift - 238 - Adding options with swipe actions</a></h1></div>
+
+<p>
+We need a way to move people between the Contacted and Uncontacted tabs, and the easiest thing to do is add a swipe action to the <code>VStack</code> in <code>ProspectsView</code>. This will allow users to swipe on any person in the list, then tap a single option to move them between the tabs.
+</p>
+
+<p>
+Now, remember that this view is shared in three places, so we need to make sure the swipe actions look correct no matter where it’s used. We <em>could</em> try and use a bunch of ternary conditional operators, but later on we’ll add a second button so the ternary operator approach won’t really help much. Instead, we’ll just wrap the button inside a simple condition - add this to the <code>VStack</code> now:
+</p>
+
+<pre swift>
+.swipeActions {
+    if prospect.isContacted {
+        Button("Mark Uncontacted", systemImage: "person.crop.circle.badge.xmark") {
+            prospect.isContacted.toggle()
+        }
+        .tint(.blue)
+    } else {
+        Button("Mark Contacted", systemImage: "person.crop.circle.fill.badge.checkmark") {
+            prospect.isContacted.toggle()
+        }
+        .tint(.green)
+    }
+}
+</pre>
+
+<p>
+Thanks to SwiftUI and SwiftData's tight integration, just calling <code>toggle()</code> on our property will flip the Boolean, update our view, and save the change to permanent storage - all in just one line of code.
+</p>
+
+<p>
+If you run the app now you’ll see it works great now - scan a user, then bring up the context menu and tap its action to see the user move between the Contacted and Uncontacted tabs.
+</p>
+
+<div id="Hacking With Swift - 238 - Adding options with swipe actions-onDelete"><h2 id="onDelete" class="header"><a href="#Hacking With Swift - 238 - Adding options with swipe actions-onDelete">onDelete</a></h2></div>
+
+<p>
+Now, swipe actions are a great feature for adding extra functionality to your SwiftUI app, but they <em>don't</em> play nicely with the <code>onDelete()</code> modifier we used previously. So, we need to make deletion work by hand, and we're going to do this in two ways at the same time: individual swipe to delete like we had with <code>onDelete()</code>, but also a multiple selection mode that lets users remove many entries at the same time.
+</p>
+
+<p>
+Getting a swipe to delete is straightforward, because we can just add another button to our existing swipe actions. Make sure and add this first in the list of buttons, so that it automatically gets the "swipe fully to activate" functionality:
+</p>
+
+<pre swift>
+Button("Delete", systemImage: "trash", role: .destructive) {
+    modelContext.delete(prospect)
+}
+</pre>
+
+
+<p>
+<span id="Hacking With Swift - 238 - Adding options with swipe actions-onDelete-Tip"></span><strong id="Tip">Tip</strong>: When used by itself, the regular swipe to delete action uses the word "Delete" rather than a trash icon, but when used alongside other swipe actions Apple prefers to add the icon to avoid mixing icons and words.
+</p>
+
+<div id="Hacking With Swift - 238 - Adding options with swipe actions-Selection Delete"><h2 id="Selection Delete" class="header"><a href="#Hacking With Swift - 238 - Adding options with swipe actions-Selection Delete">Selection Delete</a></h2></div>
+
+<p>
+The second approach we'll add is to let users select multiple rows at the same time and delete them in one go. That means adding some new local state to store their active selection:
+</p>
+
+<pre swift>
+@State private var selectedProspects = Set&lt;Prospect&gt;()
+</pre>
+
+<p>
+Then binding that selection to our list:
+</p>
+
+<pre swift>
+List(prospects, selection: $selectedProspects) { prospect in
+</pre>
+
+<p>
+<span id="Hacking With Swift - 238 - Adding options with swipe actions-Selection Delete-Important"></span><strong id="Important">Important</strong>: To help SwiftUI understand that each row in our <code>List</code> corresponds to a single prospect, it's important to add the following code after the swipe actions:
+</p>
+
+<pre swift>
+.tag(prospect)
+</pre>
+
+<p>
+Now we just need to decide what kind of UI to build to make selection and deletion possible. There are a few different options here, and of course you're welcome to experiment, but I think the easiest is to show an edit button the top-leading part of our navigation bar, which is where it normally lives in Apple's own apps. We can then activate mass deletion by adding a second button, and Apple usually has that button in a special toolbar at the bottom.
+</p>
+
+<p>
+First, we need a method to call that will delete all the rows we selected:
+</p>
+
+<pre swift>
+func delete() {
+    for prospect in selectedProspects {
+        modelContext.delete(prospect)
+    }
+}
+</pre>
+
+<p>
+And now we can add two new toolbar items to the existing <code>toolbar()</code> modifier, one to create the edit button.
+</p>
+
+<p>
+However...
+</p>
+
+<p>
+Once you start using <code>ToolbarItem</code> to specify positions (like <code>.topBarLeading</code>), <span id="Hacking With Swift - 238 - Adding options with swipe actions-Selection Delete-every distinct control inside that toolbar should be placed in its own"></span><strong id="every distinct control inside that toolbar should be placed in its own">every distinct control inside that toolbar should be placed in its own</strong> <code>ToolbarItem</code> (or <code>ToolbarItemGroup</code>) block.
+</p>
+
+<p>
+Before we can add the new edit buttons, change the existing scan button from...
+</p>
+
+<pre swift>
+Button("Scan", systemImage: "qrcode.viewfinder") {
+    isShowingScanner = true
+}
+</pre>
+
+<p>
+...to:
+</p>
+
+<pre swift>
+ToolbarItem(placement: .topBarTrailing) {
+    Button("Scan", systemImage: "qrcode.viewfinder") {
+        isShowingScanner = true
+    }
+}
+</pre>
+
+<p>
+Now add:
+</p>
+
+<pre swift>
+ToolbarItem(placement: .topBarLeading) {
+    EditButton()
+}
+</pre>
+
+<p>
+And then another one to create the delete button, but only when there are actually selections to delete:
+</p>
+
+<pre swift>
+if selectedProspects.isEmpty == false {
+    ToolbarItem(placement: .bottomBar) {
+        Button("Delete Selected", action: delete)
+    }
+}
+</pre>
+
+<p>
+With that in place we're giving users two ways to access the same thing: the regular swipe to delete they expect to see, but also a clear Edit/Done button to aid discoverability.
+</p>
+
+<p>
+<span id="Hacking With Swift - 238 - Adding options with swipe actions-Selection Delete-Important"></span><strong id="Important">Important</strong>: Now that we're using <code>ToolbarItem</code> in our toolbar, you need to wrap the previous code in a <code>ToolbarItem</code> too, like this:
+</p>
+
+<pre swift>
+ToolbarItem(placement: .topBarTrailing) {
+    Button("Scan", systemImage: "qrcode.viewfinder") {
+        isShowingScanner = true
+    }
+}
+</pre>
+
+<p>
+Now go ahead and run the app - you should be able to add and delete prospects freely!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
