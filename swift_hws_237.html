@@ -78,7 +78,7 @@ We already have a “Scan” button in <code>ProspectsView</code>, and we’re g
 </pre>
 
 <p>
-Earlier we added some test functionality to the “Scan” button so we could insert some sample data, but we don’t need that any more because we’re about to scan real QR codes. So, replace the action code for the toolbar button with this:
+Earlier we added some test functionality to the “Scan” button so we could insert some sample data, but we don’t need that any more because we’re about to scan real QR codes. So, replace all the code for the toolbar button with this:
 </p>
 
 <pre swift>
@@ -86,7 +86,7 @@ isShowingScanner = true
 </pre>
 
 <p>
-When it comes to handling the result of the QR scanning, I’ve made the CodeScanner package do literally all the work of figuring out what the code is and how to send it back, so all we need to do here is catch the result and process it somehow.
+When it comes to handling the result of the QR scanning, I’ve made the <code>CodeScanner</code> package do literally all the work of figuring out what the code is and how to send it back, so all we need to do here is catch the result and process it somehow.
 </p>
 
 <p>
@@ -99,19 +99,41 @@ Start by adding this new import near the top of <code>ProspectsView.swift</code>
 
 <pre swift>
 import CodeScanner
-Now add this method to ProspectsView:
+</pre>
 
+<table>
+<tr>
+<td>
+NOTE: Since the tutorial was written, something changed, and now you need to import AVFoundation also.
+</td>
+</tr>
+</table>
+
+<pre swift>
+import AVFoundation
+</pre>
+
+<p>
+Now add this method to <code>ProspectsView</code>, which uses 'Result' type:
+</p>
+
+<pre swift>
 func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
    isShowingScanner = false
    // more code to come
 }
 </pre>
 
+<div id="Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Camera Permission"><h2 id="Camera Permission" class="header"><a href="#Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Camera Permission">Camera Permission</a></h2></div>
+
 <p>
 Before we show the scanner and try to handle its result, we need to ask the user for permission to use the camera:
 </p>
 
 <ul>
+<li>
+Select the topmost item in the navigator panel.
+
 <li>
 Go to your target’s configuration options under its Info tab.
 
@@ -125,6 +147,8 @@ Select “Privacy - Camera Usage Description” for the key.
 For the value enter “We need to scan QR codes.”
 
 </ul>
+<div id="Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Sheet Modifier"><h2 id="Sheet Modifier" class="header"><a href="#Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Sheet Modifier">Sheet Modifier</a></h2></div>
+
 <p>
 And now we’re ready to scan some QR codes! We already have the <code>isShowingScanner</code> state that determines whether to show a code scanner or not, so we can now attach a <code>sheet()</code> modifier to present our scanner UI.
 </p>
@@ -187,6 +211,97 @@ Go ahead and run the code now. If you’re using the simulator you’ll see a te
 <p>
 If you’re using a real device you’ll see a permission message asking the user to allow camera use, and you grant that you’ll see a scanner view. To test out scanning on a real device, simultaneously launch the app in the simulator and switch to the Me tab - your phone should be able to scan the simulator screen on your computer.
 </p>
+
+<div id="Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Sheet Modifier-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Sheet Modifier-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Sheet Modifier-In Context-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Hacking With Swift - 237 - Scanning QR codes with SwiftUI]]-Sheet Modifier-In Context-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+
+<pre swift>
+import AVFoundation
+import CodeScanner
+import SwiftData
+import SwiftUI
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \Prospect.name) var prospects: [Prospect]
+    
+    @State private var isShowingScanner = false
+    
+    enum FilterType {
+        case none, contacted, uncontacted
+    }
+    
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none:
+            "Everyone"
+        case .contacted:
+            "Contacted people"
+        case .uncontacted:
+            "Uncontacted people"
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List(prospects) { prospect in
+                VStack(alignment: .leading) {
+                    Text(prospect.name)
+                        .font(.headline)
+                    Text(prospect.emailAddress)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .navigationTitle(title)
+                .toolbar {
+                    Button("Scan", systemImage: "qrcode.viewfinder") {
+                        isShowingScanner = true
+                    }
+                }
+                .sheet(isPresented: $isShowingScanner) {
+                    CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+                }
+        }
+    }
+    init(filter: FilterType) {
+        self.filter = filter
+        
+        if filter != .none {
+            let showContactedOnly = filter == .contacted
+            
+            _prospects = Query(filter: #Predicate {
+                $0.isContacted == showContactedOnly
+            }, sort: [SortDescriptor(\Prospect.name)])
+        }
+    }
+    func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+        isShowingScanner = false
+        
+        switch result {
+        case .success(let result):
+            let details = result.string.components(separatedBy: "\n")
+            guard details.count == 2 else { return }
+            
+            let person = Prospect(
+                name: details[0],
+                emailAddress: details[1],
+                isContacted: false)
+            modelContext.insert(person)
+            
+        case .failure(let error):
+            print("Scanning failed: \(error.localizedDescription)")
+        }
+    }
+}
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
+</pre>
 
 <p>
 <hr>
