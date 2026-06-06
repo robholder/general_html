@@ -46,7 +46,7 @@ It took enthusiasm to start day 1 of this series, but here you are on day 84 jus
 </p>
 
 <p>
-This project has already drawn upon some important SwiftUI features such as tab bars, swipe actions, and the environment; some important Swift features such as importing external packages and <code>Result</code>; and even some important iOS features such as Core Image and scanning codes with the camera. Today we’re going to add the icing on the cake, which is adding a context menu, and showing alerts using the <code>UserNotification</code> framework.
+This project has already drawn upon some important SwiftUI features such as tab bars, swipe actions, and the environment; some important Swift features such as importing external packages and <code>Result</code>; and even some important iOS features such as <code>CoreImage</code> and scanning codes with the camera. Today we’re going to add the icing on the cake, which is adding a context menu, and showing alerts using the <code>UserNotification</code> framework.
 </p>
 
 <p>
@@ -58,6 +58,147 @@ Today you have two topics to work through, in which you’ll add a context menu 
 </p>
 
 <div id="Hacking With Swift - 239 - Adding a context menu to an image-Adding A Context Menu To An Image"><h2 id="Adding A Context Menu To An Image" class="header"><a href="#Hacking With Swift - 239 - Adding a context menu to an image-Adding A Context Menu To An Image">Adding A Context Menu To An Image</a></h2></div>
+
+<p>
+We’ve already written code that dynamically generates a QR code based on the user’s name and email address, but with a little extra code we can also let the user share that QR code outside the app. This is another example of where <code>ShareLink</code> comes in handy, although this time we'll place it inside a context menu.
+</p>
+
+<p>
+Start by opening <code>MeView.swift</code>, and adding the <code>contextMenu()</code> modifier to the QR code image, like this:
+</p>
+
+<pre swift>
+Image(uiImage: generateQRCode(from: "\(name)\n\(emailAddress)"))
+    .interpolation(.none)
+    .resizable()
+    .scaledToFit()
+    .frame(width: 200, height: 200)
+    .contextMenu {
+        let image = generateQRCode(from: "\(name)\n\(emailAddress)")
+
+        ShareLink(item: Image(uiImage: image), preview: SharePreview("My QR Code", image: Image(uiImage: image)))
+    }
+</pre>
+
+<p>
+As you can see, we need to convert the <code>UIImage</code> of our QR code to a SwiftUI <code>Image</code> view, which can then be handed to the system's share sheet.
+</p>
+
+<p>
+We <em>could</em> save a little work by caching the generated QR code, however a more important side effect of that is that we wouldn’t have to pass in the name and email address each time - duplicating that data means if we change one copy in the future we need to change the other too.
+</p>
+
+<p>
+To add this change, first add a new <code>@State</code> property that will store the code we generate:
+</p>
+
+<pre swift>
+@State private var qrCode = UIImage()
+</pre>
+
+<p>
+Now modify <code>generateQRCode()</code> so that it quietly stores the new code in our cache before sending it back:
+</p>
+
+<pre swift>
+if let cgimg = context.createCGImage(outputImage, from: outputImage.extent) {
+    qrCode = UIImage(cgImage: cgimg)
+    return qrCode
+}
+</pre>
+
+<p>
+And now our context menu button can use the cached code:
+</p>
+
+<pre swift>
+.contextMenu {
+    ShareLink(item: Image(uiImage: qrCode), preview: SharePreview("My QR Code", image: Image(uiImage: qrCode)))
+}
+</pre>
+
+<p>
+Before you try the context menu yourself, make sure you add the same project option we had for the Instafilter project - you need to add a permission request string to your project’s configuration options.
+</p>
+
+<p>
+In case you’ve forgotten how to do that, here are the steps you need:
+</p>
+
+<ul>
+<li>
+Open your target settings
+
+<li>
+Select the Info tab
+
+<li>
+Right-click on an existing option
+
+<li>
+Choose Add Row
+
+<li>
+Select “Privacy - Photo Library Additions Usage Description” for the key name.
+
+<li>
+Enter “We want to save your QR code.” as the value.
+
+</ul>
+<p>
+And now go ahead and run the app - you're likely to find things don't work quite as planned. In fact, back in Xcode you might see a purple warning line in the <code>generateQRCode()</code> method: "Modifying state during view update, this will cause undefined behavior."
+</p>
+
+<p>
+What this means is that our current view body calls <code>generateQRCode()</code> to create the shareable image that we're attaching our context menu to, but calling that method now saves a value in the <code>qrCode</code> property we marked with <code>@State</code>, which in <em>turn</em> causes the view body to be reinvoked - it creates a loop, so SwiftUI bails out and flags a big warning for us.
+</p>
+
+<p>
+To fix this we need to make the <code>Image</code> view use our cached QR code, like this:
+</p>
+
+<pre swift>
+Image(uiImage: qrCode)
+</pre>
+
+<p>
+And then use a combination of <code>onAppear()</code> and <code>onChange()</code> to make sure the code is updated when the view is first shown, and also when either the name or email address changes.
+</p>
+
+<p>
+This means creating a new method that updates our code in one place:
+</p>
+
+<pre swift>
+func updateCode() {
+    qrCode = generateQRCode(from: "\(name)\n\(emailAddress)")
+}
+</pre>
+
+<p>
+Then attaching some extra modifiers below <code>navigationTitle()</code>:
+</p>
+
+<pre swift>
+.onAppear(perform: updateCode)
+.onChange(of: name, updateCode)
+.onChange(of: emailAddress, updateCode)
+</pre>
+
+<p>
+<span id="Hacking With Swift - 239 - Adding a context menu to an image-Adding A Context Menu To An Image-Tip"></span><strong id="Tip">Tip</strong>: Now that <code>updateCode()</code> updates the value of <code>qrCode</code> directly, we can go back to the earlier version of <code>generateQRCode()</code>, which simply returns the new value:
+</p>
+
+<pre swift>
+if let cgimg = context.createCGImage(outputImage, from: outputImage.extent) {
+    return UIImage(cgImage: cgimg)
+}
+</pre>
+
+<p>
+Now this step is done, and done properly - you should be able to run the app, switch to the Me tab, then long press the QR code to bring up your new context menu.
+</p>
+
 
 <p>
 <hr>
