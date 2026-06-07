@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_rsync</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="rsync"><h1 id="rsync" class="header"><a href="#rsync">rsync</a></h1></div>
+
+<p>
+At its core, <code>rsync</code> (Remote Sync) is a utility used for copying and synchronizing files and directories either locally or across a network.
+</p>
+
+<p>
+What makes <code>rsync</code> legendary among developers and sysadmins is its delta-transfer algorithm. Instead of blindly overwriting files like <code>cp</code> or <code>scp</code>, <code>rsync</code> compares the source and destination, calculates the exact differences, and <span id="rsync-only sends the bytes that actually changed."></span><strong id="only sends the bytes that actually changed.">only sends the bytes that actually changed.</strong>
+</p>
+
+<p>
+For your specific workflow (hundreds of text files inside multiple <code>.git</code> repositories), <code>rsync</code> is lightning fast because code diffs are tiny, even if your total directory size is gigabytes.
+</p>
+
+<div id="rsync-1. The Core Anatomy of an rsync Command"><h2 id="1. The Core Anatomy of an rsync Command" class="header"><a href="#rsync-1. The Core Anatomy of an rsync Command">1. The Core Anatomy of an rsync Command</a></h2></div>
+
+<p>
+The basic syntax is always:
+</p>
+
+<pre bash>
+rsync [options] /path/to/source/ /path/to/destination/
+</pre>
+
+<div id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️"><h3 id="The &quot;Trailing Slash&quot; Trap ⚠️" class="header"><a href="#rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️">The "Trailing Slash" Trap ⚠️</a></h3></div>
+
+<p>
+There is one massive quirk with <code>rsync</code> that everyone trips over at least once. The presence or absence of a <span id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️-trailing slash"></span><strong id="trailing slash">trailing slash</strong> (<code>/</code>) <span id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️-on the source folder"></span><strong id="on the source folder">on the source folder</strong> completely changes what happens:
+</p>
+
+<ul>
+<li>
+<span id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️-With a trailing slash"></span><strong id="With a trailing slash">With a trailing slash</strong> (<code>source/</code>): Copies the <em>contents</em> of the folder into the destination.
+
+</ul>
+  
+<pre bash>
+rsync -a /my/photos/ /backup/
+# Result: /backup/pic1.jpg, /backup/pic2.jpg
+</pre>
+
+<ul>
+<li>
+<span id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️-Without a trailing slash"></span><strong id="Without a trailing slash">Without a trailing slash</strong> (<code>source</code>): Copies the <em>folder itself</em> into the destination.
+<pre bash>
+rsync -a /my/photos /backup/
+# Result: /backup/photos/pic1.jpg, /backup/photos/pic2.jpg
+</pre>
+
+</ul>
+<div id="rsync-2. Essential Flags to Know"><h2 id="2. Essential Flags to Know" class="header"><a href="#rsync-2. Essential Flags to Know">2. Essential Flags to Know</a></h2></div>
+
+<p>
+You rarely use <code>rsync</code> naked. You almost always use these standard flags:
+</p>
+
+<ul>
+<li>
+<code>-a</code> (<span id="rsync-2. Essential Flags to Know-Archive Mode"></span><strong id="Archive Mode">Archive Mode</strong>): The holy grail flag. It is a shortcut for <code>-rlptgoD</code>. It ensures that symlinks, modification times, permissions, groups, and owners are all preserved perfectly. For Git repos, this is mandatory to keep your metadata intact.
+
+<li>
+<code>-v</code> (<span id="rsync-2. Essential Flags to Know-Verbose"></span><strong id="Verbose">Verbose</strong>): Prints out exactly what files are currently transferring.
+
+<li>
+<code>-z</code> (<span id="rsync-2. Essential Flags to Know-Compress"></span><strong id="Compress">Compress</strong>): Compresses file data during the transfer. Great for saving bandwidth over a network.
+
+<li>
+<code>-n</code> or <code>--dry-run</code>: <span id="rsync-2. Essential Flags to Know-Always use this first!"></span><strong id="Always use this first!">Always use this first!</strong> It simulates the sync without actually changing any files. It lets you verify that your trailing slashes are correct before committing to the transfer.
+
+<li>
+<code>--delete</code>: Deletes files in the destination directory if they no longer exist in the source directory. Essential for keeping a mirror clean.
+
+</ul>
+<div id="rsync-3. macOS vs. Linux: The Crucial Differences"><h2 id="3. macOS vs. Linux: The Crucial Differences" class="header"><a href="#rsync-3. macOS vs. Linux: The Crucial Differences">3. macOS vs. Linux: The Crucial Differences</a></h2></div>
+
+<p>
+While <code>rsync</code> behaves mostly the same on both operating systems, there are two major differences that can bite you if you are syncing between a Mac and a Linux machine.
+</p>
+
+<div id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)"><h3 id="Difference A: The Engine Version (GPLv2 vs. GPLv3)" class="header"><a href="#rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)">Difference A: The Engine Version (GPLv2 vs. GPLv3)</a></h3></div>
+
+<ul>
+<li>
+<span id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)-Linux"></span><strong id="Linux">Linux</strong>: Almost all modern Linux distributions ship with <span id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)-rsync version 3.x"></span><strong id="rsync version 3.x">rsync version 3.x</strong>. Version 3 uses an advanced, incremental file-scanning algorithm that starts transferring files immediately while it's still scanning the rest of the drive.
+
+<li>
+<span id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)-macOS"></span><strong id="macOS">macOS</strong>: Apple ships an ancient version of <span id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)-rsync (usually version 2.6.9)"></span><strong id="rsync (usually version 2.6.9)">rsync (usually version 2.6.9)</strong>. Apple froze it there because newer versions of <code>rsync</code> moved to the GPLv3 license, which Apple avoids for legal/corporate reasons.
+
+</ul>
+  
+<table>
+<tr>
+<td>
+💡 The Impact: The old Mac version scans the entire directory structure into memory before it sends a single file. If you have hundreds of tutorial repos with thousands of tiny files, a Mac-native rsync might feel sluggish or hog RAM compared to Linux.
+</td>
+</tr>
+</table>
+
+<div id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)-The Fix: Install a modern version of rsync on your Mac via Homebrew:"><h4 id="The Fix: Install a modern version of rsync on your Mac via Homebrew:" class="header"><a href="#rsync-3. macOS vs. Linux: The Crucial Differences-Difference A: The Engine Version (GPLv2 vs. GPLv3)-The Fix: Install a modern version of rsync on your Mac via Homebrew:">The Fix: Install a modern version of rsync on your Mac via Homebrew:</a></h4></div>
+
+<pre bash>
+brew install rsync
+</pre>
+
+<p>
+(Note: You may need to call it via <code>/opt/homebrew/bin/rsync</code> or update your <code>$PATH</code> so it overrides Apple's default).
+</p>
+
+<div id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference B: Extended Attributes and Resource Forks (Mac Metadata)"><h3 id="Difference B: Extended Attributes and Resource Forks (Mac Metadata)" class="header"><a href="#rsync-3. macOS vs. Linux: The Crucial Differences-Difference B: Extended Attributes and Resource Forks (Mac Metadata)">Difference B: Extended Attributes and Resource Forks (Mac Metadata)</a></h3></div>
+
+<p>
+macOS hides a lot of operating system metadata inside files (Finder tags, icons, color labels, and ACL permissions). Linux doesn't natively care about these.
+</p>
+
+<ul>
+<li>
+<span id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference B: Extended Attributes and Resource Forks (Mac Metadata)-On Linux"></span><strong id="On Linux">On Linux</strong>: The <code>-a</code> flag is usually enough.
+
+<li>
+<span id="rsync-3. macOS vs. Linux: The Crucial Differences-Difference B: Extended Attributes and Resource Forks (Mac Metadata)-On macOS"></span><strong id="On macOS">On macOS</strong>: To safely copy Mac-specific metadata, you need to explicitly add the <code>-E</code> (or <code>--extended-attributes</code>) flag.
+
+</ul>
+<p>
+If you are syncing from a Mac to a Linux machine, or Mac-to-Mac, your optimal flag combination changes slightly:
+</p>
+
+<pre bash>
+# Standard Linux-to-Linux
+rsync -avz --delete source/ dest/
+
+# macOS (using Homebrew rsync 3.x) to safely handle Mac metadata
+rsync -avzE --delete source/ dest/
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
