@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_240</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_239.html">Hacking With Swift - 239 - Adding a context menu to an image</a>
+
+</ul>
+<div id="Hacking With Swift - 240 - Posting notifications to the lock screen"><h1 id="Hacking With Swift - 240 - Posting notifications to the lock screen" class="header"><a href="#Hacking With Swift - 240 - Posting notifications to the lock screen">Hacking With Swift - 240 - Posting notifications to the lock screen</a></h1></div>
+
+<p>
+For the final part of our app, we’re going to add another button to our list swipe actions, letting users opt to be reminded to contact a particular person.
+</p>
+
+<p>
+This will use iOS’s UserNotifications framework to create a local notification, and we’ll conditionally include it in the swipe actions as part of our existing <code>if</code> check - the button will only be shown if the user hasn’t been contacted already.
+</p>
+
+<p>
+Much more interesting is how we schedule the local notifications. Remember, the first time we try this we need to use <code>requestAuthorization()</code> to explicitly ask for permission to show a notification on the lock screen, but we also need to be careful subsequent times because the user can retroactively change their mind and disable notifications.
+</p>
+
+<p>
+One option is to call <code>requestAuthorization()</code> <em>every time we want to post a notification</em>, and honestly that works great: the first time it will show an alert, and all other times it will immediately return success or failure based on the previous response.
+</p>
+
+<p>
+However, in the interests of completion I want to show you a more powerful alternative: we can request the current authorization settings, and use that to determine whether we should schedule a notification or request permission. The reason it’s helpful to use <em>this</em> approach rather than just requesting permission repeatedly, is that the settings object handed back to us includes properties such as <code>alertSetting</code> to check whether we can show an alert or not - the user might have restricted this so all we can do is display a numbered badge on our icon.
+</p>
+
+<p>
+So, we’re going to:
+</p>
+<ul>
+<li>
+Call <code>getNotificationSettings()</code> to read whether notifications are currently allowed.
+
+<li>
+If they are, we’ll show a notification.
+
+<li>
+If they <em>aren’t</em>, we’ll request permissions, and if <code>that</code> comes back successfully then we’ll also show a notification.
+
+</ul>
+<p>
+Rather than repeat the code to schedule a notification, we’ll put it inside a closure that can be called in either scenario.
+</p>
+
+<p>
+Start by adding this import near the top of <code>ProspectsView.swift</code>:
+</p>
+
+<pre swift>
+import UserNotifications
+</pre>
+
+<p>
+Now add this method to the <code>ProspectsView struct</code>:
+</p>
+
+<pre swift>
+func addNotifications(for prospect: Prospect) {
+    let center = UNUserNotificationCenter.current()
+    
+    let addRequest = {
+        let content = UNMutableNotificationContent()
+        content.title = "Contact \(prospect.name)"
+        content.subtitle = prospect.emailAddress
+        content.sound = UNNotificationSound.default
+        
+        var dateComponents = DateComponents()
+        dateComponents.hour = 9
+        
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: dateComponents,
+            repeats: false)
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        center.add(request)
+    }
+    //more code to come
+}
+</pre>
+
+<p>
+That puts all the code to create a notification for the current prospect into a closure, which we can call whenever we need. Notice that I’ve used <code>UNCalendarNotificationTrigger</code> for the trigger, which lets us specify a custom <code>DateComponents</code> instance. I set it to have an hour component of 9, which means it will trigger the next time 9am comes about.
+</p>
+
+<p>
+<span id="Hacking With Swift - 240 - Posting notifications to the lock screen-Tip"></span><strong id="Tip">Tip</strong>: For testing purposes, I recommend you comment out that trigger code and replace it with the following, which shows the alert five seconds from now:
+</p>
+
+<pre swift>
+let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+</pre>
+
+<p>
+For the second part of that method we’re going to use both <code>getNotificationSettings()</code> and <code>requestAuthorization()</code> together, to make sure we only schedule notifications when allowed. This will use the <code>addRequest</code> closure we defined above, because the same code can be used if we have permission already or if we ask and have been granted permission.
+</p>
+
+<p>
+Replace the <code>// more code to come</code> comment with this:
+</p>
+
+<pre swift>
+center.getNotificationSettings { settings in
+    if settings.authorizationStatus == .authorized {
+        addRequest()
+    } else {
+        center.requestAuthorization(options: [.alert, .badge, .sound]) { success, error in
+            if success {
+                addRequest()
+            } else if let error {
+                print(error.localizedDescription)
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+That’s all the code we need to schedule a notification for a particular prospect, so all that remains is to add an extra button to our swipe actions - add this below the “Mark Contacted” button:
+</p>
+
+<pre swift>
+Button("Remind Me", systemImage: "bell") {
+    addNotification(for: prospect)
+}
+.tint(.orange)
+</pre>
+
+<p>
+That completes the current step, and completes our project too - try running it now and you should find that you can add new prospects, then press and hold to either mark them as contacted, or to schedule a contact reminder.
+</p>
+
+<p>
+Good job!
+</p>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
