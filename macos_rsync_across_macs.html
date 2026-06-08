@@ -27,10 +27,108 @@
 <div id="rsync - Two Macs-Ai After Exhasperation of the rest of the page..."><h2 id="Ai After Exhasperation of the rest of the page..." class="header"><a href="#rsync - Two Macs-Ai After Exhasperation of the rest of the page...">Ai After Exhasperation of the rest of the page...</a></h2></div>
 
 <p>
-Let’s take a breath, step completely back, and hit the reset button. Since you own both Macs, you are logged into the same user account, and you just want your Xcode projects to sync without the technical headache, let’s look at the easiest, most modern ways to do this.
+When you use an SSH key, you bypass the slow interactive password challenge entirely. Instead, your Macs perform an instantaneous, cryptographic handshake. This shaves seconds off the initial connection time, which makes scripts and <code>rsync</code> aliases fire off almost instantly.
 </p>
 
+<p>
+Here is how to set up lightning-fast, passwordless SSH keys between your two Macs in under two minutes.
+</p>
+
+<div id="rsync - Two Macs-Ai After Exhasperation of the rest of the page...-Step 1: Generate a Key Pair on Machine 1"><h3 id="Step 1: Generate a Key Pair on Machine 1" class="header"><a href="#rsync - Two Macs-Ai After Exhasperation of the rest of the page...-Step 1: Generate a Key Pair on Machine 1">Step 1: Generate a Key Pair on Machine 1</a></h3></div>
+
+<p>
+We will use an Ed25519 key, which is the most modern, secure, and computationally fast encryption algorithm available.
+</p>
+
+<p>
+Open a terminal on Machine 1 (your main Mac) and run:
+</p>
+
+<pre bash>
+ssh-keygen -t ed25519 -C "my-mac-sync-key"
+</pre>
+
+<ul>
+<li>
+Press Enter three times to accept the defaults (leave the passphrase blank, as adding a passphrase forces you to type it in anyway, defeating our automated speed goal).
+
+</ul>
+<p>
+This creates two files in a hidden directory:
+</p>
+
+<ul>
+<li>
+<code>id_ed25519</code> (Your Private Key — keep this safe on Machine 1).
+
+<li>
+<code>id_ed25519.pub</code> (Your Public Key — the "lock" we are going to copy to the Mac Mini).
+
+</ul>
+<div id="rsync - Two Macs-Ai After Exhasperation of the rest of the page...-Step 2: Copy the Key to the Mac Mini"><h3 id="Step 2: Copy the Key to the Mac Mini" class="header"><a href="#rsync - Two Macs-Ai After Exhasperation of the rest of the page...-Step 2: Copy the Key to the Mac Mini">Step 2: Copy the Key to the Mac Mini</a></h3></div>
+
+<p>
+macOS doesn't come with the standard Linux <code>ssh-copy-id</code> tool by default, but you can copy the key over securely with this one-liner.
+</p>
+
+<p>
+Run this command from Machine 1 (replace user and <code>macmini.local</code> with your actual details):
+</p>
+
+<pre bash>
+cat ~/.ssh/id_ed25519.pub | ssh user@macmini.local "mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; cat &gt;&gt; ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys"
+</pre>
+
+<ul>
+<li>
+Type your Mac Mini account password one last time to authorize the transfer.
+
+</ul>
+<div id="rsync - Two Macs-Ai After Exhasperation of the rest of the page...-Step 3: Switch Your Alias Back to the Speed Engine (SSH)"><h3 id="Step 3: Switch Your Alias Back to the Speed Engine (SSH)" class="header"><a href="#rsync - Two Macs-Ai After Exhasperation of the rest of the page...-Step 3: Switch Your Alias Back to the Speed Engine (SSH)">Step 3: Switch Your Alias Back to the Speed Engine (SSH)</a></h3></div>
+
+<p>
+Because SSH keys are incredibly fast and secure, you can abandon the slow SMB File Sharing method entirely. Go into your <code>~/.zshrc</code> file on Machine 1 and change your alias back to using native SSH, matching your new setup:
+</p>
+
+<pre bash>
+alias sync-to-m2="rsync -avz --delete ~/Desktop/xcode_projects/ user@macmini.local:/Users/user/Desktop/xcode_projects/"
+</pre>
+
+
+<p>
+Run <code>source ~/.zshrc</code> to reload.
+</p>
+
+<div id="rsync - Two Macs-Ai After Exhasperation of the rest of the page...-The Result"><h3 id="The Result" class="header"><a href="#rsync - Two Macs-Ai After Exhasperation of the rest of the page...-The Result">The Result</a></h3></div>
+
+<p>
+Test it out by running your alias. You will notice:
+</p>
+
+<ul>
+<li>
+It will never ask you for a password again.
+
+<li>
+The connection initialization is instantaneous.
+
+<li>
+Because <code>rsync</code> is communicating natively via SSH rather than scanning individual security signatures on a mounted file server (SMB), your sync speeds will be blazingly fast.
+
+</ul>
 <div id="rsync - Two Macs-The Native macOS Sync (File Sharing / SMB)"><h2 id="The Native macOS Sync (File Sharing / SMB)" class="header"><a href="#rsync - Two Macs-The Native macOS Sync (File Sharing / SMB)">The Native macOS Sync (File Sharing / SMB)</a></h2></div>
+
+<table>
+<tr>
+<td>
+SUPERSLOW!
+</td>
+</tr>
+</table>
+
+<p>
+Let’s take a breath, step completely back, and hit the reset button. Since you own both Macs, you are logged into the same user account, and you just want your Xcode projects to sync without the technical headache, let’s look at the easiest, most modern ways to do this.
+</p>
 
 <p>
 Instead of forcing a command-line utility to break through Apple's security gates via SSH, we can use Apple's built-in File Sharing. This mounts your Mac Mini's hard drive directly onto your main Mac's Finder sidebar like a USB thumb drive.
