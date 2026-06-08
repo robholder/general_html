@@ -118,6 +118,28 @@ Replace <code>TARGET-NAME.local</code> with the hostname found in Step 1.1.
 The <code>-n</code> flag tells <code>rsync</code> to execute a Dry Run.
 
 </ul>
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Test the hostname with a basic &quot;Ping&quot;"><h4 id="Test the hostname with a basic &quot;Ping&quot;" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Test the hostname with a basic &quot;Ping&quot;">Test the hostname with a basic "Ping"</a></h4></div>
+
+<p>
+If the command fails, try using Ping. We need to see if Machine 1 can even look up <code>&lt;machine_name&gt;.local</code>.
+Open your terminal on Machine 1 and type:
+</p>
+
+<pre bash>
+ping macmini.local
+</pre>
+<p>
+If it says <code>ping: cannot resolve &lt;machine_name&gt;.local: Unknown host</code>: Your home Wi-Fi router isn't properly broadcasting Apple's Bonjour names between devices.
+</p>
+
+<p>
+If it shows lines of numbers like <code>64 bytes from...</code>: Great news! The network name works perfectly, meaning something is blocking the SSH connection itself.
+</p>
+
+<p>
+Press <code>&lt;Ctrl&gt;</code> + <code>C</code> to stop the ping if it keeps going.
+</p>
+
 <div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.2: Establish SSH Trust"><h4 id="Step 2.2: Establish SSH Trust" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.2: Establish SSH Trust">Step 2.2: Establish SSH Trust</a></h4></div>
 
 <p>
@@ -220,6 +242,82 @@ Finish work on Machine 2: Type <code>sync-to-m1</code> in your terminal to save 
 
 </ul>
  
+<div id="The Delete Flag"><h1 id="The Delete Flag" class="header"><a href="#The Delete Flag">The Delete Flag</a></h1></div>
+
+<p>
+The <code>--delete</code> flag is what turns <code>rsync</code> from a simple file copier into a true mirroring engine.
+</p>
+
+<p>
+Without it, <code>rsync</code> only looks at what needs to be added or updated. With it, <code>rsync</code> also looks at what needs to be cleaned up.
+</p>
+
+<p>
+Here is exactly what that means for your tutorial repositories and why it is so significant for your specific workflow.
+</p>
+
+<div id="The Delete Flag-The Default Behavior (Without --delete)"><h3 id="The Default Behavior (Without --delete)" class="header"><a href="#The Delete Flag-The Default Behavior (Without --delete)">The Default Behavior (Without --delete)</a></h3></div>
+
+<p>
+If you run <code>rsync</code> without the <code>--delete</code> flag, the sync is strictly additive.
+</p>
+
+<p>
+Imagine you are working in your <code>tutorials</code> folder on Machine 1:
+</p>
+
+<ul>
+<li>
+You decide a project called <code>Bad-Experiment</code> was a mistake, and you delete the entire folder from your computer.
+
+<li>
+You run your <code>rsync</code> command without the <code>--delete</code> flag.
+
+<li>
+<span id="The Delete Flag-The Default Behavior (Without --delete)-The Result"></span><strong id="The Result">The Result</strong>: <code>rsync</code> copies over your new work, but it completely ignores the deleted folder. <code>Bad-Experiment</code> will remain sitting on Machine 2 forever. Over months of learning, Machine 2 will become a "ghost town" cluttered with old, abandoned files and folders that you deleted weeks ago on your primary machine.
+
+</ul>
+<div id="The Delete Flag-The Mirror Behavior (With --delete)"><h3 id="The Mirror Behavior (With --delete)" class="header"><a href="#The Delete Flag-The Mirror Behavior (With --delete)">The Mirror Behavior (With --delete)</a></h3></div>
+
+<p>
+When you include <code>--delete</code>, you are telling <code>rsync</code>: <em>"Make the destination look exactly like the source. If a file doesn't exist on my main machine anymore, destroy it on the backup machine too."</em>
+</p>
+
+<pre text>
+Source (Machine 1)         Destination (Machine 2)
+  ├── Project A              ├── Project A
+  └── Project B              ├── Project B
+                             └── Bad-Experiment  ❌ (rsync deletes this)
+</pre>
+
+<p>
+Now, your backup machine remains perfectly pristine, matching your primary workspace file-for-file.
+</p>
+
+<div id="The Delete Flag-⚠️ Why it matters for Git repos (The &quot;Detached HEAD&quot; Gotcha)"><h3 id="⚠️ Why it matters for Git repos (The &quot;Detached HEAD&quot; Gotcha)" class="header"><a href="#The Delete Flag-⚠️ Why it matters for Git repos (The &quot;Detached HEAD&quot; Gotcha)">⚠️ Why it matters for Git repos (The "Detached HEAD" Gotcha)</a></h3></div>
+
+<p>
+Because you use <code>git checkout &lt;commit-hash&gt;</code> to jump back and forth between different stages of your tutorials, the <code>--delete</code> flag is absolutely critical.
+</p>
+
+<p>
+When you jump back to a very early commit in Git, newer files and folders physically disappear from your hard drive (Git hides them in its internal history). If you sync your machines while sitting on an early commit <em>without</em> the <code>--delete</code> flag, the second machine won't remove those newer files. Your working directory on Machine 2 will become a confusing hybrid mix of early commits and late commits mashed together, which can break your code builds.
+</p>
+
+<p>
+The <code>--delete</code> flag ensures that whatever state your Git repository is currently sitting in on Machine 1 is perfectly, identically replicated on Machine 2.
+</p>
+
+<div id="The Delete Flag-The Golden Safety Rule"><h3 id="The Golden Safety Rule" class="header"><a href="#The Delete Flag-The Golden Safety Rule">The Golden Safety Rule</a></h3></div>
+
+<p>
+Because <code>--delete</code> has the power to erase files on the destination machine, you must always adhere to the operational workflow rule: <em>Only sync from the machine you just finished coding on.</em> If you accidentally code for three hours on Machine 2, walk over to Machine 1, and run <code>sync-to-m2</code> (which pushes Machine 1's old state to Machine 2), the --delete flag will instantly wipe out those three hours of new work on Machine 2 because those files don't exist on Machine 1 yet!
+</p>
+
+<p>
+(This is why we used the -n dry-run flag earlier—it lets you double-check exactly what files --delete intends to erase before any real damage can happen).
+</p>
+
 <p>
 <a href="unix_tools_index.html">Unix Tools</a>
 </p>
