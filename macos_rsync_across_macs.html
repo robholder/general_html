@@ -407,7 +407,87 @@ Because <code>--delete</code> has the power to erase files on the destination ma
 (This is why we used the -n dry-run flag earlier—it lets you double-check exactly what files --delete intends to erase before any real damage can happen).
 </p>
 
+<div id="Not working"><h1 id="Not working" class="header"><a href="#Not working">Not working</a></h1></div>
+
 <p>
+When an SSH server abruptly closes a connection the exact millisecond you authenticate, it isn't a problem with your password, network, or rsync. It means the sshd-session binary on the Mac Mini is crashing or intentionally killing its own process because macOS is denying it permission to spawn the environment.
+</p>
+
+<p>
+This happens if there is a corrupted permission cache or if macOS security gets trapped in a loop. Let's force macOS to reset its security database for these specific tools.
+</p>
+
+<p>
+Step 1: Nuclear Reset of Full Disk Access Caches
+</p>
+
+<p>
+We need to tell the Mac Mini's internal security database (tccutil) to wipe out and reset the permissions for Remote Login and the Shell, forcing macOS to re-evaluate them cleanly.
+</p>
+
+<p>
+Walk over to the Mac Mini (or screen share into it), open its terminal, and run these two commands:
+</p>
+
+<p>
+Bash
+sudo tccutil reset SystemPolicyAllFiles com.apple.Terminal
+sudo tccutil reset SystemPolicyAllFiles /usr/libexec/sshd-session
+(It will prompt you for your Mac Mini password to authorize the reset).
+</p>
+
+<p>
+Step 2: The Re-Apply Sequence
+</p>
+
+<p>
+Now that the database is clean, let's re-apply the permissions in the specific sequence macOS expects.
+</p>
+
+<p>
+On the Mac Mini:
+</p>
+
+<p>
+Go to System Settings &gt; Privacy &amp; Security &gt; Full Disk Access.
+</p>
+
+<p>
+If sshd-session, Terminal, or zsh are still in the list, highlight them and click the - (minus) button to delete them entirely.
+</p>
+
+<p>
+Go to System Settings &gt; General &gt; Sharing.
+</p>
+
+<p>
+Turn Remote Login completely OFF.
+</p>
+
+<p>
+Turn Remote Login back ON. (This triggers macOS to automatically re-add the fresh sshd-session architecture back into the system privacy database).
+</p>
+
+<p>
+Go back to Privacy &amp; Security &gt; Full Disk Access, locate Remote Login (sshd) or sshd-session, and ensure it is toggled ON.
+</p>
+
+<p>
+Step 3: Run the Direct Diagnostic Test
+</p>
+
+<p>
+Before trying rsync, let's use the simplest baseline test to see if the Mac Mini will let you in at all. From Machine 1, run a completely empty SSH connection:
+</p>
+
+<p>
+Bash
+ssh user@macmini.local
+If it logs you in and gives you a command prompt (user@macmini ~ %): We won! The security loop is broken. Type exit to close it, and your rsync alias will now run perfectly.
+</p>
+
+<p>
+If it still says Connection closed: There is a deeper configuration mismatch in the SSH daemon configuration file itself. If this happens, please run ssh -vvv user@macmini.local and paste the last 10 lines of output. The "triple verbose" flag will print out a live step-by-step log of the exact handshake packet that causes the Mac Mini to drop the connection.
 <a href="unix_tools_index.html">Unix Tools</a>
 </p>
 
