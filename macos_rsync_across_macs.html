@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>macos_rsync_across_macs</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="rsync - Two Macs"><h1 id="rsync - Two Macs" class="header"><a href="#rsync - Two Macs">rsync - Two Macs</a></h1></div>
+
+<p>
+Here is a complete, step-by-step documentation guide for setting up bidirectional synchronization across your two Macs using <code>rsync</code> and macOS Local Hostnames.
+</p>
+
+<p>
+Save this guide into your Vimwiki or a reference document so you can look back at it whenever you need to configure or run a sync.
+</p>
+
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames"><h2 id="Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames">Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames</a></h2></div>
+
+<p>
+This guide establishes a seamless, two-way manual syncing routine between your primary machine (Machine 1) and secondary machine (Machine 2) over your home Wi-Fi network.
+</p>
+
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Architectural Overview"><h3 id="Architectural Overview" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Architectural Overview">Architectural Overview</a></h3></div>
+
+<p>
+By using Apple's built-in <span id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Architectural Overview-Bonjour network service"></span><strong id="Bonjour network service">Bonjour network service</strong>, your Macs can discover each other using a persistent domain extension (<code>.local</code>) instead of relying on shifting IP addresses.
+</p>
+
+<pre bash>
+[Machine 1]  --- (rsync over SSH via Name.local) ---&gt;  [Machine 2]
+</pre>
+
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)"><h3 id="Part 1: Initial Setup (One-Time Configuration)" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)">Part 1: Initial Setup (One-Time Configuration)</a></h3></div>
+
+<p>
+You must configure the receiving machine so it has a readable network name and permission to accept secure files.
+</p>
+
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.1: Find and Verify the Local Hostname"><h4 id="Step 1.1: Find and Verify the Local Hostname" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.1: Find and Verify the Local Hostname">Step 1.1: Find and Verify the Local Hostname</a></h4></div>
+
+<ul>
+<li>
+Walk over to Machine 2 (the machine you intend to sync files to).
+
+<li>
+Open System Settings &gt; General &gt; Sharing.
+
+<li>
+Scroll down to the very bottom to find the Local hostname section.
+
+<li>
+Note down the name exactly as it appears (e.g., <code>Mac-Mini.local</code> or <code>My-MacBook-Pro.local</code>).
+
+</ul>
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.2: Enable Remote Login Permissions"><h4 id="Step 1.2: Enable Remote Login Permissions" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.2: Enable Remote Login Permissions">Step 1.2: Enable Remote Login Permissions</a></h4></div>
+
+<ul>
+<li>
+While still in System Settings &gt; General &gt; Sharing on Machine 2, look for the Remote Login toggle.
+
+<li>
+Toggle the switch to ON.
+
+<li>
+Click the small info icon (<code>i</code>) next to the toggle and verify that your standard macOS user account is checked under "Allow access to:".
+
+<li>
+Note down your macOS <span id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.2: Enable Remote Login Permissions-account shortname"></span><strong id="account shortname">account shortname</strong> (the name of your home user folder).
+
+</ul>
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)"><h3 id="Part 2: Testing the Connection (The Dry Run)" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)">Part 2: Testing the Connection (The Dry Run)</a></h3></div>
+
+<p>
+Before modifying actual data, use <code>rsync</code>'s simulation mode to verify that your directory paths match perfectly.
+</p>
+
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.1: Run a Simulation from Machine 1"><h4 id="Step 2.1: Run a Simulation from Machine 1" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.1: Run a Simulation from Machine 1">Step 2.1: Run a Simulation from Machine 1</a></h4></div>
+
+<p>
+Open your terminal or a Tmux pane on Machine 1 and run the following command.
+</p>
+
+<p>
+<blockquote>
+⚠️ The Trailing Slash Rule: Note the trailing slash on the source directory /tutorials/. This ensures that <code>rsync</code> copies the contents of your tutorial directory into the target destination, rather than copying the parent folder itself.
+</blockquote>
+</p>
+
+<pre bash>
+rsync -avzn --delete /path/to/local/tutorials/ username@TARGET-NAME.local:/path/to/remote/tutorials/
+</pre>
+
+<ul>
+<li>
+Replace <code>username</code> with Machine 2's <code>shortname</code>.
+
+<li>
+Replace <code>TARGET-NAME.local</code> with the hostname found in Step 1.1.
+
+<li>
+The <code>-n</code> flag tells <code>rsync</code> to execute a Dry Run.
+
+</ul>
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.2: Establish SSH Trust"><h4 id="Step 2.2: Establish SSH Trust" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.2: Establish SSH Trust">Step 2.2: Establish SSH Trust</a></h4></div>
+
+<p>
+When you execute the test command above, your terminal will display a security warning:
+</p>
+
+<pre text>
+The authenticity of host 'target-name.local' can't be established.
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+</pre>
+
+<ul>
+<li>
+Type <code>yes</code> and press Enter. This permanently saves Machine 2 to your Mac's known hosts list.
+
+<li>
+Type Machine 2's user login password when prompted.
+
+<li>
+Review the terminal output. It will display a list of all files and hidden <code>.git</code> historical metrics it <em>intends</em> to sync without modifying any real files.
+
+</ul>
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)"><h3 id="Part 3: Creating Permanent Terminal Shortcuts (The Workflow)" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)">Part 3: Creating Permanent Terminal Shortcuts (The Workflow)</a></h3></div>
+
+<p>
+To remove the friction of typing long paths and server addresses every time you study, map your synchronization commands to short command-line aliases.
+</p>
+
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.1: Add the Push Shortcut to Machine 1"><h4 id="Step 3.1: Add the Push Shortcut to Machine 1" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.1: Add the Push Shortcut to Machine 1">Step 3.1: Add the Push Shortcut to Machine 1</a></h4></div>
+
+<ul>
+<li>
+On Machine 1, open your shell layout file (usually ~/.zshrc or ~/.bashrc).
+
+<li>
+Add the following line at the bottom of the file (remove the -n flag so it performs the actual file transfer):
+
+</ul>
+  
+<pre bash>
+alias sync-to-m2="rsync -avz --delete /path/to/local/tutorials/ username@TARGET-NAME.local:/path/to/remote/tutorials/"
+</pre>
+
+<ul>
+<li>
+Save the file and reload your shell configuration: <code>source ~/.zshrc</code>
+
+</ul>
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.2: Add the Pull Shortcut to Machine 2"><h4 id="Step 3.2: Add the Pull Shortcut to Machine 2" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.2: Add the Pull Shortcut to Machine 2">Step 3.2: Add the Pull Shortcut to Machine 2</a></h4></div>
+
+<p>
+To achieve true bidirectional synchronization, reverse the path logic on your secondary machine so you can push your updates back whenever you work away from your primary desk.
+</p>
+
+<ul>
+<li>
+Walk over to Machine 2, open its shell configuration file (<code>~/.zshrc</code>).
+
+<li>
+Add a matching reflection alias pointing back to Machine 1's local hostname:
+
+</ul>
+  
+<pre bash>
+alias sync-to-m1="rsync -avz --delete /path/to/remote/tutorials/ username@MACHINE-1-NAME.local:/path/to/local/tutorials/"
+</pre>
+
+<p>
+(Ensure Remote Login is toggled on inside Machine 1's Sharing settings as well to make this step operational).
+</p>
+
+<ul>
+<li>
+Save and reload the shell: source ~/.zshrc
+
+</ul>
+<div id="rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 4: Daily Operational Workflow Rule"><h3 id="Part 4: Daily Operational Workflow Rule" class="header"><a href="#rsync - Two Macs-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 4: Daily Operational Workflow Rule">Part 4: Daily Operational Workflow Rule</a></h3></div>
+
+<p>
+Because <code>rsync</code> with a <code>--delete</code> flag completely mirrors one environment to another, adopt this strict operational rule to prevent accidentally erasing code updates:
+</p>
+
+<table>
+<tr>
+<td>
+💡 The Golden Rule: Always run your sync command from the machine you just finished coding on immediately before switching desks.
+</td>
+</tr>
+</table>
+
+<ul>
+<li>
+Finish work on Machine 1: Type <code>sync-to-m2</code> in your terminal. Wait for the file transfer to hit 100%.
+
+<li>
+Move to Machine 2: Wake it up. Open your tutorial folders or check out specific Git stage milestones (<code>git checkout &lt;commit&gt;</code>). Your workspaces are instantly aligned.
+
+<li>
+Finish work on Machine 2: Type <code>sync-to-m1</code> in your terminal to save your progress back to your primary workstation drive.
+
+</ul>
+ 
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
