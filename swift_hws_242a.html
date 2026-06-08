@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_242a</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_241.html">Hacking With Swift - 241 - Hot Prospects: Wrap up</a>
+
+</ul>
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button"><h1 id="Hacking With Swift - 242a - Fixing 'Delete Selected' button" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button">Hacking With Swift - 242a - Fixing 'Delete Selected' button</a></h1></div>
+
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I have a 'delete selected' conditional item on this view, but it's appearing somewhat behind the tab row at the base. How do I make sure it's visible to the user
+</p>
+
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER"><h2 id="ANSWER" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You've hit a classic layout friction point when building apps with a <code>TabView</code>.
+</p>
+
+<p>
+When a view is nested inside a <code>TabView</code>, the placement <code>.bottomBar</code> creates a native bottom toolbar. However, iOS often renders this directly underneath or overlapping the background blur of the tab bar itself. Because the native <code>TabView</code> takes layout priority, any screen attempting to claim that real estate gets choked out.
+</p>
+
+<p>
+To make sure your "Delete Selected" button is always clearly visible to the user and behaves cleanly, you have two great layout options.
+</p>
+
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-Option 1: Move it to the Top Bar (Apple's Recommended Way)"><h3 id="Option 1: Move it to the Top Bar (Apple's Recommended Way)" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-Option 1: Move it to the Top Bar (Apple's Recommended Way)">Option 1: Move it to the Top Bar (Apple's Recommended Way)</a></h3></div>
+
+<p>
+From a pure iOS UX pattern perspective, global actions that affect list selections (like deleting or archiving) usually belong at the top of the screen next to the edit buttons.
+</p>
+
+<p>
+Since you already have a <code>topBarLeading</code> and a <code>topBarTrailing</code> item, you can dynamically insert it into the top trailing section using an <code>HStack</code>. It will automatically hide when nothing is selected and appear smoothly when items are checked.
+</p>
+
+<p>
+Replace your <code>.toolbar</code> block with this:
+</p>
+
+<pre swift>
+.toolbar {
+    ToolbarItem(placement: .topBarLeading) {
+        EditButton()
+    }
+    
+    ToolbarItem(placement: .topBarTrailing) {
+        HStack(spacing: 16) {
+            // Show the delete button first if selection exists
+            if !selectedProspects.isEmpty {
+                Button("Delete Selected", role: .destructive, action: delete)
+                    .foregroundStyle(.red)
+            }
+            
+            Button("Scan", systemImage: "qrcode.viewfinder") {
+                isShowingScanner = true
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-Option 2: Float a Custom Banner Above the Tab Bar (The Overlay Way)"><h3 id="Option 2: Float a Custom Banner Above the Tab Bar (The Overlay Way)" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-Option 2: Float a Custom Banner Above the Tab Bar (The Overlay Way)">Option 2: Float a Custom Banner Above the Tab Bar (The Overlay Way)</a></h3></div>
+
+<p>
+If you specifically want it sitting at the base of the screen directly above the tab bar, do not use <code>.bottomBar</code>. Instead, attach an <code>.overlay</code> with a <code>safeAreaInset</code> to the List.
+</p>
+
+<p>
+This injects a custom view container that sits perfectly on top of the list contents while forcing the list's bottom padding to adjust so your data never gets obscured behind your button.
+</p>
+
+<p>
+Here is how to structure it:
+</p>
+
+<pre swift>
+var body: some View {
+    NavigationStack {
+        List(prospects, selection: $selectedProspects) { prospect in
+             // ... your existing row layout ...
+        }
+        .navigationTitle(title)
+        // 1. Remove the .bottomBar item from the toolbar block entirely!
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                EditButton()
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Scan", systemImage: "qrcode.viewfinder") {
+                    isShowingScanner = true
+                }
+            }
+        }
+        // 2. Add this safeAreaInset overlay onto the List
+        .safeAreaInset(edge: .bottom) {
+            if !selectedProspects.isEmpty {
+                Button(role: .destructive, action: delete) {
+                    Text("Delete Selected (\(selectedProspects.count))")
+                        .bold()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.red)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8) // Spaces it perfectly just clear of the TabBar height
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.default, value: selectedProspects.isEmpty) // Smooth slide-up animation
+        .sheet(isPresented: $isShowingScanner) {
+            CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-Why Option 2 is a great fix"><h3 id="Why Option 2 is a great fix" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-Why Option 2 is a great fix">Why Option 2 is a great fix</a></h3></div>
+
+<p>
+By using <code>.safeAreaInset(edge: .bottom)</code>, SwiftUI calculates the precise height of the <code>TabView</code> beneath it and floats your red delete button directly on top of it. Adding the <code>.animation</code> modifier ensures that the moment a user checks an item, the delete panel smoothly slides up from the base of the screen like a native modal shelf.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+<ul>
+<li>
+<a href="swift_hws_243.html">Hacking With Swift - 243 - Challenge 2 - Add Editing Screen</a>
+
+</ul>
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
