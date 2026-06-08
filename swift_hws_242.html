@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_242</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_241.html">Hacking With Swift - 241 - Hot Prospects: Wrap up</a>
+
+</ul>
+<div id="Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons"><h1 id="Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons" class="header"><a href="#Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons">Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons</a></h1></div>
+
+<div id="Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons-In Context-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Hacking With Swift - 242 - Challenge 1 - Adding 'Contacted' Icons-In Context-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+
+<pre swift>
+import AVFoundation
+import CodeScanner
+import SwiftData
+import SwiftUI
+import UserNotifications
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \Prospect.name) var prospects: [Prospect]
+    
+    @State private var isShowingScanner = false
+    @State private var selectedProspects = Set&lt;Prospect&gt;()
+    
+    enum FilterType {
+        case none, contacted, uncontacted
+    }
+    
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none:
+            "Everyone"
+        case .contacted:
+            "Contacted people"
+        case .uncontacted:
+            "Uncontacted people"
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List(prospects, selection: $selectedProspects) { prospect in
+                // 1. Wrap the entire row layout in a centering HStack
+                //HStack(alignment: .center) {
+                HStack {
+                    // Original text column stays on the left
+                    VStack(alignment: .leading) {
+                        Text(prospect.name)
+                            .font(.headline)
+                        Text(prospect.emailAddress)
+                            .foregroundStyle(.secondary)
+                    }
+                    // 2. The Spacer pushes everything after it to the far right
+                    Spacer()
+                    // 3. Conditional SF Symbol indicator
+                    Image(
+                        systemName: prospect.isContacted ?
+                        "person.crop.circle.fill.badge.checkmark" :
+                        "person.crop.circle.badge.xmark"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(prospect.isContacted ? .blue : .red)
+                }
+                // Swipe actions attach to the row's outer boundary
+                .swipeActions {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        modelContext.delete(prospect)
+                    }
+                    if prospect.isContacted {
+                        Button("Mark Uncontacted", systemImage: "person.crop.circle.badge.xmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.blue)
+                    } else {
+                        Button("Mark Contacted", systemImage: "person.crop.circle.fill.badge.checkmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.green)
+                        
+                        Button("Remind Me", systemImage: "bell") {
+                            addNotification(for: prospect)
+                        }
+                        .tint(.orange)
+                    }
+                }
+                .tag(prospect)
+            } // List ends here cleanly
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Scan", systemImage: "qrcode.viewfinder") {
+                        isShowingScanner = true
+                    }
+                }
+                
+                if selectedProspects.isEmpty == false {
+                    ToolbarItem(placement: .bottomBar) {
+                        Button("Delete Selected", action: delete)
+                    }
+                }
+            }
+            .sheet(isPresented: $isShowingScanner) {
+                CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+            }
+        }
+    }
+    init(filter: FilterType) {
+        self.filter = filter
+        
+        if filter != .none {
+            let showContactedOnly = filter == .contacted
+            
+            _prospects = Query(filter: #Predicate {
+                $0.isContacted == showContactedOnly
+            }, sort: [SortDescriptor(\Prospect.name)])
+        }
+    }
+    func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+        isShowingScanner = false
+        
+        switch result {
+        case .success(let result):
+            let details = result.string.components(separatedBy: "\n")
+            guard details.count == 2 else { return }
+            
+            let person = Prospect(
+                name: details[0],
+                emailAddress: details[1],
+                isContacted: false)
+            modelContext.insert(person)
+            
+        case .failure(let error):
+            print("Scanning failed: \(error.localizedDescription)")
+        }
+    }
+    func delete() {
+        for prospect in selectedProspects {
+            modelContext.delete(prospect)
+        }
+    }
+    func addNotification(for prospect: Prospect) {
+        let center = UNUserNotificationCenter.current()
+        
+        let addRequest = {
+            let content = UNMutableNotificationContent()
+            content.title = "Contact \(prospect.name)"
+            content.subtitle = prospect.emailAddress
+            content.sound = UNNotificationSound.default
+            
+//            // Full version:
+//            var dateComponents = DateComponents()
+//            dateComponents.hour = 9
+            
+//            let trigger = UNCalendarNotificationTrigger(
+//                dateMatching: dateComponents,
+//                repeats: false
+//            )
+//
+           // Temp version:
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: 5,
+                repeats: false
+            )
+                
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: trigger
+            )
+            center.add(request)
+        }
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                addRequest()
+            } else {
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { success, error in
+                    if success {
+                        addRequest()
+                    } else if let error {
+                        print(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
