@@ -150,6 +150,218 @@ var body: some View {
 By using <code>.safeAreaInset(edge: .bottom)</code>, SwiftUI calculates the precise height of the <code>TabView</code> beneath it and floats your red delete button directly on top of it. Adding the <code>.animation</code> modifier ensures that the moment a user checks an item, the delete panel smoothly slides up from the base of the screen like a native modal shelf.
 </p>
 
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-In Context-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-ANSWER-In Context-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+
+<pre swift>
+import AVFoundation
+import CodeScanner
+import SwiftData
+import SwiftUI
+import UserNotifications
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \Prospect.name) var prospects: [Prospect]
+    
+    @State private var isShowingScanner = false
+    @State private var selectedProspects = Set&lt;Prospect&gt;()
+    
+    enum FilterType {
+        case none, contacted, uncontacted
+    }
+    
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none:
+            "Everyone"
+        case .contacted:
+            "Contacted people"
+        case .uncontacted:
+            "Uncontacted people"
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List(prospects, selection: $selectedProspects) { prospect in
+                // 1. Wrap the entire row layout in a centering HStack
+                //HStack(alignment: .center) {
+                HStack {
+                    // Original text column stays on the left
+                    VStack(alignment: .leading) {
+                        Text(prospect.name)
+                            .font(.headline)
+                        Text(prospect.emailAddress)
+                            .foregroundStyle(.secondary)
+                    }
+                    // 2. The Spacer pushes everything after it to the far right
+                    Spacer()
+                    // 3. Conditional SF Symbol indicator
+                    Image(
+                        systemName: prospect.isContacted ?
+                        "person.crop.circle.fill.badge.checkmark" :
+                        "person.crop.circle.badge.xmark"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(prospect.isContacted ? .blue : .red)
+                }
+                // Swipe actions attach to the row's outer boundary
+                .swipeActions {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        modelContext.delete(prospect)
+                    }
+                    if prospect.isContacted {
+                        Button("Mark Uncontacted", systemImage: "person.crop.circle.badge.xmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.blue)
+                    } else {
+                        Button("Mark Contacted", systemImage: "person.crop.circle.fill.badge.checkmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.green)
+                        
+                        Button("Remind Me", systemImage: "bell") {
+                            addNotification(for: prospect)
+                        }
+                        .tint(.orange)
+                    }
+                }
+                .tag(prospect)
+            } // List ends here cleanly
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Scan", systemImage: "qrcode.viewfinder") {
+                        isShowingScanner = true
+                    }
+                }
+                
+                // Old delete button - which appears behind tab bar:
+//                if selectedProspects.isEmpty == false {
+//                    ToolbarItem(placement: .bottomBar) {
+//                        Button("Delete Selected", action: delete)
+//                    }
+//                }
+            }
+            // New Delete Selected treatment:
+            // safeAreaInset verlay onto the List
+            .safeAreaInset(edge: .bottom) {
+                if !selectedProspects.isEmpty {
+                    Button(role: .destructive, action: delete) {
+                        Text("Delete Selected (\(selectedProspects.count))")
+                            .bold()
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(.red)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 8) // Spaces it perfectly just clear of the TabBar height
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.default, value: selectedProspects.isEmpty) // Smooth slide-up animation
+            .sheet(isPresented: $isShowingScanner) {
+                CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+            }
+        }
+    }
+    init(filter: FilterType) {
+        self.filter = filter
+        
+        if filter != .none {
+            let showContactedOnly = filter == .contacted
+            
+            _prospects = Query(filter: #Predicate {
+                $0.isContacted == showContactedOnly
+            }, sort: [SortDescriptor(\Prospect.name)])
+        }
+    }
+    func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+        isShowingScanner = false
+        
+        switch result {
+        case .success(let result):
+            let details = result.string.components(separatedBy: "\n")
+            guard details.count == 2 else { return }
+            
+            let person = Prospect(
+                name: details[0],
+                emailAddress: details[1],
+                isContacted: false)
+            modelContext.insert(person)
+            
+        case .failure(let error):
+            print("Scanning failed: \(error.localizedDescription)")
+        }
+    }
+    func delete() {
+        for prospect in selectedProspects {
+            modelContext.delete(prospect)
+        }
+    }
+    func addNotification(for prospect: Prospect) {
+        let center = UNUserNotificationCenter.current()
+        
+        let addRequest = {
+            let content = UNMutableNotificationContent()
+            content.title = "Contact \(prospect.name)"
+            content.subtitle = prospect.emailAddress
+            content.sound = UNNotificationSound.default
+            
+//            // Full version:
+//            var dateComponents = DateComponents()
+//            dateComponents.hour = 9
+            
+//            let trigger = UNCalendarNotificationTrigger(
+//                dateMatching: dateComponents,
+//                repeats: false
+//            )
+//
+           // Temp version:
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: 5,
+                repeats: false
+            )
+                
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: trigger
+            )
+            center.add(request)
+        }
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                addRequest()
+            } else {
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { success, error in
+                    if success {
+                        addRequest()
+                    } else if let error {
+                        print(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
+</pre>
 
 <div id="Hacking With Swift - 242a - Fixing 'Delete Selected' button-QUESTION"><h2 id="QUESTION" class="header"><a href="#Hacking With Swift - 242a - Fixing 'Delete Selected' button-QUESTION">QUESTION</a></h2></div>
 

@@ -38,6 +38,140 @@ Add an editing screen, so users can adjust the name and email address of someone
 </ul>
 <div id="Hacking With Swift - 243 - Challenge 2 - Add Editing Screen-Add Editing Screen"><h2 id="Add Editing Screen" class="header"><a href="#Hacking With Swift - 243 - Challenge 2 - Add Editing Screen-Add Editing Screen">Add Editing Screen</a></h2></div>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<p>
+This is a classic Hacking with Swift challenge! Let’s break down exactly what this looks like to the user, why Paul Hudson gives that specific <code>NavigationLink</code> tip, and how to write the code.
+</p>
+
+<div id="Ai Insight-What it looks like in the app"><h3 id="What it looks like in the app" class="header"><a href="#Ai Insight-What it looks like in the app">What it looks like in the app</a></h3></div>
+
+<ul>
+<li>
+<span id="Ai Insight-What it looks like in the app-The Trigger"></span><strong id="The Trigger">The Trigger</strong>: When a user taps on any prospect row in your <code>List</code>, the row will display a native chevron (<code>&gt;</code>) disclosure indicator on the right.
+
+<li>
+<span id="Ai Insight-What it looks like in the app-The Transition"></span><strong id="The Transition">The Transition</strong>: Tapping the row slides a new "Edit Prospect" detail screen into view from the right side.
+
+<li>
+<span id="Ai Insight-What it looks like in the app-The Screen"></span><strong id="The Screen">The Screen</strong>: This screen displays a clean, native <code>Form</code> containing two text fields: one initialized with the prospect's current name, and one with their email address.
+
+<li>
+<span id="Ai Insight-What it looks like in the app-The Autosave"></span><strong id="The Autosave">The Autosave</strong>: Because you are using SwiftData, any changes the user types into those text fields will mutate the <code>@Model</code> properties directly and automatically save back to the database the moment they hit the back button.
+
+</ul>
+<div id="Ai Insight-Understanding the Tip: Why avoid navigationDestination?"><h3 id="Understanding the Tip: Why avoid navigationDestination?" class="header"><a href="#Ai Insight-Understanding the Tip: Why avoid navigationDestination?">Understanding the Tip: Why avoid navigationDestination?</a></h3></div>
+
+<p>
+Normally, modern SwiftUI apps use <code>.navigationDestination(for:)</code>. However, your list has multi-selection active (<code>selection: ＄selectedProspects</code>).
+</p>
+
+<p>
+If you use <code>.navigationDestination</code>, SwiftUI gets confused about your tap intent. It can't figure out if tapping a row means <em>"add this item to the edit/delete selection batch" or "navigate to the detail screen".</em>
+</p>
+
+<p>
+By wrapping your row content inside a simple form <code>NavigationLink(destination:)</code>, SwiftUI creates a dedicated disclosure button area for navigation that neatly coexists with the multi-selection edit checkmarks.
+</p>
+
+<div id="Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 1: Create the Edit Screen View"><h4 id="Step 1: Create the Edit Screen View" class="header"><a href="#Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 1: Create the Edit Screen View">Step 1: Create the Edit Screen View</a></h4></div>
+
+<p>
+Create a brand new SwiftUI file named <code>EditProspectView.swift</code>. It needs a bindable or directly mutable reference to the <code>Prospect</code> being edited.
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+struct EditProspectView: View {
+    // Bindable allows TextField to write updates directly back to the SwiftData model object
+    @Bindable var prospect: Prospect
+    
+    var body: some View {
+        Form {
+            TextField("Name", text: $prospect.name)
+                .textContentType(.name)
+            
+            TextField("Email Address", text: $prospect.emailAddress)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocorrectionDisabled()
+        }
+        .navigationTitle("Edit Prospect")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+</pre>
+
+<div id="Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 2: Update ProspectsView.swift"><h4 id="Step 2: Update ProspectsView.swift" class="header"><a href="#Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 2: Update ProspectsView.swift">Step 2: Update ProspectsView.swift</a></h4></div>
+
+<p>
+Now, wrap your row's current horizontal layout inside the simple form of <code>NavigationLink</code>.
+</p>
+
+<p>
+Find the <code>List</code> loop inside your <code>ProspectsView</code> and modify it to look like this:
+</p>
+
+<pre swift>
+List(prospects, selection: $selectedProspects) { prospect in
+    // Wrap the row's existing visual content inside a NavigationLink
+    NavigationLink {
+        EditProspectView(prospect: prospect)
+    } label: {
+        // Your exact row design goes here entirely unchanged
+        HStack {
+            VStack(alignment: .leading) {
+                Text(prospect.name)
+                    .font(.headline)
+                Text(prospect.emailAddress)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            Image(
+                systemName: prospect.isContacted ?
+                "person.crop.circle.fill.badge.checkmark" :
+                "person.crop.circle.badge.xmark"
+            )
+            .font(.title2)
+            .foregroundStyle(prospect.isContacted ? .blue : .red)
+        }
+    } // NavigationLink ends here
+    // Swipe actions attach outside the NavigationLink, to the row container
+    .swipeActions {
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            modelContext.delete(prospect)
+        }
+        if prospect.isContacted {
+            Button("Mark Uncontacted", systemImage: "person.crop.circle.badge.xmark") {
+                prospect.isContacted.toggle()
+            }
+            .tint(.blue)
+        } else {
+            Button("Mark Contacted", systemImage: "person.crop.circle.fill.badge.checkmark") {
+                prospect.isContacted.toggle()
+            }
+            .tint(.green)
+            
+            Button("Remind Me", systemImage: "bell") {
+                addNotification(for: prospect)
+            }
+            .tint(.orange)
+        }
+    }
+    .tag(prospect)
+} // List ends
+</pre>
+
+<div id="Ai Insight-How the Magic Happens Automatically"><h3 id="How the Magic Happens Automatically" class="header"><a href="#Ai Insight-How the Magic Happens Automatically">How the Magic Happens Automatically</a></h3></div>
+
+<p>
+Because <code>Prospect</code> is marked with the SwiftData <code>@Model</code> macro, any object passed into <code>EditProspectView</code> remains tracked by your container's context. When a user changes the text in the edit fields, they are editing the live database entry. When they tap the back arrow to return to <code>ProspectsView</code>, the main list will immediately animate to reflect the new name or email change without any extra <code>save()</code> code required!
+</p>
+
 <p>
 <hr>
 <br>
