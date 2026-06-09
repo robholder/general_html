@@ -23,10 +23,218 @@
 
 <div id="rsync - Two Macs"><h1 id="rsync - Two Macs" class="header"><a href="#rsync - Two Macs">rsync - Two Macs</a></h1></div>
 
+<div id="rsync - Two Macs-Ethernet"><h2 id="Ethernet" class="header"><a href="#rsync - Two Macs-Ethernet">Ethernet</a></h2></div>
+
+<p>
+Connecting two Macs directly via Ethernet is one of the fastest, most reliable ways to transfer massive amounts of data or run automated backups.
+</p>
+
+<p>
+Here is a complete, step-by-step guide to setting up your connection, mounting the volumes, navigating them in the Terminal, automating backups with <code>rsync</code>, and optimizing performance.
+</p>
+
+<div id="rsync - Two Macs-Ethernet-Step 1: Physical Setup &amp; Network Configuration"><h3 id="Step 1: Physical Setup &amp; Network Configuration" class="header"><a href="#rsync - Two Macs-Ethernet-Step 1: Physical Setup &amp; Network Configuration">Step 1: Physical Setup &amp; Network Configuration</a></h3></div>
+
+<ul>
+<li>
+Connect both Macs using an Ethernet cable. (Modern Macs automatically detect direct connections, so a standard Cat5e or Cat6 cable works perfectly—no crossover cable needed).
+
+<li>
+On both Macs, go to System Settings &gt; Network.
+
+<li>
+Look at the Ethernet status. They should automatically assign themselves local IP addresses (Self-Assigned IPs) and show a green dot or a "Connected" status.
 <table>
 <tr>
 <td>
-ALL THIS PAGE IS CRAP.
+💡 Tip: To ensure the Macs talk directly over Ethernet rather than your slower Wi-Fi network, make sure Ethernet is at the top of your network service order, or temporarily turn off Wi-Fi on both machines while setting this up.
+</td>
+</tr>
+</table>
+
+</ul>
+<div id="rsync - Two Macs-Ethernet-Step 2: Enable File Sharing on the Target Mac (Mac Mini)"><h3 id="Step 2: Enable File Sharing on the Target Mac (Mac Mini)" class="header"><a href="#rsync - Two Macs-Ethernet-Step 2: Enable File Sharing on the Target Mac (Mac Mini)">Step 2: Enable File Sharing on the Target Mac (Mac Mini)</a></h3></div>
+
+<p>
+Before you can connect, the "host" Mac (your Mac Mini) needs to allow incoming connections:
+</p>
+
+<ul>
+<li>
+On the Mac Mini, go to <code>System Settings &gt; General &gt; Sharing</code>.
+
+<li>
+Turn on <span id="rsync - Two Macs-Ethernet-Step 2: Enable File Sharing on the Target Mac (Mac Mini)-File Sharing"></span><strong id="File Sharing">File Sharing</strong> and click the small "i" (info) icon next to it.
+
+<li>
+Note the exact local hostname listed at the bottom (e.g., <code>macmini.local</code>).
+
+<li>
+Ensure the folders you want to share are listed under <span id="rsync - Two Macs-Ethernet-Step 2: Enable File Sharing on the Target Mac (Mac Mini)-Shared Folders"></span><strong id="Shared Folders">Shared Folders</strong>, and your user account has <span id="rsync - Two Macs-Ethernet-Step 2: Enable File Sharing on the Target Mac (Mac Mini)-Read &amp; Write"></span><strong id="Read &amp; Write">Read &amp; Write</strong> permissions.
+
+</ul>
+<div id="rsync - Two Macs-Ethernet-Step 3: Mount the Volume via SMB (Command+K)"><h3 id="Step 3: Mount the Volume via SMB (Command+K)" class="header"><a href="#rsync - Two Macs-Ethernet-Step 3: Mount the Volume via SMB (Command+K)">Step 3: Mount the Volume via SMB (Command+K)</a></h3></div>
+
+<p>
+Now, move to your main MacBook:
+</p>
+
+<ul>
+<li>
+Click on your desktop to focus on <span id="rsync - Two Macs-Ethernet-Step 3: Mount the Volume via SMB (Command+K)-Finder"></span><strong id="Finder">Finder</strong>, then press <code>&lt;Cmd&gt;</code> + <code>k</code> (or go to Go > Connect to Server in the menu bar).
+
+<li>
+In the Server Address field, type: <code>smb://macmini.local</code> (adjust for the name of the mac!) and click Connect.
+
+<li>
+A prompt might ask for a username and password. Enter the login credentials for the Mac Mini.
+
+<li>
+A pop-up will appear asking you to choose the volume/mount folder you want to mount (e.g., Macintosh HD, User, or a specific shared folder). Select it and click OK.
+
+</ul>
+<p>
+The volume will now appear in your Finder sidebar under Locations, and on your Desktop (if you have "Connected Servers" visible in Finder settings).
+</p>
+
+<div id="rsync - Two Macs-Ethernet-Step 4: Accessing the Connected Volume in Terminal"><h3 id="Step 4: Accessing the Connected Volume in Terminal" class="header"><a href="#rsync - Two Macs-Ethernet-Step 4: Accessing the Connected Volume in Terminal">Step 4: Accessing the Connected Volume in Terminal</a></h3></div>
+
+<p>
+In macOS, all external drives, network shares, and mounted volumes are located in a hidden root directory called <code>/Volumes</code>.
+</p>
+
+<p>
+To find and navigate your mounted Mac Mini in the Terminal:
+</p>
+
+<ul>
+<li>
+Open Terminal.
+
+<li>
+Type the following command to see all mounted drives:
+
+</ul>
+  
+<pre bash>
+ls -la /Volumes
+</pre>
+
+<ul>
+<li>
+You will see your Mac Mini's shared folder listed there. To enter it, use the <code>cd</code> command (wrap the path in quotes if the folder name has spaces):
+
+</ul>
+  
+<pre bash>
+cd "/Volumes/Your Mounted Folder Name"
+</pre>
+
+<div id="rsync - Two Macs-Ethernet-Step 5: Setting Up the rsync Automation &amp; Alias"><h3 id="Step 5: Setting Up the rsync Automation &amp; Alias" class="header"><a href="#rsync - Two Macs-Ethernet-Step 5: Setting Up the rsync Automation &amp; Alias">Step 5: Setting Up the rsync Automation &amp; Alias</a></h3></div>
+
+<p>
+Since you are running <code>rsync</code> over a mounted network volume, you don't actually need to pass the network username and SSH address (<code>&lt;username&gt;@&lt;MACHINE-1-NAME&gt;.local</code>) inside the <code>rsync</code> command itself. Because the drive is already mounted via SMB, the Mac treats it like a local hard drive located in <code>/Volumes</code>.
+</p>
+
+<p>
+Here is how to structure your <code>rsync</code> command, along with a breakdown of your requested syntax:
+</p>
+
+<div id="rsync - Two Macs-Ethernet-Step 5: Setting Up the rsync Automation &amp; Alias-The rsync Command Explained"><h4 id="The rsync Command Explained" class="header"><a href="#rsync - Two Macs-Ethernet-Step 5: Setting Up the rsync Automation &amp; Alias-The rsync Command Explained">The rsync Command Explained</a></h4></div>
+
+<pre bash>
+rsync−avz−−delete/Source/Directory//Destination/Directory/
+</pre>
+
+<ul>
+<li>
+<code>-a</code> (archive mode): Preserves permissions, modification times, and symlinks.
+
+<li>
+<code>-v</code> (verbose): Shows the files being transferred in real-time.
+
+<li>
+<code>-z</code> (compress): Compresses data during transfer (great for networks).
+
+<li>
+<code>--delete</code>: Caution! This deletes files in the destination directory if they no longer exist in the source directory. It keeps both folders perfectly mirrored.
+
+</ul>
+<div id="rsync - Two Macs-Ethernet-Step 5: Setting Up the rsync Automation &amp; Alias-Creating the Permanent Alias"><h4 id="Creating the Permanent Alias" class="header"><a href="#rsync - Two Macs-Ethernet-Step 5: Setting Up the rsync Automation &amp; Alias-Creating the Permanent Alias">Creating the Permanent Alias</a></h4></div>
+
+<ul>
+<li>
+Open your shell configuration file (modern macOS uses Zsh by default) by running:
+
+</ul>
+  
+<pre bash>
+alias sync-to-m1="rsync -avz --delete /path/to/local/tutorials/ \"/Volumes/Your Shared Folder Name/path/to/remote/tutorials/\""
+</pre>
+
+<ul>
+<li>
+Reload your Terminal profiles to activate the alias.
+<pre bash>
+source ~/.zshrc
+</pre>
+
+</ul>
+<p>
+Now, whenever you type <code>sync-to-m1</code> in Terminal, your sync will run instantly.
+</p>
+
+<div id="rsync - Two Macs-Ethernet-Step 6: Pro-Tips for Power Users"><h3 id="Step 6: Pro-Tips for Power Users" class="header"><a href="#rsync - Two Macs-Ethernet-Step 6: Pro-Tips for Power Users">Step 6: Pro-Tips for Power Users</a></h3></div>
+
+<div id="rsync - Two Macs-Ethernet-Step 6: Pro-Tips for Power Users-How to Auto-Connect at Login"><h4 id="How to Auto-Connect at Login" class="header"><a href="#rsync - Two Macs-Ethernet-Step 6: Pro-Tips for Power Users-How to Auto-Connect at Login">How to Auto-Connect at Login</a></h4></div>
+
+<p>
+If you don't want to press <code>&lt;Cmd&gt;</code> + <code>k</code> every time you boot your Mac, you can force macOS to mount the Mac Mini automatically when you log in:
+</p>
+
+<ul>
+<li>
+Go to System Settings &gt; General &gt; Login Items.
+
+<li>
+Under the Open at Login section, click the + (plus) icon.
+
+<li>
+In the Finder sidebar, look under Locations, select your mounted Mac Mini folder, and click Open.
+
+<li>
+Now, macOS will automatically attempt to mount this share every time you log in (as long as the Ethernet cable is plugged in).
+
+</ul>
+<div id="rsync - Two Macs-Ethernet-Step 6: Pro-Tips for Power Users-Turn Off Spotlight on the Mounted Drive (Highly Recommended)"><h4 id="Turn Off Spotlight on the Mounted Drive (Highly Recommended)" class="header"><a href="#rsync - Two Macs-Ethernet-Step 6: Pro-Tips for Power Users-Turn Off Spotlight on the Mounted Drive (Highly Recommended)">Turn Off Spotlight on the Mounted Drive (Highly Recommended)</a></h4></div>
+
+<p>
+When you connect a network share, macOS will often try to index the entire drive using Spotlight. This can cause massive lag, high CPU usage, and slow down your <code>rsync</code> file transfers.
+</p>
+
+<ul>
+<li>
+Go to System Settings &gt; Siri &amp; Spotlight.
+
+<li>
+Scroll all the way to the bottom and click Spotlight Privacy.
+
+<li>
+Drag and drop your mounted Mac Mini volume from your desktop (or Finder) directly into this list, or click the + icon to browse and add it.
+
+<li>
+Click Done. Spotlight will now ignore that directory completely.
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+<table>
+<tr>
+<td>
+MOST OF THE REST OF THIS PAGE IS CRAP.
 </td>
 </tr>
 </table>
