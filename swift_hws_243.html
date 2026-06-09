@@ -172,7 +172,61 @@ List(prospects, selection: $selectedProspects) { prospect in
 Because <code>Prospect</code> is marked with the SwiftData <code>@Model</code> macro, any object passed into <code>EditProspectView</code> remains tracked by your container's context. When a user changes the text in the edit fields, they are editing the live database entry. When they tap the back arrow to return to <code>ProspectsView</code>, the main list will immediately animate to reflect the new name or email change without any extra <code>save()</code> code required!
 </p>
 
+<div id="Ai Insight-#Preview"><h2 id="#Preview" class="header"><a href="#Ai Insight-#Preview">#Preview</a></h2></div>
+
 <p>
+To make a SwiftUI <code>#Preview</code> work with a view that depends on a SwiftData model object like <code>Prospect</code>, you have to provide it with an in-memory database container.
+</p>
+
+<p>
+If you just try to pass a loose <code>Prospect()</code> instance without a container, SwiftData will crash because the model isn't hooked up to a data context.
+</p>
+
+<p>
+Here is how you populate the <code>#Preview</code> enclosure using an in-memory container and dummy data.
+</p>
+
+<div id="Ai Insight-#Preview-The Solution"><h3 id="The Solution" class="header"><a href="#Ai Insight-#Preview-The Solution">The Solution</a></h3></div>
+
+<p>
+Add this code to the bottom of your file:
+</p>
+
+<pre swift>
+#Preview {
+    // 1. Create an in-memory configuration so it doesn't save to the actual device disk
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    
+    // 2. Create the container using your model type and configuration
+    let container = try! ModelContainer(for: Prospect.self, configurations: config)
+    
+    // 3. Create your dummy sample data
+    let sampleProspect = Prospect(name: "John Doe", emailAddress: "john.doe@example.com")
+    
+    // 4. Insert the sample data into the container's context
+    container.mainContext.insert(sampleProspect)
+    
+    // 5. Return the view, passing the sample data and injecting the container
+    return EditProspectView(prospect: sampleProspect)
+        .modelContainer(container)
+}
+</pre>
+
+<div id="Ai Insight-#Preview-The Solution-Why this works:"><h4 id="Why this works:" class="header"><a href="#Ai Insight-#Preview-The Solution-Why this works:">Why this works:</a></h4></div>
+
+<ul>
+<li>
+<code>isStoredInMemoryOnly: true</code>: This ensures that any edits you make inside the canvas preview are temporary. It prevents your dummy preview data from polluting your live app's real database.
+
+<li>
+<code>try!</code>: While using <code>try!</code> is generally a bad idea in production code, it is perfectly acceptable—and standard practice—in previews because if the preview container fails to initialize, you want the build to fail immediately so you can fix it.
+
+<li>
+<code>.modelContainer(container)</code>: Even though your view only takes a <code>@Bindable var prospect</code>, SwiftData objects require an active context in the environment to track changes correctly. Injecting the container at the root of the preview keeps the canvas stable and interactive.
+
+</ul>
+<p>
+Now your preview will fully render, and you'll be able to type into the text fields interactively in Xcode!
 <hr>
 <br>
 </p>
