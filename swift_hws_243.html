@@ -194,21 +194,19 @@ Add this code to the bottom of your file:
 
 <pre swift>
 #Preview {
-    // 1. Create an in-memory configuration so it doesn't save to the actual device disk
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    
-    // 2. Create the container using your model type and configuration
-    let container = try! ModelContainer(for: Prospect.self, configurations: config)
-    
-    // 3. Create your dummy sample data
-    let sampleProspect = Prospect(name: "John Doe", emailAddress: "john.doe@example.com")
-    
-    // 4. Insert the sample data into the container's context
-    container.mainContext.insert(sampleProspect)
-    
-    // 5. Return the view, passing the sample data and injecting the container
-    return EditProspectView(prospect: sampleProspect)
-        .modelContainer(container)
+    // We wrap the setup in a closure and call it immediately with ()
+    {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: Prospect.self, configurations: config)
+        
+        // Creating sample data with your new isContacted parameter
+        let sampleProspect = Prospect(name: "John Doe", emailAddress: "john.doe@example.com", isContacted: false)
+        
+        container.mainContext.insert(sampleProspect)
+        
+        return EditProspectView(prospect: sampleProspect)
+            .modelContainer(container)
+    }() // &lt;--- These parentheses execute the code block and return the configured View safely
 }
 </pre>
 
@@ -227,6 +225,473 @@ Add this code to the bottom of your file:
 </ul>
 <p>
 Now your preview will fully render, and you'll be able to type into the text fields interactively in Xcode!
+</p>
+
+
+<div id="Busted"><h1 id="Busted" class="header"><a href="#Busted">Busted</a></h1></div>
+
+<p>
+The Edit (for deletion selection) and the Delete Selected buttons are broken at this stage.
+</p>
+
+<p>
+This is the code with comments:
+</p>
+
+<div id="Busted-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Busted-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+
+<pre>
+import AVFoundation
+import CodeScanner
+import SwiftData
+import SwiftUI
+import UserNotifications
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \Prospect.name) var prospects: [Prospect]
+    
+    @State private var isShowingScanner = false
+    @State private var selectedProspects = Set&lt;Prospect&gt;()
+    
+    /// LEARNING POINT: Custom Edit Mode State
+    /// We use a standard @State Boolean instead of Apple's `@Environment(\.editMode)`.
+    /// This fixes a massive SwiftUI bug where the native EditButton() fails to broadcast 
+    /// its active state to parent layout wrappers when hosted inside a multi-tab application.
+    @State private var isEditing = false
+    
+    enum FilterType {
+        case none, contacted, uncontacted
+    }
+    
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none:
+            "Everyone"
+        case .contacted:
+            "Contacted people"
+        case .uncontacted:
+            "Uncontacted people"
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List(prospects, selection: $selectedProspects) { prospect in
+                
+                /// LEARNING POINT: The NavigationLink Conflict
+                /// In vanilla SwiftUI, wrapping a row in a NavigationLink gives the row a "disclosure chevron" 
+                /// gesture wrapper. When the list goes into edit mode, this gesture wrapper accidentally 
+                /// blocks the user from tapping the multi-selection circles on the left.
+                NavigationLink {
+                    EditProspectView(prospect: prospect)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(prospect.name)
+                                .font(.headline)
+                            Text(prospect.emailAddress)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(
+                            systemName: prospect.isContacted ?
+                            "person.crop.circle.fill.badge.checkmark" :
+                            "person.crop.circle.badge.xmark"
+                        )
+                        .font(.title2)
+                        .foregroundStyle(prospect.isContacted ? .blue : .red)
+                    }
+                }
+                .swipeActions {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        modelContext.delete(prospect)
+                    }
+                    if prospect.isContacted {
+                        Button("Mark Uncontacted", systemImage: "person.crop.circle.badge.xmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.blue)
+                    } else {
+                        Button("Mark Contacted", systemImage: "person.crop.circle.fill.badge.checkmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.green)
+                        
+                        Button("Remind Me", systemImage: "bell") {
+                            addNotification(for: prospect)
+                        }
+                        .tint(.orange)
+                    }
+                }
+                .tag(prospect)
+                
+                /// LEARNING POINT: Defeating Tap Theft with `.allowsHitTesting()`
+                /// When `isEditing` is true, we pass `false` to `.allowsHitTesting()`.
+                /// This completely freezes the row's child interaction. Because the NavigationLink is 
+                /// now transparent to taps, user touches bypass it entirely and hit the underlying List frame,
+                /// cleanly selecting the native checkmark circles instead of opening the details screen.
+                .allowsHitTesting(!isEditing)
+            }
+            /// LEARNING POINT: Injecting Constant Edit Mode
+            /// Instead of letting the container handle EditMode, we explicitly inject our own rule into the List.
+            /// When `isEditing` toggles, this tells the List to instantly slide out its checkbox margin.
+            .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 12) {
+                        
+                        /// LEARNING POINT: Stable "Edit Mode" Toggle
+                        /// Using a hardcoded standard button string keeps its text locked as "Edit" forever,
+                        /// ignoring Apple's automatic swap to "Done". We change the tint color to red 
+                        /// when active to provide a clear, intuitive state indicator for the user.
+                        Button("Edit") {
+                            withAnimation {
+                                isEditing.toggle()
+                                if !isEditing {
+                                    // Housekeeping: Empty out stale checkmarks if a user toggles Edit mode off
+                                    selectedProspects.removeAll()
+                                }
+                            }
+                        }
+                        .tint(isEditing ? .red : .blue)
+                        
+                        /// LEARNING POINT: Top-Bar Selection Panel
+                        /// Relocating the batch delete button from a bottom overlay to the top toolbar completely
+                        /// protects it from crashing or getting cut off by the system Tab Bar layout.
+                        /// It dynamically renders if we are in edit mode AND at least one selection is marked.
+                        if isEditing &amp;&amp; !selectedProspects.isEmpty {
+                            Button(role: .destructive, action: deleteSelected) {
+                                Label("Delete Selection", systemImage: "trash.fill")
+                                    .foregroundStyle(.red)
+                            }
+                            // Smoothly fades and slides the button sideways when selections change
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Scan", systemImage: "qrcode.viewfinder") {
+                        isShowingScanner = true
+                    }
+                }
+            }
+            .sheet(isPresented: $isShowingScanner) {
+                CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+            }
+        }
+    }
+    
+    // MARK: - Core Logic Functions
+    
+    init(filter: FilterType) {
+        self.filter = filter
+        
+        if filter != .none {
+            let showContactedOnly = filter == .contacted
+            
+            _prospects = Query(filter: #Predicate {
+                $0.isContacted == showContactedOnly
+            }, sort: [SortDescriptor(\Prospect.name)])
+        }
+    }
+    
+    func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+        isShowingScanner = false
+        
+        switch result {
+        case .success(let result):
+            let details = result.string.components(separatedBy: "\n")
+            guard details.count == 2 else { return }
+            
+            let person = Prospect(
+                name: details[0],
+                emailAddress: details[1],
+                isContacted: false)
+            modelContext.insert(person)
+            
+        case .failure(let error):
+            print("Scanning failed: \(error.localizedDescription)")
+        }
+    }
+    
+    /// LEARNING POINT: Processing the Batch Delete
+    /// This runs through our selected set, removes them from the SwiftData ModelContext,
+    /// and resets the view state back to normal.
+    func deleteSelected() {
+        withAnimation {
+            for prospect in selectedProspects {
+                modelContext.delete(prospect)
+            }
+            selectedProspects.removeAll()
+            isEditing = false // Cleanly shut down editing mode once deletion finishes
+        }
+    }
+    
+    func addNotification(for prospect: Prospect) {
+        let center = UNUserNotificationCenter.current()
+        
+        let addRequest = {
+            let content = UNMutableNotificationContent()
+            content.title = "Contact \(prospect.name)"
+            content.subtitle = prospect.emailAddress
+            content.sound = UNNotificationSound.default
+            
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: 5,
+                repeats: false
+            )
+                
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: trigger
+            )
+            center.add(request)
+        }
+        
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                addRequest()
+            } else {
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { success, error in
+                    if success {
+                        addRequest()
+                    } else if let error {
+                        print(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
+</pre>
+
+<p>
+This is the fix (with out explanation).
+</p>
+
+<div id="Busted-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Busted-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+
+<pre swift>
+import AVFoundation
+import CodeScanner
+import SwiftData
+import SwiftUI
+import UserNotifications
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \Prospect.name) var prospects: [Prospect]
+    
+    @State private var isShowingScanner = false
+    @State private var selectedProspects = Set&lt;Prospect&gt;()
+    
+    // Custom state to ensure reliable, cross-tab view redrawing
+    @State private var isEditing = false
+    
+    enum FilterType {
+        case none, contacted, uncontacted
+    }
+    
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none:
+            "Everyone"
+        case .contacted:
+            "Contacted people"
+        case .uncontacted:
+            "Uncontacted people"
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List(prospects, selection: $selectedProspects) { prospect in
+                NavigationLink {
+                    EditProspectView(prospect: prospect)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(prospect.name)
+                                .font(.headline)
+                            Text(prospect.emailAddress)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(
+                            systemName: prospect.isContacted ?
+                            "person.crop.circle.fill.badge.checkmark" :
+                                "person.crop.circle.badge.xmark"
+                        )
+                        .font(.title2)
+                        .foregroundStyle(prospect.isContacted ? .blue : .red)
+                    }
+                }
+                .swipeActions {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        modelContext.delete(prospect)
+                    }
+                    if prospect.isContacted {
+                        Button("Mark Uncontacted", systemImage: "person.crop.circle.badge.xmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.blue)
+                    } else {
+                        Button("Mark Contacted", systemImage: "person.crop.circle.fill.badge.checkmark") {
+                            prospect.isContacted.toggle()
+                        }
+                        .tint(.green)
+                        
+                        Button("Remind Me", systemImage: "bell") {
+                            addNotification(for: prospect)
+                        }
+                        .tint(.orange)
+                    }
+                }
+                .tag(prospect)
+                // Freezes the NavigationLink logic when editing so checkboxes work perfectly
+                .allowsHitTesting(!isEditing)
+            }
+            // Bind the List's edit mode directly to our reliable state property
+            .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 12) {
+                        // Explicit button guarantees a view refresh and always says "Edit"
+                        Button("Edit") {
+                            withAnimation {
+                                isEditing.toggle()
+                                if !isEditing {
+                                    selectedProspects.removeAll()
+                                }
+                            }
+                        }
+                        .tint(isEditing ? .red : .blue) // Red tint provides a visual active state indicator
+                        
+                        // Trash button appears dynamically based on our local, responsive state
+                        if isEditing &amp;&amp; !selectedProspects.isEmpty {
+                            Button(role: .destructive, action: deleteSelected) {
+                                Label("Delete Selection", systemImage: "trash.fill")
+                                    .foregroundStyle(.red)
+                            }
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Scan", systemImage: "qrcode.viewfinder") {
+                        isShowingScanner = true
+                    }
+                }
+            }
+            .sheet(isPresented: $isShowingScanner) {
+                CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+            }
+        }
+    }
+    
+    // MARK: - Core Logic Functions
+    
+    init(filter: FilterType) {
+        self.filter = filter
+        
+        if filter != .none {
+            let showContactedOnly = filter == .contacted
+            
+            _prospects = Query(filter: #Predicate {
+                $0.isContacted == showContactedOnly
+            }, sort: [SortDescriptor(\Prospect.name)])
+        }
+    }
+    
+    func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+        isShowingScanner = false
+        
+        switch result {
+        case .success(let result):
+            let details = result.string.components(separatedBy: "\n")
+            guard details.count == 2 else { return }
+            
+            let person = Prospect(
+                name: details[0],
+                emailAddress: details[1],
+                isContacted: false)
+            modelContext.insert(person)
+            
+        case .failure(let error):
+            print("Scanning failed: \(error.localizedDescription)")
+        }
+    }
+    
+    func deleteSelected() {
+        withAnimation {
+            for prospect in selectedProspects {
+                modelContext.delete(prospect)
+            }
+            selectedProspects.removeAll()
+            isEditing = false // Cleanly close out selection mode upon deletion
+        }
+    }
+    
+    func addNotification(for prospect: Prospect) {
+        let center = UNUserNotificationCenter.current()
+        
+        let addRequest = {
+            let content = UNMutableNotificationContent()
+            content.title = "Contact \(prospect.name)"
+            content.subtitle = prospect.emailAddress
+            content.sound = UNNotificationSound.default
+            
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: 5,
+                repeats: false
+            )
+            
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: trigger
+            )
+            center.add(request)
+        }
+        
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                addRequest()
+            } else {
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { success, error in
+                    if success {
+                        addRequest()
+                    } else if let error {
+                        print(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
+</pre>
+
+<p>
 <hr>
 <br>
 </p>
