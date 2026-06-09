@@ -74,7 +74,117 @@ If you use <code>.navigationDestination</code>, SwiftUI gets confused about your
 By wrapping your row content inside a simple form <code>NavigationLink(destination:)</code>, SwiftUI creates a dedicated disclosure button area for navigation that neatly coexists with the multi-selection edit checkmarks.
 </p>
 
-<div id="Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 1: Create the Edit Screen View"><h4 id="Step 1: Create the Edit Screen View" class="header"><a href="#Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 1: Create the Edit Screen View">Step 1: Create the Edit Screen View</a></h4></div>
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+In the original tutorial challenge, the 'Tip' section elude to some of these issues? And have we applied it by the end of this page?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, Paul Hudson's tip points exactly to the core of the nightmare we fought through to create this solution!
+</p>
+
+<p>
+In fact, the tip acknowledges a known architectural tension in SwiftUI: when a <code>List</code> has multi-selection enabled (<code>selection: ＄selectedProspects</code>), any complex navigation mechanics attached to the rows can get their touch-targets and state tracking completely crossed.
+</p>
+
+<p>
+Here is the breakdown of what that tip means, why it matters, and how we ultimately applied it.
+</p>
+
+<div id="Ai Insight-ANSWER-What the Tip Means: NavigationLink vs navigationDestination()"><h3 id="What the Tip Means: NavigationLink vs navigationDestination()" class="header"><a href="#Ai Insight-ANSWER-What the Tip Means: NavigationLink vs navigationDestination()">What the Tip Means: NavigationLink vs navigationDestination()</a></h3></div>
+
+<p>
+In modern SwiftUI, there are two primary ways to handle stack navigation:
+</p>
+
+<ul>
+<li>
+The Simple/Older Form (Direct Binding):
+
+</ul>
+  
+<pre swift>
+NavigationLink {
+    EditProspectView(prospect: prospect) // View is declared directly right here
+} label: {
+    Text(prospect.name)
+}
+</pre>
+
+<ul>
+<li>
+The Modern Form (Type-Driven Deferral):
+
+</ul>
+  
+<pre swift>
+NavigationLink(value: prospect) // Only passes a data token
+// ...placed somewhere down on the List view:
+.navigationDestination(for: Prospect.self) { prospect in
+    EditProspectView(prospect: prospect)
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Why navigationDestination() Fails Here"><h3 id="Why navigationDestination() Fails Here" class="header"><a href="#Ai Insight-ANSWER-Why navigationDestination() Fails Here">Why navigationDestination() Fails Here</a></h3></div>
+
+<p>
+When you use the modern <code>.navigationDestination(for:)</code> pattern, SwiftUI relies entirely on row selection hashes to push views onto the stack. However, when you tap <code>Edit</code> to select multiple items for deletion, the <code>List</code> also starts manipulating row selection hashes to build your <code>selectedProspects</code> Set.
+</p>
+
+<p>
+If you use <code>.navigationDestination()</code>, SwiftUI gets completely confused. It can't distinguish between "the user wants to select this checkbox to batch-delete" and "the user wants to navigate to the edit screen." This conflict is what triggers the rapid layout glitches where checkboxes flash open and instantly snap shut.
+</p>
+
+<div id="Ai Insight-ANSWER-Have We Applied It?"><h3 id="Have We Applied It?" class="header"><a href="#Ai Insight-ANSWER-Have We Applied It?">Have We Applied It?</a></h3></div>
+
+<p>
+Yes, we used the simple form exactly as instructed. In our working code, you can see the direct declaration layout:
+</p>
+
+<pre swift>
+NavigationLink {
+    EditProspectView(prospect: prospect) // Direct destination injection
+} label: {
+    HStack { ... }
+}
+</pre>
+
+<p>
+By sticking to the simple form, the destination view (<code>EditProspectView</code>) is tied tightly to the literal button label of that specific row.
+</p>
+
+<div id="Ai Insight-ANSWER-The Missing Piece We Had to Solve"><h3 id="The Missing Piece We Had to Solve" class="header"><a href="#Ai Insight-ANSWER-The Missing Piece We Had to Solve">The Missing Piece We Had to Solve</a></h3></div>
+
+<p>
+Even with Paul's tip, SwiftUI still has trouble when a row contains a working hyperlink and a native checkbox at the same time. While the simple <code>NavigationLink</code> kept our state from crashing, the row link was still "stealing" the user's touch. Tapping a row during edit mode would accidentally push the user into the <code>EditProspectView</code> instead of checking the multi-select circle.
+</p>
+
+<p>
+To completely bridge the gap and make the tip functional, we added this modifier to the row:
+</p>
+
+<pre swift>
+.allowsHitTesting(!isEditing)
+</pre>
+
+<p>
+By adding this, we fulfilled the spirit of the tutorial's tip:
+</p>
+
+<ul>
+<li>
+When <code>isEditing</code> is false: The simple <code>NavigationLink</code> handles standard detail navigation natively.
+
+<li>
+<a href="When.html">When</a> <code>isEditing</code> is true: The <code>NavigationLink</code> gesture engine is completely deactivated. It remains visible on screen, but it steps out of the way so the List container can intercept your tap and cleanly check the selection circle.
+
+</ul>
+<div id="The Battle"><h1 id="The Battle" class="header"><a href="#The Battle">The Battle</a></h1></div>
+
+<div id="The Battle-Step 1: Create the Edit Screen View"><h4 id="Step 1: Create the Edit Screen View" class="header"><a href="#The Battle-Step 1: Create the Edit Screen View">Step 1: Create the Edit Screen View</a></h4></div>
 
 <p>
 Create a brand new SwiftUI file named <code>EditProspectView.swift</code>. It needs a bindable or directly mutable reference to the <code>Prospect</code> being edited.
@@ -104,7 +214,7 @@ struct EditProspectView: View {
 }
 </pre>
 
-<div id="Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 2: Update ProspectsView.swift"><h4 id="Step 2: Update ProspectsView.swift" class="header"><a href="#Ai Insight-Understanding the Tip: Why avoid navigationDestination?-Step 2: Update ProspectsView.swift">Step 2: Update ProspectsView.swift</a></h4></div>
+<div id="The Battle-Step 2: Update ProspectsView.swift"><h4 id="Step 2: Update ProspectsView.swift" class="header"><a href="#The Battle-Step 2: Update ProspectsView.swift">Step 2: Update ProspectsView.swift</a></h4></div>
 
 <p>
 Now, wrap your row's current horizontal layout inside the simple form of <code>NavigationLink</code>.
@@ -166,13 +276,13 @@ List(prospects, selection: $selectedProspects) { prospect in
 } // List ends
 </pre>
 
-<div id="Ai Insight-How the Magic Happens Automatically"><h3 id="How the Magic Happens Automatically" class="header"><a href="#Ai Insight-How the Magic Happens Automatically">How the Magic Happens Automatically</a></h3></div>
+<div id="The Battle-How the Magic Happens Automatically"><h3 id="How the Magic Happens Automatically" class="header"><a href="#The Battle-How the Magic Happens Automatically">How the Magic Happens Automatically</a></h3></div>
 
 <p>
 Because <code>Prospect</code> is marked with the SwiftData <code>@Model</code> macro, any object passed into <code>EditProspectView</code> remains tracked by your container's context. When a user changes the text in the edit fields, they are editing the live database entry. When they tap the back arrow to return to <code>ProspectsView</code>, the main list will immediately animate to reflect the new name or email change without any extra <code>save()</code> code required!
 </p>
 
-<div id="Ai Insight-#Preview"><h2 id="#Preview" class="header"><a href="#Ai Insight-#Preview">#Preview</a></h2></div>
+<div id="The Battle-#Preview"><h2 id="#Preview" class="header"><a href="#The Battle-#Preview">#Preview</a></h2></div>
 
 <p>
 To make a SwiftUI <code>#Preview</code> work with a view that depends on a SwiftData model object like <code>Prospect</code>, you have to provide it with an in-memory database container.
@@ -186,7 +296,7 @@ If you just try to pass a loose <code>Prospect()</code> instance without a conta
 Here is how you populate the <code>#Preview</code> enclosure using an in-memory container and dummy data.
 </p>
 
-<div id="Ai Insight-#Preview-The Solution"><h3 id="The Solution" class="header"><a href="#Ai Insight-#Preview-The Solution">The Solution</a></h3></div>
+<div id="The Battle-#Preview-The Solution"><h3 id="The Solution" class="header"><a href="#The Battle-#Preview-The Solution">The Solution</a></h3></div>
 
 <p>
 Add this code to the bottom of your file:
@@ -210,7 +320,7 @@ Add this code to the bottom of your file:
 }
 </pre>
 
-<div id="Ai Insight-#Preview-The Solution-Why this works:"><h4 id="Why this works:" class="header"><a href="#Ai Insight-#Preview-The Solution-Why this works:">Why this works:</a></h4></div>
+<div id="The Battle-#Preview-The Solution-Why this works:"><h4 id="Why this works:" class="header"><a href="#The Battle-#Preview-The Solution-Why this works:">Why this works:</a></h4></div>
 
 <ul>
 <li>
@@ -240,7 +350,7 @@ This is the code with comments:
 
 <div id="Busted-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Busted-ProspectsView.swift">ProspectsView.swift</a></h4></div>
 
-<pre>
+<pre swift>
 import AVFoundation
 import CodeScanner
 import SwiftData
