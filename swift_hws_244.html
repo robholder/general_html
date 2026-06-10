@@ -538,6 +538,270 @@ extension EnvironmentValues {
 }
 </pre>
 
+<div id="More Modern Approach-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#More Modern Approach-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="More Modern Approach-ANSWER-In Context-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#More Modern Approach-ANSWER-In Context-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+
+<pre swift>
+import AVFoundation
+import CodeScanner
+import SwiftData
+import SwiftUI
+import UserNotifications
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    @State private var isShowingScanner = false
+    @State private var selectedProspects = Set&lt;Prospect&gt;()
+    @State private var isEditing = false
+    @State private var currentSort: SortOption = .name
+    
+    enum SortOption { case name, email }
+    enum FilterType { case none, contacted, uncontacted }
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none: "Everyone"
+        case .contacted: "Contacted people"
+        case .uncontacted: "Uncontacted people"
+        }
+    }
+    
+    var activeSortDescriptor: SortDescriptor&lt;Prospect&gt; {
+        currentSort == .name ? SortDescriptor(\Prospect.name) : SortDescriptor(\Prospect.emailAddress)
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ProspectsListView(filter: filter, sortOrder: activeSortDescriptor)
+                .navigationTitle(title)
+            // Inject our state bindings directly into the view hierarchy environment
+                .environment(\.prospectsEditing, $isEditing)
+                .environment(\.prospectsSelection, $selectedProspects)
+                .toolbar {
+                    // Leading Group (Left Side)
+                    ToolbarItem(placement: .topBarLeading) {
+                        HStack(spacing: 12) {
+                            Button("Edit") {
+                                withAnimation {
+                                    isEditing.toggle()
+                                    if !isEditing { selectedProspects.removeAll() }
+                                }
+                            }
+                            .tint(isEditing ? .red : .blue)
+                            
+                            if isEditing &amp;&amp; !selectedProspects.isEmpty {
+                                Button(role: .destructive, action: deleteSelected) {
+                                    Label("Delete Selection", systemImage: "trash.fill")
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Trailing Group (Right Side)
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 15) {
+                            // Drop-down sorting selection menu
+                            Menu {
+                                Button {
+                                    currentSort = .name
+                                } label: {
+                                    HStack {
+                                        Text("Sort by Name")
+                                        if currentSort == .name { Image(systemName: "checkmark") }
+                                    }
+                                }
+                                
+                                Button {
+                                    currentSort = .email
+                                } label: {
+                                    HStack {
+                                        Text("Sort by Email")
+                                        if currentSort == .email { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "arrow.up.and.down.text.horizontal")
+                            }
+                            
+                            // Scanner Button
+                            Button("Scan", systemImage: "qrcode.viewfinder") {
+                                isShowingScanner = true
+                            }
+                        }
+                    }
+                }
+            // Modifiers attached to the root stack element
+                .sheet(isPresented: $isShowingScanner) {
+                    CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+                }
+        }
+    }
+    
+    // Clean, singular initializer for the parent view
+    init(filter: FilterType) {
+        self.filter = filter
+    }
+    
+    // MARK: - Core Logic Functions (Safely Inside the View Struct)
+    
+    func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+        isShowingScanner = false
+        
+        switch result {
+        case .success(let result):
+            let details = result.string.components(separatedBy: "\n")
+            guard details.count == 2 else { return }
+            
+            let person = Prospect(
+                name: details[0],
+                emailAddress: details[1],
+                isContacted: false)
+            modelContext.insert(person)
+            
+        case .failure(let error):
+            print("Scanning failed: \(error.localizedDescription)")
+        }
+    }
+    
+    func deleteSelected() {
+        withAnimation {
+            for prospect in selectedProspects {
+                modelContext.delete(prospect)
+            }
+            selectedProspects.removeAll()
+            isEditing = false
+        }
+    }
+    
+    func addNotification(for prospect: Prospect) {
+        let center = UNUserNotificationCenter.current()
+        
+        let addRequest = {
+            let content = UNMutableNotificationContent()
+            content.title = "Contact \(prospect.name)"
+            content.subtitle = prospect.emailAddress
+            content.sound = UNNotificationSound.default
+            
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: 5,
+                repeats: false
+            )
+            
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: trigger
+            )
+            center.add(request)
+        }
+        
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                addRequest()
+            } else {
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { success, error in
+                    if success {
+                        addRequest()
+                    } else if let error {
+                        print(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Modern Environment Key Registrations (Cleanly at Global Scope)
+
+private struct ProspectsEditingKey: EnvironmentKey {
+    static let defaultValue: Binding&lt;Bool&gt; = .constant(false)
+}
+
+private struct ProspectsSelectionKey: EnvironmentKey {
+    static let defaultValue: Binding&lt;Set&lt;Prospect&gt;&gt; = .constant([])
+}
+
+extension EnvironmentValues {
+    var prospectsEditing: Binding&lt;Bool&gt; {
+        get { self[ProspectsEditingKey.self] }
+        set { self[ProspectsEditingKey.self] = newValue }
+    }
+    
+    var prospectsSelection: Binding&lt;Set&lt;Prospect&gt;&gt; {
+        get { self[ProspectsSelectionKey.self] }
+        set { self[ProspectsSelectionKey.self] = newValue }
+    }
+}
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
+</pre>
+
+<div id="More Modern Approach-ANSWER-In Context-ProspectsListView.swift"><h4 id="ProspectsListView.swift" class="header"><a href="#More Modern Approach-ANSWER-In Context-ProspectsListView.swift">ProspectsListView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ProspectsListView: View {
+    @Environment(\.modelContext) var modelContext
+    @Query var prospects: [Prospect]
+    
+    // Modern SwiftUI maps custom bindings natively out of the environment
+    @Environment(\.prospectsEditing) private var isEditing
+    @Environment(\.prospectsSelection) private var selectedProspects
+    
+    var body: some View {
+        // We safely extract the wrapped value out of our environment bindings
+        List(prospects, selection: selectedProspects) { prospect in
+            NavigationLink {
+                EditProspectView(prospect: prospect)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(prospect.name)
+                            .font(.headline)
+                        Text(prospect.emailAddress)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: prospect.isContacted ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle.badge.xmark")
+                        .font(.title2)
+                        .foregroundStyle(prospect.isContacted ? .blue : .red)
+                }
+            }
+            .swipeActions {
+                Button("Delete", systemImage: "trash", role: .destructive) {
+                    modelContext.delete(prospect)
+                }
+            }
+            .tag(prospect)
+            // Read the boolean directly from our modern environment tracker
+            .allowsHitTesting(!isEditing.wrappedValue)
+        }
+        .environment(\.editMode, .constant(isEditing.wrappedValue ? .active : .inactive))
+    }
+    
+    init(filter: ProspectsView.FilterType, sortOrder: SortDescriptor&lt;Prospect&gt;) {
+        let showContactedOnly = filter == .contacted
+        
+        if filter == .none {
+            _prospects = Query(sort: [sortOrder])
+        } else {
+            _prospects = Query(filter: #Predicate&lt;Prospect&gt; { prospect in
+                prospect.isContacted == showContactedOnly
+            }, sort: [sortOrder])
+        }
+    }
+}
+</pre>
+
 <p>
 <hr>
 <br>
