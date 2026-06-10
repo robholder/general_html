@@ -40,7 +40,282 @@ Allow users to customize the way contacts are sorted - by name or by most recent
 </ul>
 <div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options"><h2 id="Adding Sort Options" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options">Adding Sort Options</a></h2></div>
 
+<p>
+Adding sorting options is the perfect next step for this app. To implement this cleanly in SwiftUI, we can use a <code>Menu</code> button in the toolbar. It looks like a standard button but pops open a sleek drop-down menu where users can tap their preference.
+</p>
 
+<p>
+Because you are using SwiftData's <code>@Query</code>, dynamically changing the sorting order requires a tiny architectural adjustments. In SwiftData, a <code>@Query</code> macro has its sort descriptors baked in when the view is created. If you change a sorting property <em>inside</em> the view, the list won't dynamically update on its own.
+</p>
+
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-The Standard SwiftData Solution"><h3 id="The Standard SwiftData Solution" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-The Standard SwiftData Solution">The Standard SwiftData Solution</a></h3></div>
+
+<p>
+To change sorting dynamically, the best practice is to separate your code into two parts:
+</p>
+
+<ul>
+<li>
+A Parent View (<code>ProspectsView</code>): This view holds the <code>@State</code> variable for the chosen sorting option and displays the toolbar menu.
+
+<li>
+A Child Container View (<code>ProspectsListView</code>): This view receives the current sorting choice, runs the actual SwiftData <code>@Query</code>, and renders the <code>List</code>.
+
+</ul>
+<p>
+Whenever the user changes the sort option in the parent menu, SwiftUI automatically re-initializes the child view with the new sort rule, causing the list to update instantly and smoothly.
+</p>
+
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 1: Create the Child View (ProspectsListView)"><h3 id="Step 1: Create the Child View (ProspectsListView)" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 1: Create the Child View (ProspectsListView)">Step 1: Create the Child View (ProspectsListView)</a></h3></div>
+
+<p>
+Extract the <code>List</code> and your delete/notification logic into a dedicated child view. This view accepts the filter and the sort order, setting up the dynamic query inside its initializer.
+</p>
+
+<p>
+Create a new Swift file named <code>ProspectsListView.swift</code> (or place it right below your existing view):
+</p>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct ProspectsListView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    // The dynamic query that handles our filtered and sorted data
+    @Query var prospects: [Prospect]
+    
+    // Bindings passed down from the parent view to maintain state
+    @Binding var selectedProspects: Set&lt;Prospect&gt;
+    @Binding var isEditing: Bool
+    
+    var body: some View {
+        List(prospects, selection: $selectedProspects) { prospect in
+            NavigationLink {
+                EditProspectView(prospect: prospect)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(prospect.name)
+                            .font(.headline)
+                        Text(prospect.emailAddress)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(
+                        systemName: prospect.isContacted ?
+                        "person.crop.circle.fill.badge.checkmark" :
+                        "person.crop.circle.badge.xmark"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(prospect.isContacted ? .blue : .red)
+                }
+            }
+            .swipeActions {
+                Button("Delete", systemImage: "trash", role: .destructive) {
+                    modelContext.delete(prospect)
+                }
+                // ... Keep your existing swipe actions (Mark Contacted, Remind Me, etc.) ...
+            }
+            .tag(prospect)
+            .allowsHitTesting(!isEditing)
+        }
+        // Force-bind our stable state down to the List framework
+        .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+    }
+    
+    /// LEARNING POINT: Dynamic Query Initializer
+    /// This initializer intercepts the filter and sort choices from the parent view
+    /// and configures the SwiftData @Query before the list ever renders.
+    init(filter: ProspectsView.FilterType, sortOrder: SortDescriptor&lt;Prospect&gt;, selectedProspects: Binding&lt;Set&lt;Prospect&gt;&gt;, isEditing: Binding&lt;Bool&gt;) {
+        self._selectedProspects = selectedProspects
+        self._isEditing = isEditing
+        
+        // Define the predicate logic for tabs
+        let showContactedOnly = filter == .contacted
+        
+        if filter == .none {
+            // No tab filter, just apply the requested sort configuration
+            _prospects = Query(sort: [sortOrder])
+        } else {
+            // Filter by contact status AND apply the requested sort configuration
+            _prospects = Query(filter: #Predicate&lt;Prospect&gt; { prospect in
+                prospect.isContacted == showContactedOnly
+            }, sort: [sortOrder])
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 2: Update the Parent View (ProspectsView)"><h3 id="Step 2: Update the Parent View (ProspectsView)" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 2: Update the Parent View (ProspectsView)">Step 2: Update the Parent View (ProspectsView)</a></h3></div>
+
+<p>
+Now, refactor your primary <code>ProspectsView</code>. We will add a <code>SortOrder</code> enum, a <code>@State</code> tracking property, and the drop-down <code>Menu</code> in the top right toolbar next to the QR Scanner.
+</p>
+
+<p>
+Here is the updated full code for your <code>ProspectsView</code>:
+</p>
+
+<pre swift>
+import AVFoundation
+import CodeScanner
+import SwiftData
+import SwiftUI
+import UserNotifications
+
+struct ProspectsView: View {
+    @Environment(\.modelContext) var modelContext
+    
+    @State private var isShowingScanner = false
+    @State private var selectedProspects = Set&lt;Prospect&gt;()
+    @State private var isEditing = false
+    
+    /// LEARNING POINT: Sorting State Tracker
+    /// We define an enum for our options and track the current selection via state.
+    enum SortOption {
+        case name, email
+    }
+    @State private var currentSort: SortOption = .name
+    
+    enum FilterType {
+        case none, contacted, uncontacted
+    }
+    
+    let filter: FilterType
+    
+    var title: String {
+        switch filter {
+        case .none: "Everyone"
+        case .contacted: "Contacted people"
+        case .uncontacted: "Uncontacted people"
+        }
+    }
+    
+    /// Computed property to convert our enum into a SwiftData SortDescriptor
+    var activeSortDescriptor: SortDescriptor&lt;Prospect&gt; {
+        switch currentSort {
+        case .name:
+            SortDescriptor(\Prospect.name)
+        case .email:
+            SortDescriptor(\Prospect.emailAddress)
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            
+            // Call our new Child View and pass the active sorting descriptor down
+            ProspectsListView(
+                filter: filter,
+                sortOrder: activeSortDescriptor,
+                selectedProspects: $selectedProspects,
+                isEditing: $isEditing
+            )
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 12) {
+                        Button("Edit") {
+                            withAnimation {
+                                isEditing.toggle()
+                                if !isEditing { selectedProspects.removeAll() }
+                            }
+                        }
+                        .tint(isEditing ? .red : .blue)
+                        
+                        if isEditing &amp;&amp; !selectedProspects.isEmpty {
+                            Button(role: .destructive, action: deleteSelected) {
+                                Label("Delete Selection", systemImage: "trash.fill")
+                                    .foregroundStyle(.red)
+                            }
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 15) {
+                        
+                        /// LEARNING POINT: Toolbar Drop-Down Menu
+                        /// The Menu view wraps a button label and displays its contents 
+                        /// as clickable actions when pressed.
+                        Menu {
+                            Button {
+                                currentSort = .name
+                            } label: {
+                                HStack {
+                                    Text("Sort by Name")
+                                    if currentSort == .name { Image(systemName: "checkmark") }
+                                }
+                            }
+                            
+                            Button {
+                                currentSort = .email
+                            } label: {
+                                HStack {
+                                    Text("Sort by Email")
+                                    if currentSort == .email { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            // The icon that sits in the toolbar representing the sort action
+                            Image(systemName: "arrow.up.and.down.text.horizontal")
+                        }
+                        
+                        Button("Scan", systemImage: "qrcode.viewfinder") {
+                            isShowingScanner = true
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $isShowingScanner) {
+                CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+            }
+        }
+    }
+    
+    // MARK: - Core Logic Functions
+    
+    // Clean up the custom init() since Query injection now happens entirely in the child list view!
+    init(filter: FilterType) {
+        self.filter = filter
+    }
+    
+    func handleScan(result: Result&lt;ScanResult, ScanError&gt;) {
+        isShowingScanner = false
+        switch result {
+        case .success(let result):
+            let details = result.string.components(separatedBy: "\n")
+            guard details.count == 2 else { return }
+            let person = Prospect(name: details[0], emailAddress: details[1], isContacted: false)
+            modelContext.insert(person)
+        case .failure(let error):
+            print("Scanning failed: \(error.localizedDescription)")
+        }
+    }
+    
+    func deleteSelected() {
+        withAnimation {
+            for prospect in selectedProspects { modelContext.delete(prospect) }
+            selectedProspects.removeAll()
+            isEditing = false
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Why this design works perfectly:"><h3 id="Why this design works perfectly:" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Why this design works perfectly:">Why this design works perfectly:</a></h3></div>
+
+<ul>
+<li>
+Instant Animations: When you select "Sort by Email", the parent view mutates <code>currentSort</code>, transforming the <code>activeSortDescriptor</code>. Because SwiftUI recognizes a change in the inputs passed to <code>ProspectsListView</code>, it re-runs its <code>@Query</code> and animates the list rows into their new alphabetical order automatically.
+
+<li>
+Toolbar Hygiene: Grouping the sorting <code>Menu</code> inside a trailing <code>HStack</code> alongside the scanner button keeps your navigation header clean and consistent with Apple's system look.
+
+</ul>
 <p>
 <hr>
 <br>
