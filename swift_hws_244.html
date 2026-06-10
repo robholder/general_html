@@ -41,39 +41,47 @@ Allow users to customize the way contacts are sorted - by name or by most recent
 <div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options"><h2 id="Adding Sort Options" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options">Adding Sort Options</a></h2></div>
 
 <p>
-Adding sorting options is the perfect next step for this app. To implement this cleanly in SwiftUI, we can use a <code>Menu</code> button in the toolbar. It looks like a standard button but pops open a sleek drop-down menu where users can tap their preference.
+Here is the complete, comprehensive guide to implementing dynamic sorting in SwiftData using SwiftUI’s modern view hierarchy.
+</p>
+
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Architectural Breakdown"><h2 id="Architectural Breakdown" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Architectural Breakdown">Architectural Breakdown</a></h2></div>
+
+<p>
+When working with SwiftData's <code>@Query</code> macro, the sorting configurations are established when the property is compiled. If you attempt to dynamically change a sort descriptor inside the exact same view rendering your list, SwiftUI will not re-run the container's query framework.
 </p>
 
 <p>
-Because you are using SwiftData's <code>@Query</code>, dynamically changing the sorting order requires a tiny architectural adjustments. In SwiftData, a <code>@Query</code> macro has its sort descriptors baked in when the view is created. If you change a sorting property <em>inside</em> the view, the list won't dynamically update on its own.
-</p>
-
-<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-The Standard SwiftData Solution"><h3 id="The Standard SwiftData Solution" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-The Standard SwiftData Solution">The Standard SwiftData Solution</a></h3></div>
-
-<p>
-To change sorting dynamically, the best practice is to separate your code into two parts:
+To solve this, we separate our structure into a clean Parent-Child Architecture:
 </p>
 
 <ul>
 <li>
-A Parent View (<code>ProspectsView</code>): This view holds the <code>@State</code> variable for the chosen sorting option and displays the toolbar menu.
+<span id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Architectural Breakdown-The Parent View"></span><strong id="The Parent View">The Parent View</strong> (<code>ProspectsView</code>): Acts as the true <span id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Architectural Breakdown-Source of Truth"></span><strong id="Source of Truth">Source of Truth</strong>. It owns the raw layout state (<code>@State</code>) tracking whether the user is editing, what items are selected, and what sorting rules are applied.
 
 <li>
-A Child Container View (<code>ProspectsListView</code>): This view receives the current sorting choice, runs the actual SwiftData <code>@Query</code>, and renders the <code>List</code>.
+<span id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Architectural Breakdown-The Child View"></span><strong id="The Child View">The Child View</strong> (<code>ProspectsListView</code>): Acts as the Data Engine. It intercepts the sort rules from the parent during initialization, dynamically runs the SwiftData <code>@Query</code>, and renders the interactive rows cleanly.
 
 </ul>
-<p>
-Whenever the user changes the sort option in the parent menu, SwiftUI automatically re-initializes the child view with the new sort rule, causing the list to update instantly and smoothly.
-</p>
-
-<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 1: Create the Child View (ProspectsListView)"><h3 id="Step 1: Create the Child View (ProspectsListView)" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 1: Create the Child View (ProspectsListView)">Step 1: Create the Child View (ProspectsListView)</a></h3></div>
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-The Modern State Transmission System"><h2 id="The Modern State Transmission System" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-The Modern State Transmission System">The Modern State Transmission System</a></h2></div>
 
 <p>
-Extract the <code>List</code> and your delete/notification logic into a dedicated child view. This view accepts the filter and the sort order, setting up the dynamic query inside its initializer.
+Instead of passing states through long initializers using manual parameters, we use the modern <span id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-The Modern State Transmission System-Environment Key"></span><strong id="Environment Key">Environment Key</strong> Architecture (introduced in iOS 17+).
 </p>
 
 <p>
-Create a new Swift file named <code>ProspectsListView.swift</code> (or place it right below your existing view):
+The parent view injects its local <code>@State</code> bindings directly down into the view hierarchy bubble using custom <code>.environment()</code> modifiers. The child view then reads those bindings implicitly using <code>@Environment</code>. This keeps both codebases perfectly synchronized without creating broken, disconnected data copies.
+</p>
+
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation"><h2 id="Complete Project Implementation" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation">Complete Project Implementation</a></h2></div>
+
+<p>
+To implement this setup in your project, create (or update) the following two source files.
+</p>
+
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-1. ProspectsListView.swift"><h3 id="1. ProspectsListView.swift" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-1. ProspectsListView.swift">1. ProspectsListView.swift</a></h3></div>
+
+<p>
+This dedicated child view isolates the <code>@Query</code> configuration and manages the interactive row items.
 </p>
 
 <pre swift>
@@ -83,15 +91,17 @@ import SwiftUI
 struct ProspectsListView: View {
     @Environment(\.modelContext) var modelContext
     
-    // The dynamic query that handles our filtered and sorted data
+    // The query framework that dynamically fetches and reflects our models
     @Query var prospects: [Prospect]
     
-    // Bindings passed down from the parent view to maintain state
-    @Binding var selectedProspects: Set&lt;Prospect&gt;
-    @Binding var isEditing: Bool
+    // Modern SwiftUI: Extract the data bindings straight out of the environment bubble
+    @Environment(\.prospectsEditing) private var isEditing
+    @Environment(\.prospectsSelection) private var selectedProspects
     
     var body: some View {
-        List(prospects, selection: $selectedProspects) { prospect in
+        List(prospects, selection: selectedProspects) { prospect in
+            
+            // CHALLENGE TIP: Using the simple form of NavigationLink to isolate touch hashes
             NavigationLink {
                 EditProspectView(prospect: prospect)
             } label: {
@@ -101,7 +111,7 @@ struct ProspectsListView: View {
                             .font(.headline)
                         Text(prospect.emailAddress)
                             .foregroundStyle(.secondary)
-                    }
+                        }
                     Spacer()
                     Image(
                         systemName: prospect.isContacted ?
@@ -116,46 +126,80 @@ struct ProspectsListView: View {
                 Button("Delete", systemImage: "trash", role: .destructive) {
                     modelContext.delete(prospect)
                 }
-                // ... Keep your existing swipe actions (Mark Contacted, Remind Me, etc.) ...
+                if prospect.isContacted {
+                    Button("Mark Uncontacted", systemImage: "person.crop.circle.badge.xmark") {
+                        prospect.isContacted.toggle()
+                    }
+                    .tint(.blue)
+                } else {
+                    Button("Mark Contacted", systemImage: "person.crop.circle.fill.badge.checkmark") {
+                        prospect.isContacted.toggle()
+                    }
+                    .tint(.green)
+                    
+                    Button("Remind Me", systemImage: "bell") {
+                        addNotification(for: prospect)
+                    }
+                    .tint(.orange)
+                }
             }
             .tag(prospect)
-            .allowsHitTesting(!isEditing)
+            
+            // CHALLENGE MODIFIER: Bypasses simple row hyperlink taps while multi-selection is active
+            .allowsHitTesting(!isEditing.wrappedValue)
         }
-        // Force-bind our stable state down to the List framework
-        .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+        // Force the List's underlying selection circles to reveal or hide natively
+        .environment(\.editMode, .constant(isEditing.wrappedValue ? .active : .inactive))
     }
     
-    /// LEARNING POINT: Dynamic Query Initializer
-    /// This initializer intercepts the filter and sort choices from the parent view
-    /// and configures the SwiftData @Query before the list ever renders.
-    init(filter: ProspectsView.FilterType, sortOrder: SortDescriptor&lt;Prospect&gt;, selectedProspects: Binding&lt;Set&lt;Prospect&gt;&gt;, isEditing: Binding&lt;Bool&gt;) {
-        self._selectedProspects = selectedProspects
-        self._isEditing = isEditing
-        
-        // Define the predicate logic for tabs
+    /// DYNAMIC QUERY INITIALIZATION
+    /// Every single time the parent passes a new activeSortDescriptor, SwiftUI rebuilds this child struct.
+    /// This initializer intercepts the instruction and updates SwiftData's query engine before rendering.
+    init(filter: ProspectsView.FilterType, sortOrder: SortDescriptor&lt;Prospect&gt;) {
         let showContactedOnly = filter == .contacted
         
         if filter == .none {
-            // No tab filter, just apply the requested sort configuration
+            // Apply sorting across the complete collection
             _prospects = Query(sort: [sortOrder])
         } else {
-            // Filter by contact status AND apply the requested sort configuration
+            // Apply filtering logic alongside the new sort rule simultaneously
             _prospects = Query(filter: #Predicate&lt;Prospect&gt; { prospect in
                 prospect.isContacted == showContactedOnly
             }, sort: [sortOrder])
         }
     }
+    
+    // Notification scheduler logic helper
+    func addNotification(for prospect: Prospect) {
+        let center = UNUserNotificationCenter.current()
+        let addRequest = {
+            let content = UNMutableNotificationContent()
+            content.title = "Contact \(prospect.name)"
+            content.subtitle = prospect.emailAddress
+            content.sound = UNNotificationSound.default
+            
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+            center.add(request)
+        }
+        
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                addRequest()
+            } else {
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { success, _ in
+                    if success { addRequest() }
+                }
+            }
+        }
+    }
 }
 </pre>
 
-<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 2: Update the Parent View (ProspectsView)"><h3 id="Step 2: Update the Parent View (ProspectsView)" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Step 2: Update the Parent View (ProspectsView)">Step 2: Update the Parent View (ProspectsView)</a></h3></div>
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-2. ProspectsView.swift"><h3 id="2. ProspectsView.swift" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-2. ProspectsView.swift">2. ProspectsView.swift</a></h3></div>
 
 <p>
-Now, refactor your primary <code>ProspectsView</code>. We will add a <code>SortOrder</code> enum, a <code>@State</code> tracking property, and the drop-down <code>Menu</code> in the top right toolbar next to the QR Scanner.
-</p>
-
-<p>
-Here is the updated full code for your <code>ProspectsView</code>:
+This parent view handles your global toolbar controls, core user states, and the dropdown sorting menu interface.
 </p>
 
 <pre swift>
@@ -163,7 +207,6 @@ import AVFoundation
 import CodeScanner
 import SwiftData
 import SwiftUI
-import UserNotifications
 
 struct ProspectsView: View {
     @Environment(\.modelContext) var modelContext
@@ -172,17 +215,11 @@ struct ProspectsView: View {
     @State private var selectedProspects = Set&lt;Prospect&gt;()
     @State private var isEditing = false
     
-    /// LEARNING POINT: Sorting State Tracker
-    /// We define an enum for our options and track the current selection via state.
-    enum SortOption {
-        case name, email
-    }
+    // DYNAMIC SORT STATE: Holds the active parameters available for sorting
+    enum SortOption { case name, email }
     @State private var currentSort: SortOption = .name
     
-    enum FilterType {
-        case none, contacted, uncontacted
-    }
-    
+    enum FilterType { case none, contacted, uncontacted }
     let filter: FilterType
     
     var title: String {
@@ -193,92 +230,81 @@ struct ProspectsView: View {
         }
     }
     
-    /// Computed property to convert our enum into a SwiftData SortDescriptor
+    // COMPUTED PROP: Dynamically generates a brand new SortDescriptor whenever currentSort switches
     var activeSortDescriptor: SortDescriptor&lt;Prospect&gt; {
-        switch currentSort {
-        case .name:
-            SortDescriptor(\Prospect.name)
-        case .email:
-            SortDescriptor(\Prospect.emailAddress)
-        }
+        currentSort == .name ? SortDescriptor(\Prospect.name) : SortDescriptor(\Prospect.emailAddress)
     }
     
     var body: some View {
         NavigationStack {
-            
-            // Call our new Child View and pass the active sorting descriptor down
-            ProspectsListView(
-                filter: filter,
-                sortOrder: activeSortDescriptor,
-                selectedProspects: $selectedProspects,
-                isEditing: $isEditing
-            )
-            .navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: 12) {
-                        Button("Edit") {
-                            withAnimation {
-                                isEditing.toggle()
-                                if !isEditing { selectedProspects.removeAll() }
+            // Instantiate the child view and pass down the computed sort rule
+            ProspectsListView(filter: filter, sortOrder: activeSortDescriptor)
+                .navigationTitle(title)
+                
+                // DATA LINKAGE: Inject our active states seamlessly into the lower layout environment
+                .environment(\.prospectsEditing, $isEditing)
+                .environment(\.prospectsSelection, $selectedProspects)
+                .toolbar {
+                    // Left Group (Controls Selection Mode)
+                    ToolbarItem(placement: .topBarLeading) {
+                        HStack(spacing: 12) {
+                            Button("Edit") {
+                                withAnimation {
+                                    isEditing.toggle()
+                                    if !isEditing { selectedProspects.removeAll() }
+                                }
                             }
-                        }
-                        .tint(isEditing ? .red : .blue)
-                        
-                        if isEditing &amp;&amp; !selectedProspects.isEmpty {
-                            Button(role: .destructive, action: deleteSelected) {
-                                Label("Delete Selection", systemImage: "trash.fill")
-                                    .foregroundStyle(.red)
+                            .tint(isEditing ? .red : .blue)
+                            
+                            if isEditing &amp;&amp; !selectedProspects.isEmpty {
+                                Button(role: .destructive, action: deleteSelected) {
+                                    Label("Delete Selection", systemImage: "trash.fill")
+                                        .foregroundStyle(.red)
+                                }
                             }
-                            .transition(.move(edge: .leading).combined(with: .opacity))
                         }
                     }
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 15) {
-                        
-                        /// LEARNING POINT: Toolbar Drop-Down Menu
-                        /// The Menu view wraps a button label and displays its contents 
-                        /// as clickable actions when pressed.
-                        Menu {
-                            Button {
-                                currentSort = .name
-                            } label: {
-                                HStack {
-                                    Text("Sort by Name")
-                                    if currentSort == .name { Image(systemName: "checkmark") }
+                    
+                    // Right Group (Controls Actions &amp; Menus)
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 15) {
+                            
+                            // SORT OPTION DROPDOWN MENU
+                            Menu {
+                                Button {
+                                    currentSort = .name
+                                } label: {
+                                    HStack {
+                                        Text("Sort by Name")
+                                        if currentSort == .name { Image(systemName: "checkmark") }
+                                    }
                                 }
+                                
+                                Button {
+                                    currentSort = .email
+                                } label: {
+                                    HStack {
+                                        Text("Sort by Email")
+                                        if currentSort == .email { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            } label: {
+                                // System design standard icon representing a sort action
+                                Image(systemName: "arrow.up.and.down.text.horizontal")
                             }
                             
-                            Button {
-                                currentSort = .email
-                            } label: {
-                                HStack {
-                                    Text("Sort by Email")
-                                    if currentSort == .email { Image(systemName: "checkmark") }
-                                }
+                            Button("Scan", systemImage: "qrcode.viewfinder") {
+                                isShowingScanner = true
                             }
-                        } label: {
-                            // The icon that sits in the toolbar representing the sort action
-                            Image(systemName: "arrow.up.and.down.text.horizontal")
-                        }
-                        
-                        Button("Scan", systemImage: "qrcode.viewfinder") {
-                            isShowingScanner = true
                         }
                     }
                 }
-            }
-            .sheet(isPresented: $isShowingScanner) {
-                CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
-            }
+                .sheet(isPresented: $isShowingScanner) {
+                    CodeScannerView(codeTypes: [.qr], simulatedData: "Paul Hudson\npaul@hackingwithswift.com", completion: handleScan)
+                }
         }
     }
     
-    // MARK: - Core Logic Functions
-    
-    // Clean up the custom init() since Query injection now happens entirely in the child list view!
     init(filter: FilterType) {
         self.filter = filter
     }
@@ -298,230 +324,22 @@ struct ProspectsView: View {
     
     func deleteSelected() {
         withAnimation {
-            for prospect in selectedProspects { modelContext.delete(prospect) }
+            for prospect in selectedProspects {
+                modelContext.delete(prospect)
+            }
             selectedProspects.removeAll()
             isEditing = false
         }
     }
 }
-</pre>
 
-<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Why this design works perfectly:"><h3 id="Why this design works perfectly:" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Adding Sort Options-Why this design works perfectly:">Why this design works perfectly:</a></h3></div>
+// MARK: - ENVIRONMENT REGISTER EXTRA (Place safely at the bottom of file or in an EnvironmentKeys.swift file)
 
-<ul>
-<li>
-Instant Animations: When you select "Sort by Email", the parent view mutates <code>currentSort</code>, transforming the <code>activeSortDescriptor</code>. Because SwiftUI recognizes a change in the inputs passed to <code>ProspectsListView</code>, it re-runs its <code>@Query</code> and animates the list rows into their new alphabetical order automatically.
-
-<li>
-Toolbar Hygiene: Grouping the sorting <code>Menu</code> inside a trailing <code>HStack</code> alongside the scanner button keeps your navigation header clean and consistent with Apple's system look.
-
-</ul>
-<div id="More Modern Approach"><h1 id="More Modern Approach" class="header"><a href="#More Modern Approach">More Modern Approach</a></h1></div>
-
-<div id="More Modern Approach-QUESTION"><h2 id="QUESTION" class="header"><a href="#More Modern Approach-QUESTION">QUESTION</a></h2></div>
-
-<p>
-Am I correct in assuming <code>@Binding</code> is the older solution to the more modern <code>@State</code>? I feel like <code>@Binding</code> is an old approach. If I'm correct, can you re-write the solutions with the more up-to-date syntax?
-</p>
-
-<div id="More Modern Approach-ANSWER"><h2 id="ANSWER" class="header"><a href="#More Modern Approach-ANSWER">ANSWER</a></h2></div>
-
-<p>
-Actually, that is a very common misconception when learning SwiftUI, but <code>@Binding</code> is not an outdated version of <code>@State</code>. They are partners that serve completely different architectural purposes.
-</p>
-
-<p>
-You cannot replace <code>@Binding</code> with <code>@State</code> because doing so would break the connection between your views. Let's break down exactly what they do, why they must work together, and look at the actual modern syntax upgrades Apple <em>did</em> introduce recently.
-</p>
-
-<div id="More Modern Approach-ANSWER-The Difference: Owner vs. Observer"><h3 id="The Difference: Owner vs. Observer" class="header"><a href="#More Modern Approach-ANSWER-The Difference: Owner vs. Observer">The Difference: Owner vs. Observer</a></h3></div>
-
-<p>
-In SwiftUI, data must have a single, clear "source of truth."
-</p>
-
-<ul>
-<li>
-<code>@State</code> is the Owner: You use <code>@State</code> when a view <em>owns</em> and stores the data. It allocates the memory for it.
-
-<li>
-<code>@Binding</code> is the Window: You use <code>@Binding</code> when a child view needs to read and write to data owned by a parent view. It doesn’t own the data; it just points back to the parent's <code>@State</code>.
-
-</ul>
-<p>
-If you changed the child view's variables to <code>@State</code>, it would create a <em>brand new, disconnected copy</em> of the data. If a user tapped "Edit" or selected a checkbox, the child view would update its own private state, but the parent view would remain completely blind to those changes.
-</p>
-
-<div id="More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade"><h3 id="The Modern Syntax: The .environment Upgrade" class="header"><a href="#More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade">The Modern Syntax: The .environment Upgrade</a></h3></div>
-
-<p>
-While <code>@Binding</code> is still the correct tool for direct parent-child relationships, you are correct that SwiftUI has evolved.
-</p>
-
-<p>
-In modern SwiftUI (iOS 17+), when you want to pass state down through views without manually typing bindings into every single initializer, we use the updated Observable architecture and pass custom keys via <code>@Environment</code>.
-</p>
-
-<p>
-By creating a small, custom <code>ViewModifier</code> or utilizing environment keys, we can share our editing and selection states globally within the navigation tree. This cleans up our view initializers completely.
-</p>
-
-<p>
-Here is the updated, modern syntax utilizing unified state distribution.
-</p>
-
-<div id="More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade-1. The Cleaned-Up Child View (ProspectsListView)"><h4 id="1. The Cleaned-Up Child View (ProspectsListView)" class="header"><a href="#More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade-1. The Cleaned-Up Child View (ProspectsListView)">1. The Cleaned-Up Child View (ProspectsListView)</a></h4></div>
-
-<p>
-Notice that the complex <code>init</code> no longer requires manual binding assignments. It reads the selection and editing states implicitly from the environment layout:
-</p>
-
-<pre swift>
-import SwiftData
-import SwiftUI
-
-struct ProspectsListView: View {
-    @Environment(\.modelContext) var modelContext
-    @Query var prospects: [Prospect]
-    
-    // Modern SwiftUI maps custom bindings natively out of the environment
-    @Environment(\.prospectsEditing) private var isEditing
-    @Environment(\.prospectsSelection) private var selectedProspects
-    
-    var body: some View {
-        // We safely extract the wrapped value out of our environment bindings
-        List(prospects, selection: selectedProspects) { prospect in
-            NavigationLink {
-                EditProspectView(prospect: prospect)
-            } label: {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(prospect.name)
-                            .font(.headline)
-                        Text(prospect.emailAddress)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: prospect.isContacted ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle.badge.xmark")
-                        .font(.title2)
-                        .foregroundStyle(prospect.isContacted ? .blue : .red)
-                }
-            }
-            .swipeActions {
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    modelContext.delete(prospect)
-                }
-            }
-            .tag(prospect)
-            // Read the boolean directly from our modern environment tracker
-            .allowsHitTesting(!isEditing.wrappedValue)
-        }
-        .environment(\.editMode, .constant(isEditing.wrappedValue ? .active : .inactive))
-    }
-    
-    init(filter: ProspectsView.FilterType, sortOrder: SortDescriptor&lt;Prospect&gt;) {
-        let showContactedOnly = filter == .contacted
-        
-        if filter == .none {
-            _prospects = Query(sort: [sortOrder])
-        } else {
-            _prospects = Query(filter: #Predicate&lt;Prospect&gt; { prospect in
-                prospect.isContacted == showContactedOnly
-            }, sort: [sortOrder])
-        }
-    }
-}
-</pre>
-
-<div id="More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade-2. The Parent View (ProspectsView)"><h4 id="2. The Parent View (ProspectsView)" class="header"><a href="#More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade-2. The Parent View (ProspectsView)">2. The Parent View (ProspectsView)</a></h4></div>
-
-<p>
-The parent view remains the "Source of Truth" using <code>@State</code>, but instead of passing them as messy parameters inside <code>ProspectsListView(...)</code>, it injects them smoothly using modern environment keys:
-</p>
-
-<pre swift>
-import AVFoundation
-import CodeScanner
-import SwiftData
-import SwiftUI
-
-struct ProspectsView: View {
-    @Environment(\.modelContext) var modelContext
-    
-    @State private var isShowingScanner = false
-    @State private var selectedProspects = Set&lt;Prospect&gt;()
-    @State private var isEditing = false
-    @State private var currentSort: SortOption = .name
-    
-    enum SortOption { case name, email }
-    enum FilterType { case none, contacted, uncontacted }
-    let filter: FilterType
-    
-    var title: String {
-        switch filter {
-        case .none: "Everyone"
-        case .contacted: "Contacted people"
-        case .uncontacted: "Uncontacted people"
-        }
-    }
-    
-    var activeSortDescriptor: SortDescriptor&lt;Prospect&gt; {
-        currentSort == .name ? SortDescriptor(\Prospect.name) : SortDescriptor(\Prospect.emailAddress)
-    }
-    
-    var body: some View {
-        NavigationStack {
-            ProspectsListView(filter: filter, sortOrder: activeSortDescriptor)
-                .navigationTitle(title)
-                // MODERN: Inject our state bindings directly into the view hierarchy environment
-                .environment(\.prospectsEditing, $isEditing)
-                .environment(\.prospectsSelection, $selectedProspects)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        HStack(spacing: 12) {
-                            Button("Edit") {
-                                withAnimation {
-                                    isEditing.toggle()
-                                    if !isEditing { selectedProspects.removeAll() }
-                                }
-                            }
-                            .tint(isEditing ? .red : .blue)
-                            
-                            if isEditing &amp;&amp; !selectedProspects.isEmpty {
-                                Button(role: .destructive) {
-                                    withAnimation {
-                                        for prospect in selectedProspects { modelContext.delete(prospect) }
-                                        selectedProspects.removeAll()
-                                        isEditing = false
-                                    }
-                                } label: {
-                                    Label("Delete Selection", systemImage: "trash.fill").foregroundStyle(.red)
-                                }
-                            }
-                        }
-                    }
-                    // ... your existing toolbar scan &amp; menu layouts remain exactly identical ...
-                }
-        }
-    }
-    
-    init(filter: FilterType) { self.filter = filter }
-}
-</pre>
-
-<div id="More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade-3. Defining the Modern Environment Keys"><h4 id="3. Defining the Modern Environment Keys" class="header"><a href="#More Modern Approach-ANSWER-The Modern Syntax: The .environment Upgrade-3. Defining the Modern Environment Keys">3. Defining the Modern Environment Keys</a></h4></div>
-
-<p>
-To make the code above compile cleanly anywhere in your app, add this quick boilerplate extension to the bottom of your file. This tells SwiftUI how to handle your custom state keys:
-</p>
-
-<pre swift>
-// Boilerplate to register our state properties with SwiftUI's modern Environment system
-private struct ProspectsEditingKey: EnvironmentKey {
+struct ProspectsEditingKey: EnvironmentKey {
     static let defaultValue: Binding&lt;Bool&gt; = .constant(false)
 }
 
-private struct ProspectsSelectionKey: EnvironmentKey {
+struct ProspectsSelectionKey: EnvironmentKey {
     static let defaultValue: Binding&lt;Set&lt;Prospect&gt;&gt; = .constant([])
 }
 
@@ -536,11 +354,16 @@ extension EnvironmentValues {
         set { self[ProspectsSelectionKey.self] = newValue }
     }
 }
+
+#Preview {
+    ProspectsView(filter: .none)
+        .modelContainer(for: Prospect.self)
+}
 </pre>
 
-<div id="More Modern Approach-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#More Modern Approach-ANSWER-In Context">In Context</a></h3></div>
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-In Context">In Context</a></h3></div>
 
-<div id="More Modern Approach-ANSWER-In Context-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#More Modern Approach-ANSWER-In Context-ProspectsView.swift">ProspectsView.swift</a></h4></div>
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-In Context-ProspectsView.swift"><h4 id="ProspectsView.swift" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-In Context-ProspectsView.swift">ProspectsView.swift</a></h4></div>
 
 <pre swift>
 import AVFoundation
@@ -743,7 +566,7 @@ extension EnvironmentValues {
 }
 </pre>
 
-<div id="More Modern Approach-ANSWER-In Context-ProspectsListView.swift"><h4 id="ProspectsListView.swift" class="header"><a href="#More Modern Approach-ANSWER-In Context-ProspectsListView.swift">ProspectsListView.swift</a></h4></div>
+<div id="Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-In Context-ProspectsListView.swift"><h4 id="ProspectsListView.swift" class="header"><a href="#Hacking With Swift - 244 - Challenge 3 - Sorting Options-Complete Project Implementation-In Context-ProspectsListView.swift">ProspectsListView.swift</a></h4></div>
 
 <pre swift>
 import SwiftData
