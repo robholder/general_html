@@ -60,7 +60,7 @@ iOS comes with a built-in <code>Timer</code> class that lets us run code on a re
 </p>
 
 <p>
-Apple’s core system library is called <span id="Hacking With Swift - 248 - Triggering events repeatedly using a timer-Triggering Events Repeatedly Using A Timer-Foundation"></span><strong id="Foundation">Foundation</strong>, and it gives us things like <code>Data</code>, <code>Date</code>, <code>SortDescriptor</code>, <code>UserDefaults</code>, and much more. It also gives us the <code>Timer</code> class, which is designed to run a function after a certain number of seconds, but it can also run code repeatedly. <span id="Hacking With Swift - 248 - Triggering events repeatedly using a timer-Triggering Events Repeatedly Using A Timer-Combine"></span><strong id="Combine">Combine</strong> adds an extension to this so that timers can become <em>publishers</em>, which are things that announce when their value changes.
+Apple’s core system library is called <span id="Hacking With Swift - 248 - Triggering events repeatedly using a timer-Triggering Events Repeatedly Using A Timer-Foundation"></span><strong id="Foundation">Foundation</strong>, and it gives us things like <code>Data</code>, <code>Date</code>, <code>SortDescriptor</code>, <code>UserDefaults</code>, and much more. It also gives us the <code>Timer</code> class, which is designed to run a function after a certain number of seconds, but it can also run code repeatedly. <span id="Hacking With Swift - 248 - Triggering events repeatedly using a timer-Triggering Events Repeatedly Using A Timer-Combine"></span><strong id="Combine">Combine</strong> adds an extension to <span id="Hacking With Swift - 248 - Triggering events repeatedly using a timer-Triggering Events Repeatedly Using A Timer-Foundation"></span><strong id="Foundation">Foundation</strong> so that timers can become <em>publishers</em>, which are things that announce when their value changes.
 </p>
 
 <p>
@@ -171,14 +171,88 @@ let timer = Timer.publish(every: 1, tolerance: 0.5, on: .main, in: .common).auto
 If you need to keep time strictly then leaving off the <code>tolerance</code> parameter will make your timer as accurate as possible, but please note that even without any tolerance the <code>Timer</code> class is still “best effort” - the system makes no guarantee it will execute precisely.
 </p>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
 
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I asked Ai why I had to import Combine, when Paul Hudson's tutorial didn't. I talked about how the whole Combine thing is not the most modern solution, and now to use <code>async/await</code>:
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+In the version of the iOS SDK and Xcode you are running, <code>autoconnect()</code> <span id="Ai Insight-ANSWER-is explicitly treated by the compiler as a Combine framework method,"></span><strong id="is explicitly treated by the compiler as a Combine framework method,">is explicitly treated by the compiler as a Combine framework method,</strong> not a core Foundation framework method.
+</p>
+
+<p>
+The underlying reason this compiled without an import in Paul Hudson's video - but throws a hard error for you—comes down to a subtle difference in <span id="Ai Insight-ANSWER-Xcode play-spaces, template updates, or implicit framework dependencies."></span><strong id="Xcode play-spaces, template updates, or implicit framework dependencies.">Xcode play-spaces, template updates, or implicit framework dependencies.</strong> Depending on your exact iOS deployment target, Xcode build configuration, or whether you are running code in a swift playground vs. a full multi-file app template, Xcode changes what frameworks it pre-loads in the background. If a playground or preview canvas imports anything that relies on Combine internally, it accidentally leaks the <code>autoconnect()</code> syntax into your global scope, masking the requirement. Your clean project, however, is being strictly checked by the compiler.
+</p>
+
+<div id="Ai Insight-ANSWER-The Solution"><h3 id="The Solution" class="header"><a href="#Ai Insight-ANSWER-The Solution">The Solution</a></h3></div>
+
+<p>
+Because <code>autoconnect()</code> is structurally tied to Combine's reactive publisher workflows, you must explicitly add the import statement to use that exact syntax.
+</p>
+
+<div id="Ai Insight-The Modern Approach"><h2 id="The Modern Approach" class="header"><a href="#Ai Insight-The Modern Approach">The Modern Approach</a></h2></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct ContentView: View {
+    @State private var counter = 0
+    @State private var isRunning = false
+    
+    var body: some View {
+        Text(isRunning ? "Counting: \(counter)" : "Tap Me to Start")
+            .font(.title2)
+            .padding()
+            .background(isRunning ? .orange : .blue)
+            .foregroundStyle(.white)
+            .clipShape(Capsule())
+        // 1. Listen for the user's tap gesture
+            .onTapGesture {
+                // Prevent starting multiple timers overlapping if they tap repeatedly
+                guard !isRunning else { return }
+                
+                isRunning = true
+                counter = 0
+                
+                // 2. Manually spawn a Task context to handle the background loop
+                Task {
+                    while counter &lt; 5 {
+                        // Sleep for exactly 1 second
+                        try? await Task.sleep(for: .seconds(1))
+                        
+                        counter += 1
+                        print("The time is now \(Date.now), counter: \(counter)")
+                    }
+                    
+                    // Reset state back to idle when done
+                    isRunning = false
+                    print("Timer finished completely!")
+                }
+            }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_249.html">Hacking With Swift - 249 - How to be notified when your SwiftUI app moves to the background</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>
