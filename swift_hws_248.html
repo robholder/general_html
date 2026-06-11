@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_248</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_247.html">Hacking With Swift - 247 - Disabling user interactivity with allowsHitTesting()</a>
+
+</ul>
+<div id="Hacking With Swift - 248 - Triggering events repeatedly using a timer"><h1 id="Hacking With Swift - 248 - Triggering events repeatedly using a timer" class="header"><a href="#Hacking With Swift - 248 - Triggering events repeatedly using a timer">Hacking With Swift - 248 - Triggering events repeatedly using a timer</a></h1></div>
+
+<p>
+Cory House once said:
+</p>
+
+<p>
+<blockquote>
+"Code is like humor. When you have to explain it, it’s bad."
+</blockquote>
+</p>
+
+<p>
+I’ve touched on something similar previously - the need to write clear code that effectively communicates our intent is the mark of good programming, and it will save many hours of maintenance and testing in the future.
+</p>
+
+<p>
+Today you’re going to be learning about monitoring notifications using Apple’s Combine framework, and you’ll see that the code is so simple it barely requires any explanation at all - and that’s despite it letting us do all sorts of monitoring for system events.
+</p>
+
+<p>
+This doesn’t happen by accident: Apple spends a lot of time doing <em>API review</em>, which is when cross-functional teams of developers get together to discuss what we call the <em>surface area</em> of an API - how it looks to us end-user developers in terms of what parameters they take, what they return, how they are named, whether they throw errors, and how they fit together in context. API review is harder than you might think, but the end result is we get great functionality with remarkably little Swift and SwiftUI code, so it’s a big win for us!
+</p>
+
+<div id="Hacking With Swift - 248 - Triggering events repeatedly using a timer-Triggering Events Repeatedly Using A Timer"><h2 id="Triggering Events Repeatedly Using A Timer" class="header"><a href="#Hacking With Swift - 248 - Triggering events repeatedly using a timer-Triggering Events Repeatedly Using A Timer">Triggering Events Repeatedly Using A Timer</a></h2></div>
+
+<p>
+iOS comes with a built-in <code>Timer</code> class that lets us run code on a regular basis. This uses a system of <em>publishers</em> that comes from an Apple framework called Combine – it was launched at the same time as SwiftUI, way back in iOS 13, but has since mostly been superseded by Swift language features such as the <code>await</code> keyword.
+</p>
+
+<p>
+Apple’s core system library is called Foundation, and it gives us things like <code>Data</code>, <code>Date</code>, <code>SortDescriptor</code>, <code>UserDefaults</code>, and much more. It also gives us the <code>Timer</code> class, which is designed to run a function after a certain number of seconds, but it can also run code repeatedly. Combine adds an extension to this so that timers can become <em>publishers</em>, which are things that announce when their value changes.
+</p>
+
+<p>
+The code to create a timer publisher looks like this:
+</p>
+
+<pre swift>
+let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+</pre>
+
+<p>
+That does several things all at once:
+</p>
+
+<ul>
+<li>
+It asks the timer to fire every 1 second.
+
+<li>
+It says the timer should run on the main thread.
+
+<li>
+It says the timer should run on the common run loop, which is the one you’ll want to use most of the time. (Run loops let iOS handle running code while the user is actively doing something, such as scrolling in a list.)
+
+<li>
+It connects the timer immediately, which means it will start counting time.
+
+<li>
+It assigns the whole thing to the <code>timer</code> constant so that it stays alive.
+
+</ul>
+<p>
+Once the timer starts it will send change announcements that we can monitor in SwiftUI using a new modifier called <code>onReceive()</code>. This accepts a publisher as its first parameter and a function to run as its second, and it will make sure that function is called whenever the publisher sends its change notification.
+</p>
+
+<p>
+For our timer example, we could receive its notifications like this:
+</p>
+
+<pre swift>
+Text("Hello, World!")
+    .onReceive(timer) { time in
+        print("The time is now \(time)")
+    }
+</pre>
+
+<p>
+That will print the time every second until the timer is finally stopped.
+</p>
+
+<p>
+Speaking of stopping the timer, it takes a little digging to stop the one we created. You see, the <code>timer</code> property we made is an autoconnected publisher, so we need to go to its <em>upstream publisher</em> to find the timer itself. From there we can connect to the timer publisher, and ask it to cancel itself. Honestly, if it weren’t for code completion this would be rather hard to find, but here’s how it looks in code:
+</p>
+
+<pre swift>
+timer.upstream.connect().cancel()
+</pre>
+
+<p>
+For example, we could update our existing example so that it fires the timer only five times, like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    @State private var counter = 0
+
+    var body: some View {
+        Text("Hello, World!")
+            .onReceive(timer) { time in
+                if counter == 5 {
+                    timer.upstream.connect().cancel()
+                } else {
+                    print("The time is now \(time)")
+                }
+
+                counter += 1
+            }
+    }
+}
+</pre>
+
+<p>
+Before we’re done, there’s one more important timer concept I want to show you: if you’re okay with your timer having a little float, you can specify some tolerance. This allows iOS to perform important energy optimization, because it can fire the timer at any point between its scheduled fire time and its scheduled fire time plus the tolerance you specify.
+</p>
+
+<p>
+In practice this means the system can perform <em>timer coalescing</em>: it can push back your timer just a little so that it fires at the same time as one or more other timers, which means it can keep the CPU idling more and save battery power.
+</p>
+
+<p>
+As an example, this adds half a second of tolerance to our timer:
+</p>
+
+<pre swift>
+let timer = Timer.publish(every: 1, tolerance: 0.5, on: .main, in: .common).autoconnect()
+</pre>
+
+<p>
+If you need to keep time strictly then leaving off the <code>tolerance</code> parameter will make your timer as accurate as possible, but please note that even without any tolerance the <code>Timer</code> class is still “best effort” – the system makes no guarantee it will execute precisely.
+</p>
+
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
