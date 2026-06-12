@@ -84,7 +84,7 @@ You can test that in the simulator by going to the Settings app (the Settings ap
 <div id="Hacking With Swift - 250 - Supporting specific accessibility needs with SwiftUI-Reduce Motion"><h2 id="Reduce Motion" class="header"><a href="#Hacking With Swift - 250 - Supporting specific accessibility needs with SwiftUI-Reduce Motion">Reduce Motion</a></h2></div>
 
 <p>
-Another common option is Reduce Motion, which again is available in the simulator under Accessibility &gt; Motion &gt; Reduce Motion. When this is enabled, apps should limit the amount of animation that causes movement on screen. For example, the iOS app switcher makes views fade in and out rather than scale up and down.
+Another common option is <span id="Hacking With Swift - 250 - Supporting specific accessibility needs with SwiftUI-Reduce Motion-Reduce Motion"></span><strong id="Reduce Motion">Reduce Motion</strong>, which again is available in the simulator (on board Systems App) under <span id="Hacking With Swift - 250 - Supporting specific accessibility needs with SwiftUI-Reduce Motion-Accessibility &gt; Motion &gt; Reduce Motion"></span><strong id="Accessibility &gt; Motion &gt; Reduce Motion">Accessibility &gt; Motion &gt; Reduce Motion</strong>. When this is enabled, apps should limit the amount of animation that causes movement on screen. For example, the iOS app switcher makes views fade in and out rather than scale up and down.
 </p>
 
 <p>
@@ -112,9 +112,16 @@ struct ContentView: View {
 }
 </pre>
 
+<div id="Hacking With Swift - 250 - Supporting specific accessibility needs with SwiftUI-withAnimation"><h2 id="withAnimation" class="header"><a href="#Hacking With Swift - 250 - Supporting specific accessibility needs with SwiftUI-withAnimation">withAnimation</a></h2></div>
+
 <p>
 I don’t know about you, but I find that rather annoying to use. Fortunately we can add a little wrapper function around <code>withAnimation()</code> that uses UIKit’s <code>UIAccessibility</code> data directly, allowing us to bypass animation automatically:
 </p>
+
+<p>
+Notice the 'generic parameter'.
+</p>
+
 
 <pre swift>
 func withOptionalAnimation&lt;Result&gt;(_ animation: Animation? = .default, _ body: () throws -&gt; Result) rethrows -&gt; Result {
@@ -178,6 +185,105 @@ struct ContentView: View {
 
 <p>
 That’s the final technique I want you to learn ahead of building the real project, so please reset your project back to its original state so we have a clean slate to start on.
+</p>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I can't recall what the angle brackets represent in the first line of the function here. Can you help me understand what's going on?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Those angle brackets <code>&lt;Result&gt;</code> represent a <span id="Ai Insight-ANSWER-Generic Parameter"></span><strong id="Generic Parameter">Generic Parameter</strong>.
+</p>
+
+<p>
+In Swift, generics allow you to write a single, flexible function that can work with any data type (like a <code>String</code>, an <code>Int</code>, a custom <code>struct</code>, or even <code>Void</code> if it returns nothing), without having to rewrite the function over and over again for each type.
+</p>
+
+<p>
+Here is a breakdown of exactly what is happening in that function signature.
+</p>
+
+<div id="Ai Insight-ANSWER-The Anatomy of <Result>"><h3 id="The Anatomy of <Result>" class="header"><a href="#Ai Insight-ANSWER-The Anatomy of <Result>">The Anatomy of <Result></a></h3></div>
+
+<p>
+Think of <code>&lt;Result&gt;</code> as a <span id="Ai Insight-ANSWER-The Anatomy of <Result>-placeholder label"></span><strong id="placeholder label">placeholder label</strong> that you define before the function's arguments. You are essentially telling the Swift compiler:
+</p>
+
+<table>
+<tr>
+<td>
+"Hey, this function is going to deal with a data type. I don't know what type it is yet, but for the rest of this signature, I'm going to refer to that type as Result."
+</td>
+</tr>
+</table>
+
+<p>
+If we track how <code>Result</code> is used across that single line of code, its purpose becomes clear:
+</p>
+
+<pre swift>
+func withOptionalAnimation&lt;Result&gt;(
+    _ animation: Animation? = .default, 
+    _ body: () throws -&gt; Result          // 1. The closure must return this placeholder type
+) rethrows -&gt; Result {                  // 2. The entire function will output that same type
+</pre>
+
+<ul>
+<li>
+<code>_ body: () throws -&gt; Result</code>: This tells Swift that whatever code block (closure) the user passes into this function, that block must execute and return something (the <code>Result</code> type).
+
+<li>
+<code>-&gt; Result</code>: This guarantees that the overall <code>withOptionalAnimation</code> function will pass that exact same data type right back to you when it finishes.
+
+</ul>
+<div id="Ai Insight-ANSWER-Why is this useful? (A Concrete Example)"><h3 id="Why is this useful? (A Concrete Example)" class="header"><a href="#Ai Insight-ANSWER-Why is this useful? (A Concrete Example)">Why is this useful? (A Concrete Example)</a></h3></div>
+
+<p>
+Imagine you are fetching data inside an animation. Sometimes you are fetching a user's <code>String</code> <span id="Ai Insight-ANSWER-Why is this useful? (A Concrete Example)-profile name"></span><strong id="profile name">profile name</strong>, and other times you are calculating an <code>Int</code> <span id="Ai Insight-ANSWER-Why is this useful? (A Concrete Example)-score"></span><strong id="score">score</strong>.
+</p>
+
+<p>
+Because of the generic <code>&lt;Result&gt;</code> placeholder, you can use this exact same function for both scenarios:
+</p>
+
+<div id="Ai Insight-ANSWER-Scenario A: The closure returns a String"><h3 id="Scenario A: The closure returns a String" class="header"><a href="#Ai Insight-ANSWER-Scenario A: The closure returns a String">Scenario A: The closure returns a String</a></h3></div>
+
+<p>
+Swift looks at your closure, sees it returns text, and silently replaces every instance of <code>&lt;Result&gt;</code> with <code>&lt;String&gt;</code>.
+</p>
+
+<pre swift>
+let profileName = withOptionalAnimation {
+    return "Alex" // Swift knows 'Result' is a String here
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Scenario B: The closure returns an Int"><h3 id="Scenario B: The closure returns an Int" class="header"><a href="#Ai Insight-ANSWER-Scenario B: The closure returns an Int">Scenario B: The closure returns an Int</a></h3></div>
+
+<p>
+Swift looks at your closure, sees it returns a number, and silently replaces every instance of <code>&lt;Result&gt;</code> with <code>&lt;Int&gt;</code>.
+</p>
+
+<pre swift>
+let finalScore = withOptionalAnimation {
+    return 100 // Swift knows 'Result' is an Int here
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Scenario B: The closure returns an Int-Why not just use Any?"><h4 id="Why not just use Any?" class="header"><a href="#Ai Insight-ANSWER-Scenario B: The closure returns an Int-Why not just use Any?">Why not just use Any?</a></h4></div>
+
+<p>
+You might wonder why we don't just use Apple's catch-all <code>Any</code> type instead of generics.
+</p>
+
+<p>
+If the function returned <code>Any</code>, you would lose all <span id="Ai Insight-ANSWER-Scenario B: The closure returns an Int-Why not just use Any?-type safety"></span><strong id="type safety">type safety</strong>. Every time you used <code>withOptionalAnimation</code>, you would have to manually type-cast the output (e.g., <code>as! String</code>), which is dangerous and can cause your app to crash if you guess wrong. Generics provide absolute flexibility while keeping strict, compile-time type safety.
 </p>
 
 <p>
