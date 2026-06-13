@@ -31,6 +31,107 @@
 </ul>
 <div id="Hacking With Swift - 252 - Building a stack of cards"><h1 id="Hacking With Swift - 252 - Building a stack of cards" class="header"><a href="#Hacking With Swift - 252 - Building a stack of cards">Hacking With Swift - 252 - Building a stack of cards</a></h1></div>
 
+<p>
+Now that we’ve designed one card and its associated card view, the next step is to build a stack of those cards to represent the things our user is trying to learn. This stack will change as the app is used because the user will be able to remove cards, so we need to mark it with <code>@State</code>.
+</p>
+
+<p>
+Right now we don’t have any way of adding cards, so we’re going to add a stack of 10 using our example card. Swift’s arrays have a helpful initializer, <code>init(repeating:count:)</code>, which takes one value and repeats it a number of times to create the array. In our case we can use that with our example <code>Card</code> to create a simple test array.
+</p>
+
+<p>
+So, start by adding this property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+</pre>
+
+<p>
+Our main <code>ContentView</code> is going to contain a number of overlapping elements inside stacks, but for now we’re just going to put in a rough skeleton:
+</p>
+
+<ul>
+<li>
+Our stack of cards will be placed inside a <code>ZStack</code> so we can make them partially overlap with a neat 3D effect.
+
+<li>
+Around that <code>ZStack</code> will be a <code>VStack</code>. Right now that <code>VStack</code> won’t do much, but later on it will allow us to place a timer above our cards.
+
+<li>
+Around that <code>VStack</code> will be another <code>ZStack</code>, so we can place our cards and timer on top of a background.
+
+</ul>
+<p>
+Right now these stacks probably feel like overkill, but it will make more sense as we progress.
+</p>
+
+<p>
+The only complex part of our next code is how we position the cards inside the card stack so they have slight overlapping. I’ve said it before, but the best way to write SwiftUI code is to carve off any messy calculations so they are handled as methods or modifiers.
+</p>
+
+<p>
+In this case we’re going to create a new <code>stacked()</code> modifier that takes a position in an array along with the total size of the array, and offsets a view by some amount based on those values. This will allow us to create an attractive card stack where each card is a little further down the screen than the ones before it.
+</p>
+
+<p>
+Add this extension to <code>ContentView.swift</code>, outside of the <code>ContentView</code> struct:
+</p>
+
+<pre swift>
+extension View {
+    func stacked(at position: Int, in total: Int) -&gt; some View {
+        let offset = Double(total - position)
+        return self.offset(y: offset * 10)
+    }
+}
+</pre>
+
+<p>
+As you can see, that pushes views down by 10 points for each place they are in the array: 0, then 10, 20, 30, and so on.
+</p>
+
+<p>
+With that simple modifier we can now build a really nice card stack effect using the layout I described earlier. Replace your current <code>body</code> property in <code>ContentView</code> with this:
+</p>
+
+<pre swift>
+var body: some View {
+    ZStack {
+        VStack {
+            ZStack {
+                ForEach(0..&lt;cards.count, id: \.self) { index in
+                    CardView(card: cards[index])
+                        .stacked(at: index, in: cards.count)
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+When you run that back you’ll see what I mean about the shadows building up as the card depth increases. It looks quite stark against a white background, but if we add a background picture you’ll see it looks better.
+</p>
+
+<p>
+In the GitHub files for this project you’ll see background@2x.jpg and background@3x.jpg – please drag those both into your asset catalog so we can use them.
+</p>
+
+<p>
+Now add this <code>Image</code> view into <code>ContentView</code>, just inside the initial <code>ZStack</code>:
+</p>
+
+<pre swift>
+Image(.background)
+    .resizable()
+    .ignoresSafeArea()
+</pre>
+
+<p>
+Adding a background image is only a small change, but I think it makes the whole app look better!
+</p>
+
 
 <p>
 <hr>
