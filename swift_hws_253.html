@@ -573,6 +573,123 @@ By default, Xcode might stack them or show them in a grid.
 You can click the Live Play button on each one individually, allowing you to tap and test the card flip interaction in both layouts simultaneously without one interrupting the other!
 
 </ul>
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I'm having trouble following the logic in this set up. The biggest confusion is that the cards are removed, even WITHOUT the code added in the <code>ContentView</code> - except that the remaining cards in the stack/array don't animate upwards as the top card is deleted. Can you explain how the code works?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+It makes absolute sense why this is confusing! What you are experiencing is a classic SwiftUI optical illusion.
+</p>
+
+<p>
+When you drag a card off the screen and let go <em>without</em> the <code>ContentView</code> code, the card vanishes, making it look like it was deleted. But it wasn't actually deleted from your data-it was just left stranded thousands of pixels off the screen!
+</p>
+
+<p>
+Let’s break down exactly what is happening under the hood to clear up this confusion.
+</p>
+
+<div id="Ai Insight-ANSWER-The Illusion: Why the card &quot;disappears&quot; without the code"><h3 id="The Illusion: Why the card &quot;disappears&quot; without the code" class="header"><a href="#Ai Insight-ANSWER-The Illusion: Why the card &quot;disappears&quot; without the code">The Illusion: Why the card "disappears" without the code</a></h3></div>
+
+<p>
+Remember your <code>@State private var offset = CGSize.zero</code> inside <code>CardView</code>?
+</p>
+
+<ul>
+<li>
+When you drag your finger, <code>offset</code> changes to something like <code>width: 400, height: 50</code>. The card moves off-screen.
+
+<li>
+In your gesture logic, you wrote: <code>if abs(offset.width) &gt; 100 { // remove the card }</code>.
+
+<li>
+Because that block was <span id="Ai Insight-ANSWER-The Illusion: Why the card &quot;disappears&quot; without the code-empty"></span><strong id="empty">empty</strong>, you never reset the offset back to <code>.zero</code>.
+
+</ul>
+<p>
+As a result, when you let go of the screen, the card just stays at an offset of 400 pixels. It is still fully alive and rendering in your app's memory, but it's sitting way out in the "virtual wings" off-screen.
+</p>
+
+<div id="Ai Insight-ANSWER-The Illusion: Why the card &quot;disappears&quot; without the code-Why the underlying cards don't move up:"><h4 id="Why the underlying cards don't move up:" class="header"><a href="#Ai Insight-ANSWER-The Illusion: Why the card &quot;disappears&quot; without the code-Why the underlying cards don't move up:">Why the underlying cards don't move up:</a></h4></div>
+
+<p>
+Because the top card was never <em>actually</em> deleted from the <code>cards</code> array in <code>ContentView</code>, the other cards underneath have no idea they need to move. As far as <code>ContentView</code> is concerned, the top card is still sitting perfectly in place - it just happens to have an offset that pushes it out of the user's view.
+</p>
+
+<div id="Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works"><h3 id="The Fix: How the Closure/Callback Logic Works" class="header"><a href="#Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works">The Fix: How the Closure/Callback Logic Works</a></h3></div>
+
+<p>
+To fix this, Paul Hudson introduces a <span id="Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works-closure callback"></span><strong id="closure callback">closure callback</strong>. This is a way for a child view (<code>CardView</code>) to send a message up to its parent (<code>ContentView</code>) saying: <em>"Hey, I've been dragged far enough. Please delete me from the master list."</em>
+</p>
+
+<p>
+Here is a structural breakdown of how that data communication flows:
+</p>
+
+<div id="Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works-Step 1: Giving CardView a &quot;Call Button&quot;"><h4 id="Step 1: Giving CardView a &quot;Call Button&quot;" class="header"><a href="#Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works-Step 1: Giving CardView a &quot;Call Button&quot;">Step 1: Giving CardView a "Call Button"</a></h4></div>
+
+<p>
+By adding <code>var removal: (() -&gt; Void)? = nil</code>, you are giving <code>CardView</code> a button it can press.
+When the drag exceeds 100 pixels, it presses that button by calling <code>removal?()</code>. <code>CardView</code> doesn't know <em>what</em> happens when the button is pressed; it just knows its job is to trigger it.
+</p>
+
+<div id="Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works-Step 2: Defining the Action in ContentView"><h4 id="Step 2: Defining the Action in ContentView" class="header"><a href="#Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works-Step 2: Defining the Action in ContentView">Step 2: Defining the Action in ContentView</a></h4></div>
+
+<p>
+In <code>ContentView</code>, you create the master hammer that can actually modify the data array:
+</p>
+
+<pre swift>
+func removeCard(at index: Int) {
+    cards.remove(at: index)
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works-Step 3: Wiring the Button to the Action"><h4 id="Step 3: Wiring the Button to the Action" class="header"><a href="#Ai Insight-ANSWER-The Fix: How the Closure/Callback Logic Works-Step 3: Wiring the Button to the Action">Step 3: Wiring the Button to the Action</a></h4></div>
+
+<p>
+This is where the trailing closure syntax comes in. When <code>ContentView</code> loops through the cards and builds each <code>CardView</code>, it wires up that <code>removal</code> button:
+</p>
+
+<pre swift>
+CardView(card: cards[index]) {
+    // This block of code is what gets passed into the 'removal' variable!
+    withAnimation {
+        removeCard(at: index)
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Why withAnimation matters for the rest of the stack"><h3 id="Why withAnimation matters for the rest of the stack" class="header"><a href="#Ai Insight-ANSWER-Why withAnimation matters for the rest of the stack">Why withAnimation matters for the rest of the stack</a></h3></div>
+
+<p>
+Now that the logic is fully wired up, here is the chain reaction that happens when you swipe a card away:
+</p>
+
+<ul>
+<li>
+You drag a card past 100 points.
+
+<li>
+<code>CardView</code> triggers <code>removal?()</code>.
+
+<li>
+This runs the block of code inside <code>ContentView</code>, which fires <code>removeCard(at: index)</code>.
+
+<li>
+The card is <span id="Ai Insight-ANSWER-Why withAnimation matters for the rest of the stack-actually destroyed and removed"></span><strong id="actually destroyed and removed">actually destroyed and removed</strong> from the <code>cards</code> array.
+
+<li>
+SwiftUI notices the array changed from 5 cards to 4 cards. It completely redraws the screen.
+
+<li>
+Because the deletion was wrapped in <code>withAnimation</code>, SwiftUI looks at the new positions of the remaining 4 cards and smoothly slides them up into their new positions, rather than having them instantly jar/snap into place.
+
+</ul>
 <p>
 <hr>
 <br>
