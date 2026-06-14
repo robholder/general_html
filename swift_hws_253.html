@@ -713,14 +713,25 @@ When you declared <code>var removal: (() -&gt; Void)? = nil</code> inside <code>
 </p>
 
 <p>
-When <code>ContentView</code> creates a <code>CardView</code>, it passes code into that slot. If we wrote out the code completely explicitly - without any shorthand tricks-it would look like this:
+When <code>ContentView</code> creates a <code>CardView</code>, it passes code into that slot with Trailing Closure Syntax.
 </p>
 
 <pre swift>
-// ⚠️ THE EXPLICIT WAY (No shortcuts)
-CardView(
-    card: cards[index], 
-    removal: { 
+// As the code appears in ContentView using Trailing Closure Syntax
+CardView(card: cards[index]) {
+    withAnimation {
+        removeCard(at: index)
+    }
+}
+</pre>
+
+<p>
+If we wrote out the code completely explicitly - without any shorthand tricks of the trailing closure syntax - it would look like this:
+</p>
+
+<pre swift>
+// THE EXPLICIT WAY (No shortcuts)
+CardView(card: cards[index], removal: { 
         withAnimation {
             removeCard(at: index)
         }
@@ -743,7 +754,7 @@ So Xcode lets you turn the explicit code above into this:
 </p>
 
 <pre swift>
-// ✨ THE SWIFTWAY (Trailing Closure Syntax)
+// THE SWIFTWAY (Trailing Closure Syntax)
 CardView(card: cards[index]) { 
     withAnimation {
         removeCard(at: index)
@@ -801,6 +812,147 @@ Inside <code>ContentView</code>, you install that house. When you install it, yo
 When the user swipes, <code>CardView</code> presses its button (<code>removal?()</code>). It doesn't know what the button does, it just presses it. But because <code>ContentView</code> wired it up, the chime fires in the kitchen, and the card is deleted!
 
 </ul>
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Can you expand on this bit? (I'm not understanding what the 'last parameter of a function/struct' is, and what is meant by 'you can close the normal parentheses early'.)
+</p>
+
+<p>
+<blockquote>
+"Because passing blocks of code into views is incredibly common in SwiftUI, Swift has a rule: If the last parameter of a function or struct is a closure, you can close the normal parentheses early, and just drop the block of code right after it."
+</blockquote>
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+To understand this, we need to look at how a struct or function declares its list of parameters (its "inputs"), and how Swift changes the punctuation rules depending on where a closure sits in that list.
+</p>
+
+<p>
+Let's look at exactly what a "parameter list" is, and what "closing parentheses early" looks like in slow motion.
+</p>
+
+<div id="Ai Insight-ANSWER-1. What is the &quot;Last Parameter&quot;?"><h3 id="1. What is the &quot;Last Parameter&quot;?" class="header"><a href="#Ai Insight-ANSWER-1. What is the &quot;Last Parameter&quot;?">1. What is the "Last Parameter"?</a></h3></div>
+
+<p>
+When you create a struct like <code>CardView</code>, Swift automatically builds an initializer for it under the hood. It lists out every single variable you declared inside the struct as a parameter, wrapped in parentheses <code>( )</code>.
+</p>
+
+<p>
+Your <code>CardView</code> has two parameters:
+</p>
+
+<ul>
+<li>
+<code>card</code> (a <code>Card</code> struct)
+
+<li>
+<code>removal</code> (a closure function)
+
+</ul>
+<p>
+Because <code>removal</code> is at the very end of that list, it is officially the <span id="Ai Insight-ANSWER-1. What is the &quot;Last Parameter&quot;?-last parameter"></span><strong id="last parameter">last parameter</strong>.
+</p>
+
+<pre swift>
+CardView(card: Card, removal: (() -&gt; Void)?)
+        │           │
+        ▼           ▼
+  1st Parameter   Last Parameter (and it's a closure!)
+</pre>
+
+<div id="Ai Insight-ANSWER-2. What does &quot;Closing Parentheses Early&quot; mean?"><h3 id="2. What does &quot;Closing Parentheses Early&quot; mean?" class="header"><a href="#Ai Insight-ANSWER-2. What does &quot;Closing Parentheses Early&quot; mean?">2. What does "Closing Parentheses Early" mean?</a></h3></div>
+
+<p>
+Normally, when you create a struct or call a function in Swift, all your arguments must sit safely inside the parentheses <code>( )</code>.
+</p>
+
+<p>
+If we followed the standard, strict rule, you would have to write your <code>CardView</code> like this, with the code block tucked inside the closing parenthesis:
+</p>
+
+<pre swift>
+    // Normal Syntax (Everything is trapped inside the parentheses)
+    CardView(card: cards[index], removal: {
+        withAnimation {
+            removeCard(at: index)
+        }
+    }
+) // &lt;--- The normal closing parenthesis is all the way at the very end!
+</pre>
+
+<p>
+Notice how <code>})</code> at the end looks a bit messy?
+</p>
+
+<p>
+Because <code>removal</code> is the last parameter, Swift says: <em>"Hey, we know there are no more parameters coming after this closure. So, you are allowed to close the normal parentheses right after the card: parameter, and just let the closure code hang out cleanly afterward."</em>
+</p>
+
+<p>
+Watch how the closing parenthesis moves up:
+</p>
+
+<pre swift>
+// Trailing Closure Syntax (Closing early!)
+CardView(card: cards[index]) { 
+                           ▲ 
+             We closed the parenthesis EARLY right here!
+             
+    withAnimation {
+        removeCard(at: index)
+    }
+} // &lt;--- No closing parenthesis needed here anymore, just the bracket!
+</pre>
+
+<div id="Ai Insight-ANSWER-A Non-SwiftUI Example (To see it clearly)"><h3 id="A Non-SwiftUI Example (To see it clearly)" class="header"><a href="#Ai Insight-ANSWER-A Non-SwiftUI Example (To see it clearly)">A Non-SwiftUI Example (To see it clearly)</a></h3></div>
+
+<p>
+Imagine you wrote a simple function to calculate a math problem and then print the result using a closure callback.
+</p>
+
+<pre swift>
+func addNumbers(num1: Int, num2: Int, completion: () -&gt; Void) {
+    let total = num1 + num2
+    print("Total is \(total)")
+    completion() // Running the last parameter
+}
+</pre>
+
+<p>
+Here, <code>completion</code> is the <span id="Ai Insight-ANSWER-A Non-SwiftUI Example (To see it clearly)-last parameter"></span><strong id="last parameter">last parameter</strong>, and it's a closure.
+</p>
+
+<div id="Ai Insight-ANSWER-A Non-SwiftUI Example (To see it clearly)-Without the shortcut:"><h4 id="Without the shortcut:" class="header"><a href="#Ai Insight-ANSWER-A Non-SwiftUI Example (To see it clearly)-Without the shortcut:">Without the shortcut:</a></h4></div>
+
+<p>
+You have to feed everything inside the <code>()</code> brackets:
+</p>
+
+<pre swift>
+addNumbers(num1: 5, num2: 10, completion: {
+    print("Done adding!")
+})
+</pre>
+
+<div id="Ai Insight-ANSWER-With the shortcut (Closing early):"><h3 id="With the shortcut (Closing early):" class="header"><a href="#Ai Insight-ANSWER-With the shortcut (Closing early):">With the shortcut (Closing early):</a></h3></div>
+
+<p>
+You close the <code>()</code> right after the numbers, and the closure trails behind:
+</p>
+
+<pre swift>
+addNumbers(num1: 5, num2: 10) {
+    print("Done adding!")
+}
+</pre>
+
+<p>
+That is <span id="Ai Insight-ANSWER-With the shortcut (Closing early):-Trailing Closure"></span><strong id="Trailing Closure">Trailing Closure</strong> syntax. It is purely a visual cleanup feature. Under the hood, Swift still takes that trailing block of code and injects it directly into the last parameter slot of the struct or function!
+</p>
+
 <p>
 <hr>
 <br>
