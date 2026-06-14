@@ -1120,6 +1120,107 @@ Int
 So yes, <code>() -&gt; Void</code> is absolutely a closure type! And because it is the very last slot in your <code>CardView</code> parameter list, it unlocks that trailing closure syntax shortcut you've been working through.
 </p>
 
+<div id="Rotation &amp; Offset"><h1 id="Rotation &amp; Offset" class="header"><a href="#Rotation &amp; Offset">Rotation &amp; Offset</a></h1></div>
+
+<div id="Rotation &amp; Offset-QUESTION"><h2 id="QUESTION" class="header"><a href="#Rotation &amp; Offset-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I'm trying to understand Paul Hudson's explanation of having to move (offset) items before rotation, so that rotating 90º doesn't result in the offsets heading off in a 90º direction. That makes sense. However, Paul THEN goes on to put rotation first in the example code. What's going on?
+</p>
+
+<div id="Rotation &amp; Offset-ANSWER"><h2 id="ANSWER" class="header"><a href="#Rotation &amp; Offset-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is easily one of the most mind-bending concepts in SwiftUI. It feels like Paul is completely contradicting his own rule!
+</p>
+
+<p>
+The confusion comes from a golden rule of SwiftUI: <span id="Rotation &amp; Offset-ANSWER-View modifiers are applied from top to bottom, but they actually wrap the view like layers of an onion."></span><strong id="View modifiers are applied from top to bottom, but they actually wrap the view like layers of an onion.">View modifiers are applied from top to bottom, but they actually wrap the view like layers of an onion.</strong> Because of this onion effect, the physical order you type them in code behaves <span id="Rotation &amp; Offset-ANSWER-backward"></span><strong id="backward">backward</strong> from how our brains naturally expect.
+</p>
+
+<p>
+Let's look at exactly what happens to your card under both scenarios to see why putting <code>.rotationEffect</code> <em>first</em> in code actually achieves the "offset first, then rotate" behavior physically.
+</p>
+
+<div id="Rotation &amp; Offset-ANSWER-The Code Behavior: The &quot;Onion&quot; Layer Effect"><h3 id="The Code Behavior: The &quot;Onion&quot; Layer Effect" class="header"><a href="#Rotation &amp; Offset-ANSWER-The Code Behavior: The &quot;Onion&quot; Layer Effect">The Code Behavior: The "Onion" Layer Effect</a></h3></div>
+
+<p>
+When you apply modifiers to a SwiftUI view, each modifier doesn't modify the existing pixels. Instead, it takes the view above it, wraps it inside a new invisible container, and hands it down to the next line.
+</p>
+
+<p>
+Let's trace your exact code layout from top to bottom:
+</p>
+
+<pre swift>
+ZStack { ... }
+    .frame(width: 450, height: 250) // 1. Core Card View
+    .rotationEffect(...)            // 2. Inner Layer
+    .offset(...)                    // 3. Outer Layer
+</pre>
+
+<p>
+Here is how SwiftUI builds and executes this package on screen:
+</p>
+
+<ul>
+<li>
+<code>ZStack</code> + <code>.frame</code>: SwiftUI draws the basic 450x250 card.
+
+<li>
+<code>.rotationEffect</code>: SwiftUI takes that card and wraps it in a box that handles rotation. Crucially, <em>the center point of this rotation box is locked to the card's current local position.</em>
+
+<li>
+<code>.offset</code>: SwiftUI takes that <em>entire combined package</em> (the card + its rotation instruction) and physically shifts its position across the screen.
+
+</ul>
+<p>
+Because the <code>.offset</code> is on the <span id="Rotation &amp; Offset-ANSWER-The Code Behavior: The &quot;Onion&quot; Layer Effect-outside"></span><strong id="outside">outside</strong>, it moves the whole system together. The card slides smoothly to the left or right, and gently rotates around its own center as it moves. This creates the exact "natural card-swipe fling" you are looking for.
+</p>
+
+<div id="Rotation &amp; Offset-ANSWER-What happens if you flip them? (Offset first in code)"><h3 id="What happens if you flip them? (Offset first in code)" class="header"><a href="#Rotation &amp; Offset-ANSWER-What happens if you flip them? (Offset first in code)">What happens if you flip them? (Offset first in code)</a></h3></div>
+
+<p>
+If you reversed the code to match what your brain naturally wants to write, you would get this:
+</p>
+
+<pre swift>
+// THE BROKEN WAY
+ZStack { ... }
+    .frame(width: 450, height: 250)
+    .offset(...)          // 1. Inner Layer: Shove the card away first
+    .rotationEffect(...)  // 2. Outer Layer: Rotate everything afterward
+</pre>
+
+<p>
+If you do this, the <code>.offset</code> layer immediately shoves the card 300 pixels to the right.
+</p>
+
+<p>
+Then, the <code>.rotationEffect</code> layer wraps around it. The problem is, the rotation container anchors its center point at the <em>original center of the screen</em>, not the card's new position!
+</p>
+
+<p>
+When the rotation triggers, it swings the card through the air like a giant pendulum orbiting the center of the screen. Instead of the card spinning gently on its own axis, it flies wildly off-screen in an unpredictable, sweeping arc.
+</p>
+
+<div id="Rotation &amp; Offset-ANSWER-Summary Checklist for Your Notes"><h3 id="Summary Checklist for Your Notes" class="header"><a href="#Rotation &amp; Offset-ANSWER-Summary Checklist for Your Notes">Summary Checklist for Your Notes</a></h3></div>
+
+<p>
+To keep your sanity when managing SwiftUI layouts, remember this rule of thumb:
+</p>
+
+<ul>
+<li>
+What you want to happen LAST physically, you must write FIRST in code.
+
+<li>
+Writing <code>.rotationEffect</code> followed by <code>.offset</code> means the <span id="Rotation &amp; Offset-ANSWER-Summary Checklist for Your Notes-offset controls the whole package"></span><strong id="offset controls the whole package">offset controls the whole package</strong>, shifting the self-spinning card smoothly across the screen.
+
+<li>
+Writing <code>.offset</code> followed by <code>.rotationEffect</code> means the <span id="Rotation &amp; Offset-ANSWER-Summary Checklist for Your Notes-rotation controls the whole package"></span><strong id="rotation controls the whole package">rotation controls the whole package</strong>, swinging the shifted card wildly around the screen's center point.
+
+</ul>
 <p>
 <hr>
 <br>
