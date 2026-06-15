@@ -131,15 +131,15 @@ So, replace your current <code>RoundedRectangle</code> code with this:
 RoundedRectangle(cornerRadius: 25)
     .fill(
         accessibilityDifferentiateWithoutColor
-            ? .white
-            : .white
+            // Ternary condition
+            ? .white : .white
                 .opacity(1 - Double(abs(offset.width / 50)))
 
     )
     .background(
         accessibilityDifferentiateWithoutColor
-            ? nil
-            : RoundedRectangle(cornerRadius: 25)
+            // Ternary condition
+            ? nil : RoundedRectangle(cornerRadius: 25)
                 .fill(offset.width &gt; 0 ? .green : .red)
     )
     .shadow(radius: 10)
@@ -195,6 +195,190 @@ That creates another <code>VStack</code>, this time starting with a spacer so th
 <p>
 All this extra work <em>matters</em>: it makes sure users get a great experience regardless of their accessibility needs, and that’s what we should always be aiming for.
 </p>
+
+<div id="Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-FlashzillaApp.swift"><h4 id="FlashzillaApp.swift" class="header"><a href="#Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-FlashzillaApp.swift">FlashzillaApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct FlashzillaApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-Card.swift"><h4 id="Card.swift" class="header"><a href="#Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-Card.swift">Card.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Card {
+    var prompt: String
+    var answer: String
+    
+    static let example = Card(
+        prompt: "Who played the 13th Doctor in Doctor Who?",
+        answer: "Jodie Whittaker"
+        )
+}
+</pre>
+
+<div id="Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-CardView.swift"><h4 id="CardView.swift" class="header"><a href="#Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-CardView.swift">CardView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct CardView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+
+    let card: Card
+    var removal: (() -&gt; Void)? = nil
+    
+    @State private var isShowingAnswer = false
+    @State private var offset = CGSize.zero
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 25)
+                .fill(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? .white : .white
+                        .opacity(1 - Double(abs(offset.width / 50)))
+                    
+                )
+                .background(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? nil : RoundedRectangle(cornerRadius: 25)
+                        .fill(offset.width &gt; 0 ? .green : .red)
+                )
+                .shadow(radius: 10)
+            VStack {
+                Text(card.prompt)
+                    .font(.largeTitle)
+                    .foregroundStyle(.black)
+                if isShowingAnswer {
+                    Text(card.answer)
+                        .font(.title)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(20)
+            .multilineTextAlignment(.center)
+        }
+        .frame(width:450, height: 250)
+        .rotationEffect(.degrees(offset.width / 5.0))
+        .offset(x: offset.width * 5)
+        .opacity(2 - Double(abs(offset.width / 50)))
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    offset = gesture.translation
+                }
+                .onEnded { _ in
+                    if abs(offset.width) &gt; 100 {
+                        removal?()
+                    } else {
+                        offset = .zero
+                    }
+                }
+            )
+        .onTapGesture {
+            isShowingAnswer.toggle()
+        }
+
+    }
+}
+
+//#Preview("Standard Portrait") {
+//    CardView(card: .example)
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    CardView(card: .example)
+}
+</pre>
+
+<div id="Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 254 - Coloring views as we swipe-Coloring Views As We Swipe-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+extension View {
+    func stacked(at position: Int, in total: Int) -&gt; some View {
+        let offset = Double(total - position)
+        return self.offset(y: offset * 10)
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+    // Create a stack of identical cards using 'repeating'
+    @State private var cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+    
+    var body: some View {
+        ZStack {
+            // Add background image
+            Image(.background)
+                .resizable()
+                .ignoresSafeArea()
+            VStack {
+                ZStack {
+                    ForEach(0..&lt;cards.count, id: \.self) { index in
+                        CardView(card: cards[index]) {
+                            withAnimation {
+                                removeCard(at: index)
+                            }
+                        }
+                        .stacked(at: index, in: cards.count)
+                    }
+                }
+            }
+            if accessibilityDifferentiateWithoutColor {
+                VStack {
+                    Spacer()
+                    
+                    HStack {
+                        Image(systemName: "xmark.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                        Spacer()
+                        Image(systemName: "checkmark.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                    }
+                    .foregroundStyle(.white)
+                    .font(.largeTitle)
+                    .padding()
+                }
+            }
+
+        }
+    }
+    func removeCard(at index: Int) {
+        cards.remove(at: index)
+    }
+}
+
+
+//#Preview {
+//    ContentView()
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    ContentView()
+}
+</pre>
 
 <p>
 <hr>
