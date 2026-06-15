@@ -26,154 +26,164 @@
 <a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
 
 <li>
-<a href="swift_hws_253.html">Hacking With Swift - 253- Moving views with DragGesture and offset()</a>
+<a href="swift_hws_254.html">Hacking With Swift - 254 - Coloring views as we swipe</a>
 
 </ul>
 <div id="Hacking With Swift - 255 - Counting down with a timer"><h1 id="Hacking With Swift - 255 - Counting down with a timer" class="header"><a href="#Hacking With Swift - 255 - Counting down with a timer">Hacking With Swift - 255 - Counting down with a timer</a></h1></div>
 
 <p>
-Users can swipe our cards left or right to mark them as being guessed correctly or not, but there’s no visual distinction between the two directions. Borrowing controls from dating apps like Tinder, we’ll make swiping <em>right</em> good (they guessed the answer correctly), and swiping <em>left</em> bad (they were wrong).
+If we bring together Foundation, SwiftUI, and Combine, we can add a timer to our app to add a little bit of pressure to the user. A simple implementation of this doesn’t take much work, but it also has a bug that requires some extra work to fix.
 </p>
 
 <p>
-We’ll solve this problem in two ways: for a phone with default settings we’ll make the cards become colored green or red before fading away, but if the user enabled the Differentiate Without Color setting we’ll leave the cards as white and instead show some extra UI over our background.
+For our first pass of the timer, we’re going to create two new properties: the timer itself, which will fire once a second, and a <code>timeRemaining</code> property, from which we’ll subtract 1 every time the timer fires. This will allow us to show how many seconds remain in the current app run, which should give the user a gentle incentive to speed up.
 </p>
 
 <p>
-Let’s start with a first pass on the cards themselves. Right now our card view is created with this background:
+So, start by adding these two new properties to <code>ContentView</code>:
 </p>
 
 <pre swift>
-RoundedRectangle(cornerRadius: 25)
-    .fill(.white)
-    .shadow(radius: 10)
+@State private var timeRemaining = 100
+let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 </pre>
 
 <p>
-We’re going to replace that with some more advanced code: we’ll give it a background of the same rounded rectangle except in green or red depending on the gesture movement, then we’ll make the white fill from above fade out as the drag movement gets larger.
+That gives the user 100 seconds to start with, then creates and starts a timer that fires once a second on the main thread.
 </p>
 
 <p>
-First, the background. Add this directly before the <code>shadow()</code> modifier:
+Whenever that timer fires, we want to subtract 1 from <code>timeRemaining</code> so that it counts down. We could try and do some date mathematics here by storing a start date and showing the difference between that and the current date, but there really is no need as you’ll see!
+</p>
+
+<p>
+Add this <code>onReceive()</code> modifier to the outermost <code>ZStack</code> in <code>ContentView</code>:
 </p>
 
 <pre swift>
-.background(
-    RoundedRectangle(cornerRadius: 25)
-        .fill(offset.width &gt; 0 ? .green : .red)
-)
-</pre>
-
-<p>
-As for the white fill opacity, this is going to be similar to the <code>opacity()</code> modifier we added previously except we’ll use 1 minus 1/50th of the gesture width rather than 2 minus the gesture width. This creates a really nice effect: we used 2 minus earlier because it meant the card would have to move at least 50 points before fading away, but for the card fill we’re going to use 1 minus so that it starts becoming colored straight away.
-</p>
-
-<p>
-Replace the existing <code>fill()</code> modifier with this:
-</p>
-
-<pre swift>
-.fill(
-    .white
-        .opacity(1 - Double(abs(offset.width / 50)))
-)
-</pre>
-
-<p>
-If you run the app now you’ll see that the cards blend from white to either red or green, <em>then</em> start to fade out. Awesome!
-</p>
-
-<p>
-However, as nice as our code is it won’t work well for folks with red/green color blindness - they will see the brightness of the cards change, but it won’t be clear which side is which.
-</p>
-
-<p>
-To fix this we’re going to add an environment property to track whether we should be using color for this purpose or not, then disable the red/green effect when that property is true.
-</p>
-
-<p>
-Start by adding this new property to <code>CardView</code>, before the existing properties:
-</p>
-
-<pre swift>
-@Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
-</pre>
-
-<p>
-Now we can use that for both the fill and background for our <code>RoundedRectangle</code> to make sure we fade out the white smoothly. It’s important we use it for both, because as the card fades out the background color will start to bleed through the fill.
-</p>
-
-<p>
-So, replace your current <code>RoundedRectangle</code> code with this:
-</p>
-
-<pre swift>
-RoundedRectangle(cornerRadius: 25)
-    .fill(
-        accessibilityDifferentiateWithoutColor
-            ? .white
-            : .white
-                .opacity(1 - Double(abs(offset.width / 50)))
-
-    )
-    .background(
-        accessibilityDifferentiateWithoutColor
-            ? nil
-            : RoundedRectangle(cornerRadius: 25)
-                .fill(offset.width &gt; 0 ? .green : .red)
-    )
-    .shadow(radius: 10)
-</pre>
-
-<p>
-So, when in a default configuration our cards will fade to green or red, but when Differentiate Without Color is enabled that won’t be used. Instead we need to provide some extra UI in <code>ContentView</code> to make it clear which side is positive and which is negative.
-</p>
-
-<p>
-Earlier we made a very particular structure of stacks in <code>ContentView</code>: we had a <code>ZStack</code>, then a <code>VStack</code>, then another <code>ZStack</code>. That first <code>ZStack</code>, the outermost one, allows us to have our background and card stack overlapping, and we’re also going to put some buttons in that stack so users can see which side is "good".
-</p>
-
-<p>
-First, add this property to <code>ContentView</code>:
-</p>
-
-<pre swift>
-@Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
-</pre>
-
-<p>
-Now add these new views directly after the <code>VStack</code>:
-</p>
-
-<pre swift>
-if accessibilityDifferentiateWithoutColor {
-    VStack {
-        Spacer()
-
-        HStack {
-            Image(systemName: "xmark.circle")
-                .padding()
-                .background(.black.opacity(0.7))
-                .clipShape(.circle)
-            Spacer()
-            Image(systemName: "checkmark.circle")
-                .padding()
-                .background(.black.opacity(0.7))
-                .clipShape(.circle)
-        }
-        .foregroundStyle(.white)
-        .font(.largeTitle)
-        .padding()
+.onReceive(timer) { time in
+    if timeRemaining &gt; 0 {
+        timeRemaining -= 1
     }
 }
 </pre>
 
 <p>
-That creates another <code>VStack</code>, this time starting with a spacer so that the images inside the stacks are pushed to the bottom of the screen. And with that condition around them all, they’ll only appear when Differentiate Without Color is enabled, so most of the time our UI stays clear.
+<span id="Hacking With Swift - 255 - Counting down with a timer-Tip"></span><strong id="Tip">Tip</strong>: That adds a trivial condition to make sure we never stray into negative numbers.
 </p>
 
 <p>
-All this extra work <em>matters</em>: it makes sure users get a great experience regardless of their accessibility needs, and that’s what we should always be aiming for.
+That code starts our timer at 100 and makes it count down to 0, but we need to actually display it. This is as simple as adding another text view to our layout, this time with a dark background color to make sure it’s clearly visible.
+</p>
+
+<p>
+Put this inside the <code>VStack</code> that contains the <code>ZStack</code> for our cards:
+</p>
+
+<pre swift>
+Text("Time: \(timeRemaining)")
+    .font(.largeTitle)
+    .foregroundStyle(.white)
+    .padding(.horizontal, 20)
+    .padding(.vertical, 5)
+    .background(.black.opacity(0.75))
+    .clipShape(.capsule)
+</pre>
+
+<p>
+If you’ve placed it correctly, your layout code should look like this:
+</p>
+
+<pre swift>
+ZStack {
+    Image(.background)
+        .resizable()
+        .ignoresSafeArea()
+
+    VStack {
+        Text("Time: \(timeRemaining)")
+            .font(.largeTitle)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 5)
+            .background(.black.opacity(0.75))
+            .clipShape(.capsule)
+
+        ZStack {
+</pre>
+
+<p>
+You should be able to run the app now and give it a try - it works well enough, right? Well, there’s a small problem:
+</p>
+
+<ul>
+<li>
+Take a look at the current value in the timer.
+
+<li>
+Press Cmd+Shift+H to go back to the home screen.
+
+<li>
+Wait about ten seconds.
+
+<li>
+Now tap your app’s icon to go back to the app.
+
+<li>
+What time is shown in the timer?
+
+</ul>
+<p>
+What I find is that the timer shows a value about three seconds lower than we had when we were in the app previously - the timer runs for a few seconds in the background, then pauses until the app comes back.
+</p>
+
+<p>
+We can do better than this: we can detect when our app moves to the background or foreground, then pause and restart our timer appropriately.
+</p>
+
+<p>
+First, add two properties to store whether the app is currently active:
+</p>
+
+<pre swift>
+@Environment(\.scenePhase) var scenePhase
+@State private var isActive = true
+</pre>
+
+<p>
+We have two because the environment value tells us whether the app is active or inactive in terms of its visibility, but we’ll also consider the app inactive is the player has gone through their deck of flashcards - it will be active from a scene phase point of view, but we don’t keep the timer ticking.
+</p>
+
+<p>
+Now add this <code>onChange()</code> modifier below the existing <code>onReceive()</code> modifier:
+</p>
+
+<pre swift>
+.onChange(of: scenePhase) {
+    if scenePhase == .active {
+        isActive = true
+    } else {
+        isActive = false
+    }
+}
+</pre>
+
+<p>
+Finally, modify the <code>onReceive(timer)</code> function so it exits immediately is <code>isActive</code> is false, like this:
+</p>
+
+<pre swift>
+.onReceive(timer) { time in
+    guard isActive else { return }
+
+    if timeRemaining &gt; 0 {
+        timeRemaining -= 1
+    }
+}
+</pre>
+
+<p>
+And with that small change the timer will automatically pause when the app moves to the background - we no longer lose any mystery seconds.
 </p>
 
 <p>
