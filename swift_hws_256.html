@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_256</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_255.html">Hacking With Swift - 255 - Counting down with a timer</a>
+
+</ul>
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()"><h1 id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()">Hacking With Swift - 256 - Ending the app with allowsHitTesting()</a></h1></div>
+
+<p>
+SwiftUI lets us disable interactivity for a view by setting <code>allowsHitTesting()</code> to false, so in our project we can use it to disable swiping on any card when the time runs out by checking the value of <code>timeRemaining</code>.
+</p>
+
+<p>
+Start by adding this modifier to the innermost <code>ZStack</code> - the one that shows our card stack:
+</p>
+
+<pre swift>
+.allowsHitTesting(timeRemaining &gt; 0)
+</pre>
+
+<p>
+That enables hit testing when <code>timeRemaining</code> is 1 or greater, but sets it to false otherwise because the user is out of time.
+</p>
+
+<p>
+The <em>other</em> outcome is that the user flies through all the cards correctly, and ends with none left. When the final card goes away, right now our timer slides down to the center of the screen, and carries on ticking. What we want to happen is for the timer to stop so users can see how fast they were, and also to show a button allowing them to reset their cards and try again.
+</p>
+
+<p>
+This takes a little thinking, because just setting <code>isActive</code> to false isn’t enough - if the app moves to the background and returns to the foreground, <code>isActive</code> will be re-enabled even though there are no cards left.
+</p>
+
+<p>
+Let’s tackle it piece by piece. First, we need a method to run to reset the app so the user can try again, so add this to <code>ContentView</code>:
+</p>
+
+<pre swift>
+func resetCards() {
+    cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+    timeRemaining = 100
+    isActive = true
+}
+</pre>
+
+<p>
+Second, we need a button to trigger that, shown only when all cards have been removed. Put this after the innermost <code>ZStack</code>, just below the <code>allowsHitTesting()</code> modifier:
+</p>
+
+<pre swift>
+if cards.isEmpty {
+    Button("Start Again", action: resetCards)
+        .padding()
+        .background(.white)
+        .foregroundStyle(.black)
+        .clipShape(.capsule)
+}
+</pre>
+
+<p>
+Now we have code to restart the timer when resetting the cards, but now we need to <em>stop</em> the timer when the final card is removed - and make sure it <em>stays</em> stopped when coming back to the foreground.
+</p>
+
+<p>
+We can solve the first problem by adding this to the end of the <code>removeCard(at:)</code> method:
+</p>
+
+<pre swift>
+if cards.isEmpty {
+    isActive = false
+}
+</pre>
+
+<p>
+As for the second problem - making sure <code>isActive</code> stays false when returning from the background - we should just update our scene phase code so it explicitly checks for cards:
+</p>
+
+<pre swift>
+.onChange(of: scenePhase) {
+    if scenePhase == .active {
+        if cards.isEmpty == false {
+            isActive = true
+        }
+    } else {
+        isActive = false
+    }
+}
+</pre>
+
+<p>
+Done!
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
