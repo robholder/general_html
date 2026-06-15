@@ -204,6 +204,227 @@ Finally, modify the <code>onReceive(timer)</code> function so it exits immediate
 And with that small change the timer will automatically pause when the app moves to the background - we no longer lose any mystery seconds.
 </p>
 
+<div id="Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-FlashzillaApp.swift"><h4 id="FlashzillaApp.swift" class="header"><a href="#Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-FlashzillaApp.swift">FlashzillaApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct FlashzillaApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-Card.swift"><h4 id="Card.swift" class="header"><a href="#Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-Card.swift">Card.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Card {
+    var prompt: String
+    var answer: String
+    
+    static let example = Card(
+        prompt: "Who played the 13th Doctor in Doctor Who?",
+        answer: "Jodie Whittaker"
+        )
+}
+</pre>
+
+<div id="Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-CardView.swift"><h4 id="CardView.swift" class="header"><a href="#Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-CardView.swift">CardView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct CardView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+
+    let card: Card
+    var removal: (() -&gt; Void)? = nil
+    
+    @State private var isShowingAnswer = false
+    @State private var offset = CGSize.zero
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 25)
+                .fill(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? .white : .white
+                        .opacity(1 - Double(abs(offset.width / 50)))
+                    
+                )
+                .background(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? nil : RoundedRectangle(cornerRadius: 25)
+                        .fill(offset.width &gt; 0 ? .green : .red)
+                )
+                .shadow(radius: 10)
+            VStack {
+                Text(card.prompt)
+                    .font(.largeTitle)
+                    .foregroundStyle(.black)
+                if isShowingAnswer {
+                    Text(card.answer)
+                        .font(.title)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(20)
+            .multilineTextAlignment(.center)
+        }
+        .frame(width:450, height: 250)
+        .rotationEffect(.degrees(offset.width / 5.0))
+        .offset(x: offset.width * 5)
+        .opacity(2 - Double(abs(offset.width / 50)))
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    offset = gesture.translation
+                }
+                .onEnded { _ in
+                    if abs(offset.width) &gt; 100 {
+                        removal?()
+                    } else {
+                        offset = .zero
+                    }
+                }
+            )
+        .onTapGesture {
+            isShowingAnswer.toggle()
+        }
+
+    }
+}
+
+//#Preview("Standard Portrait") {
+//    CardView(card: .example)
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    CardView(card: .example)
+}
+</pre>
+
+<div id="Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 255 - Counting down with a timer-Countdown-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import Combine
+import SwiftUI
+
+
+extension View {
+    func stacked(at position: Int, in total: Int) -&gt; some View {
+        let offset = Double(total - position)
+        return self.offset(y: offset * 10)
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+    // Environment info on active status of app
+    @Environment(\.scenePhase) var scenePhase
+    // To set if app is active
+    @State private var isActive = true
+    
+    // Create a stack of identical cards using 'repeating'
+    @State private var cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+    
+    @State private var timeRemaining = 100
+    let timer = Timer.publish(
+        every: 1,
+        on: .main,
+        in: .common).autoconnect()
+    var body: some View {
+        ZStack {
+            // Add background image
+            Image(.background)
+                .resizable()
+                .ignoresSafeArea()
+            VStack {
+                Text("Time: \(timeRemaining)")
+                    .font(.largeTitle)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 5)
+                    .background(.black.opacity(0.75))
+                    .clipShape(.capsule)
+                
+                ZStack {
+                    ForEach(0..&lt;cards.count, id: \.self) { index in
+                        CardView(card: cards[index]) {
+                            withAnimation {
+                                removeCard(at: index)
+                            }
+                        }
+                        .stacked(at: index, in: cards.count)
+                    }
+                }
+                
+            }
+            if accessibilityDifferentiateWithoutColor {
+                VStack {
+                    Spacer()
+                    
+                    HStack {
+                        Image(systemName: "xmark.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                        Spacer()
+                        Image(systemName: "checkmark.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                    }
+                    .foregroundStyle(.white)
+                    .font(.largeTitle)
+                    .padding()
+                }
+            }
+
+        }
+        .onReceive(timer) { time in
+            // Check if app is active (in the foreground)
+            guard isActive else { return }
+
+            // Condition to prevent straying into negative numbers
+            if timeRemaining &gt; 0 {
+                // Subtract one second
+                timeRemaining -= 1
+            }
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                isActive = true
+            } else {
+                isActive = false
+            }
+        }
+    }
+    func removeCard(at index: Int) {
+        cards.remove(at: index)
+    }
+}
+
+
+//#Preview {
+//    ContentView()
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    ContentView()
+}
+</pre>
+
 <p>
 <hr>
 <br>
