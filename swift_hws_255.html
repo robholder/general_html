@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_255</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_253.html">Hacking With Swift - 253- Moving views with DragGesture and offset()</a>
+
+</ul>
+<div id="Hacking With Swift - 255 - Counting down with a timer"><h1 id="Hacking With Swift - 255 - Counting down with a timer" class="header"><a href="#Hacking With Swift - 255 - Counting down with a timer">Hacking With Swift - 255 - Counting down with a timer</a></h1></div>
+
+<p>
+Users can swipe our cards left or right to mark them as being guessed correctly or not, but there’s no visual distinction between the two directions. Borrowing controls from dating apps like Tinder, we’ll make swiping <em>right</em> good (they guessed the answer correctly), and swiping <em>left</em> bad (they were wrong).
+</p>
+
+<p>
+We’ll solve this problem in two ways: for a phone with default settings we’ll make the cards become colored green or red before fading away, but if the user enabled the Differentiate Without Color setting we’ll leave the cards as white and instead show some extra UI over our background.
+</p>
+
+<p>
+Let’s start with a first pass on the cards themselves. Right now our card view is created with this background:
+</p>
+
+<pre swift>
+RoundedRectangle(cornerRadius: 25)
+    .fill(.white)
+    .shadow(radius: 10)
+</pre>
+
+<p>
+We’re going to replace that with some more advanced code: we’ll give it a background of the same rounded rectangle except in green or red depending on the gesture movement, then we’ll make the white fill from above fade out as the drag movement gets larger.
+</p>
+
+<p>
+First, the background. Add this directly before the <code>shadow()</code> modifier:
+</p>
+
+<pre swift>
+.background(
+    RoundedRectangle(cornerRadius: 25)
+        .fill(offset.width &gt; 0 ? .green : .red)
+)
+</pre>
+
+<p>
+As for the white fill opacity, this is going to be similar to the <code>opacity()</code> modifier we added previously except we’ll use 1 minus 1/50th of the gesture width rather than 2 minus the gesture width. This creates a really nice effect: we used 2 minus earlier because it meant the card would have to move at least 50 points before fading away, but for the card fill we’re going to use 1 minus so that it starts becoming colored straight away.
+</p>
+
+<p>
+Replace the existing <code>fill()</code> modifier with this:
+</p>
+
+<pre swift>
+.fill(
+    .white
+        .opacity(1 - Double(abs(offset.width / 50)))
+)
+</pre>
+
+<p>
+If you run the app now you’ll see that the cards blend from white to either red or green, <em>then</em> start to fade out. Awesome!
+</p>
+
+<p>
+However, as nice as our code is it won’t work well for folks with red/green color blindness - they will see the brightness of the cards change, but it won’t be clear which side is which.
+</p>
+
+<p>
+To fix this we’re going to add an environment property to track whether we should be using color for this purpose or not, then disable the red/green effect when that property is true.
+</p>
+
+<p>
+Start by adding this new property to <code>CardView</code>, before the existing properties:
+</p>
+
+<pre swift>
+@Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+</pre>
+
+<p>
+Now we can use that for both the fill and background for our <code>RoundedRectangle</code> to make sure we fade out the white smoothly. It’s important we use it for both, because as the card fades out the background color will start to bleed through the fill.
+</p>
+
+<p>
+So, replace your current <code>RoundedRectangle</code> code with this:
+</p>
+
+<pre swift>
+RoundedRectangle(cornerRadius: 25)
+    .fill(
+        accessibilityDifferentiateWithoutColor
+            ? .white
+            : .white
+                .opacity(1 - Double(abs(offset.width / 50)))
+
+    )
+    .background(
+        accessibilityDifferentiateWithoutColor
+            ? nil
+            : RoundedRectangle(cornerRadius: 25)
+                .fill(offset.width &gt; 0 ? .green : .red)
+    )
+    .shadow(radius: 10)
+</pre>
+
+<p>
+So, when in a default configuration our cards will fade to green or red, but when Differentiate Without Color is enabled that won’t be used. Instead we need to provide some extra UI in <code>ContentView</code> to make it clear which side is positive and which is negative.
+</p>
+
+<p>
+Earlier we made a very particular structure of stacks in <code>ContentView</code>: we had a <code>ZStack</code>, then a <code>VStack</code>, then another <code>ZStack</code>. That first <code>ZStack</code>, the outermost one, allows us to have our background and card stack overlapping, and we’re also going to put some buttons in that stack so users can see which side is "good".
+</p>
+
+<p>
+First, add this property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+</pre>
+
+<p>
+Now add these new views directly after the <code>VStack</code>:
+</p>
+
+<pre swift>
+if accessibilityDifferentiateWithoutColor {
+    VStack {
+        Spacer()
+
+        HStack {
+            Image(systemName: "xmark.circle")
+                .padding()
+                .background(.black.opacity(0.7))
+                .clipShape(.circle)
+            Spacer()
+            Image(systemName: "checkmark.circle")
+                .padding()
+                .background(.black.opacity(0.7))
+                .clipShape(.circle)
+        }
+        .foregroundStyle(.white)
+        .font(.largeTitle)
+        .padding()
+    }
+}
+</pre>
+
+<p>
+That creates another <code>VStack</code>, this time starting with a spacer so that the images inside the stacks are pushed to the bottom of the screen. And with that condition around them all, they’ll only appear when Differentiate Without Color is enabled, so most of the time our UI stays clear.
+</p>
+
+<p>
+All this extra work <em>matters</em>: it makes sure users get a great experience regardless of their accessibility needs, and that’s what we should always be aiming for.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
