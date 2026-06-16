@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_258</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_257.html">Hacking With Swift - 257 - Fixing the bugs</a>
+
+</ul>
+<div id="Hacking With Swift - 258 - Adding and deleting cards"><h1 id="Hacking With Swift - 258 - Adding and deleting cards" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards">Hacking With Swift - 258 - Adding and deleting cards</a></h1></div>
+
+<p>
+Everything we’ve worked on so far has used a fixed set of sample cards, but of course this app only becomes useful if users can actually customize the list of cards they see. This means adding a new view that lists all existing cards and lets the user add a new one, which is all stuff you’ve seen before. However, there’s an interesting catch this time that will require something new to fix, so it’s worth working through this.
+</p>
+
+<p>
+First we need some state that controls whether our editing screen is visible. So, add this to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var showingEditScreen = false
+</pre>
+
+<p>
+Next we need to add a button to flip that Boolean when tapped, so find the <code>if differentiateWithoutColor || accessibilityEnabled</code> condition and put this before it:
+</p>
+
+<pre swift>
+VStack {
+    HStack {
+        Spacer()
+
+        Button {
+            showingEditScreen = true
+        } label: {
+            Image(systemName: "plus.circle")
+                .padding()
+                .background(.black.opacity(0.7))
+                .clipShape(.circle)
+        }
+    }
+
+    Spacer()
+}
+.foregroundStyle(.white)
+.font(.largeTitle)
+.padding()
+</pre>
+
+<p>
+We’re going to design a new <code>EditCards</code> view to encode and decode a <code>Card</code> array to <code>UserDefaults</code>, but before we do that I’d like you to make the <code>Card</code> struct conform to <code>Codable</code> like this:
+</p>
+
+<pre swift>
+struct Card: Codable {
+</pre>
+
+<p>
+Now create a new SwiftUI view called "EditCards". This needs to:
+</p>
+
+<ul>
+<li>
+Have its own <code>Card</code> array.
+
+<li>
+Be wrapped in a <code>NavigationStack</code> so we can add a Done button to dismiss the view.
+
+<li>
+Have a list showing all existing cards.
+
+<li>
+Add swipe to delete for those cards.
+
+<li>
+Have a section at the top of the list so users can add a new card.
+
+<li>
+Have methods to load and save data from <code>UserDefaults</code>.
+
+</ul>
+<p>
+We’ve looked at literally all that code previously, so I’m not going to explain it again here. I hope you can stop to appreciate how far this means you have come!
+</p>
+
+<p>
+Replace the template <code>EditCards</code> struct with this:
+</p>
+
+<pre swift>
+struct EditCards: View {
+    @Environment(\.dismiss) var dismiss
+    @State private var cards = [Card]()
+    @State private var newPrompt = ""
+    @State private var newAnswer = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Add new card") {
+                    TextField("Prompt", text: $newPrompt)
+                    TextField("Answer", text: $newAnswer)
+                    Button("Add Card", action: addCard)
+                }
+
+                Section {
+                    ForEach(0..&lt;cards.count, id: \.self) { index in
+                        VStack(alignment: .leading) {
+                            Text(cards[index].prompt)
+                                .font(.headline)
+                            Text(cards[index].answer)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onDelete(perform: removeCards)
+                }
+            }
+            .navigationTitle("Edit Cards")
+            .toolbar {
+                Button("Done", action: done)
+            }
+            .onAppear(perform: loadData)
+        }
+    }
+
+    func done() {
+        dismiss()
+    }
+
+    func loadData() {
+        if let data = UserDefaults.standard.data(forKey: "Cards") {
+            if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
+                cards = decoded
+            }
+        }
+    }
+
+    func saveData() {
+        if let data = try? JSONEncoder().encode(cards) {
+            UserDefaults.standard.set(data, forKey: "Cards")
+        }
+    }
+
+    func addCard() {
+        let trimmedPrompt = newPrompt.trimmingCharacters(in: .whitespaces)
+        let trimmedAnswer = newAnswer.trimmingCharacters(in: .whitespaces)
+        guard trimmedPrompt.isEmpty == false &amp;&amp; trimmedAnswer.isEmpty == false else { return }
+
+        let card = Card(prompt: trimmedPrompt, answer: trimmedAnswer)
+        cards.insert(card, at: 0)
+        saveData()
+    }
+
+    func removeCards(at offsets: IndexSet) {
+        cards.remove(atOffsets: offsets)
+        saveData()
+    }
+}
+</pre>
+
+<p>
+That’s almost all of <code>EditCards</code> complete, but before we can use it we need to add some more code to <code>ContentView</code> so that it shows the sheet on demand and calls <code>resetCards()</code> when dismissed.
+</p>
+
+<p>
+We’ve used sheets previously, but there’s one extra technique I’d like you to show you: you can attach a function to your sheet, that will automatically be run when the sheet is dismissed. This isn’t helpful for times you need to pass back data from the sheet, but here we’re just going to call <code>resetCards()</code> so it’s perfect.
+</p>
+
+<p>
+Add this <code>sheet()</code> modifier to the end of the outermost <code>ZStack</code> in <code>ContentView</code>:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingEditScreen, onDismiss: resetCards) {
+    EditCards()
+}
+</pre>
+
+<p>
+That works, but now that you’re gaining more experience in SwiftUI I want to show you an alternative way to get the same result.
+</p>
+
+<p>
+When we use the <code>sheet()</code> modifier we need to give SwiftUI a function it can run that returns the view to show in the sheet. For us above that’s a closure with <code>EditCards()</code> inside - that creates and returns a new view, which is what the sheet wants.
+</p>
+
+<p>
+When we write <code>EditCards()</code>, we’re relying on <em>syntactic sugar</em> - we’re treating our view struct like a function, because Swift silently treats that as a call to the view’s initializer. So, in practice we’re actually writing <code>EditCards.init()</code>, just in a shorter way.
+</p>
+
+<p>
+This all matters because rather than creating a closure that calls the <code>EditCards</code> initializer, we can actually pass the <code>EditCards</code> initializer directly to the sheet, like this:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingEditScreen, onDismiss: resetCards, content: EditCards.init)
+</pre>
+
+<p>
+That means "when you want to read the content for the sheet, call the <code>EditCards</code> initializer and it will send you back the view to use."
+</p>
+
+<p>
+<span id="Hacking With Swift - 258 - Adding and deleting cards-Important"></span><strong id="Important">Important</strong>: This approach only works because <code>EditCards</code> has an initializer that accepts no parameters. If you need to pass in specific values you need to use the closure-based approach instead.
+</p>
+
+<p>
+Anyway, as well as calling <code>resetCards()</code> when the sheet is dismissed, we also want to call it when the view first appears, so add this modifier below the previous one:
+</p>
+
+<pre swift>
+.onAppear(perform: resetCards)
+</pre>
+
+<p>
+So, when the view is first shown <code>resetCards()</code> is called, and when it’s shown after <code>EditCards</code> has been dismissed <code>resetCards()</code> is also called. This means we can ditch our example <code>cards</code> data and instead make it an empty array that gets filled at runtime.
+</p>
+
+<p>
+So, change the <code>cards</code> property of <code>ContentView</code> to this:
+</p>
+
+<pre swift>
+@State private var cards = [Card]()
+</pre>
+
+<p>
+To finish up with <code>ContentView</code> we need to make it load that <code>cards</code> property on demand. This starts with the same code we just added in <code>EditCard</code>, so put this method into <code>ContentView</code> now:
+</p>
+
+<pre swift>
+func loadData() {
+    if let data = UserDefaults.standard.data(forKey: "Cards") {
+        if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
+            cards = decoded
+        }
+    }
+}
+</pre>
+
+<p>
+And now we can add a call to <code>loadData()</code> in <code>resetCards()</code>, so that we refill the <code>cards</code> property with all saved cards when the app launches or when the user edits their cards:
+</p>
+
+<pre swift>
+func resetCards() {
+    timeRemaining = 100
+    isActive = true
+    loadData()        
+}
+</pre>
+
+<p>
+Now go ahead and run the app. We’ve wiped out our default examples, so you’ll need to press the + icon to add some of your own.
+</p>
+
+<p>
+With that last change, our app is complete - good job!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
