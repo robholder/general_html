@@ -31,6 +31,8 @@
 </ul>
 <div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()"><h1 id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()">Hacking With Swift - 256 - Ending the app with allowsHitTesting()</a></h1></div>
 
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Making Timer Stop The Session"><h2 id="Making Timer Stop The Session" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Making Timer Stop The Session">Making Timer Stop The Session</a></h2></div>
+
 <p>
 SwiftUI lets us disable interactivity for a view by setting <code>allowsHitTesting()</code> to false, so in our project we can use it to disable swiping on any card when the time runs out by checking the value of <code>timeRemaining</code>.
 </p>
@@ -46,6 +48,8 @@ Start by adding this modifier to the innermost <code>ZStack</code> - the one tha
 <p>
 That enables hit testing when <code>timeRemaining</code> is 1 or greater, but sets it to false otherwise because the user is out of time.
 </p>
+
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset"><h2 id="Stopping The Timer And Reset" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset">Stopping The Timer And Reset</a></h2></div>
 
 <p>
 The <em>other</em> outcome is that the user flies through all the cards correctly, and ends with none left. When the final card goes away, right now our timer slides down to the center of the screen, and carries on ticking. What we want to happen is for the timer to stop so users can see how fast they were, and also to show a button allowing them to reset their cards and try again.
@@ -113,11 +117,401 @@ As for the second problem - making sure <code>isActive</code> stays false when r
 
 <p>
 Done!
+</p>
+
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-FlashzillaApp.swift"><h4 id="FlashzillaApp.swift" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-FlashzillaApp.swift">FlashzillaApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct FlashzillaApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-Card.swift"><h4 id="Card.swift" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-Card.swift">Card.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Card {
+    var prompt: String
+    var answer: String
+    
+    static let example = Card(
+        prompt: "Who played the 13th Doctor in Doctor Who?",
+        answer: "Jodie Whittaker"
+        )
+}
+</pre>
+
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-CardView.swift"><h4 id="CardView.swift" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-CardView.swift">CardView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct CardView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+
+    let card: Card
+    var removal: (() -&gt; Void)? = nil
+    
+    @State private var isShowingAnswer = false
+    @State private var offset = CGSize.zero
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 25)
+                .fill(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? .white : .white
+                        .opacity(1 - Double(abs(offset.width / 50)))
+                    
+                )
+                .background(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? nil : RoundedRectangle(cornerRadius: 25)
+                        .fill(offset.width &gt; 0 ? .green : .red)
+                )
+                .shadow(radius: 10)
+            VStack {
+                Text(card.prompt)
+                    .font(.largeTitle)
+                    .foregroundStyle(.black)
+                if isShowingAnswer {
+                    Text(card.answer)
+                        .font(.title)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(20)
+            .multilineTextAlignment(.center)
+        }
+        .frame(width:450, height: 250)
+        .rotationEffect(.degrees(offset.width / 5.0))
+        .offset(x: offset.width * 5)
+        .opacity(2 - Double(abs(offset.width / 50)))
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    offset = gesture.translation
+                }
+                .onEnded { _ in
+                    if abs(offset.width) &gt; 100 {
+                        removal?()
+                    } else {
+                        offset = .zero
+                    }
+                }
+            )
+        .onTapGesture {
+            isShowingAnswer.toggle()
+        }
+
+    }
+}
+
+//#Preview("Standard Portrait") {
+//    CardView(card: .example)
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    CardView(card: .example)
+}
+</pre>
+
+<div id="Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 256 - Ending the app with allowsHitTesting()-Stopping The Timer And Reset-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import Combine
+import SwiftUI
+
+
+extension View {
+    func stacked(at position: Int, in total: Int) -&gt; some View {
+        let offset = Double(total - position)
+        return self.offset(y: offset * 10)
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+    // Environment info on active status of app
+    @Environment(\.scenePhase) var scenePhase
+    // To set if app is active
+    @State private var isActive = true
+    
+    // Create a stack of identical cards using 'repeating'
+    @State private var cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+    
+    // 'static let' belongs to the blueprint, so it's born first!
+    static let defaultDuration = 10
+    // Access static constant for default duration value
+    @State private var timeRemaining = ContentView.defaultDuration
+    
+    let timer = Timer.publish(
+        every: 1,
+        on: .main,
+        in: .common).autoconnect()
+    var body: some View {
+        ZStack {
+            // Add background image
+            Image(.background)
+                .resizable()
+                .ignoresSafeArea()
+            VStack {
+                Text("Time: \(timeRemaining)")
+                    .font(.largeTitle)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 5)
+                    .background(.black.opacity(0.75))
+                    .clipShape(.capsule)
+                
+                ZStack {
+                    ForEach(0..&lt;cards.count, id: \.self) { index in
+                        CardView(card: cards[index]) {
+                            withAnimation {
+                                removeCard(at: index)
+                            }
+                        }
+                        .stacked(at: index, in: cards.count)
+                    }
+                }
+                .allowsHitTesting(timeRemaining &gt; 0)
+                if cards.isEmpty {
+                    Button("Start Again", action: resetCards)
+                        .padding()
+                        .background(.white)
+                        .foregroundStyle(.black)
+                        .clipShape(.capsule)
+                }
+            }
+            if accessibilityDifferentiateWithoutColor {
+                VStack {
+                    Spacer()
+                    
+                    HStack {
+                        Image(systemName: "xmark.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                        Spacer()
+                        Image(systemName: "checkmark.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                    }
+                    .foregroundStyle(.white)
+                    .font(.largeTitle)
+                    .padding()
+                }
+            }
+
+        }
+        .onReceive(timer) { time in
+            // Check if app is active (in the foreground)
+            guard isActive else { return }
+
+            // Condition to prevent straying into negative numbers
+            if timeRemaining &gt; 0 {
+                // Subtract one second
+                timeRemaining -= 1
+            }
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                if cards.isEmpty {
+                    isActive = true
+                }
+            } else {
+                isActive = false
+            }
+        }
+    }
+    func removeCard(at index: Int) {
+        cards.remove(at: index)
+        if cards.isEmpty {
+            isActive = false
+        }
+    }
+    func resetCards() {
+        cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+        // Access static constant for default duration value
+        timeRemaining = ContentView.defaultDuration
+        isActive = true
+    }
+}
+
+
+//#Preview {
+//    ContentView()
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    ContentView()
+}
+</pre>
+<p>
+<hr>
+</p>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I have an interesting initialization and variable issue.  I have this line to set the duration in seconds:
+</p>
+<pre swift>
+@State private var timeRemaining = 10
+</pre>
+<p>
+However, I'd like to be able to use another variable to assign that value (of 10 in this example).This is because the <code>timeRemaining</code> is also reset in another part of the code, and I want to have a single source of value.
+</p>
+
+<p>
+If I do something like:
+</p>
+<pre swift>
+@State private var duration = 10
+@State private var timeRemaining= duration
+</pre>
+
+<p>
+...it fails the initialization step with an error. How can I work around this?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You have run into one of the most classic catch-22s in Swift initialization.
+</p>
+
+<p>
+The compiler is stopping you because of a strict safety rule: <span id="Ai Insight-ANSWER-You cannot use one property of a struct to initialize another property before the struct is fully born."></span><strong id="You cannot use one property of a struct to initialize another property before the struct is fully born.">You cannot use one property of a struct to initialize another property before the struct is fully born.</strong> When Swift is building your view, <code>duration</code> and <code>timeRemaining</code> are being created at the exact same millisecond. Because <code>duration</code> doesn't officially exist yet, Swift won't let <code>timeRemaining</code> look at it for its initial value.
+</p>
+
+<p>
+Fortunately, there are a few clean ways to work around this depending on how you want to manage your app's settings.
+</p>
+
+<div id="Ai Insight-ANSWER-Solution 1: Use a Custom Initializer (The Direct Workaround)"><h3 id="Solution 1: Use a Custom Initializer (The Direct Workaround)" class="header"><a href="#Ai Insight-ANSWER-Solution 1: Use a Custom Initializer (The Direct Workaround)">Solution 1: Use a Custom Initializer (The Direct Workaround)</a></h3></div>
+
+<p>
+If you want <code>duration</code> to be a variable that can be changed, you can write a custom <code>init()</code> for your view. Inside the initializer, the struct is being born, which gives you a chance to pass the value across.
+</p>
+
+<p>
+When dealing with <code>@State</code> variables, you have to use a slightly special syntax inside the initializer - you initialize their underlying storage by adding an underscore (<code>_</code>) before the variable name:
+</p>
+
+<pre swift>
+struct TimerView: View {
+    @State private var duration: Int
+    @State private var timeRemaining: Int
+
+    // Custom Initializer
+    init(initialDuration: Int = 10) {
+        // 1. Set the duration
+        _duration = State(initialValue: initialDuration)
+        // 2. Safely copy it to timeRemaining during birth!
+        _timeRemaining = State(initialValue: initialDuration)
+    }
+
+    var body: some View {
+        Text("\(timeRemaining) seconds left")
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Solution 2: The Modern SwiftUI Way (.onAppear)"><h3 id="Solution 2: The Modern SwiftUI Way (.onAppear)" class="header"><a href="#Ai Insight-ANSWER-Solution 2: The Modern SwiftUI Way (.onAppear)">Solution 2: The Modern SwiftUI Way (.onAppear)</a></h3></div>
+
+<p>
+If <code>duration</code> is just a constant default number that never changes, you don't actually need it to be a <code>@State</code> variable. You can make it a plain static constant, or you can initialize <code>timeRemaining</code> to <code>0</code> and load the real duration the split-second the view appears on screen.
+</p>
+
+<p>
+This is often preferred in SwiftUI because it avoids messing with complex custom initializers:
+</p>
+
+<pre swift>
+struct TimerView: View {
+    @State private var duration = 10
+    // 1. Start at 0 temporarily
+    @State private var timeRemaining = 0 
+
+    var body: some View {
+        VStack {
+            Text("\(timeRemaining) seconds left")
+        }
+        // 2. The moment the view hits the screen, grab the source value
+        .onAppear {
+            timeRemaining = duration
+        }
+    }
+}
+</pre>
+
+<p>
+NOTE: <code>.onAppear</code> will <em>not</em> trigger when the app is brought back to the foreground. It fires exactly once when your SwiftUI view is physically constructed and slid onto the screen.
+</p>
+
+<div id="Ai Insight-ANSWER-Solution 3: The Plain Constant Approach"><h3 id="Solution 3: The Plain Constant Approach" class="header"><a href="#Ai Insight-ANSWER-Solution 3: The Plain Constant Approach">Solution 3: The Plain Constant Approach</a></h3></div>
+
+<p>
+If your <code>duration</code> is truly a hardcoded default that you just want to reference in multiple places (like your timer setup and your reset button), you can drop the <code>@State</code> modifier from <code>duration</code> entirely and mark it as a static let.
+</p>
+
+<p>
+Static constants belong to the type <em>itself</em>, not the individual instance, meaning they are fully alive before the struct is initialized:
+</p>
+
+<pre swift>
+struct TimerView: View {
+    // 'static let' belongs to the blueprint, so it's born first!
+    static let defaultDuration = 10 
+    
+    @State private var timeRemaining = TimerView.defaultDuration
+
+    var body: some View {
+        Button("Reset Timer") {
+            // You can easily read it here to reset your value!
+            timeRemaining = TimerView.defaultDuration 
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Summary Recommendation"><h3 id="Summary Recommendation" class="header"><a href="#Ai Insight-ANSWER-Summary Recommendation">Summary Recommendation</a></h3></div>
+
+<ul>
+<li>
+Go with <span id="Ai Insight-ANSWER-Summary Recommendation-Solution 3"></span><strong id="Solution 3">Solution 3</strong> (<code>static let</code>) if your default time is a fixed number that never changes during runtime. It is the cleanest and requires the least code.
+
+<li>
+Go with <span id="Ai Insight-ANSWER-Summary Recommendation-Solution 2"></span><strong id="Solution 2">Solution 2</strong> (<code>.onAppear</code>) if duration is a dynamic value coming from somewhere else (like a user settings screen) that you need to capture right as the timer view loads.
+
+</ul>
+<p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_257.html">Hacking With Swift - 257 - Fixing the bugs</a>
 
+</ul>
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
 </p>

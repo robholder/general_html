@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_257</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_256.html">Hacking With Swift - 256 - Ending the app with allowsHitTesting()</a>
+
+</ul>
+<div id="Hacking With Swift - 257 - Fixing the bugs"><h1 id="Hacking With Swift - 257 - Fixing the bugs" class="header"><a href="#Hacking With Swift - 257 - Fixing the bugs">Hacking With Swift - 257 - Fixing the bugs</a></h1></div>
+
+<p>
+Today we wrap up our program by adding some final features and also fixing a ton of bugs. Yes, our program has bugs, and I’m going to walk you through some of them and also show you how to fix them.
+</p>
+
+<p>
+When you’re learning to program, finding bugs in your code can feel disheartening because it feels like you’ve screwed up. But as legendary Dutch computer scientist Edsger Dijkstra once said:
+</p>
+
+<p>
+<blockquote>
+"If debugging is the process of removing bugs, then programming must be the process of putting them in."
+</blockquote>
+</p>
+
+<p>
+In other words, fixing bugs is par for the course when you’re developing software, because we aren’t perfect. The more comfortable you are with creating bugs, finding bugs, and fixing bugs, the better a developer you’ll be.
+</p>
+
+<div id="Hacking With Swift - 257 - Fixing the bugs-Fixing The Bugs"><h2 id="Fixing The Bugs" class="header"><a href="#Hacking With Swift - 257 - Fixing the bugs-Fixing The Bugs">Fixing The Bugs</a></h2></div>
+
+<p>
+Our SwiftUI app is looking good so far: we have a stack of cards that can be dragged around to control the app, plus some accessibility support. But at the same time it’s also pretty full of glitches that are holding it back - some big, some small, but all worth addressing.
+</p>
+
+<p>
+First, it’s possible to drag cards around when they aren’t at the top. This is confusing for users because they can grab a card they can’t actually see, so this should never be possible.
+</p>
+
+<p>
+To fix this we’re going to use <code>allowsHitTesting()</code> so that only the last card - the one on top - can be dragged around. Find the <code>stacked()</code> modifier in <code>ContentView</code> and add this directly below:
+</p>
+
+<pre swift>
+.allowsHitTesting(index == cards.count - 1)
+</pre>
+
+<p>
+Second, our UI is a bit of a mess when used with VoiceOver. If you launch it on a real device with VoiceOver enabled, you’ll find that you can tap on the background image to get "Background, image" read out, which is pointless. However, things get worse: make small swipes to the right and VoiceOver will move through all the accessibility elements - it reads out the text from all our cards, even the ones that aren’t visible.
+</p>
+
+<p>
+To fix the background image problem we should make it use a decorative image so it won’t be read out as part of the accessibility layout. Modify the background image to this:
+</p>
+
+<pre swift>
+Image(decorative: "background")
+</pre>
+
+<p>
+To fix the cards, we need to use an <code>accessibilityHidden()</code> modifier with a similar condition to the <code>allowsHitTesting()</code> modifier we added a minute ago. In this case, every card that’s at an index less than the top card should be hidden from the accessibility system because there’s really nothing useful it can do with the card, so add this directly below the <code>allowsHitTesting()</code> modifier:
+</p>
+
+<pre swift>
+.accessibilityHidden(index &lt; cards.count - 1)
+</pre>
+
+<p>
+There’s a third accessibility problem with our app, and it’s the direct result of using gestures to control things. Yes, gestures are great fun to use most of the time, but if you have specific accessibility needs it can be very hard to use them.
+</p>
+
+<p>
+In this app our gestures are causing multiple problems: it’s not apparent to VoiceOver users how they should control the app:
+</p>
+
+<ul>
+<li>
+We don’t say that the cards are buttons that can be tapped.
+
+<li>
+When the answer is revealed there is no audible notification of what it was.
+
+<li>
+Users have no way of swiping left or right to move through the cards.
+
+</ul>
+<p>
+It takes very little work to fix these problems, but the pay off is that our app is much more accessible to everyone.
+</p>
+
+<p>
+First, we need to make it clear that our cards are tappable buttons. This is as simple as adding <code>accessibilityAddTraits()</code> with <code>.isButton</code> to the <code>ZStack</code> in <code>CardView</code>. Put this after its <code>opacity()</code> modifier:
+</p>
+
+<pre swift>
+.accessibilityAddTraits(.isButton)
+</pre>
+
+<p>
+Now the system will read "Who played the 13th Doctor in Doctor Who? Button" - an important hint to users that the card can be tapped.
+</p>
+
+<p>
+Second, we need to help the system to read the answer to the cards as well as the questions. This is <em>possible</em> right now, but only if the user swipes around on the screen - it’s far from obvious. So, to fix this we’re going to detect whether the user has accessibility enabled on their device, and if so automatically toggle between showing the prompt and showing the answer. That is, rather than have the answer appear below the prompt we’ll switch it out and just show the answer, which will cause VoiceOver to read it out immediately.
+</p>
+
+<p>
+SwiftUI provides a specific environment property that tells us when VoiceOver is running, called <code>accessibilityVoiceOverEnabled</code>. So, add this new property to <code>CardView</code>:
+</p>
+
+<pre swift>
+@Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
+</pre>
+
+<p>
+Right now our code for displaying the prompt and answer looks like this:
+</p>
+
+<pre>
+VStack {
+    Text(card.prompt)
+        .font(.largeTitle)
+        .foregroundStyle(.black)
+
+    if isShowingAnswer {
+        Text(card.answer)
+            .font(.title)
+            .foregroundStyle(.secondary)
+    }
+}
+</pre>
+
+<p>
+We’re going to change that so the prompt and answer are shown in a single text view, with <code>accessibilityEnabled</code> deciding which layout is shown. Amend your code to this:
+</p>
+
+<pre swift>
+VStack {
+    if accessibilityVoiceOverEnabled {
+        Text(isShowingAnswer ? card.answer : card.prompt)
+            .font(.largeTitle)
+            .foregroundStyle(.black)
+    } else {
+        Text(card.prompt)
+            .font(.largeTitle)
+            .foregroundStyle(.black)
+
+        if isShowingAnswer {
+            Text(card.answer)
+                .font(.title)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+</pre>
+
+<p>
+If you try that out with VoiceOver you’ll hear that it works much better - as soon as the card is double-tapped the answer is read out.
+</p>
+
+<p>
+Third, we need to make it easier for users to mark cards as correct or wrong, because right now our images just don’t cut it. Not only do they stop users from interacting with our app using tap gestures, but they also get read out as their SF Symbols name - "checkmark, circle, image" - rather than anything useful.
+</p>
+
+<p>
+To fix this we need to replace the images with buttons that actually remove the cards. We don’t actually do anything different if the user was correct or wrong - I need to leave <em>something</em> for your challenges! - but we can at least remove the top card from the deck. At the same time, we’re going to provide an accessibility label and hint so that users get a better idea of what the buttons do.
+</p>
+
+<p>
+So, replace your current <code>HStack</code> with those images with this new code:
+</p>
+
+<pre swift>
+HStack {
+    Button {
+        withAnimation {
+            removeCard(at: cards.count - 1)
+        }
+    } label: {
+        Image(systemName: "xmark.circle")
+            .padding()
+            .background(.black.opacity(0.7))
+            .clipShape(.circle)
+    }
+    .accessibilityLabel("Wrong")
+    .accessibilityHint("Mark your answer as being incorrect.")
+
+    Spacer()
+
+    Button {
+        withAnimation {
+            removeCard(at: cards.count - 1)
+        }
+    } label: {
+        Image(systemName: "checkmark.circle")
+            .padding()
+            .background(.black.opacity(0.7))
+            .clipShape(.circle)
+    }
+    .accessibilityLabel("Correct")
+    .accessibilityHint("Mark your answer as being correct.")
+}
+</pre>
+
+<p>
+Because those buttons remain onscreen even when the last card has been removed, we need to add a <code>guard</code> check to the start of <code>removeCard(at:)</code> to make sure we don’t try to remove a card that doesn’t exist. So, put this new line of code at the start of that method:
+</p>
+
+<pre swift>
+guard index &gt;= 0 else { return }
+</pre>
+
+<p>
+Finally, we can make those buttons visible when either <code>accessibilityDifferentiateWithoutColor</code> is enabled or when VoiceOver is enabled. This means adding another <code>accessibilityVoiceOverEnabled</code> property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
+</pre>
+
+<p>
+Then modifying the <code>if accessibilityDifferentiateWithoutColor {</code> condition to this:
+</p>
+
+<pre swift>
+if accessibilityDifferentiateWithoutColor || accessibilityVoiceOverEnabled {
+</pre>
+
+<p>
+With these accessibility changes our app works much better for everyone - good job!
+</p>
+
+<p>
+Before we’re done, I’d like to add one tiny extra change. Right now if you drag an image a little then let go we set its offset back to zero, which causes it to jump back into the center of the screen. If we attach a spring animation to our card, it will slide into the center, which I think is a much clearer indication to our user of what actually happened.
+</p>
+
+<p>
+To make this happen, add an <code>animation()</code> modifier to the end of the <code>ZStack</code> in <code>CardView</code>, directly after the <code>onTapGesture()</code>:
+</p>
+
+<pre swift>
+.animation(.bouncy, value: offset)
+</pre>
+
+<p>
+Much better!
+</p>
+
+<p>
+<span id="Hacking With Swift - 257 - Fixing the bugs-Fixing The Bugs-Tip"></span><strong id="Tip">Tip</strong>: If you look carefully, you might notice the card flash red if you drag it a little to the right then release. More on that later!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
