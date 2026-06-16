@@ -35,6 +35,8 @@
 Everything we’ve worked on so far has used a fixed set of sample cards, but of course this app only becomes useful if users can actually customize the list of cards they see. This means adding a new view that lists all existing cards and lets the user add a new one, which is all stuff you’ve seen before. However, there’s an interesting catch this time that will require something new to fix, so it’s worth working through this.
 </p>
 
+<div id="Hacking With Swift - 258 - Adding and deleting cards-Edit Button"><h2 id="Edit Button" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-Edit Button">Edit Button</a></h2></div>
+
 <p>
 First we need some state that controls whether our editing screen is visible. So, add this to <code>ContentView</code>:
 </p>
@@ -68,6 +70,8 @@ VStack {
 .font(.largeTitle)
 .padding()
 </pre>
+
+<div id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View"><h2 id="EditCards View" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-EditCards View">EditCards View</a></h2></div>
 
 <p>
 We’re going to design a new <code>EditCards</code> view to encode and decode a <code>Card</code> array to <code>UserDefaults</code>, but before we do that I’d like you to make the <code>Card</code> struct conform to <code>Codable</code> like this:
@@ -223,8 +227,16 @@ That means "when you want to read the content for the sheet, call the <code>Edit
 </p>
 
 <p>
-<span id="Hacking With Swift - 258 - Adding and deleting cards-Important"></span><strong id="Important">Important</strong>: This approach only works because <code>EditCards</code> has an initializer that accepts no parameters. If you need to pass in specific values you need to use the closure-based approach instead.
+<span id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View-Important"></span><strong id="Important">Important</strong>: This approach only works because <code>EditCards</code> has an initializer that accepts no parameters. If you need to pass in specific values you need to use the closure-based approach instead.
 </p>
+
+<table>
+<tr>
+<td>
+NOTE: See 'Ai Insight' below about changes in Swift that make the <code>EditCards.init</code> less attractive.
+</td>
+</tr>
+</table>
 
 <p>
 Anyway, as well as calling <code>resetCards()</code> when the sheet is dismissed, we also want to call it when the view first appears, so add this modifier below the previous one:
@@ -285,6 +297,138 @@ With that last change, our app is complete - good job!
 <br>
 </p>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I'm following another tutorial by Paul Hudson, and he suggests I use:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingEditScreen, onDismiss: resetCards, content: EditCards.init)
+</pre>
+
+<p>
+...instead of the full closure version:
+</p>
+
+<pre swift>
+.sheet(isPresented: $showingEditScreen, onDismiss: resetCards) {
+  EditCards()
+}
+</pre>
+
+<p>
+...but I get this warning in Xcode:
+</p>
+
+<pre text>
+Call to main actor-isolated initializer 'init()' in a
+synchronous nonisolated context
+</pre>
+
+<p>
+What's going on?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You have run straight into a classic clash between First-Class Functions (the syntax trick Paul Hudson recommended) and <span id="Ai Insight-ANSWER-Swift's Modern Strict Concurrency (Swift 6)."></span><strong id="Swift's Modern Strict Concurrency (Swift 6).">Swift's Modern Strict Concurrency (Swift 6).</strong>
+</p>
+
+<p>
+Paul’s advice is fundamentally sound and incredibly elegant, but Xcode is complaining because the rules of the Swift compiler changed to be much stricter about thread safety.
+</p>
+
+<p>
+Here is exactly what is happening under the hood and how to fix it.
+</p>
+
+<div id="Ai Insight-ANSWER-The Trick: Passing the Initializer Directly"><h3 id="The Trick: Passing the Initializer Directly" class="header"><a href="#Ai Insight-ANSWER-The Trick: Passing the Initializer Directly">The Trick: Passing the Initializer Directly</a></h3></div>
+
+<p>
+When you write <code>content: EditCards.init</code>, you are using a feature called <span id="Ai Insight-ANSWER-The Trick: Passing the Initializer Directly-First-Class Functions"></span><strong id="First-Class Functions">First-Class Functions</strong>. Instead of opening a closure execution box and calling the function manually (<code>{ EditCards() }</code>), you are passing a direct pointer to the initialization function itself, telling SwiftUI: <em>"Hey, when you're ready to make this view, just run this function."</em>
+</p>
+
+<p>
+It is beautifully short, but it has a hidden trap when it comes to thread safety.
+</p>
+
+<div id="Ai Insight-ANSWER-The Problem: Thread Isolation"><h3 id="The Problem: Thread Isolation" class="header"><a href="#Ai Insight-ANSWER-The Problem: Thread Isolation">The Problem: Thread Isolation</a></h3></div>
+
+<p>
+In SwiftUI, all <code>View</code> structures are marked with <code>@MainActor</code>. This means their initializers (<code>init()</code>) are legally required to run exclusively on the main thread (the Main Actor) to ensure the UI doesn't crash.
+</p>
+
+<p>
+Look at how the two different code snippets pass that initializer to SwiftUI:
+</p>
+
+<div id="Ai Insight-ANSWER-The Problem: Thread Isolation-1. The Closure Version (Why it works)"><h4 id="1. The Closure Version (Why it works)" class="header"><a href="#Ai Insight-ANSWER-The Problem: Thread Isolation-1. The Closure Version (Why it works)">1. The Closure Version (Why it works)</a></h4></div>
+
+<pre swift>
+.sheet(isPresented: $showingEditScreen, onDismiss: resetCards) {
+    EditCards() // 🟢 Safe
+}
+</pre>
+
+<p>
+SwiftUI explicitly marks the content closure block (<code>{ }</code>) as <code>@MainActor</code>. Because the closure itself is guaranteed to run on the main thread, calling <code>EditCards()</code> inside it is completely safe.
+</p>
+
+<div id="Ai Insight-ANSWER-The Problem: Thread Isolation-2. The EditCards.init Version (Why it throws a warning)"><h4 id="2. The EditCards.init Version (Why it throws a warning)" class="header"><a href="#Ai Insight-ANSWER-The Problem: Thread Isolation-2. The EditCards.init Version (Why it throws a warning)">2. The EditCards.init Version (Why it throws a warning)</a></h4></div>
+
+<pre swift>
+.sheet(isPresented: $showingEditScreen, onDismiss: resetCards, content: EditCards.init) // ⚠️ Warning!
+</pre>
+
+<p>
+When you tear the <code>.init</code> function away from its struct and pass it as a raw object parameter, Swift 6 evaluates it outside of that protected closure environment. The compiler looks at <code>content:</code> and says: "Wait, <code>EditCards.init</code> is bound to the Main Actor, but you are referencing it as a generic, un-isolated function pointer. I cannot guarantee that whatever calls this parameter down the line will be on the main thread!"
+</p>
+
+<div id="Ai Insight-ANSWER-How to Fix It"><h3 id="How to Fix It" class="header"><a href="#Ai Insight-ANSWER-How to Fix It">How to Fix It</a></h3></div>
+
+<p>
+If you love the ultra-clean look of passing functions directly and want to keep it, you have to explicitly reassure the compiler that the context you are currently standing in is safely isolated to the main thread.
+</p>
+
+<p>
+You can fix this by adding the <code>@MainActor</code> attribute directly to the view or the specific function enclosing this code:
+</p>
+
+<pre swift>
+@MainActor // 👈 Adding this tells Swift everything in this view belongs to the Main Actor
+struct ContentView: View {
+    @State private var showingEditScreen = false
+    
+    var body: some View {
+        Button("Show Sheet") {
+            showingEditScreen = true
+        }
+        // 🟢 Now this compiles flawlessly with Swift 6 strict checking!
+        .sheet(isPresented: $showingEditScreen, onDismiss: resetCards, content: EditCards.init)
+    }
+    
+    func resetCards() { ... }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Summary Rule of Thumb"><h3 id="Summary Rule of Thumb" class="header"><a href="#Ai Insight-ANSWER-Summary Rule of Thumb">Summary Rule of Thumb</a></h3></div>
+
+<ul>
+<li>
+If you are in <span id="Ai Insight-ANSWER-Summary Rule of Thumb-Swift 5 mode"></span><strong id="Swift 5 mode">Swift 5 mode</strong> (or don't have Strict Concurrency turned on), <code>content: EditCards.init</code> works seamlessly.
+
+<li>
+If you are running <span id="Ai Insight-ANSWER-Summary Rule of Thumb-Swift 6 mode"></span><strong id="Swift 6 mode">Swift 6 mode</strong>, you either need to mark your parent struct/class as <code>@MainActor</code>, or stick to the traditional trailing closure syntax <code>{ EditCards() }</code> which handles the isolation handshake automatically.
+
+</ul>
+<p>
+<hr>
+<br>
+</p>
 
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
