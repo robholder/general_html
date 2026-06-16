@@ -292,6 +292,403 @@ Now go ahead and run the app. We’ve wiped out our default examples, so you’l
 With that last change, our app is complete - good job!
 </p>
 
+<div id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-FlashzillaApp.swift"><h4 id="FlashzillaApp.swift" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-FlashzillaApp.swift">FlashzillaApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@main
+struct FlashzillaApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-Card.swift"><h4 id="Card.swift" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-Card.swift">Card.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+
+struct Card: Codable {
+    var prompt: String
+    var answer: String
+    
+    static let example = Card(
+        prompt: "Who played the 13th Doctor in Doctor Who?",
+        answer: "Jodie Whittaker"
+        )
+}
+</pre>
+
+<div id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-CardView.swift"><h4 id="CardView.swift" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-CardView.swift">CardView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct CardView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+    // Detect if VoiceOver is enabled
+    @Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
+
+    let card: Card
+    var removal: (() -&gt; Void)? = nil
+    
+    @State private var isShowingAnswer = false
+    @State private var offset = CGSize.zero
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 25)
+                .fill(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? .white : .white
+                        .opacity(1 - Double(abs(offset.width / 50)))
+                    
+                )
+                .background(
+                    accessibilityDifferentiateWithoutColor
+                    // Ternary condition
+                    ? nil : RoundedRectangle(cornerRadius: 25)
+                        .fill(offset.width &gt; 0 ? .green : .red)
+                )
+                .shadow(radius: 10)
+            VStack {
+                // Show either Question or Answer only if VoiceOver enabled
+                if accessibilityVoiceOverEnabled {
+                    Text(isShowingAnswer ? card.answer : card.prompt)
+                        .font(.largeTitle)
+                        .foregroundStyle(.black)
+                } else {
+                    // Run as normal if VoiceOver disabled
+                    Text(card.prompt)
+                        .font(.largeTitle)
+                        .foregroundStyle(.black)
+                    
+                    if isShowingAnswer {
+                        Text(card.answer)
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(20)
+            .multilineTextAlignment(.center)
+        }
+        .frame(width:450, height: 250)
+        .rotationEffect(.degrees(offset.width / 5.0))
+        .offset(x: offset.width * 5)
+        .opacity(2 - Double(abs(offset.width / 50)))
+        .accessibilityAddTraits(.isButton)
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    offset = gesture.translation
+                }
+                .onEnded { _ in
+                    if abs(offset.width) &gt; 100 {
+                        removal?()
+                    } else {
+                        offset = .zero
+                    }
+                }
+            )
+        .onTapGesture {
+            isShowingAnswer.toggle()
+        }
+        // Releasing a card will slide it back to the center
+        .animation(.bouncy, value: offset)
+
+    }
+}
+
+//#Preview("Standard Portrait") {
+//    CardView(card: .example)
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    CardView(card: .example)
+}
+</pre>
+
+<div id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-EditView.swift"><h4 id="EditView.swift" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-EditView.swift">EditView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct EditCards: View {
+    @Environment(\.dismiss) var dismiss
+    @State private var cards = [Card]()
+    @State private var newPrompt = ""
+    @State private var newAnswer = ""
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Add new card") {
+                    TextField("Prompt", text: $newPrompt)
+                    TextField("Answer", text: $newAnswer)
+                    Button("Add Card", action: addCard)
+                }
+                
+                Section {
+                    ForEach(0..&lt;cards.count, id: \.self) { index in
+                        VStack(alignment: .leading) {
+                            Text(cards[index].prompt)
+                                .font(.headline)
+                            Text(cards[index].answer)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onDelete(perform: removeCards)
+                }
+            }
+            .navigationTitle("Edit Cards")
+            .toolbar {
+                Button("Done", action: done)
+            }
+            .onAppear(perform: loadData)
+        }
+    }
+    
+    func done() {
+        dismiss()
+    }
+    
+    func loadData() {
+        if let data = UserDefaults.standard.data(forKey: "Cards") {
+            if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
+                cards = decoded
+            }
+        }
+    }
+    
+    func saveData() {
+        if let data = try? JSONEncoder().encode(cards) {
+            UserDefaults.standard.set(data, forKey: "Cards")
+        }
+    }
+    
+    func addCard() {
+        let trimmedPrompt = newPrompt.trimmingCharacters(in: .whitespaces)
+        let trimmedAnswer = newAnswer.trimmingCharacters(in: .whitespaces)
+        guard trimmedPrompt.isEmpty == false &amp;&amp; trimmedAnswer.isEmpty == false else { return }
+        
+        let card = Card(prompt: trimmedPrompt, answer: trimmedAnswer)
+        cards.insert(card, at: 0)
+        saveData()
+    }
+    
+    func removeCards(at offsets: IndexSet) {
+        cards.remove(atOffsets: offsets)
+        saveData()
+    }
+}
+
+#Preview {
+    EditCards()
+}
+</pre>
+
+<div id="Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 258 - Adding and deleting cards-EditCards View-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import Combine
+import SwiftUI
+
+
+extension View {
+    func stacked(at position: Int, in total: Int) -&gt; some View {
+        let offset = Double(total - position)
+        return self.offset(y: offset * 10)
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+    // Detect if VoiceOver is enabled
+    @Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
+    // Environment info on active status of app
+    @Environment(\.scenePhase) var scenePhase
+    // To set if app is active
+    @State private var isActive = true
+    
+    // Create a stack of identical cards using 'repeating'
+    //@State private var cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+    @State private var cards = [Card]()
+    
+    // 'static let' belongs to the blueprint, so it's born first!
+    static let defaultDuration = 100
+    // Access static constant for default duration value
+    @State private var timeRemaining = ContentView.defaultDuration
+    
+    @State private var showingEditScreen = false
+    
+    let timer = Timer.publish(
+        every: 1,
+        on: .main,
+        in: .common).autoconnect()
+    
+    var body: some View {
+        ZStack {
+            // Add background image
+            // Mark as 'decorative' to silence in VoiceOver
+            Image(decorative: "background")
+                .resizable()
+                .ignoresSafeArea()
+            VStack {
+                Text("Time: \(timeRemaining)")
+                    .font(.largeTitle)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 5)
+                    .background(.black.opacity(0.75))
+                    .clipShape(.capsule)
+                
+                ZStack {
+                    ForEach(0..&lt;cards.count, id: \.self) { index in
+                        CardView(card: cards[index]) {
+                            withAnimation {
+                                removeCard(at: index)
+                            }
+                        }
+                        .stacked(at: index, in: cards.count)
+                        // Only top card is dragable.
+                        .allowsHitTesting(index == cards.count - 1)
+                        .accessibilityHidden(index &lt; cards.count - 1)
+                    }
+                }
+                .allowsHitTesting(timeRemaining &gt; 0)
+                if cards.isEmpty {
+                    Button("Start Again", action: resetCards)
+                        .padding()
+                        .background(.white)
+                        .foregroundStyle(.black)
+                        .clipShape(.capsule)
+                }
+            }
+            VStack {
+                HStack {
+                    Spacer()
+                    
+                    Button {
+                        showingEditScreen = true
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                    }
+                }
+                
+                Spacer()
+            }
+            .foregroundStyle(.white)
+            .font(.largeTitle)
+            .padding()
+            
+            if accessibilityDifferentiateWithoutColor || accessibilityVoiceOverEnabled {
+                VStack {
+                    Spacer()
+                    
+                    HStack {
+                        Button {
+                            withAnimation {
+                                removeCard(at: cards.count - 1)
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                                .padding()
+                                .background(.black.opacity(0.7))
+                                .clipShape(.circle)
+                        }
+                        .accessibilityLabel("Wrong")
+                        .accessibilityHint("Mark your answer as being incorrect.")
+                        
+                        Spacer()
+                        
+                        Button {
+                            withAnimation {
+                                removeCard(at: cards.count - 1)
+                            }
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .padding()
+                                .background(.black.opacity(0.7))
+                                .clipShape(.circle)
+                        }
+                        .accessibilityLabel("Correct")
+                        .accessibilityHint("Mark your answer as being correct.")
+                    }
+                    .foregroundStyle(.white)
+                    .font(.largeTitle)
+                    .padding()
+                }
+            }
+        }
+        // Full closure technique
+//        .sheet(isPresented: $showingEditScreen, onDismiss: resetCards) {
+//            EditCards()
+//        }
+        .sheet(isPresented: $showingEditScreen, onDismiss: resetCards, content: EditCards.init)
+        .onAppear(perform: resetCards)
+        .onReceive(timer) { time in
+            // Check if app is active (in the foreground)
+            guard isActive else { return }
+
+            // Condition to prevent straying into negative numbers
+            if timeRemaining &gt; 0 {
+                // Subtract one second
+                timeRemaining -= 1
+            }
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                if cards.isEmpty {
+                    isActive = true
+                }
+            } else {
+                isActive = false
+            }
+        }
+    }
+    func removeCard(at index: Int) {
+        guard index &gt;= 0 else { return }
+        cards.remove(at: index)
+        if cards.isEmpty {
+            isActive = false
+        }
+    }
+    func resetCards() {
+        //cards = Array&lt;Card&gt;(repeating: .example, count: 10)
+        // Access static constant for default duration value
+        timeRemaining = ContentView.defaultDuration
+        isActive = true
+        loadData()
+    }
+    func loadData() {
+        if let data = UserDefaults.standard.data(forKey: "Cards") {
+            if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
+                cards = decoded
+            }
+        }
+    }
+}
+
+
+//#Preview {
+//    ContentView()
+//}
+
+#Preview("Landscape Left Alignment", traits: .landscapeLeft) {
+    ContentView()
+}
+</pre>
 <p>
 <hr>
 <br>
