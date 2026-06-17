@@ -39,6 +39,139 @@ When adding a card, the text fields keep their current text. Fix that so that th
 </blockquote>
 </p>
 
+<p>
+My solution is to amend the function (the one that's called when a user prompt and answer is added) with two lines to revert the variables to empty strings like this:
+</p>
+
+<pre swift>
+func addCard() {
+    let trimmedPrompt = newPrompt.trimmingCharacters(in: .whitespaces)
+    let trimmedAnswer = newAnswer.trimmingCharacters(in: .whitespaces)
+    guard trimmedPrompt.isEmpty == false &amp;&amp; trimmedAnswer.isEmpty == false else { return }
+    
+    let card = Card(prompt: trimmedPrompt, answer: trimmedAnswer)
+    cards.insert(card, at: 0)
+    saveData()
+    // set variables to empty strings
+    newPrompt = ""
+    newAnswer = ""
+}
+</pre>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Is my solution a good candidate for Challenge 1?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+That is 100% the correct and intended solution for this challenge.
+</p>
+
+<p>
+By setting <code>newPrompt = ""</code> and <code>newAnswer = ""</code>, you are modifying the <code>@State</code> variables bound to your text fields. Because SwiftUI is a declarative framework, it notices that the state changed, re-renders the view, and instantly empties out those text fields for the next entry.
+</p>
+
+<div id="Ai Insight-ANSWER-One Minor Tip (To Make It Even Cleaner)"><h3 id="One Minor Tip (To Make It Even Cleaner)" class="header"><a href="#Ai Insight-ANSWER-One Minor Tip (To Make It Even Cleaner)">One Minor Tip (To Make It Even Cleaner)</a></h3></div>
+
+<p>
+Your code is perfect as it is, but since you've already gone through the trouble of trimming the whitespace to validate the input, you might want to use those same trimmed versions to clear out any accidental spaces a user typed before hitting save.
+</p>
+
+<p>
+Right now, if a user types <code>"    "</code> (just spaces) into the field, your <code>guard</code> statement correctly catches it and exits early (<code>return</code>). However, because it exits before it reaches your new clearing code, those annoying empty spaces will stay stuck in the text field.
+</p>
+
+<p>
+If you move the clearing logic to the very end of the function like you did, but insert the trimmed card, it works beautifully. Alternatively, you can clear the text fields even if the guard fails, or just clear them right after the guard passes:
+</p>
+
+<p>
+Here's the given solution with comments:
+</p>
+
+<pre swift>
+func addCard() {
+    let trimmedPrompt = newPrompt.trimmingCharacters(in: .whitespaces)
+    let trimmedAnswer = newAnswer.trimmingCharacters(in: .whitespaces)
+    
+    // If they typed nothing but spaces, this bails out, 
+    // but the text field still has those ugly spaces in it.
+    guard trimmedPrompt.isEmpty == false &amp;&amp; trimmedAnswer.isEmpty == false else { return }
+    
+    // 1. Create and insert the clean, trimmed data
+    let card = Card(prompt: trimmedPrompt, answer: trimmedAnswer)
+    cards.insert(card, at: 0)
+    saveData()
+    
+    // 2. Clear the fields completely (wiping away any stray whitespaces)
+    newPrompt = ""
+    newAnswer = ""
+    
+    // 3. Optional: Dismiss the keyboard or close the sheet if needed!
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-The Edge Case: What happens when the user types only spaces?"><h3 id="The Edge Case: What happens when the user types only spaces?" class="header"><a href="#Ai Insight-ANSWER-The Edge Case: What happens when the user types only spaces?">The Edge Case: What happens when the user types only spaces?</a></h3></div>
+
+<p>
+If a user opens your app, types three spaces (<code>"   "</code>) into the text field, and hits "Save", here is exactly what your code does step-by-step:
+</p>
+
+<ul>
+<li>
+<code>trimmedPrompt</code> strips the spaces and becomes completely empty (<code>""</code>).
+
+<li>
+The <code>guard</code> statement checks if it's empty. It sees that it is empty, so it triggers the <code>else { return }</code> block.
+
+<li>
+The function <span id="Ai Insight-ANSWER-The Edge Case: What happens when the user types only spaces?-exits immediately"></span><strong id="exits immediately">exits immediately</strong> right there at the <code>guard</code> line.
+
+</ul>
+<p>
+Because the function exits early, it never reaches the bottom two lines (newPrompt = "" and newAnswer = "").
+</p>
+
+<p>
+As a result, those three spaces stay stuck in the text box on the user's screen. They have to manually backspace them out to try again.
+</p>
+
+<div id="Ai Insight-ANSWER-The Fix"><h3 id="The Fix" class="header"><a href="#Ai Insight-ANSWER-The Fix">The Fix</a></h3></div>
+
+<p>
+If you want the text fields to clear out <em>even if</em> the user types invalid spaces, you can reset the strings before the guard statement exits, or handle it in an else block:
+</p>
+
+<pre swift>
+func addCard() {
+    let trimmedPrompt = newPrompt.trimmingCharacters(in: .whitespaces)
+    let trimmedAnswer = newAnswer.trimmingCharacters(in: .whitespaces)
+    
+    // If validation fails, clear the text fields anyway so they don't stay full of spaces
+    guard trimmedPrompt.isEmpty == false &amp;&amp; trimmedAnswer.isEmpty == false else {
+        newPrompt = ""
+        newAnswer = ""
+        return 
+    }
+    
+    let card = Card(prompt: trimmedPrompt, answer: trimmedAnswer)
+    cards.insert(card, at: 0)
+    saveData()
+    
+    newPrompt = ""
+    newAnswer = ""
+}
+</pre>
+
+<p>
+Your original code is absolutely perfect for 99% of normal use cases! This is just a minor "defensive programming" tweak for when users accidentally mash the spacebar.
+</p>
+
 
 <p>
 <hr>
