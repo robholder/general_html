@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_261</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_260.html">Hacking With Swift - 260 - Challenge 1</a>
+
+</ul>
+<div id="Hacking With Swift - 261 - Challenge 2"><h1 id="Hacking With Swift - 261 - Challenge 2" class="header"><a href="#Hacking With Swift - 261 - Challenge 2">Hacking With Swift - 261 - Challenge 2</a></h1></div>
+
+<div id="Hacking With Swift - 261 - Challenge 2-Challenge 2"><h2 id="Challenge 2" class="header"><a href="#Hacking With Swift - 261 - Challenge 2-Challenge 2">Challenge 2</a></h2></div>
+
+<ul>
+<li>
+If you drag a card to the right but not far enough to remove it, then release, you see it turn red as it slides back to the center. Why does this happen and how can you fix it? (Tip: think about the way we set <code>offset</code> back to 0 immediately, even though the card hasn’t animated yet. You might solve this with a ternary within a ternary, but a custom modifier will be cleaner.)
+
+</ul>
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<p>
+This is one of the trickiest bugs in the entire 100 Days of SwiftUI course because it involves a race condition between <span id="Ai Insight-state changes"></span><strong id="state changes">state changes</strong> and <span id="Ai Insight-UI animations"></span><strong id="UI animations">UI animations</strong>.
+</p>
+
+<p>
+Your intuition about <code>abs</code> is very close, but the actual culprit is a sudden math flip when the card snaps back to the center. Here is exactly why it turns red, and the cleanest way to fix it.
+</p>
+
+<div id="Ai Insight-Why It Happens (The Bug)"><h3 id="Why It Happens (The Bug)" class="header"><a href="#Ai Insight-Why It Happens (The Bug)">Why It Happens (The Bug)</a></h3></div>
+
+<p>
+Look closely at how you color the background based on the drag direction:
+</p>
+
+<pre swift>
+.fill(offset.width &gt; 0 ? .green : .red)
+</pre>
+
+<p>
+When you drag the card to the right, <code>offset.width</code> is a positive number (e.g., <code>+120</code>). The ternary check sees <code>120 &gt; 0</code>, so it colors the background <span id="Ai Insight-Why It Happens (The Bug)-green"></span><strong id="green">green</strong>. Perfect.
+</p>
+
+<p>
+When you let go of the card <em>without</em> dragging it far enough, your <code>.onEnded</code> closure triggers this line instantly:
+</p>
+
+<pre swift>
+offset = .zero
+</pre>
+
+<p>
+Because of your <code>.animation(.bouncy, value: offset)</code> modifier at the bottom, the card does not teleport back to the center; it physically slides back using a smooth spring animation.
+</p>
+
+<p>
+However, the <code>offset</code> variable itself drops to exactly <code>0</code> the absolute millisecond you let go. As the card is physically animating through space back to the center, it re-evaluates the background color block. It checks your ternary condition: <code>offset.width &gt; 0</code>. Because <code>offset.width</code> is now exactly <code>0</code>, the condition <code>0 &gt; 0</code> evaluates to <code>false</code>.
+</p>
+
+<p>
+Because it's false, the ternary drops into the <code>else</code> block, which is <code>.red</code>.
+</p>
+
+<table>
+<tr>
+<td>
+⚠️ The Flash: As the card slides home, its state says its offset is 0, failing the "greater than zero" test, causing a split-second flash of red right before the animation finishes.
+</td>
+</tr>
+</table>
+
+<div id="Ai Insight-Solution 1: The Ternary within a Ternary (Quick Fix)"><h3 id="Solution 1: The Ternary within a Ternary (Quick Fix)" class="header"><a href="#Ai Insight-Solution 1: The Ternary within a Ternary (Quick Fix)">Solution 1: The Ternary within a Ternary (Quick Fix)</a></h3></div>
+
+<p>
+Paul mentions you can solve this with a nested ternary. If the width is exactly <code>0</code>, we can default it to a neutral color (like white or clear) so it doesn't flash red or green:
+</p>
+
+<p>
+Find this line in your background:
+</p>
+
+<pre swift>
+.fill(offset.width &gt; 0 ? .green : .red)
+</pre>
+
+<p>
+And replace it with this:
+</p>
+
+<pre swift>
+.fill(offset.width == 0 ? .clear : (offset.width &gt; 0 ? .green : .red))
+</pre>
+
+<p>
+<span id="Ai Insight-Solution 1: The Ternary within a Ternary (Quick Fix)-Why this works"></span><strong id="Why this works">Why this works</strong>: If the offset is exactly zero (which happens instantly when you release), it becomes <code>.clear</code>, hiding the underlying red asset entirely while it slides home.
+</p>
+
+<div id="Ai Insight-Solution 2: A Custom View Modifier (The Clean Way)"><h3 id="Solution 2: A Custom View Modifier (The Clean Way)" class="header"><a href="#Ai Insight-Solution 2: A Custom View Modifier (The Clean Way)">Solution 2: A Custom View Modifier (The Clean Way)</a></h3></div>
+
+<p>
+Paul's tip mentions that a custom modifier is much cleaner than messy nested inline ternaries. We can create a dedicated modifier that handles coloring the card background defensively based on the swipe state.
+</p>
+
+<p>
+Add this extension wrapper at the very bottom of your Swift file (outside the <code>CardView</code> struct):
+</p>
+
+<pre swift>
+struct CardBackgroundModifier: ViewModifier {
+    let offset: CGFloat
+
+    func body(content: Content) -&gt; some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 25)
+                    .fill(backgroundColor)
+            )
+    }
+
+    // Read-only property to isolate the coloring math cleanly
+    private var backgroundColor: Color {
+        if offset &gt; 0 {
+            return .green
+        } else if offset &lt; 0 {
+            return .red
+        } else {
+            return .clear // Safely handles exactly 0 without flashing red!
+        }
+    }
+}
+
+// Optional: Make it easy to call like a native modifier
+extension View {
+    func cardBackground(for offset: CGFloat) -&gt; some View {
+        modifier(CardBackgroundModifier(offset: offset))
+    }
+}
+</pre>
+
+<p>
+Then, look at your <code>CardView</code> and replace your messy inline background property block:
+</p>
+
+<pre swift>
+// Replace this whole section:
+// .background(
+//     accessibilityDifferentiateWithoutColor
+//     ? nil : RoundedRectangle(cornerRadius: 25)
+//         .fill(offset.width &gt; 0 ? .green : .red)
+// )
+
+// With this clean implementation:
+.background(
+    accessibilityDifferentiateWithoutColor 
+    ? nil 
+    : RoundedRectangle(cornerRadius: 25)
+        .fill(offset.width == 0 ? .clear : (offset.width &gt; 0 ? .green : .red))
+)
+</pre>
+
+<p>
+(Or if you implement the custom extension version, you can simply write <code>.cardBackground(for: offset.width)</code> if you prefer to decouple accessibility).
+</p>
+
+<p>
+Both tricks eliminate that annoying false-negative check when the card structural value snaps to zero!
+<hr>
+<br>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
