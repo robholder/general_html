@@ -324,16 +324,75 @@ ForEach(cards) { card in
 }
 </pre>
 
-<div id="Some Solutions To The firstIndex Error-ANSWER-Why this clears the error"><h4 id="Why this clears the error" class="header"><a href="#Some Solutions To The firstIndex Error-ANSWER-Why this clears the error">Why this clears the error</a></h4></div>
+<div id="Some Solutions To The firstIndex Error-QUESTION"><h2 id="QUESTION" class="header"><a href="#Some Solutions To The firstIndex Error-QUESTION">QUESTION</a></h2></div>
 
 <p>
-SwiftUI's <code>ForEach</code> expects its closure to return exactly <span id="Some Solutions To The firstIndex Error-ANSWER-Why this clears the error-one single View"></span><strong id="one single View">one single View</strong> layout structure (in this case, your configured <code>CardView</code>).
+I'm getting an error with this:
+</p>
+
+<div id="Some Solutions To The firstIndex Error-ANSWER"><h2 id="ANSWER" class="header"><a href="#Some Solutions To The firstIndex Error-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Ah, this is the final hurdle! That error happens because of a mismatch between what <code>ContentView</code> is trying to pass into the closure, and what your <code>CardView</code> template is currently expecting.
 </p>
 
 <p>
-By removing the <code>let index = ...</code> line, you are removing the raw logic step from the view hierarchy layout. Now, the compiler cleanly sees nothing but a single, uninterrupted <code>CardView</code> expression, which satisfies the compiler and makes that <code>Binding</code> error disappear.
+The error message:
 </p>
 
+<pre text>
+Contextual closure type '() -&gt; Void' expects 0 arguments, but 1 was used in closure body
+</pre>
+
+<p>
+...means <code>ContentView</code> is trying to pass <code>isCorrect</code> into the trailing closure (<code>{ isCorrect in ... }</code>), but your <code>CardView</code> file is still defined with the old, empty signature <code>var removal: (() -&gt; Void)? = nil</code>. It doesn't know what to do with that extra <code>isCorrect</code> variable yet.
+</p>
+
+<p>
+To fix this, you just need to update the signature inside your <code>CardView.swift</code> file so it matches the changes we made in <code>ContentView</code>.
+</p>
+
+<p>
+Open your <code>CardView</code> file and update these two spots:
+</p>
+
+<div id="Some Solutions To The firstIndex Error-ANSWER-1. Update the property definition"><h3 id="1. Update the property definition" class="header"><a href="#Some Solutions To The firstIndex Error-ANSWER-1. Update the property definition">1. Update the property definition</a></h3></div>
+
+<p>
+At the top of <code>CardView</code> (where your state variables are defined), find your <code>removal</code> closure declaration and change it to expect a <code>Bool</code>:
+</p>
+
+<pre swift>
+// Change this:
+// var removal: (() -&gt; Void)? = nil
+
+// To this:
+var removal: ((Bool) -&gt; Void)? = nil
+</pre>
+
+<div id="Some Solutions To The firstIndex Error-ANSWER-2. Update the Drag Gesture call"><h3 id="2. Update the Drag Gesture call" class="header"><a href="#Some Solutions To The firstIndex Error-ANSWER-2. Update the Drag Gesture call">2. Update the Drag Gesture call</a></h3></div>
+
+<p>
+Scroll down to the bottom of <code>CardView</code> where the <code>.gesture(DragGesture())</code> is configured. Inside <code>.onEnded</code>, we need to pass that boolean down:
+</p>
+
+<pre swift>
+.onEnded { _ in
+    if abs(offset.width) &gt; 100 {
+        // Calculate if it was a correct swipe (Right) or wrong swipe (Left)
+        let isCorrect = offset.width &gt; 0
+        
+        // Pass that true/false value into the removal closure!
+        removal?(isCorrect)
+    } else {
+        offset = .zero
+    }
+}
+</pre>
+
+<p>
+Once you update those two spots inside <code>CardView.swift</code>, save the file, and head back to <code>ContentView</code>. That pesky "expects 0 arguments" compiler error should completely disappear!
+</p>
 
 <div id="Some Solutions To The firstIndex Error-ANSWER-Step 2: Update the Accessibility Buttons"><h3 id="Step 2: Update the Accessibility Buttons" class="header"><a href="#Some Solutions To The firstIndex Error-ANSWER-Step 2: Update the Accessibility Buttons">Step 2: Update the Accessibility Buttons</a></h3></div>
 
