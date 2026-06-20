@@ -31,7 +31,377 @@
 </ul>
 <div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro"><h1 id="Hacking With Swift - 263 - Challenge 3 - cdalvaro" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro">Hacking With Swift - 263 - Challenge 3 - cdalvaro</a></h1></div>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution"><h2 id="Ai Insight on cdalvaro's solution" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution">Ai Insight on cdalvaro's solution</a></h2></div>
+<div id="A Solution"><h1 id="A Solution" class="header"><a href="#A Solution">A Solution</a></h1></div>
+
+<div id="A Solution-FlashzillaApp.swift"><h4 id="FlashzillaApp.swift" class="header"><a href="#A Solution-FlashzillaApp.swift">FlashzillaApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+@main
+struct FlashzillaApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        .modelContainer(for: Card.self)
+    }
+}
+</pre>
+
+<div id="A Solution-Card.swift"><h4 id="Card.swift" class="header"><a href="#A Solution-Card.swift">Card.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+class Card: Identifiable {
+    var id = UUID()
+    var prompt: String
+    var answer: String
+    
+    init(prompt: String, answer: String) {
+        self.prompt = prompt
+        self.answer = answer
+    }
+    
+    init(card: Card) {
+        prompt = card.prompt
+        answer = card.answer
+    }
+    
+    static let example = Card(prompt: "What is Swift?", answer: "A high-level programming language.")
+}
+</pre>
+
+<div id="A Solution-CardView.swift"><h4 id="CardView.swift" class="header"><a href="#A Solution-CardView.swift">CardView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct CardView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+    @Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
+    
+    @State private var isShowingAnswer = false
+    @State private var offset = CGSize.zero
+    
+    let card: Card
+    var removal: ((Bool) -&gt; Void)?
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 25)
+                .fill(
+                    accessibilityDifferentiateWithoutColor
+                    ? .white
+                    : .white
+                        .opacity(1 - Double(abs(offset.width / 50)))
+                )
+                .background(
+                    accessibilityDifferentiateWithoutColor
+                    ? nil
+                    : RoundedRectangle(cornerRadius: 25)
+                        .fill(offset.width &gt; 0 ? .green : .red)
+                )
+                .shadow(radius: 10)
+            
+            VStack {
+                if accessibilityVoiceOverEnabled {
+                    Text(isShowingAnswer ? card.answer : card.prompt)
+                        .font(.largeTitle)
+                        .foregroundStyle(.black)
+                } else {
+                    Text(card.prompt)
+                        .font(.largeTitle)
+                        .foregroundStyle(.black)
+                    
+                    if isShowingAnswer {
+                        Text(card.answer)
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(20)
+            .multilineTextAlignment(.center)
+        }
+        .frame(width: 450, height: 250)
+        .rotationEffect(.degrees(Double(offset.width / 5)))
+        .offset(x: offset.width * 5)
+        .opacity(2 - Double(abs(offset.width / 50)))
+        .accessibilityAddTraits(.isButton)
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    offset = gesture.translation
+                }
+                .onEnded { _ in
+                    if abs(offset.width) &gt; 100 {
+                        removal?(offset.width &gt; 0)
+                    } else {
+                        offset = .zero
+                    }
+                }
+        )
+        .onTapGesture {
+            isShowingAnswer.toggle()
+        }
+        .animation(.bouncy, value: offset)
+    }
+}
+
+#Preview {
+    CardView(card: .example)
+}
+</pre>
+
+<div id="A Solution-EditCards.swift"><h4 id="EditCards.swift" class="header"><a href="#A Solution-EditCards.swift">EditCards.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+struct EditCardsView: View {
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) var modelContext
+    
+    @Query private var cards: [Card]
+    @State private var newPrompt = ""
+    @State private var newAnswer = ""
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Add new card") {
+                    TextField("Prompt", text: $newPrompt)
+                    TextField("Answer", text: $newAnswer)
+                    Button("Add Card", action: addCard)
+                }
+                
+                Section {
+                    ForEach(cards, id: \.id) { card in
+                        VStack(alignment: .leading) {
+                            Text(card.prompt)
+                                .font(.headline)
+                            Text(card.answer)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onDelete(perform: deleteCards)
+                }
+            }
+            .navigationTitle("Edit Cards")
+            .toolbar {
+                Button("Done", action: done)
+            }
+        }
+    }
+    
+    func done() {
+        dismiss()
+    }
+    
+    func addCard() {
+        let trimmedPrompt = newPrompt.trimmingCharacters(in: .whitespaces)
+        let trimmedAnswer = newAnswer.trimmingCharacters(in: .whitespaces)
+        
+        guard trimmedPrompt.isEmpty == false, trimmedAnswer.isEmpty == false else {
+            return
+        }
+        
+        let card = Card(prompt: trimmedPrompt, answer: trimmedAnswer)
+        modelContext.insert(card)
+        
+        newPrompt = ""
+        newAnswer = ""
+    }
+    
+    func deleteCards(at offsets: IndexSet) {
+        for offset in offsets {
+            modelContext.delete(cards[offset])
+        }
+    }
+}
+
+#Preview {
+    EditCardsView()
+}
+</pre>
+
+<div id="A Solution-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#A Solution-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import Combine
+import SwiftData
+import SwiftUI
+
+extension View {
+    func stacked(at position: Int, in total: Int) -&gt; some View {
+        let offset = Double(total - position)
+        return self.offset(y: offset * 10)
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
+    @Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
+    @Environment(\.modelContext) var modelContext
+    
+    @Query private var cards: [Card]
+    @State private var showingEditScreen = false
+    
+    @State private var timeRemaining = 100
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    @Environment(\.scenePhase) var scenePhase
+    @State private var isActive = true
+    
+    var body: some View {
+        ZStack {
+            Image(decorative: "background")
+                .resizable()
+                .ignoresSafeArea()
+            
+            VStack {
+                Text("Time: \(timeRemaining)")
+                    .font(.largeTitle)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 5)
+                    .background(.black.opacity(0.75))
+                    .clipShape(.capsule)
+                
+                ZStack {
+                    ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                        CardView(card: card) { isRight in
+                            withAnimation {
+                                removeCard(card, isRight: isRight)
+                            }
+                        }
+                        .stacked(at: index, in: cards.count)
+                        .allowsHitTesting(index == cards.count - 1)
+                        .accessibilityHidden(index &lt; cards.count - 1)
+                    }
+                }
+                .allowsHitTesting(timeRemaining &gt; 0)
+                
+                if cards.isEmpty {
+                    Button("Start Again", action: resetCards)
+                        .padding()
+                        .background(.white)
+                        .foregroundStyle(.black)
+                        .clipShape(.capsule)
+                }
+            }
+            
+            VStack {
+                HStack {
+                    Spacer()
+                    
+                    Button {
+                        showingEditScreen = true
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .padding()
+                            .background(.black.opacity(0.7))
+                            .clipShape(.circle)
+                    }
+                }
+                
+                Spacer()
+            }
+            .foregroundStyle(.white)
+            .font(.largeTitle)
+            .padding()
+            
+            if accessibilityDifferentiateWithoutColor || accessibilityVoiceOverEnabled {
+                VStack {
+                    Spacer()
+                    
+                    HStack {
+                        Button {
+                            withAnimation {
+                                removeCard(cards.last, isRight: false)
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                                .padding()
+                                .background(.black.opacity(0.7))
+                                .clipShape(.circle)
+                        }
+                        .accessibilityLabel("Wrong")
+                        .accessibilityHint("Mark your answer as being incorrect.")
+                        
+                        Spacer()
+                        
+                        Button {
+                            withAnimation {
+                                removeCard(cards.last, isRight: true)
+                            }
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .padding()
+                                .background(.black.opacity(0.7))
+                                .clipShape(.circle)
+                        }
+                        .accessibilityLabel("Correct")
+                        .accessibilityHint("Mark your answer as being correct.")
+                    }
+                    .foregroundStyle(.white)
+                    .font(.largeTitle)
+                    .padding()
+                }
+            }
+        }
+        .onReceive(timer) { _ in
+            guard isActive else { return }
+            
+            if timeRemaining &gt; 0 {
+                timeRemaining -= 1
+            }
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                if cards.isEmpty == false {
+                    isActive = true
+                }
+            } else {
+                isActive = false
+            }
+        }
+        .sheet(isPresented: $showingEditScreen, onDismiss: resetCards) {
+            EditCardsView()
+        }        .onAppear(perform: resetCards)
+    }
+    
+    func removeCard(_ card: Card?, isRight: Bool) {
+        guard let card else { return }
+        
+        modelContext.delete(card)
+        if !isRight {
+            modelContext.insert(Card(card: card))
+        }
+        
+        if cards.isEmpty {
+            isActive = false
+        }
+    }
+    
+    func resetCards() {
+        timeRemaining = 100
+        isActive = true
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="A Solution-Ai Insight on cdalvaro's solution"><h2 id="Ai Insight on cdalvaro's solution" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution">Ai Insight on cdalvaro's solution</a></h2></div>
 
 <p>
 Challenge 3 is definitely where things get a bit mind-bending because it introduces a complete architecture shift.
@@ -45,7 +415,7 @@ Looking closely at your provided code, you've actually hit two major birds with 
 Here is a breakdown of exactly what changed and how it satisfies the goal.
 </p>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go"><h3 id="1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go">1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go</a></h3></div>
+<div id="A Solution-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go"><h3 id="1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go">1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go</a></h3></div>
 
 <p>
 In your original code, the <code>ForEach</code> loop relied on array indices to render the card stack:
@@ -60,10 +430,10 @@ When you use <code>id: \.self</code> with integers, SwiftUI binds the identity o
 </p>
 
 <p>
-<span id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go-The Bug"></span><strong id="The Bug">The Bug</strong>: If you answer a card incorrectly and shove it to the bottom of the array, the view at <code>index</code> doesn't change smoothly. SwiftUI gets confused because the indices shift around, causing animation glitches (like cards instantly teleporting or flashing back instead of sliding gracefully).
+<span id="A Solution-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go-The Bug"></span><strong id="The Bug">The Bug</strong>: If you answer a card incorrectly and shove it to the bottom of the array, the view at <code>index</code> doesn't change smoothly. SwiftUI gets confused because the indices shift around, causing animation glitches (like cards instantly teleporting or flashing back instead of sliding gracefully).
 </p>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go-The Solution in ContentView.swift:"><h4 id="The Solution in ContentView.swift:" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go-The Solution in ContentView.swift:">The Solution in ContentView.swift:</a></h4></div>
+<div id="A Solution-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go-The Solution in ContentView.swift:"><h4 id="The Solution in ContentView.swift:" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution-1. Why ForEach(0..&lt;cards.count, id: \.self) Had to Go-The Solution in ContentView.swift:">The Solution in ContentView.swift:</a></h4></div>
 
 <pre swift>
 ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in ... }
@@ -73,10 +443,10 @@ ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in ... }
 By switching to an enumerated array and setting <code>id: \.element.id</code>, you give SwiftUI a permanent anchor. Even if a card is deleted, re-inserted, or rearranged, SwiftUI tracks it by its unique identity (<code>id</code>), ensuring perfect, fluid card animations.
 </p>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-2. The Move to SwiftData (The Magic of Re-Insertion)"><h3 id="2. The Move to SwiftData (The Magic of Re-Insertion)" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-2. The Move to SwiftData (The Magic of Re-Insertion)">2. The Move to SwiftData (The Magic of Re-Insertion)</a></h3></div>
+<div id="A Solution-Ai Insight on cdalvaro's solution-2. The Move to SwiftData (The Magic of Re-Insertion)"><h3 id="2. The Move to SwiftData (The Magic of Re-Insertion)" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution-2. The Move to SwiftData (The Magic of Re-Insertion)">2. The Move to SwiftData (The Magic of Re-Insertion)</a></h3></div>
 
 <p>
-To dynamically insert cards back into the persistent stack without messy manual JSON re-encoding, the project shifted to using Apple's modern <span id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-2. The Move to SwiftData (The Magic of Re-Insertion)-SwiftData"></span><strong id="SwiftData">SwiftData</strong> framework.
+To dynamically insert cards back into the persistent stack without messy manual JSON re-encoding, the project shifted to using Apple's modern <span id="A Solution-Ai Insight on cdalvaro's solution-2. The Move to SwiftData (The Magic of Re-Insertion)-SwiftData"></span><strong id="SwiftData">SwiftData</strong> framework.
 </p>
 
 <p>
@@ -111,13 +481,13 @@ class Card: Identifiable {
 Because cards is now managed globally via <code>@Query private var cards: [Card]</code>, anytime you touch the <code>modelContext</code>, the UI updates automatically.
 </p>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works"><h3 id="3. How the &quot;Wrong Answer&quot; Logic Actually Works" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works">3. How the "Wrong Answer" Logic Actually Works</a></h3></div>
+<div id="A Solution-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works"><h3 id="3. How the &quot;Wrong Answer&quot; Logic Actually Works" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works">3. How the "Wrong Answer" Logic Actually Works</a></h3></div>
 
 <p>
 Look closely at how your <code>removeCard</code> function changed in <code>ContentView.swift</code>:
 </p>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-Old Implementation:"><h4 id="Old Implementation:" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-Old Implementation:">Old Implementation:</a></h4></div>
+<div id="A Solution-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-Old Implementation:"><h4 id="Old Implementation:" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-Old Implementation:">Old Implementation:</a></h4></div>
 
 <pre wift>
 func removeCard(at index: Int) {
@@ -129,7 +499,7 @@ func removeCard(at index: Int) {
 It didn't know (or care) if you swiped left or right; the card was permanently vaporized from the array.
 </p>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-New Implementation:"><h4 id="New Implementation:" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-New Implementation:">New Implementation:</a></h4></div>
+<div id="A Solution-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-New Implementation:"><h4 id="New Implementation:" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution-3. How the &quot;Wrong Answer&quot; Logic Actually Works-New Implementation:">New Implementation:</a></h4></div>
 
 <pre swift>
 func removeCard(_ card: Card?, isRight: Bool) {
@@ -144,7 +514,7 @@ func removeCard(_ card: Card?, isRight: Bool) {
 }
 </pre>
 
-<div id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-Breaking down the new removeCard:"><h3 id="Breaking down the new removeCard:" class="header"><a href="#Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-Breaking down the new removeCard:">Breaking down the new removeCard:</a></h3></div>
+<div id="A Solution-Ai Insight on cdalvaro's solution-Breaking down the new removeCard:"><h3 id="Breaking down the new removeCard:" class="header"><a href="#A Solution-Ai Insight on cdalvaro's solution-Breaking down the new removeCard:">Breaking down the new removeCard:</a></h3></div>
 
 <ul>
 <li>
@@ -154,7 +524,7 @@ func removeCard(_ card: Card?, isRight: Bool) {
 <code>modelContext.delete(card)</code>: No matter what, the specific card you just swiped is removed from the current context so it flies off the screen.
 
 <li>
-<code>modelContext.insert(Card(card: card))</code>: If <code>isRight</code> is false (you got it wrong), a <span id="Hacking With Swift - 263 - Challenge 3 - cdalvaro-Ai Insight on cdalvaro's solution-Breaking down the new removeCard:-brand new clone"></span><strong id="brand new clone">brand new clone</strong> of the card is inserted into SwiftData.
+<code>modelContext.insert(Card(card: card))</code>: If <code>isRight</code> is false (you got it wrong), a <span id="A Solution-Ai Insight on cdalvaro's solution-Breaking down the new removeCard:-brand new clone"></span><strong id="brand new clone">brand new clone</strong> of the card is inserted into SwiftData.
 
 </ul>
 <p>
