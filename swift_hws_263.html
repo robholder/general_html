@@ -879,6 +879,102 @@ Because of <code>id: \.element.id</code>, SwiftUI looks at the updated array and
 If you had used the old <code>id: \.self</code> with integers, SwiftUI would only look at the positions (<code>0, 1, 2</code>). It would see that the array size is still the same and say, <em>"Oh, nothing moved, the slots are the same!"</em> - causing the old card to instantly snap back to the center of the screen instead of flying away.
 </p>
 
+<div id="Extra Insight for ForEach treatment-QUESTION"><h2 id="QUESTION" class="header"><a href="#Extra Insight for ForEach treatment-QUESTION">QUESTION</a></h2></div>
+
+<p>
+So what is the required structure for <code>ForEach</code>?
+</p>
+
+<pre swift>
+ForEach('something', 'something')
+</pre>
+
+<p>
+Is it an array or list, then some kind of identifying or labeling?
+</p>
+
+<div id="Extra Insight for ForEach treatment-ANSWER"><h2 id="ANSWER" class="header"><a href="#Extra Insight for ForEach treatment-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You’ve hit the nail on the head! That is exactly what <code>ForEach</code> requires.
+</p>
+
+<p>
+The strict structural blueprint for a dynamic <code>ForEach</code> loop in SwiftUI is always:
+</p>
+
+<pre text>
+ForEach(An Array of Data,How to uniquely identify each item in that Array)
+</pre>
+
+<p>
+In code, that looks like this:
+</p>
+
+<pre swift>
+ForEach(yourArray, id: \.someUniqueProperty) { item in
+    // Build your views here using 'item'
+}
+</pre>
+
+<p>
+Here is exactly what those two components mean to SwiftUI:
+</p>
+
+<div id="Extra Insight for ForEach treatment-ANSWER-1. The First Argument: An Array of Data"><h3 id="1. The First Argument: An Array of Data" class="header"><a href="#Extra Insight for ForEach treatment-ANSWER-1. The First Argument: An Array of Data">1. The First Argument: An Array of Data</a></h3></div>
+
+<p>
+SwiftUI needs a standard collection of data to loop through. This must be a concrete array (like <code>[Card]</code>, <code>[String]</code>, <code>[Int]</code>, or your custom <code>Array(cards.enumerated())</code>). It cannot be a <code>List</code> view, because <code>List</code> is a visual container (like a UIKit table view), whereas <code>ForEach</code> is the actual logic engine that loops and spits out views.
+</p>
+
+<div id="Extra Insight for ForEach treatment-ANSWER-2. The Second Argument: id: (The Identifier)"><h3 id="2. The Second Argument: id: (The Identifier)" class="header"><a href="#Extra Insight for ForEach treatment-ANSWER-2. The Second Argument: id: (The Identifier)">2. The Second Argument: id: (The Identifier)</a></h3></div>
+
+<p>
+This is the "labeling" part you mentioned. SwiftUI views are ephemeral—they are created and destroyed constantly. To animate them smoothly, SwiftUI needs a way to link a specific visual view on your screen to a specific piece of data in your memory.
+</p>
+
+<p>
+The <code>id:</code> parameter tells SwiftUI exactly which property to look at to find that unique label.
+</p>
+
+<div id="Extra Insight for ForEach treatment-ANSWER-The Two Ways to Satisfy ForEach"><h3 id="The Two Ways to Satisfy ForEach" class="header"><a href="#Extra Insight for ForEach treatment-ANSWER-The Two Ways to Satisfy ForEach">The Two Ways to Satisfy ForEach</a></h3></div>
+
+<p>
+Because <code>ForEach</code> absolutely demands this identifier, you have two choices when using it:
+</p>
+
+<div id="Extra Insight for ForEach treatment-ANSWER-The Two Ways to Satisfy ForEach-Option A: Tell `ForEach` explicitly what the ID is (Your New Code)"><h4 id="Option A: Tell `ForEach` explicitly what the ID is (Your New Code)" class="header"><a href="#Extra Insight for ForEach treatment-ANSWER-The Two Ways to Satisfy ForEach-Option A: Tell `ForEach` explicitly what the ID is (Your New Code)">Option A: Tell <code>ForEach</code> explicitly what the ID is (Your New Code)</a></h4></div>
+
+<p>
+If your data is inside a wrapper or doesn't conform to a specific protocol, you manually point to the ID:
+</p>
+
+<pre swift>
+ForEach(Array(cards.enumerated()), id: \.element.id)
+</pre>
+
+<p>
+<em>(Translation: "Loop through this enumerated array, and find the unique label by digging into the card's id property.")</em>
+</p>
+
+<div id="Extra Insight for ForEach treatment-ANSWER-The Two Ways to Satisfy ForEach-Option B: Make the Data Type Identifiable (Clean Alternative)"><h4 id="Option B: Make the Data Type Identifiable (Clean Alternative)" class="header"><a href="#Extra Insight for ForEach treatment-ANSWER-The Two Ways to Satisfy ForEach-Option B: Make the Data Type Identifiable (Clean Alternative)">Option B: Make the Data Type Identifiable (Clean Alternative)</a></h4></div>
+
+<p>
+If your data model explicitly conforms to the <code>Identifiable</code> protocol and has a property named <code>id</code> (which your new <code>Card</code> model does!), you can actually drop the second argument entirely when looping through a raw array of cards:
+</p>
+
+<pre swift>
+ForEach(cards) { card in ... }
+</pre>
+
+<p>
+<em>(Translation: "SwiftUI already knows how to identify these objects because the Card class promises to always have a unique id property built right into it.")</em>
+</p>
+
+<p>
+You only had to use Option A in your project because <code>cards.enumerated()</code> wrapped your identifiable cards inside that extra (<code>offset, element</code>) box, forcing you to manually draw a map (<code>\.element.id</code>) to help SwiftUI find the passport number!
+</p>
+
 <p>
 <hr>
 <br>
