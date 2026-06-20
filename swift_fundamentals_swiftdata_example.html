@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_swiftdata_example</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - SwiftData"><h1 id="Swift - SwiftData" class="header"><a href="#Swift - SwiftData">Swift - SwiftData</a></h1></div>
+
+<div id="Swift - SwiftData-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Swift - SwiftData-Ai Insight">Ai Insight</a></h2></div>
+
+<div id="Swift - SwiftData-Minimal Example"><h2 id="Minimal Example" class="header"><a href="#Swift - SwiftData-Minimal Example">Minimal Example</a></h2></div>
+
+
+<p>
+Here is a complete, minimal, and fully functioning SwiftData project contained in a single file. You can drop this directly into a new Xcode project to use as a cheat sheet.
+</p>
+
+<p>
+It covers the three pillars:
+</p>
+<ul>
+<li>
+the @Model blueprint,
+
+<li>
+the .modelContainer setup,
+
+<li>
+and the @Query property wrapper to pull data in and out.
+
+</ul>
+<div id="Swift - SwiftData-Minimal Example-The Complete Minimal Example"><h3 id="The Complete Minimal Example" class="header"><a href="#Swift - SwiftData-Minimal Example-The Complete Minimal Example">The Complete Minimal Example</a></h3></div>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+// 1. THE MODEL: Define the data structure
+@Model
+class Item {
+    var timestamp: Date
+    
+    init(timestamp: Date = .now) {
+        self.timestamp = timestamp
+    }
+}
+
+// 2. THE APP ROOT: Inject the database container
+@main
+struct SwiftDataMiniApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // This sets up the database storage in the background for our Item class
+        .modelContainer(for: Item.self)
+    }
+}
+
+// 3. THE VIEW: Read from and write to the database
+struct ContentView: View {
+    // Access the 'manager' context used to insert or delete data
+    @Environment(\.modelContext) private var modelContext
+    
+    // Fetch and automatically update the list of items from the database
+    @Query private var items: [Item]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(items) { item in
+                    Text("Saved at: \(item.timestamp.formatted(
+                        date: .omitted,
+                        time: .standard)
+                    )")
+                }
+                .onDelete(perform: deleteItems) // Swipe to delete from DB
+            }
+            .navigationTitle("Mini SwiftData")
+            .toolbar {
+                Button("Add Item", systemImage: "plus", action: addItem)
+            }
+        }
+    }
+
+    // CREATE Logic
+    func addItem() {
+        let newItem = Item()
+        modelContext.insert(newItem) // Saves it instantly to the database
+    }
+
+    // DELETE Logic
+    func deleteItems(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(items[index]) // Vaporizes it from the database
+        }
+    }
+}
+</pre>
+
+<div id="Swift - SwiftData-Minimal Example-How the Data Flows (In &amp; Out)"><h3 id="How the Data Flows (In &amp; Out)" class="header"><a href="#Swift - SwiftData-Minimal Example-How the Data Flows (In &amp; Out)">How the Data Flows (In &amp; Out)</a></h3></div>
+
+<ul>
+<li>
+<span id="Swift - SwiftData-Minimal Example-How the Data Flows (In &amp; Out)-Going In (Write)"></span><strong id="Going In (Write)">Going In (Write)</strong>: You grab the environment's <code>modelContext</code>. Think of this context as your active scratchpad. When you call <code>modelContext.insert(newItem)</code>, SwiftData takes that scratchpad object and flushes it down into the permanent database file managed by your app container.
+
+<li>
+<span id="Swift - SwiftData-Minimal Example-How the Data Flows (In &amp; Out)-Coming Out (Read)"></span><strong id="Coming Out (Read)">Coming Out (Read)</strong>: You use <code>@Query private var items: [Item]</code>. This acts as a live, open pipe directly into the database file. You don't have to call a "refresh" function when you add or delete something; the moment the data file changes, <code>@Query</code> notices it, pulls the fresh data out, and tells SwiftUI to redraw the <code>List</code>.
+
+</ul>
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
