@@ -31,8 +31,108 @@
 </ul>
 <div id="Hacking With Swift - 267 - How to create a custom alignment guide"><h1 id="Hacking With Swift - 267 - How to create a custom alignment guide" class="header"><a href="#Hacking With Swift - 267 - How to create a custom alignment guide">Hacking With Swift - 267 - How to create a custom alignment guide</a></h1></div>
 
+<p>
+SwiftUI gives us alignment guides for the various edges of our views (<code>.leading</code>, <code>.trailing</code>, <code>.top</code>, and so on) plus <code>.center</code> and two baseline options to help with text alignment. However, none of these work well when you’re working with views that are split across disparate views - if you have to make two views aligned the same when they are in entirely different parts of your user interface.
+</p>
 
 <p>
+To fix this, SwiftUI lets us create custom alignment guides, and use those guides in views across our UI. It doesn’t matter what comes before or after these views; they will still line up.
+</p>
+
+<p>
+For example, here’s a layout that shows my Twitter account name and my profile picture on the left, and on the right shows "Full name:" plus "Paul Hudson" in a large font:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        HStack {
+            VStack {
+                Text("@twostraws")
+                Image(.paulHudson)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+            }
+
+            VStack {
+                Text("Full name:")
+                Text("PAUL HUDSON")
+                    .font(.largeTitle)
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+If you want "@twostraws" and "Paul Hudson" to be vertically aligned together, you’ll have a hard time right now. The horizontal stack contains two vertical stacks inside it, so there’s no built-in way to get the alignment you want - things like <code>HStack(alignment: .top)</code> just won’t come close.
+</p>
+
+<p>
+To fix this we need to define a custom layout guide. This should be an extension on either <code>VerticalAlignment</code> or <code>HorizontalAlignment</code>, and be a custom type that conforms to the <code>AlignmentID</code> protocol.
+</p>
+
+<p>
+When I say "custom type" you might be thinking of a struct, but it’s actually a good idea to implement this as an enum instead as I’ll explain shortly. The <code>AlignmentID</code> protocol has only one requirement, which is that the conforming type must provide a static <code>defaultValue(in:)</code> method that accepts a <code>ViewDimensions</code> object and returns a <code>CGFloat</code> specifying how a view should be aligned if it doesn’t have an <code>alignmentGuide()</code> modifier. You’ll be given the existing <code>ViewDimensions</code> object for the view, so you can either pick one of those for your default or use a hard-coded value.
+</p>
+
+<p>
+Let’s write out the code so you can see how it looks:
+</p>
+
+<pre swift>
+extension VerticalAlignment {
+    struct MidAccountAndName: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -&gt; CGFloat {
+            context[.top]
+        }
+    }
+
+    static let midAccountAndName = VerticalAlignment(MidAccountAndName.self)
+}
+</pre>
+
+<p>
+You can see I’ve used the .top view dimension by default, and I’ve also created a static constant called midAccountAndName to make the custom alignment easier to use.
+</p>
+
+<p>
+Now, I mentioned that using an enum is preferable to a struct, and here’s why: we just created a new struct called MidAccountAndName, which means we could (if we wanted) create an instance of that struct even though doing so doesn’t make sense because it doesn’t have any functionality. If you replace struct MidAccountAndName with enum MidAccountAndName then you can’t make an instance of it any more - it becomes clearer that this thing exists only to house some functionality.
+</p>
+
+<p>
+Regardless of whether you choose an enum or a struct, its usage stays the same: set it as the alignment for your stack, then use alignmentGuide() to activate it on any views you want to align together. This is only a guide: it helps you align views along a single line, but doesn’t say how they should be aligned. This means you still need to provide the closure to alignmentGuide() that positions the views along that guide as you want.
+</p>
+
+<p>
+For example, we could update our Twitter code to use .midAccountAndName, then tell the account and name to use their center position for the guide. To be clear, that means "align these two views so their centers are both on the .midAccountAndName guide".
+</p>
+
+<p>
+Here’s how that looks in code:
+</p>
+
+<p>
+HStack(alignment: .midAccountAndName) {
+</p>
+<pre><code>VStack {
+Text("@twostraws")
+.alignmentGuide(.midAccountAndName) { d in d[VerticalAlignment.center] }
+Image(.paulHudson)
+.resizable()
+.frame(width: 64, height: 64)
+}
+</code></pre>
+<pre><code>VStack {
+Text("Full name:")
+Text("PAUL HUDSON")
+.alignmentGuide(.midAccountAndName) { d in d[VerticalAlignment.center] }
+.font(.largeTitle)
+}
+</code></pre>
+<p>
+}
+That will make sure they are vertically aligned regardless of what comes before or after. I suggest you try adding some more text views before and after our examples - SwiftUI will reposition everything to make sure the two we aligned stay that way.
 <hr>
 <br>
 </p>
