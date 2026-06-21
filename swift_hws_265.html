@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_265</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_264.html">Hacking With Swift - 264 - Layout and geometry: Introduction</a>
+
+</ul>
+<div id="Hacking With Swift - 265 - How layout works in SwiftUI"><h1 id="Hacking With Swift - 265 - How layout works in SwiftUI" class="header"><a href="#Hacking With Swift - 265 - How layout works in SwiftUI">Hacking With Swift - 265 - How layout works in SwiftUI</a></h1></div>
+
+<p>
+All SwiftUI layout happens in three simple steps, and understanding these steps is the key to getting great layouts every time. The steps are:
+</p>
+
+<ul>
+<li>
+A parent view proposes a size for its child.
+
+<li>
+Based on that information, the child then chooses its own size and the parent must respect that choice.
+
+<li>
+The parent then positions the child in its coordinate space.
+
+</ul>
+<p>
+Behind the scenes, SwiftUI performs a fourth step: although it stores positions and sizes as floating-point numbers, when it comes to rendering SwiftUI rounds off any pixels to their nearest values so our graphics remain sharp.
+</p>
+
+<p>
+Those three rules might seem simple, but they allow us to create hugely complicated layouts where every view decides how and when it resizes without the parent having to get involved.
+</p>
+
+<p>
+To demonstrate these rules in action, I’d like you to use a simple <code>Text</code> with a <code>background()</code> modifier, like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        Text("Hello, World!")
+            .background(.red)
+    }
+}
+</pre>
+
+<p>
+You’ll see the background color sits tightly around the text itself - it takes up only enough space to fit the content we provided.
+</p>
+
+<p>
+Now, think about this question: how big is <code>ContentView</code>? As you can see, the body of <code>ContentView</code> - the thing that it renders - is some text with a background color. And so the size of <code>ContentView</code> is exactly and always the size of its body, no more and no less. This is called being <em>layout neutral</em>: <code>ContentView</code> doesn’t have any size of its own, and instead happily adjusts to fit whatever size is needed.
+</p>
+
+<p>
+Back in project 3 I explained to you that when you apply a modifier to a view we actually get back a new view type called <code>ModifiedContent</code>, which stores both our original view and its modifier. This means when we apply a modifier, the actual view that goes into the hierarchy is the modified view, not the original one.
+</p>
+
+<p>
+In our simple <code>background()</code> example, that means the top-level view inside <code>ContentView</code> is the background, and inside <em>that</em> is the text. Backgrounds are layout neutral just like <code>ContentView</code>, so it will just pass on any layout information as needed - you can end up with a chain of layout information being passed around until a definitive answer comes back.
+</p>
+
+<p>
+If we put this into the three-step layout system, we end up with a conversation a bit like this:
+</p>
+
+<ul>
+<li>
+SwiftUI: "Hey, <code>ContentView</code>, you have the whole screen to yourself - how much of it do you need?" (Parent view proposes a size)
+
+<li>
+<code>ContentView</code>: "I don’t care; I’m layout neutral. Let me ask my child: hey, background, you have the whole screen to yourself - how much of it do you need?" (Parent view proposes a size)
+
+<li>
+Background: "I also don’t care; I’m layout neutral too. Let me ask <em>my</em> child: hey, text, you can have the whole screen to yourself - how much of it do you need?" (Parent view proposes a size)
+
+<li>
+Text: "Well, I have the letters ‘Hello, World’ in the default font, so I need exactly X pixels width by Y pixels height. I don’t need the whole screen, just that." (Child chooses its size.)
+
+<li>
+Background: "Got it. Hey, ContentView: I need X by Y pixels, please."
+
+<li>
+<code>ContentView</code>: "Right on. Hey, SwiftUI: I need X by Y pixels."
+
+</ul>
+<p>
+SwiftUI: "Nice. Well, that leaves lots of space, so I’m going to put you at your size in the center." (Parent positions the child in its coordinate space.)
+</p>
+
+<p>
+So, when we say <code>Text("Hello, World!").background(.red)</code>, the text view becomes a child of its background. SwiftUI effectively works its way from bottom to top when it comes to a view and its modifiers.
+</p>
+
+<p>
+Now consider this layout:
+</p>
+
+<pre swift>
+Text("Hello, World!")
+    .padding(20)
+    .background(.red)
+</pre>
+
+<p>
+This time the conversation is more complicated: <code>padding()</code> no longer offers all its space to its child, because it needs to subtract 20 points from each side to make sure there’s enough space for the padding. Then, when the answer comes back from the text view, <code>padding()</code> <em>adds</em> 20 points on each side to pad it out, as requested.
+</p>
+
+<p>
+So, it’s more like this:
+</p>
+
+<ul>
+<li>
+SwiftUI: You can have the whole screen, how much of it do you need, ContentView?
+
+<li>
+<code>ContentView</code>: You can have the whole screen, how much of it do you need, background?
+
+<li>
+Background: You can have the whole screen, how much of it do you need, padding?
+
+<li>
+Padding: You can have the whole screen minus 20 points on each side, how much of it do you need, text?
+
+<li>
+Text: I need X by Y.
+
+<li>
+Padding: I need X by Y plus 20 points on each side.
+
+<li>
+Background: I need X by Y plus 20 points on each side.
+
+<li>
+<code>ContentView</code>: I need X by Y plus 20 points on each side.
+
+<li>
+SwiftUI: OK; I’ll center you.
+
+</ul>
+<p>
+If you remember, the order of our modifiers matters. That is, this code:
+</p>
+
+<pre swift>
+Text("Hello, World!")
+    .padding()
+    .background(.red)
+</pre>
+
+<p>
+And this code:
+</p>
+
+<pre swift>
+Text("Hello, World!")
+    .background(.red)
+    .padding()
+</pre>
+
+<p>
+Yield two different results. Hopefully now you can see why: <code>background()</code> is layout neutral, so it determines how much space <em>it</em> needs by asking its child how much space it needs and using that same value. If the child of <code>background()</code> is the text view then the background will fit snugly around the text, but if the child is <code>padding()</code> then it receive back the adjusted values that including the padding amount.
+</p>
+
+<p>
+There are two interesting side effects that come as a result of these layout rules.
+</p>
+
+<p>
+First, if your view hierarchy is wholly layout neutral, then it will automatically take up all available space. For example, shapes and colors are layout neutral, so if your view contains a color and nothing else it will automatically fill the screen like this:
+</p>
+
+<pre swift>
+var body: some View {
+    Color.red
+}
+</pre>
+
+<p>
+Remember, <code>Color.red</code> is a view in its own right, but because it is layout neutral it can be drawn at any size. When we used it inside <code>background()</code> the abridged layout conversation worked like this:
+</p>
+
+<ul>
+<li>
+Background: Hey text, you can have the whole screen - how much of that do you want?
+
+<li>
+Text: I need X by Y points; I don’t need the rest.
+
+<li>
+Background: OK. Hey, Color.red: you can have X by Y points - how much of that do you want?
+
+<li>
+Color.red: I don’t care; I’m layout neutral, so X by Y points sounds good to me.
+
+</ul>
+<p>
+The second interesting side effect is one we faced earlier: if we use <code>frame()</code> on an image that isn’t resizable, we get a larger frame without the image inside changing size. This might have been confusing before, but it makes absolute sense once you think about the frame as being the parent of the image:
+</p>
+
+<ul>
+<li>
+<code>ContentView</code> offers the frame the whole screen.
+
+<li>
+The frame reports back that it wants 300 x 300.
+
+<li>
+The frame then asks the image inside it what size it wants.
+
+<li>
+The image, not being resizable, reports back a fixed size of 64x64 (for example).
+
+<li>
+The frame then positions that image in the center of itself.
+
+</ul>
+<p>
+When you listen to Apple’s own SwiftUI engineers talk about modifiers, you’ll hear them often referred to as views - "the frame view", "the background view", and so on. I think that’s a great mental model to help understand exactly what’s going on: applying modifiers creates new views rather than just modifying existing views in-place.
+</p>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
