@@ -332,6 +332,228 @@ When <code>position</code> is 2, the guide is <code>-20</code>. The text shifts 
 Because every card shifts its anchor slightly differently relative to that one single <code>VStack</code> alignment line, it creates a beautiful, cascading staircase (or tiered) layout.
 </p>
 
+<div id="Ai Insight-Note on Double"><h2 id="Note on Double" class="header"><a href="#Ai Insight-Note on Double">Note on Double</a></h2></div>
+
+<p>
+In Swift, you cannot multiply different types of numbers together.
+</p>
+
+<ul>
+<li>
+The <code>position</code> variable comes from <code>ForEach(0..&lt;10)</code>. Because it represents a <code>count</code> or loop <code>index</code>, Swift infers its type as an <code>Int</code> (Integer).
+
+<li>
+The alignment guide closure, however, expects you to return a <code>CGFloat</code> or a <code>Double</code> (decimal numbers), because layouts in iOS require precise decimal values for crisp sub-pixel rendering.
+
+</ul>
+<p>
+If you tried to write:
+</p>
+
+<pre swift>
+position * -10
+</pre>
+
+<p>
+...Swift would see an Int multiplied by an Int, resulting in an Int. The compiler would then throw an error saying:
+</p>
+
+<p>
+<em>"Cannot convert value of type 'Int' to expected argument type 'Double'."</em>
+</p>
+
+<p>
+By wrapping it in <code>Double(position)</code>, you manually convert that whole number (<code>0</code>, <code>1</code>, <code>2</code>) into a decimal format (<code>0.0</code>, <code>1.0</code>, <code>2.0</code>), allowing Swift to multiply it cleanly and return the decimal type the layout engine expects.
+</p>
+
+<div id="Ai Insight-Note on Double-Breaking Down the Math"><h3 id="Breaking Down the Math" class="header"><a href="#Ai Insight-Note on Double-Breaking Down the Math">Breaking Down the Math</a></h3></div>
+
+<p>
+Now let's look at what that returned value actually tells the <code>VStack</code> to do.
+</p>
+
+<p>
+Remember: returning a custom value from an alignment guide overrides where the child view tells the parent its "anchor point" is. The math creates a unique anchor offset for each row:
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Position (Int)
+</th>
+<th>
+Converted Double
+</th>
+<th>
+The Math (* -10)
+</th>
+<th>
+What SwiftUI Hears
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+0
+</td>
+<td>
+0.0
+</td>
+<td>
+0.0 * -10 = 0
+</td>
+<td>
+"Line up my normal left edge exactly with the VStack line."
+</td>
+</tr>
+<tr>
+<td>
+1
+</td>
+<td>
+1.0
+</td>
+<td>
+1.0 * -10 = -10
+</td>
+<td>
+"My anchor is 10 points to the left of my normal edge."
+</td>
+</tr>
+<tr>
+<td>
+2
+</td>
+<td>
+2.0
+</td>
+<td>
+2.0 * -10 = -20
+</td>
+<td>
+"My anchor is 20 points to the left of my normal edge."
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Ai Insight-Note on Double-Breaking Down the Math-The Visual Result"><h4 id="The Visual Result" class="header"><a href="#Ai Insight-Note on Double-Breaking Down the Math-The Visual Result">The Visual Result</a></h4></div>
+
+<p>
+Because SwiftUI must line up every single one of those calculated anchor points perfectly with the <code>VStack</code>'s central invisible alignment line, it forces the physical text views to step outward:
+</p>
+
+<ul>
+<li>
+Row 0 stays put.
+
+<li>
+Row 1 has to shift right by 10 points to get its "cheated" anchor point back onto the vertical alignment line.
+
+<li>
+Row 2 has to shift right by 20 points to do the same.
+
+</ul>
+<p>
+This cumulative shifting is what creates that perfect staircase or "tiered" cascade of text views across your red and blue frames!
+</p>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I still don't quite understand where the guides are 'drawn' by the stacks. For example, if:
+</p>
+
+<pre swift>
+VStack(alignment: .leading) {
+</pre>
+
+<p>
+I would expect the guide line to be vertical 'edge' down the far left of the stacks bounds, but I see that the Text within, while ranged left, is still centered on the stack's frame.
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You have just stumbled onto the final boss of SwiftUI layouts: The difference between a Stack's internal alignment line and its external frame bounding box.
+</p>
+
+<p>
+Your intuition is entirely logical - you would expect the alignment line to sit permanently at the far left edge of the stack. But in SwiftUI, it works in reverse: The child views determine where the alignment line is first, and then the stack builds its outer bounds around them.
+</p>
+
+<p>
+Here is exactly how SwiftUI draws that line and why it still looks centered inside your frame.
+</p>
+
+<div id="Ai Insight-ANSWER-1. Step One: Drawing the Invisible &quot;Clothesline&quot;"><h3 id="1. Step One: Drawing the Invisible &quot;Clothesline&quot;" class="header"><a href="#Ai Insight-ANSWER-1. Step One: Drawing the Invisible &quot;Clothesline&quot;">1. Step One: Drawing the Invisible "Clothesline"</a></h3></div>
+
+<p>
+When you write <code>VStack(alignment: .leading)</code>, SwiftUI doesn't care about the screen width or the parent frame yet. It only looks at the immediate children inside the stack.
+</p>
+<ul>
+<li>
+It measures the width of every <code>Text</code> view inside the loop.
+
+<li>
+It looks at the longest line of text in the stack.
+
+<li>
+It draws its vertical alignment line right down the left edge of that longest text view.
+
+<li>
+It then snaps the left edges of all the other smaller text views to that exact same line.
+
+</ul>
+<p>
+At this point, the <code>VStack</code> shrinks tightly to wrap around the children. The left edge of the <code>VStack</code> and its internal alignment line are perfectly overlapping.
+</p>
+
+<div id="Ai Insight-ANSWER-2. Step Two: The Frame Explosion (Why it Looks Centered)"><h3 id="2. Step Two: The Frame Explosion (Why it Looks Centered)" class="header"><a href="#Ai Insight-ANSWER-2. Step Two: The Frame Explosion (Why it Looks Centered)">2. Step Two: The Frame Explosion (Why it Looks Centered)</a></h3></div>
+
+<p>
+The confusion happens when you add this modifier to the outside of the stack:
+</p>
+
+<pre swift>
+.frame(width: 400, height: 400)
+</pre>
+
+<p>
+By default, a <code>.frame()</code> modifier with a fixed width acts like a giant layout box that forces whatever is inside it to align to its <span id="Ai Insight-ANSWER-2. Step Two: The Frame Explosion (Why it Looks Centered)-center"></span><strong id="center">center</strong>.
+</p>
+
+<p>
+So, this is the exact sequence of events on your screen:
+</p>
+
+<ul>
+<li>
+The <code>VStack</code> creates a tight layout box based on your staircase text. Its internal alignment line is on its left edge.
+
+<li>
+The <code>.frame(width: 400)</code> modifier comes along and says, <em>"I am forcing this entire VStack box to be placed right in the dead-center of my 400-point width."</em>
+
+<li>
+The <code>VStack</code> moves to the center. Because the internal alignment line is welded to the inside of the <code>VStack</code>, it moves to the center along with it.
+
+</ul>
+<div id="Ai Insight-ANSWER-2. Step Two: The Frame Explosion (Why it Looks Centered)-Summary"><h4 id="Summary" class="header"><a href="#Ai Insight-ANSWER-2. Step Two: The Frame Explosion (Why it Looks Centered)-Summary">Summary</a></h4></div>
+
+<p>
+The alignment line is at the left edge of the <code>VStack</code>'s actual content. However, because the entire <code>VStack</code> container is being centered inside a much larger 400 x 400 frame, that "left edge" ends up sitting near the middle of your blue screen!
+</p>
+
+<p>
+If you wanted that alignment line to truly sit at the absolute far-left edge of the 400-point blue box, you would have to tell the frame to align its contents to the left, like this:
+</p>
+
+<pre swift>
+.frame(width: 400, height: 400, alignment: .leading)
+</pre>
+
 <p>
 <hr>
 <br>
