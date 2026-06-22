@@ -68,6 +68,8 @@ struct ContentView: View {
 If you want "@twostraws" and "Paul Hudson" to be vertically aligned together, you’ll have a hard time right now. The horizontal stack contains two vertical stacks inside it, so there’s no built-in way to get the alignment you want - things like <code>HStack(alignment: .top)</code> just won’t come close.
 </p>
 
+<div id="Hacking With Swift - 267 - How to create a custom alignment guide-Custom Layout"><h2 id="Custom Layout" class="header"><a href="#Hacking With Swift - 267 - How to create a custom alignment guide-Custom Layout">Custom Layout</a></h2></div>
+
 <p>
 To fix this we need to define a custom layout guide. This should be an extension on either <code>VerticalAlignment</code> or <code>HorizontalAlignment</code>, and be a custom type that conforms to the <code>AlignmentID</code> protocol.
 </p>
@@ -133,6 +135,132 @@ HStack(alignment: .midAccountAndName) {
 
 <p>
 That will make sure they are vertically aligned regardless of what comes before or after. I suggest you try adding some more text views before and after our examples - SwiftUI will reposition everything to make sure the two we aligned stay that way.
+</p>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<p>
+Rehash of the lesson.
+</p>
+
+<p>
+It is completely fair to find this text overwhelming. Paul is mixing high-level layout philosophy, Swift type-safety choices (structs vs. enums), and syntax implementation all into one unbroken stream. It reads like word salad because he's trying to explain the "why" and the "how" simultaneously.
+</p>
+
+<p>
+Let’s strip away the fluff and break this down into a clean, structured blueprint: The Problem, The Strategy, and The 2-Step Execution.
+</p>
+
+<div id="Ai Insight-1. The Core Problem (The &quot;What&quot;)"><h3 id="1. The Core Problem (The &quot;What&quot;)" class="header"><a href="#Ai Insight-1. The Core Problem (The &quot;What&quot;)">1. The Core Problem (The "What")</a></h3></div>
+
+<p>
+Normally, alignment works inside a single container. If you have a <code>VStack</code>, you can line up its items. If you have an <code>HStack</code>, you can line up its items.
+</p>
+
+<p>
+But look at your UI structure in this lesson:
+</p>
+
+<ul>
+<li>
+You have an outer <code>HStack</code>.
+
+<li>
+Inside it, you have <code>VStack</code> A (on the left) and <code>VStack</code> B (on the right).
+
+</ul>
+<p>
+You want the text inside <code>VStack</code> A (<code>@twostraws</code>) to line up perfectly on a horizontal line with the text inside <code>VStack</code> B (<code>PAUL HUDSON</code>).
+</p>
+
+<p>
+Because they are trapped inside separate vertical columns, standard tools like <code>HStack(alignment: .top)</code> will only align the tops of the columns themselves, not the specific text lines deep inside them.
+</p>
+
+<div id="Ai Insight-2. The Strategy: The &quot;Invisible String&quot;"><h3 id="2. The Strategy: The &quot;Invisible String&quot;" class="header"><a href="#Ai Insight-2. The Strategy: The &quot;Invisible String&quot;">2. The Strategy: The "Invisible String"</a></h3></div>
+
+<p>
+To fix this, we are going to create a custom tethering point.
+</p>
+
+<p>
+Think of it like drilling a hole through both <code>VStack</code> columns at the exact height of the text views, running an invisible piece of string through them, and tying them together. No matter what other content shrinks or grows around them, those two text fields are anchored to that string.
+</p>
+
+<div id="Ai Insight-3. The 2-Step Technique (The &quot;How&quot;)"><h3 id="3. The 2-Step Technique (The &quot;How&quot;)" class="header"><a href="#Ai Insight-3. The 2-Step Technique (The &quot;How&quot;)">3. The 2-Step Technique (The "How")</a></h3></div>
+
+<p>
+This process is broken down into two distinct phases: Creating the String (Boilerplate) and Tying the Knots (UI Implementation).
+</p>
+
+<div id="Ai Insight-3. The 2-Step Technique (The &quot;How&quot;)-Step 1: Create the Custom Alignment (The Infrastructure)"><h4 id="Step 1: Create the Custom Alignment (The Infrastructure)" class="header"><a href="#Ai Insight-3. The 2-Step Technique (The &quot;How&quot;)-Step 1: Create the Custom Alignment (The Infrastructure)">Step 1: Create the Custom Alignment (The Infrastructure)</a></h4></div>
+
+<p>
+You need to tell iOS that this new alignment type exists. We do this by extending VerticalAlignment.
+</p>
+
+<pre swift>
+extension VerticalAlignment {
+    // 1. Define the unique ID for our alignment string
+    enum MidAccountAndName: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -&gt; CGFloat {
+            context[.top] // If a view doesn't specify, default to its top edge
+        }
+    }
+
+    // 2. Make a clean, lowercase shortcut to use in our views
+    static let midAccountAndName = VerticalAlignment(MidAccountAndName.self)
+}
+</pre>
+
+<p>
+Deciphering Paul's side-note: Paul spends a lot of words talking about <code>struct</code> vs <code>enum</code>. All you need to know is that using <code>enum</code> is a safety trick. It prevents you from accidentally writing <code>let blank = MidAccountAndName()</code> elsewhere in your app, because an enum with no cases cannot be instantiated. It's code housekeeping, not layout logic.
+</p>
+
+<div id="Ai Insight-3. The 2-Step Technique (The &quot;How&quot;)-Step 2: Use it in your UI (The Technique)"><h4 id="Step 2: Use it in your UI (The Technique)" class="header"><a href="#Ai Insight-3. The 2-Step Technique (The &quot;How&quot;)-Step 2: Use it in your UI (The Technique)">Step 2: Use it in your UI (The Technique)</a></h4></div>
+
+<p>
+Now that <code>.midAccountAndName</code> is a real alignment option, you apply it to the outer container, and then tell the specific children to latch onto it.
+</p>
+
+<pre swift>
+// A. Tell the parent container to listen for our custom alignment string
+HStack(alignment: .midAccountAndName) {
+    
+    VStack {
+        Text("@twostraws")
+            // B. Tie this child's center point to our string
+            .alignmentGuide(.midAccountAndName) { d in d[VerticalAlignment.center] }
+        Image(.paulHudson)
+            .resizable()
+            .frame(width: 64, height: 64)
+    }
+
+    VStack {
+        Text("Full name:")
+        Text("PAUL HUDSON")
+            .font(.largeTitle)
+            // C. Tie this child's center point to the exact same string
+            .alignmentGuide(.midAccountAndName) { d in d[VerticalAlignment.center] }
+    }
+}
+</pre>
+
+<div id="Ai Insight-Summary of what you are actually doing:"><h3 id="Summary of what you are actually doing:" class="header"><a href="#Ai Insight-Summary of what you are actually doing:">Summary of what you are actually doing:</a></h3></div>
+
+<ul>
+<li>
+You turn on the custom guide on the parent: <code>HStack(alignment: .midAccountAndName)</code>.
+
+<li>
+You say to the first text view: "Find your center point (<code>d[VerticalAlignment.center]</code>), and snap it to that guide."
+
+<li>
+You say to the second text view: "Find your center point, and snap it to that exact same guide."
+
+</ul>
+<p>
+SwiftUI handles all the layout calculation behind the scenes. Even if you add 5 massive images above <code>Full Name:</code>, it will physically shift the entire right stack up or down just to ensure those two specific text fields remain perfectly aligned.
 </p>
 
 <p>
