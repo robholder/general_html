@@ -152,6 +152,142 @@ GeometryReader { proxy in
 }
 </pre>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-GeometryReader"><h2 id="GeometryReader" class="header"><a href="#Ai Insight-GeometryReader">GeometryReader</a></h2></div>
+
+<p>
+Once again, the tutorial is presenting multiple structural concepts, layout bugs, and syntax steps simultaneously. Let’s separate the <span id="Ai Insight-GeometryReader-mental model"></span><strong id="mental model">mental model</strong> (what is actually happening visually) from the <span id="Ai Insight-GeometryReader-code mechanics"></span><strong id="code mechanics">code mechanics</strong> so you can see the core lesson clearly.
+</p>
+
+<div id="Ai Insight-GeometryReader-1. The Core Principle: What is a GeometryReader?"><h3 id="1. The Core Principle: What is a GeometryReader?" class="header"><a href="#Ai Insight-GeometryReader-1. The Core Principle: What is a GeometryReader?">1. The Core Principle: What is a GeometryReader?</a></h3></div>
+
+<p>
+Normally, SwiftUI layouts are conversational negotiations:
+</p>
+<ul>
+<li>
+The Parent View says: <em>"Here is all the space I have. How much do you want?"</em>
+
+<li>
+The Child View responds: <em>"I only need exactly 150x50 pixels, thanks."</em>
+
+</ul>
+<p>
+The problem is that a standard child view <span id="Ai Insight-GeometryReader-1. The Core Principle: What is a GeometryReader?-cannot see"></span><strong id="cannot see">cannot see</strong> the space it was offered. It just says what it needs.
+</p>
+
+<p>
+A <code>GeometryReader</code> is a special container view that acts like a spy. It intercepts that offer from the parent, reads the exact measurements, and hands those numbers to you inside a variable called <code>proxy</code> (which is a <code>GeometryProxy</code> object).
+</p>
+
+<div id="Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader"><h3 id="2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader" class="header"><a href="#Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader">2. Visualizing the 2 Big "Quirks" of GeometryReader</a></h3></div>
+
+<p>
+To use <code>GeometryReader</code> successfully, you have to understand its two unique, built-in personality traits. This is where most beginners get confused.
+</p>
+
+<div id="Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader-Quirk A: It is a &quot;Greedy&quot; View"><h4 id="Quirk A: It is a &quot;Greedy&quot; View" class="header"><a href="#Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader-Quirk A: It is a &quot;Greedy&quot; View">Quirk A: It is a "Greedy" View</a></h4></div>
+
+<p>
+Most views in SwiftUI shrink to fit their content (like a <code>Text</code> view wrapping tightly around its words).
+</p>
+
+<p>
+<code>GeometryReader</code> does the opposite. It is <span id="Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader-Quirk A: It is a &quot;Greedy&quot; View-greedy"></span><strong id="greedy">greedy</strong>. The second you place it on the screen, it automatically expands to consume <em>every single pixel</em> its parent container offers it.
+</p>
+
+<div id="Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader-Quirk B: It Aligns to the Top-Left"><h4 id="Quirk B: It Aligns to the Top-Left" class="header"><a href="#Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader-Quirk B: It Aligns to the Top-Left">Quirk B: It Aligns to the Top-Left</a></h4></div>
+
+<p>
+When you put a child view (like an <code>Image</code>) inside a standard <code>VStack</code>, SwiftUI centers it by default.
+</p>
+
+<p>
+When you put a child view inside a <code>GeometryReader</code>, it completely dumps that rule and pins your view directly to the <span id="Ai Insight-GeometryReader-2. Visualizing the 2 Big &quot;Quirks&quot; of GeometryReader-Quirk B: It Aligns to the Top-Left-top-left corner"></span><strong id="top-left corner">top-left corner</strong>.
+</p>
+
+<div id="Ai Insight-GeometryReader-3. Demystifying the &quot;Double Frame&quot; Center Trick"><h3 id="3. Demystifying the &quot;Double Frame&quot; Center Trick" class="header"><a href="#Ai Insight-GeometryReader-3. Demystifying the &quot;Double Frame&quot; Center Trick">3. Demystifying the "Double Frame" Center Trick</a></h3></div>
+
+<p>
+At the very end of the lesson, Paul presents this code to fix the top-left alignment issue, which looks like total wizardry:
+</p>
+
+<pre swift>
+GeometryReader { proxy in
+    Image(.example)
+        .resizable()
+        .scaledToFit()
+        .frame(width: proxy.size.width * 0.8) // Frame 1
+        .frame(width: proxy.size.width, height: proxy.size.height) // Frame 2
+}
+</pre>
+
+<p>
+Why apply <code>.frame</code> twice? This is a brilliant SwiftUI layout technique when broken down step-by-step:
+</p>
+<ul>
+<li>
+Frame 1 (The Math Frame): <code>width: proxy.size.width * 0.8</code>
+
+<ul>
+<li>
+This shrinks the <em>image itself</em> down to exactly 80% of the available space. Because it's inside a <code>GeometryReader</code>, this small image immediately snaps to the top-left corner.
+
+</ul>
+<li>
+Frame 2 (The Invisible Box Trick): <code>width: proxy.size.width, height: proxy.size.height</code>
+
+<ul>
+<li>
+This wraps an invisible box around that image. This new invisible box is forced to match the exact, full size of the <code>GeometryReader</code>.
+
+</ul>
+</ul>
+<p>
+Here is the trick: <span id="Ai Insight-GeometryReader-3. Demystifying the &quot;Double Frame&quot; Center Trick-Standard frames in SwiftUI center their content by default"></span><strong id="Standard frames in SwiftUI center their content by default">Standard frames in SwiftUI center their content by default</strong>. By placing an invisible full-sized frame <em>around</em> our 80% width image, the frame naturally forces the smaller image to sit perfectly in its absolute center.
+</p>
+
+<div id="Ai Insight-GeometryReader-4. GeometryReader vs. ContainerRelativeFrame"><h3 id="4. GeometryReader vs. ContainerRelativeFrame" class="header"><a href="#Ai Insight-GeometryReader-4. GeometryReader vs. ContainerRelativeFrame">4. GeometryReader vs. ContainerRelativeFrame</a></h3></div>
+
+<p>
+Paul explains that <code>containerRelativeFrame()</code> only looks at "major" containers like the whole device screen or a <code>ScrollView</code>.
+</p>
+
+<p>
+If you put an image inside an <code>HStack</code> next to a sidebar, <code>containerRelativeFrame()</code> ignores the sidebar entirely and calculates its width based on the entire screen, causing your layout to smash off the edge of the device.
+</p>
+
+<p>
+A <code>GeometryReader</code> calculates its size based on <span id="Ai Insight-GeometryReader-4. GeometryReader vs. ContainerRelativeFrame-where it sits in the hierarchy"></span><strong id="where it sits in the hierarchy">where it sits in the hierarchy</strong>. If it is placed inside an <code>HStack</code> alongside a 200-point text view, the <code>GeometryReader</code> will only measure the <em>remaining</em> space left over, preventing layout clipping.
+</p>
+
+<div id="Ai Insight-GeometryReader-Formula for Writing Your Own"><h3 id="Formula for Writing Your Own" class="header"><a href="#Ai Insight-GeometryReader-Formula for Writing Your Own">Formula for Writing Your Own</a></h3></div>
+
+<p>
+Whenever you need a view to be a direct percentage of its local container, use this blueprint:
+</p>
+
+<p>
+{{swift
+GeometryReader { proxy in
+</p>
+<pre><code>YourView()
+// 1. Size your actual content using the proxy dimensions
+.frame(width: proxy.size.width * 0.50) // 50% of available width
+
+// 2. Put it in a full-sized invisible box to center it
+.frame(width: proxy.size.width, height: proxy.size.height)
+</code></pre>
+<p>
+}
+}}}
+</p>
+
+<p>
+Does seeing how <code>GeometryReader</code> expands greedily and pins to the top-left explain why that second <code>.frame</code> modifier is necessary?
+</p>
+
 <p>
 <hr>
 <br>
