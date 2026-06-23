@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_270</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_269.html">Hacking With Swift - 269 - Resizing images to fit the screen using GeometryReader</a>
+
+</ul>
+<div id="Hacking With Swift - 270 - Understanding frames and coordinates inside GeometryReader"><h1 id="Hacking With Swift - 270 - Understanding frames and coordinates inside GeometryReader" class="header"><a href="#Hacking With Swift - 270 - Understanding frames and coordinates inside GeometryReader">Hacking With Swift - 270 - Understanding frames and coordinates inside GeometryReader</a></h1></div>
+
+<p>
+SwiftUI’s <code>GeometryReader</code> allows us to use its size and coordinates to determine a child view’s layout, and it’s the key to creating some of the most remarkable effects in SwiftUI.
+</p>
+
+<p>
+You should always keep in mind SwiftUI’s three-step layout system when working with <code>GeometryReader</code>: parent proposes a size for the child, the child uses that to determine its own size, and parent uses that to position the child appropriately.
+</p>
+
+<p>
+In its most basic usage, what <code>GeometryReader</code> does is let us read the size that was proposed by the parent, then use that to manipulate our view. For example, we could use <code>GeometryReader</code> to make a text view have 90% of all available width regardless of its content:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Text("Hello, World!")
+                .frame(width: proxy.size.width * 0.9)
+                .background(.red)
+        }
+    }
+}
+</pre>
+
+<p>
+That <code>proxy</code> parameter that comes in is a <code>GeometryProxy</code>, and it contains the proposed size, any safe area insets that have been applied, plus a method for reading frame values that we’ll look at in a moment.
+</p>
+
+<p>
+<code>GeometryReader</code> has an interesting side effect that might catch you out at first: the view that gets returned has a flexible preferred size, which means it will expand to take up more space as needed. You can see this in action if you place the <code>GeometryReader</code> into a <code>VStack</code> then put some more text below it, like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        VStack {
+            GeometryReader { proxy in
+                Text("Hello, World!")
+                    .frame(width: proxy.size.width * 0.9, height: 40)
+                    .background(.red)
+            }
+
+            Text("More text")
+                .background(.blue)
+        }
+    }
+}
+</pre>
+
+<p>
+You’ll see "More text" gets pushed right to the bottom of the screen, because the <code>GeometryReader</code> takes up all remaining space. To see it in action, add <code>background(.green)</code> as a modifier to the <code>GeometryReader</code> and you’ll see just how big it is. Note: This is a <em>preferred</em> size, not an <em>absolute</em> size, which means it’s still flexible depending on its parent.
+</p>
+
+<p>
+When it comes to reading the frame of a view, <code>GeometryProxy</code> provides a <code>frame(in:)</code> method rather than simple properties. This is because the concept of a "frame" includes X and Y coordinates, which don’t make any sense in isolation - do you want the view’s absolute X and Y coordinates, or their X and Y coordinates compared to their parent?
+</p>
+
+<p>
+SwiftUI calls these options <em>coordinate spaces</em>, and those two in particular are called the global space (measuring our view’s frame relative to the whole screen), and the local space (measuring our view’s frame relative to its parent). We can also create custom coordinate spaces by attaching the <code>coordinateSpace()</code> modifier to a view - any children of that can then read its frame relative to that coordinate space.
+</p>
+
+<p>
+To demonstrate how coordinate spaces work, we could create some example views in various stacks, attach a custom coordinate space to the outermost view, then add an <code>onTapGesture</code> to one of the views inside it so it can print out the frame globally, locally, and using the custom coordinate space.
+</p>
+
+<p>
+Try this code:
+</p>
+
+<pre swift>
+struct OuterView: View {
+    var body: some View {
+        VStack {
+            Text("Top")
+            InnerView()
+                .background(.green)
+            Text("Bottom")
+        }
+    }
+}
+
+struct InnerView: View {
+    var body: some View {
+        HStack {
+            Text("Left")
+            GeometryReader { proxy in
+                Text("Center")
+                    .background(.blue)
+                    .onTapGesture {
+                        print("Global center: \(proxy.frame(in: .global).midX) x \(proxy.frame(in: .global).midY)")
+                        print("Custom center: \(proxy.frame(in: .named("Custom")).midX) x \(proxy.frame(in: .named("Custom")).midY)")
+                        print("Local center: \(proxy.frame(in: .local).midX) x \(proxy.frame(in: .local).midY)")
+                    }
+            }
+            .background(.orange)
+            Text("Right")
+        }
+    }
+}
+
+struct ContentView: View {
+    var body: some View {
+        OuterView()
+            .background(.red)
+            .coordinateSpace(name: "Custom")
+    }
+}
+</pre>
+
+<p>
+The output you get when that code runs depends on the device you’re using, but here’s what I got:
+</p>
+
+<ul>
+<li>
+Global center: 191.33 x 440.60
+
+<li>
+Custom center: 191.33 x 381.60
+
+<li>
+Local center: 153.66 x 350.63
+
+</ul>
+<p>
+Those sizes are mostly different, so hopefully you can see the full range of how these frame work:
+</p>
+
+<ul>
+<li>
+A global center X of 191 means that the center of the geometry reader is 191 points from the left edge of the screen.
+
+<li>
+A global center Y of 440 means the center of the geometry reader is 440 points from the top edge of the screen. This isn’t dead in the center of the screen because there is more safe area at the top than the bottom.
+
+<li>
+A custom center X of 191 means the center of the geometry reader is 191 points from the left edge of whichever view owns the "Custom" coordinate space, which in our case is <code>OuterView</code> because we attach it in <code>ContentView</code>. This number matches the global position because <code>OuterView</code> runs edge to edge horizontally.
+
+<li>
+A custom center Y of 381 means the center of the geometry reader is 381 points from the top edge of <code>OuterView</code>. This value is smaller than the global center Y because <code>OuterView</code> doesn’t extend into the safe area.
+
+<li>
+A local center X of 153 means the center of the geometry reader is 153 points from the left edge of its direct container.
+
+<li>
+A local center Y of 350 means the center of the geometry reader is 350 points from the top edge of its direct container.
+
+</ul>
+<p>
+Which coordinate space you want to use depends on what question you want to answer:
+</p>
+
+<ul>
+<li>
+Want to know where this view is on the screen?
+
+<ul>
+<li>
+Use the global space.
+
+</ul>
+<li>
+Want to know where this view is relative to its parent?
+
+<ul>
+<li>
+Use the local space.
+
+</ul>
+<li>
+What to know where this view is relative to some other view?
+
+<ul>
+<li>
+Use a custom space.
+
+</ul>
+</ul>
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
