@@ -58,15 +58,17 @@ ScrollView(.horizontal, showsIndicators: false) {
 </pre>
 
 <p>
-That code uses <code>GeometryReader</code> to read each view's position in the scroll view, but we've needed to add an explicit width and height to make stop our <code>GeometryReader</code> from automatically expanding to take up all available space.
+That code uses <code>GeometryReader</code> to read each view's position in the scroll view, but we've needed to add an explicit width and height to stop our <code>GeometryReader</code> from automatically expanding to take up all available space.
+</p>
+
+<div id="Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()-visualEffect"><h2 id="visualEffect" class="header"><a href="#Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()-visualEffect">visualEffect</a></h2></div>
+
+<p>
+SwiftUI gives us an alternative called <code>visualEffect()</code>, and it has a very specific purpose and a very specific restriction: it lets us apply effects that change the way something looks, which in practice means it <em>can't</em> do anything that affects the actual layout position or frame of a view.
 </p>
 
 <p>
-SwiftUI gives us an alternative called <code>visualEffect()</code>, and it has a very specific purpose and a very specific restriction: it lets us apply effects that change the way something looks, which in practice means it <code>can't</code> do anything that affects the actual layout position or frame of a view.
-</p>
-
-<p>
-This modifier works in a very interesting way: we pass it a closure to run, and we'll be given the content we're modifying as well as a <code>GeometryProxy</code> for it. That content we're modifying is our view, but we <code>can't</code> just apply any modifiers we want like we normally would - again, we can't do anything that affects the layout position of the view.
+This modifier works in a very interesting way: we pass it a closure to run, and we'll be given the content we're modifying as well as a <code>GeometryProxy</code> for it. That content we're modifying is our view, but we <em>can't</em> just apply any modifiers we want like we normally would - again, we can't do anything that affects the layout position of the view.
 </p>
 
 <p>
@@ -105,7 +107,7 @@ What we have now is a lot nicer, but with just two extra modifiers we can make t
 </p>
 
 <p>
-The first is <code>scrollTargetLayout()</code>, which I'd like you to apply to the <code>HStack</code>. That tells SwiftUI we want to make each view inside this <code>HStack</code> a scroll target - something that is considered important when it comes to scrolling around.
+The first is <code>.scrollTargetLayout()</code>, which I'd like you to apply to the <code>HStack</code>. That tells SwiftUI we want to make each view inside this <code>HStack</code> a scroll target - something that is considered important when it comes to scrolling around.
 </p>
 
 <p>
@@ -115,6 +117,46 @@ The second is <code>.scrollTargetBehavior(.viewAligned)</code>, which I'd like y
 <p>
 If you put those two together, the result is lovely: we can now scroll smoothly between our text views, and whenever we let go SwiftUI will automatically ensure one view snaps to the left edge.
 </p>
+
+<div id="Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()-visualEffect-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()-visualEffect-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()-visualEffect-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()-visualEffect-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct ContentView: View {
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
+                ForEach(1..&lt;20) { num in
+                    Text("Number \(num)")
+                        .font(.largeTitle)
+                        .padding()
+                        .background(.red)
+                        .frame(width: 200, height: 200)
+                        .visualEffect { content, proxy in
+                            content
+                                .rotation3DEffect(.degrees(-proxy.frame(in: .global)
+                                    .minX) / 8, axis: (x: 0, y: 1, z: 0)
+                                )
+                        }
+                    
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.viewAligned)
+    }
+}
+    
+#Preview {
+    ContentView()
+}
+</pre>
+
 
 
 <p>
