@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_272</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_271.html">Hacking With Swift - 271 - ScrollView effects using GeometryReader</a>
+
+</ul>
+<div id="Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()"><h1 id="Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()" class="header"><a href="#Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()">Hacking With Swift - 272 - ScrollView effects using visualEffect() and scrollTargetBehavior()</a></h1></div>
+
+<p>
+Previously we looked at how to use <code>GeometryReader</code> to create varying effects based on where a view is on the screen. That code all works fine, and you'll certainly see it in lots of apps, but SwiftUI provides some helpful alternatives that can be much easier.
+</p>
+
+<p>
+First, let's look again at some previous code - this creates a simple CoverFlow-style effect, where we can swipe horizontally to see views moving in 3D space:
+</p>
+
+<pre swift>
+ScrollView(.horizontal, showsIndicators: false) {
+    HStack(spacing: 0) {
+        ForEach(1..&lt;20) { num in
+            GeometryReader { proxy in
+                Text("Number \(num)")
+                    .font(.largeTitle)
+                    .padding()
+                    .background(.red)
+                    .rotation3DEffect(.degrees(-proxy.frame(in: .global).minX) / 8, axis: (x: 0, y: 1, z: 0))
+                    .frame(width: 200, height: 200)
+            }
+            .frame(width: 200, height: 200)
+        }
+    }
+}
+</pre>
+
+<p>
+That code uses <code>GeometryReader</code> to read each view's position in the scroll view, but we've needed to add an explicit width and height to make stop our <code>GeometryReader</code> from automatically expanding to take up all available space.
+</p>
+
+<p>
+SwiftUI gives us an alternative called <code>visualEffect()</code>, and it has a very specific purpose and a very specific restriction: it lets us apply effects that change the way something looks, which in practice means it <code>can't</code> do anything that affects the actual layout position or frame of a view.
+</p>
+
+<p>
+This modifier works in a very interesting way: we pass it a closure to run, and we'll be given the content we're modifying as well as a <code>GeometryProxy</code> for it. That content we're modifying is our view, but we <code>can't</code> just apply any modifiers we want like we normally would - again, we can't do anything that affects the layout position of the view.
+</p>
+
+<p>
+Fortunately, that still leaves lots of modifiers for us to use, including some that might surprise you - we can use <code>rotationEffect()</code>, <code>rotation3DEffect()</code>, and even <code>offset()</code>, because although they effect how views are drawn, they don't change the frame of the view.
+</p>
+
+<p>
+So, we can rewrite our code using <code>visualEffect()</code> like this:
+</p>
+
+<pre swift>
+ScrollView(.horizontal, showsIndicators: false) {
+    HStack(spacing: 0) {
+        ForEach(1..&lt;20) { num in
+            Text("Number \(num)")
+                .font(.largeTitle)
+                .padding()
+                .background(.red)
+                .frame(width: 200, height: 200)
+                .visualEffect { content, proxy in
+                    content
+                        .rotation3DEffect(.degrees(-proxy.frame(in: .global).minX) / 8, axis: (x: 0, y: 1, z: 0))
+                }
+
+        }
+    }
+}
+</pre>
+
+<p>
+Although the code is only a little shorter, this is a much neater solution than using <code>GeometryReader</code> because we no longer need to add a second <code>frame()</code> modifier to stop things taking up the full screen - this scroll view can fit alongside other parts of our SwiftUI layout without screwing things up.
+</p>
+
+<p>
+What we have now is a lot nicer, but with just two extra modifiers we can make this effect work a lot better.
+</p>
+
+<p>
+The first is <code>scrollTargetLayout()</code>, which I'd like you to apply to the <code>HStack</code>. That tells SwiftUI we want to make each view inside this <code>HStack</code> a scroll target - something that is considered important when it comes to scrolling around.
+</p>
+
+<p>
+The second is <code>.scrollTargetBehavior(.viewAligned)</code>, which I'd like you to apply to the <code>ScrollView</code>. That tells SwiftUI it should make this scroll view move smoothly between all scroll targets, which we just defined as being every view inside our <code>HStack</code>.
+</p>
+
+<p>
+If you put those two together, the result is lovely: we can now scroll smoothly between our text views, and whenever we let go SwiftUI will automatically ensure one view snaps to the left edge.
+</p>
+
+
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
