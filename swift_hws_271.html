@@ -192,6 +192,115 @@ struct ContentView: View {
 }
 </pre>
 
+<p>
+...and here's Ai's suggestion:
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-QUESTION"><h2 id="QUESTION" class="header"><a href="#My Own Tweaks to Horizontal Carousel-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I'm looking at this example (horizontal scrolling with carousel rotation) and I'd like to tweak it to have the text views be 'flat' (no rotation) when they pass the mid point of the phone screen (because right now they are flat at the left-most side). Also, I'd like the text views to be centered vertically on the screen (perhaps using another GeometryReader). (The Tutorial code was shown to Ai.)
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER"><h2 id="ANSWER" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You are combining the best of both tweaks here! To make the cards flatten out perfectly at the exact center of the screen (instead of the left edge) and center them vertically, we will use the exact same outer - <code>GeometryReader</code> landmark strategy we used in the vertical example.
+</p>
+
+<p>
+Here is the updated, corrected code, followed by an explanation of how the math and layout logic solve your two goals.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let colors: [Color] = [.red, .green, .blue, .orange, .pink, .purple, .yellow]
+    
+    var body: some View {
+        // 1. Outer GeometryReader to measure the entire phone screen
+        GeometryReader { fullView in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(1..&lt;20) { index in
+                        GeometryReader { proxy in
+                            Text("Number \(index)")
+                                .font(.largeTitle)
+                                .padding()
+                                .background(colors[index % 7])
+                                // 2. Centered Math: Subtract half the screen width
+                                .rotation3DEffect(
+                                    .degrees((proxy.frame(in: .global).midX - fullView.size.width / 2) / 5),
+                                    axis: (x: 0, y: 1, z: 0)
+                                )
+                                .frame(width: 200, height: 200)
+                                // 3. Use our invisible box trick to center vertically within the proxy
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                        }
+                        .frame(width: 200, height: 200)
+                    }
+                }
+                // 4. Forces the HStack's track to fill the full screen height
+                .frame(minHeight: fullView.size.height)
+            }
+        }
+    }
+}
+</pre>
+
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 1: Flattening at the Midpoint (The Math Fix)"><h3 id="Goal 1: Flattening at the Midpoint (The Math Fix)" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER-Goal 1: Flattening at the Midpoint (The Math Fix)">Goal 1: Flattening at the Midpoint (The Math Fix)</a></h3></div>
+
+<p>
+In your original code, the rotation was calculated using <code>.minX</code> (the card's left edge). When the left edge hit the left of the screen (<code>0</code>), the math became 0 ÷ 8 = 0°, causing it to flatten out on the far left.
+</p>
+
+<p>
+To move the flattening sweet spot to the middle, we updated the math to this:
+</p>
+
+<pre swift>
+(proxy.frame(in: .global).midX - fullView.size.width / 2) / 5
+</pre>
+
+<ul>
+<li>
+<code>proxy.frame(in: .global).midX</code>: Instead of tracking the left edge, we now track the <span id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 1: Flattening at the Midpoint (The Math Fix)-exact center point of the moving card."></span><strong id="exact center point of the moving card.">exact center point of the moving card.</strong>
+
+<li>
+<code>- fullView.size.width / 2</code>: We subtract <span id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 1: Flattening at the Midpoint (The Math Fix)-half the width of the screen"></span><strong id="half the width of the screen">half the width of the screen</strong> (the center line of the phone).
+
+</ul>
+<p>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 1: Flattening at the Midpoint (The Math Fix)-The Result"></span><strong id="The Result">The Result</strong>: When a card's middle aligns perfectly with the phone's middle, the math becomes:
+</p>
+
+<p>
+Screen Center − Screen Center = 0
+</p>
+
+<p>
+The rotation drops to exactly 0°, rendering it completely flat right where the user is looking. As it slides past the center to the left, the numbers turn negative, tilting it backwards; as it slides to the right, the numbers are positive, tilting it forwards.
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 2: Vertical Centering (The Layout Fix)"><h3 id="Goal 2: Vertical Centering (The Layout Fix)" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER-Goal 2: Vertical Centering (The Layout Fix)">Goal 2: Vertical Centering (The Layout Fix)</a></h3></div>
+
+<p>
+To get the cards centered vertically on the device screen without forcing them to stretch, we applied a two-part layout technique:
+</p>
+<ul>
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 2: Vertical Centering (The Layout Fix)-Expanding the Scroll Track"></span><strong id="Expanding the Scroll Track">Expanding the Scroll Track</strong>: We added <code>.frame(minHeight: fullView.size.height)</code> to the inner <code>HStack</code>. This tells the scroll view's internal track to stretch top-to-bottom and occupy the full height of the device.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 2: Vertical Centering (The Layout Fix)-The Invisible Box Center Trick"></span><strong id="The Invisible Box Center Trick">The Invisible Box Center Trick</strong>: Because the <code>HStack</code> is now full-screen height, the inner <code>GeometryReader</code> blocks also stretch to fill that full height. We then applied our trusty double-frame trick to the text view:
+<pre swift>
+.frame(width: 200, height: 200) // The card's actual size
+.frame(width: proxy.size.width, height: proxy.size.height) // The full-height invisible wrapper
+</pre>
+
+</ul>
+<p>
+Because standard SwiftUI frames center their content by default, wrapping the 200×200 card inside a full-height container automatically drops the card directly onto the screen's vertical centerline.
+</p>
 
 <div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
 
