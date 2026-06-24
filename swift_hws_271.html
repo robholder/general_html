@@ -229,7 +229,8 @@ struct ContentView: View {
                                 .background(colors[index % 7])
                                 // 2. Centered Math: Subtract half the screen width
                                 .rotation3DEffect(
-                                    .degrees((proxy.frame(in: .global).midX - fullView.size.width / 2) / 5),
+                                    // notice the minus/negative sign to flip the result
+                                    .degrees(-(proxy.frame(in: .global).midX - fullView.size.width / 2) / 5),
                                     axis: (x: 0, y: 1, z: 0)
                                 )
                                 .frame(width: 200, height: 200)
@@ -292,14 +293,87 @@ To get the cards centered vertically on the device screen without forcing them t
 
 <li>
 <span id="My Own Tweaks to Horizontal Carousel-ANSWER-Goal 2: Vertical Centering (The Layout Fix)-The Invisible Box Center Trick"></span><strong id="The Invisible Box Center Trick">The Invisible Box Center Trick</strong>: Because the <code>HStack</code> is now full-screen height, the inner <code>GeometryReader</code> blocks also stretch to fill that full height. We then applied our trusty double-frame trick to the text view:
+
+</ul>
+  
 <pre swift>
 .frame(width: 200, height: 200) // The card's actual size
 .frame(width: proxy.size.width, height: proxy.size.height) // The full-height invisible wrapper
 </pre>
 
-</ul>
 <p>
 Because standard SwiftUI frames center their content by default, wrapping the 200×200 card inside a full-height container automatically drops the card directly onto the screen's vertical centerline.
+</p>
+
+<div id="Regarding the '-' sign"><h1 id="Regarding the '-' sign" class="header"><a href="#Regarding the '-' sign">Regarding the '-' sign</a></h1></div>
+
+<div id="Regarding the '-' sign-QUESTION"><h2 id="QUESTION" class="header"><a href="#Regarding the '-' sign-QUESTION">QUESTION</a></h2></div>
+
+<p>
+That's interesting. I tried inserting a '-1 *' in place of the '-' you suggest, and it failed. I don't think I've seen a plain '-' to flip signs.
+</p>
+
+<div id="Regarding the '-' sign-ANSWER"><h2 id="ANSWER" class="header"><a href="#Regarding the '-' sign-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Ah, the reason <code>-1 x</code> threw* an error is because of a strict type mismatch rule in Swift. It’s one of those times where the compiler is being incredibly rigid, but for a valid technical reason.
+</p>
+
+<p>
+Here is exactly what went wrong and why that plain <code>-</code> works instead.
+</p>
+
+<div id="Regarding the '-' sign-ANSWER-Why -1 x Crashed Your Code"><h3 id="Why -1 x Crashed Your Code" class="header"><a href="#Regarding the '-' sign-ANSWER-Why -1 x Crashed Your Code">Why -1 x Crashed Your Code</a></h3></div>
+
+<p>
+In Swift, numbers aren't just numbers - they have strict types.
+</p>
+
+<ul>
+<li>
+The number <code>1</code> is an <code>Int</code> (an integer/whole number).
+
+<li>
+The numbers coming out of your <code>GeometryReader</code> (<code>proxy.frame...</code>) are <code>CGFloat</code> (Core Graphics Floats, which handle decimal precision for screen pixels).
+
+</ul>
+<p>
+Swift refuses to let you multiply an <code>Int</code> and a <code>CGFloat</code> together directly. To Swift, that is like trying to multiply 5 miles by 3 liters - it doesn't understand how to combine the types.
+</p>
+
+<p>
+To make <code>-1 x</code> work, you would have to explicitly tell Swift to treat the <code>1</code> as a decimal point, like this:
+</p>
+
+<pre swift>
+-1.0 * (proxy.frame(in: .global).midX ... )
+</pre>
+
+<p>
+Because <code>1.0</code> is a floating-point number, Swift is happy to do the math.
+</p>
+
+<div id="Regarding the '-' sign-ANSWER-The Secret of the Plain - (Unary Minus)"><h3 id="The Secret of the Plain - (Unary Minus)" class="header"><a href="#Regarding the '-' sign-ANSWER-The Secret of the Plain - (Unary Minus)">The Secret of the Plain - (Unary Minus)</a></h3></div>
+
+<p>
+The plain negative sign you used (<code>-</code>) is called the Unary Minus Operator.
+</p>
+
+<p>
+Instead of performing multiplication between two separate values, it acts as a direct prefix modifier that instantly toggles the sign of whatever number sits right next to it.
+</p>
+
+<p>
+It is built directly into Swift's numeric system to automatically match whatever type it is modifying. If you put it in front of an <code>Int</code>, it returns a negative <code>Int</code>. If you put it in front of a <code>CGFloat</code>, it returns a negative <code>CGFloat</code>.
+</p>
+
+<pre swift>
+let positiveNumber: CGFloat = 42.0
+let flippedNumber = -positiveNumber // Swift handles this effortlessly!
+</pre>
+
+<p>
+Using the plain <code>-</code> is the preferred, idiomatic way to flip signs in Swift because it avoids type conflicts entirely and keeps your layout equations much cleaner to read!
 </p>
 
 <div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
