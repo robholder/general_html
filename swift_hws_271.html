@@ -313,6 +313,187 @@ To get the cards centered vertically on the device screen without forcing them t
 Because standard SwiftUI frames center their content by default, wrapping the 200×200 card inside a full-height container automatically drops the card directly onto the screen's vertical centerline.
 </p>
 
+<div id="My Own Tweaks to Horizontal Carousel-QUESTION"><h2 id="QUESTION" class="header"><a href="#My Own Tweaks to Horizontal Carousel-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I have great difficulty in picturing what the frame lines do:
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER"><h2 id="ANSWER" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is the absolute trickiest part of SwiftUI's layout system to visualize because you are dealing with three layers of invisible layout boxes nested inside each other.
+</p>
+
+<p>
+Let’s lift the curtain and trace exactly how these four frame lines coordinate to position a single text card, using a step-by-step visual assembly.
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 1: The Content Frame"><h3 id="Layer 1: The Content Frame" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER-Layer 1: The Content Frame">Layer 1: The Content Frame</a></h3></div>
+
+<pre swift>
+Text("Number \(index)")
+    .frame(width: 200, height: 200) // Line A
+</pre>
+
+<ul>
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 1: The Content Frame-What it does"></span><strong id="What it does">What it does</strong>: This cuts out a rigid 200×200 square container around your raw text and paints the background color (<code>.red</code>, <code>.green</code>, etc.) inside it. This is your physical card.
+
+</ul>
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 2: The Invisible Center Box (The Double Frame Trick)"><h3 id="Layer 2: The Invisible Center Box (The Double Frame Trick)" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER-Layer 2: The Invisible Center Box (The Double Frame Trick)">Layer 2: The Invisible Center Box (The Double Frame Trick)</a></h3></div>
+
+<pre swift>
+    .frame(width: proxy.size.width, height: proxy.size.height) // Line B
+</pre>
+
+<ul>
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 2: The Invisible Center Box (The Double Frame Trick)-What it does"></span><strong id="What it does">What it does</strong>: This wraps an outer, invisible box around your 200×200 card.
+
+<li>
+How it forces centering: Because this frame asks for <code>proxy.size.width</code> and <code>proxy.size.height</code>, it instantly expands to match the exact total space of the <code>GeometryReader</code> it sits inside.
+
+</ul>
+<p>
+Because standard SwiftUI frames always position their contents dead-center, your 200×200 card is pulled away from the top-left corner and forced to float perfectly in the middle of this larger invisible box.
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 3: The GeometryReader Slot"><h3 id="Layer 3: The GeometryReader Slot" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER-Layer 3: The GeometryReader Slot">Layer 3: The GeometryReader Slot</a></h3></div>
+
+<pre swift>
+} // End of Text &amp; Frames
+.frame(width: 200, height: 200) // Line C
+</pre>
+
+<ul>
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 3: The GeometryReader Slot-What it does"></span><strong id="What it does">What it does</strong>: This tells the <code>HStack</code> how much space to reserve for this entire <code>GeometryReader</code> package.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 3: The GeometryReader Slot-The Conflict it Solves"></span><strong id="The Conflict it Solves">The Conflict it Solves</strong>: Remember how we established that <code>GeometryReader</code> is greedy and wants to expand horizontally to fill the whole screen? If we didn't add this line, the first <code>GeometryReader</code> card would take up the <em>entire screen width</em>, pushing Card #2 completely off-screen. By hard-coding <code>.frame(width: 200)</code> here, we force the <code>GeometryReader</code> to only take up a 200-point slot horizontally in the scrolling row.
+
+</ul>
+<p>
+Notice that we <span id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 3: The GeometryReader Slot-did not"></span><strong id="did not">did not</strong> restrict its height here. Horizontally it is locked to 200, but vertically it remains greedy, stretching top-to-bottom.
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 4: The Full-Height Track"><h3 id="Layer 4: The Full-Height Track" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER-Layer 4: The Full-Height Track">Layer 4: The Full-Height Track</a></h3></div>
+
+<pre swift>
+.frame(minHeight: fullView.size.height) // Line D
+</pre>
+
+<ul>
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Layer 4: The Full-Height Track-What it does"></span><strong id="What it does">What it does</strong>: This is attached to the outer <code>HStack</code>. It forces the horizontal scrolling track to stretch vertically to match the full height of the device screen (<code>fullView</code>).
+
+</ul>
+<div id="My Own Tweaks to Horizontal Carousel-ANSWER-Putting the Blueprint Together"><h3 id="Putting the Blueprint Together" class="header"><a href="#My Own Tweaks to Horizontal Carousel-ANSWER-Putting the Blueprint Together">Putting the Blueprint Together</a></h3></div>
+
+<p>
+When you look at the screen, here is the chain reaction of these four lines working together:
+</p>
+<ul>
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Putting the Blueprint Together-Line D"></span><strong id="Line D">Line D</strong> stretches the <code>HStack</code> track to be full-screen height.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Putting the Blueprint Together-Line C"></span><strong id="Line C">Line C</strong> forces the <code>GeometryReader</code> to be a 200-wide column, but lets it stretch to match that full-screen height vertically.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Putting the Blueprint Together-Line B"></span><strong id="Line B">Line B</strong> creates a matching full-screen height invisible box inside that column.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-ANSWER-Putting the Blueprint Together-Line A"></span><strong id="Line A">Line A</strong> sits dead-center inside that invisible box, completely balanced.
+
+</ul>
+<p>
+Without this nesting, your cards would either stretch to fill the whole screen, crush into the top-left corner, or bunch up at the very top of the app!
+</p>
+
+<div id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames"><h2 id="Visualizing The Frames" class="header"><a href="#My Own Tweaks to Horizontal Carousel-Visualizing The Frames">Visualizing The Frames</a></h2></div>
+
+<p>
+To help you see exactly how these invisible boxes are nesting and interacting, we can use a <span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-debug border strategy"></span><strong id="debug border strategy">debug border strategy</strong>. Instead of solid backgrounds, we will give each frame a unique, bright border color and some small padding. This lets us "X-ray" the layout.
+</p>
+
+<p>
+Here is the modified code configured specifically to show you the geometry blueprint on your screen:
+</p>
+
+<pre swift>
+import SwiftUI
+
+
+struct ContentView: View {
+    let colors: [Color] = [.red, .green, .blue, .orange, .pink, .purple, .yellow]
+    
+    var body: some View {
+        GeometryReader { fullView in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(1..&lt;20) { index in
+                        GeometryReader { proxy in
+                            Text("Number \(index)")
+                                .font(.largeTitle)
+                                .padding()
+                                .background(colors[index % 7])
+                                .rotation3DEffect(
+                                    .degrees(-(proxy.frame(in: .global).midX - fullView.size.width / 2) / 5),
+                                    axis: (x: 0, y: 1, z: 0)
+                                )
+                            // LAYER 1: The Core Card (200x200)
+                                .frame(width: 200, height: 200)
+                                .border(.black, width: 4) // &lt;--- BLACK BORDER
+                            
+                            // LAYER 2: The Centering Wrapper
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                                .border(.blue, width: 2)  // &lt;--- BLUE BORDER
+                        }
+                        // LAYER 3: The GeometryReader's allocated slot
+                        .frame(width: 200, height: 200)
+                        .padding(.vertical, 10)     // Shaves a tiny bit of height so you can see the track
+                        .border(.purple, width: 4)  // &lt;--- YELLOW BORDER
+                    }
+                }
+                // LAYER 4: The Scroll View Track
+                .frame(minHeight: fullView.size.height)
+                .background(.purple.opacity(0.15)) // &lt;--- LIGHT PURPLE TRACK BACKGROUND
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen"><h3 id="What to Look For On Your Screen" class="header"><a href="#My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen">What to Look For On Your Screen</a></h3></div>
+
+<p>
+When you run this version, look closely at how the borders reveal the hidden layers:
+</p>
+
+<ul>
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen-The Purple Tint (Layer 4)"></span><strong id="The Purple Tint (Layer 4)">The Purple Tint (Layer 4)</strong>: This fills the entire background of your app from top to bottom. It proves that the <code>HStack</code> track successfully stretched to match the full height of your phone.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen-The Yellow Box (Layer 3)"></span><strong id="The Yellow Box (Layer 3)">The Yellow Box (Layer 3)</strong>: You will see a tall, narrow yellow column that stretches from the top of the screen to the bottom, but is exactly 200 points wide. This is the "slot" reserved in the horizontal row for this specific item.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen-The Blue Box (Layer 2)"></span><strong id="The Blue Box (Layer 2)">The Blue Box (Layer 2)</strong>: This box perfectly matches the inside of the Yellow box. It represents the <code>GeometryReader</code>'s inner world, which is also full-height but 200 points wide.
+
+<li>
+<span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen-The Black Box (Layer 1)"></span><strong id="The Black Box (Layer 1)">The Black Box (Layer 1)</strong>: Look right at the center of that tall Blue/Yellow column. Floating perfectly suspended in the middle is your 200×200 colored card, outlined in thick black.
+
+</ul>
+<p>
+Seeing it with borders shows that the frames aren't actually stacked flat on top of each other. Instead, <span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen-Layer 1"></span><strong id="Layer 1">Layer 1</strong> is a tiny box floating in the absolute center of <span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen-Layer 2"></span><strong id="Layer 2">Layer 2</strong>, which is confined inside the boundaries of <span id="My Own Tweaks to Horizontal Carousel-Visualizing The Frames-What to Look For On Your Screen-Layer 3"></span><strong id="Layer 3">Layer 3</strong>.
+</p>
+
 <div id="Regarding the '-' sign"><h1 id="Regarding the '-' sign" class="header"><a href="#Regarding the '-' sign">Regarding the '-' sign</a></h1></div>
 
 <div id="Regarding the '-' sign-QUESTION"><h2 id="QUESTION" class="header"><a href="#Regarding the '-' sign-QUESTION">QUESTION</a></h2></div>
