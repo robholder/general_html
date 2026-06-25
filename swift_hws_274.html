@@ -393,6 +393,11 @@ let scale = proxy.frame(in: .local).width / 200
 
 <div id="Hacking With Swift - 274 - Challenge 1-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 274 - Challenge 1-ANSWER-In Context">In Context</a></h3></div>
 
+
+<p>
+Full screen fade:
+</p>
+
 <div id="Hacking With Swift - 274 - Challenge 1-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 274 - Challenge 1-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
 
 <pre swift>
@@ -418,6 +423,111 @@ struct ContentView: View {
                                 1.0 - Double(abs(proxy.frame(in: .global)
                                     .midY - fullView.size.height / 2)
                                              / (fullView.size.height / 2))
+                            )
+                    }
+                    .frame(height: 40)
+                }
+            }
+        }
+    }
+}
+    
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below"><h2 id="200 Pixels Above and Below" class="header"><a href="#Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below">200 Pixels Above and Below</a></h2></div>
+
+<p>
+Right now, the equation divides the distance by <code>fullView.size.height / 2</code> (half the screen height). This spreads the fade out across the entire viewport. If you want the items to hit <span id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-0% opacity at exactly 200 pixels out from the center"></span><strong id="0% opacity at exactly 200 pixels out from the center">0% opacity at exactly 200 pixels out from the center</strong>, you simply swap that dynamic denominator out for a hardcoded value of <code>200.0</code>.
+</p>
+
+<p>
+Here is the exact code modification to clamp that fade window down:
+</p>
+
+<pre swift>
+    // --- THE 200px FADE CLAMP ---
+    .opacity(
+        max(0.0, 1.0 - Double(abs(proxy.frame(in: .global).midY - fullView.size.height / 2) / 200.0))
+    )
+</pre>
+
+<div id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-Why this works:"><h3 id="Why this works:" class="header"><a href="#Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-Why this works:">Why this works:</a></h3></div>
+
+<ul>
+<li>
+<span id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-Why this works:-At the exact center"></span><strong id="At the exact center">At the exact center</strong>: The distance (<code>abs(...)</code>) is <code>0</code>.
+
+<ul>
+<li>
+<code>0 / 200.0 = 0</code>
+
+<li>
+<code>1.0 - 0 = 1.0</code> (100% opaque).
+
+</ul>
+<li>
+<span id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-Why this works:-At 100 pixels away (up or down)"></span><strong id="At 100 pixels away (up or down)">At 100 pixels away (up or down)</strong>: The distance is <code>100</code>.
+
+<ul>
+<li>
+<code>100 / 200.0 = 0.5</code>
+
+<li>
+<code>1.0 - 0.5 = 0.5</code> (50% opaque).
+
+</ul>
+<li>
+<span id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-Why this works:-At exactly 200 pixels away"></span><strong id="At exactly 200 pixels away">At exactly 200 pixels away</strong>: The distance is <code>200</code>.
+
+<ul>
+<li>
+<code>200 / 200.0 = 1.0</code>
+
+<li>
+<code>1.0 - 1.0 = 0.0</code> (0% opaque / invisible).
+
+</ul>
+<li>
+<span id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-Why this works:-Beyond 200 pixels away"></span><strong id="Beyond 200 pixels away">Beyond 200 pixels away</strong>: The distance becomes greater than 200 (say 250), making the fraction <code>1.25</code>.
+
+<ul>
+<li>
+<code>1.0 - 1.25 = -0.25</code>.
+
+<li>
+The <code>max(0.0, ...)</code> wrapper instantly catches this negative value and locks it perfectly at <code>0.0</code> so it stays completely hidden as it approaches the far edges of the device!
+
+</ul>
+</ul>
+<div id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 274 - Challenge 1-200 Pixels Above and Below-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct ContentView: View {
+    let colors: [Color] = [.red, .green, .blue, .orange, .pink, .purple, .yellow]
+    
+    var body: some View {
+        GeometryReader { fullView in
+            ScrollView(.vertical) {
+                ForEach(0..&lt;50) { index in
+                    GeometryReader { proxy in
+                        Text("Row #\(index)")
+                            .font(.title)
+                            .frame(maxWidth: .infinity)
+                            .background(colors[index % 7])
+                            .rotation3DEffect(.degrees(proxy.frame(in: .global)
+                                .minY - fullView.size.height / 2) / 5,
+                                              axis: (x: 0, y: 1, z: 0))
+                            // --- THE 200px FADE CLAMP ---
+                            .opacity(
+                                max(0.0, 1.0 - Double(abs(proxy.frame(in: .global).midY - fullView.size.height / 2) / 200.0))
                             )
                     }
                     .frame(height: 40)
