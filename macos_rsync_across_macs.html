@@ -53,6 +53,10 @@ Look at the Ethernet status.
 <ul>
 <li>
 They should automatically assign themselves local IP addresses (Self-Assigned IPs) and show a green dot or a "Connected" status.
+
+</ul>
+</ul>
+  
 <table>
 <tr>
 <td>
@@ -61,8 +65,6 @@ They should automatically assign themselves local IP addresses (Self-Assigned IP
 </tr>
 </table>
 
-</ul>
-</ul>
 <div id="rsync - Two Macs-Ethernet-Step 2: Enable File Sharing on the Target Mac (Mac Mini)"><h3 id="Step 2: Enable File Sharing on the Target Mac (Mac Mini)" class="header"><a href="#rsync - Two Macs-Ethernet-Step 2: Enable File Sharing on the Target Mac (Mac Mini)">Step 2: Enable File Sharing on the Target Mac (Mac Mini)</a></h3></div>
 
 <p>
@@ -317,26 +319,60 @@ Replace <code>my_user</code> with the actual username on the Mac mini.
 
 # --- CONFIG ---
 REMOTE_HOST="macmini.local"
-REMOTE_USER="my_user"
-REMOTE_SHARE="Desktop"   # or whatever share you want
+REMOTE_USER="your_user_name"
+REMOTE_SHARE="your_user_name"
 MOUNT_POINT="$HOME/mnt/macmini"
+
 LOCAL_SYNC_DIR="$HOME/Desktop/xcode_projects"
 REMOTE_SYNC_DIR="$MOUNT_POINT/xcode_projects"
 
-# --- CREATE MOUNT POINT IF NEEDED ---
+# --- ENSURE MOUNT POINT EXISTS ---
 mkdir -p "$MOUNT_POINT"
 
+echo "Checking for Finder auto-mounts..."
+
+# --- FIND AND UNMOUNT ANY EXISTING /Volumes AUTO-MOUNTS ---
+AUTO_MOUNT=$(mount | grep "smbfs" | grep "/Volumes/$REMOTE_USER" | awk '{print $3}')
+
+if [[ -n "$AUTO_MOUNT" ]]; then
+    echo "Auto-mounted share found at $AUTO_MOUNT — unmounting..."
+    umount "$AUTO_MOUNT" 2&gt;/dev/null || umount -f "$AUTO_MOUNT"
+fi
+
+# --- ENSURE OUR MOUNT POINT IS NOT ALREADY MOUNTED ---
+if mount | grep -q "$MOUNT_POINT"; then
+    echo "Unmounting stale mount at $MOUNT_POINT..."
+    umount "$MOUNT_POINT" 2&gt;/dev/null || umount -f "$MOUNT_POINT"
+fi
+
 # --- MOUNT REMOTE SHARE ---
-echo "Mounting remote Mac..."
+echo "Mounting remote share..."
 mount_smbfs "//$REMOTE_USER@$REMOTE_HOST/$REMOTE_SHARE" "$MOUNT_POINT"
+
+# Verify mount succeeded
+if ! mount | grep -q "$MOUNT_POINT"; then
+    echo "ERROR: Mount failed."
+    exit 1
+fi
 
 # --- RUN SYNC ---
 echo "Running rsync..."
+
+## Dummy run (-n)
+#rsync -avzn --delete "$LOCAL_SYNC_DIR/" "$REMOTE_SYNC_DIR/"
+
+## Real command
 rsync -avz --delete "$LOCAL_SYNC_DIR/" "$REMOTE_SYNC_DIR/"
 
-# --- UNMOUNT ---
+# --- UNMOUNT CLEANLY ---
 echo "Unmounting..."
-diskutil unmount "$MOUNT_POINT"
+umount "$MOUNT_POINT" 2&gt;/dev/null || umount -f "$MOUNT_POINT"
+
+if mount | grep -q "$MOUNT_POINT"; then
+    echo "WARNING: Unmount failed."
+else
+    echo "Unmount successful."
+fi
 
 echo "Done."
 </pre>
