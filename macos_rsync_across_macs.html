@@ -282,6 +282,132 @@ Drag and drop your mounted Mac Mini volume from your desktop (or Finder) directl
 Click Done. Spotlight will now ignore that directory completely.
 
 </ul>
+<div id="Alias To Mount, Sync, And Unmount"><h1 id="Alias To Mount, Sync, And Unmount" class="header"><a href="#Alias To Mount, Sync, And Unmount">Alias To Mount, Sync, And Unmount</a></h1></div>
+
+<p>
+A single, reliable Terminal command that:
+</p>
+<ul>
+<li>
+mounts your Mac mini
+
+<li>
+runs your rsync sync
+
+<li>
+unmounts cleanly
+
+</ul>
+<p>
+...and does it without requiring Finder to “wake up” the network share first.
+</p>
+
+<p>
+Below is a polished, ready‑to‑use script.
+</p>
+
+<div id="Alias To Mount, Sync, And Unmount-Your Mount → Sync → Unmount Script"><h3 id="Your Mount → Sync → Unmount Script" class="header"><a href="#Alias To Mount, Sync, And Unmount-Your Mount → Sync → Unmount Script">Your Mount → Sync → Unmount Script</a></h3></div>
+
+<p>
+Replace <code>my_user</code> with the actual username on the Mac mini.
+</p>
+
+<pre bash>
+#!/bin/zsh
+
+# --- CONFIG ---
+REMOTE_HOST="macmini.local"
+REMOTE_USER="my_user"
+REMOTE_SHARE="Desktop"   # or whatever share you want
+MOUNT_POINT="$HOME/mnt/macmini"
+LOCAL_SYNC_DIR="$HOME/Desktop/xcode_projects"
+REMOTE_SYNC_DIR="$MOUNT_POINT/xcode_projects"
+
+# --- CREATE MOUNT POINT IF NEEDED ---
+mkdir -p "$MOUNT_POINT"
+
+# --- MOUNT REMOTE SHARE ---
+echo "Mounting remote Mac..."
+mount_smbfs "//$REMOTE_USER@$REMOTE_HOST/$REMOTE_SHARE" "$MOUNT_POINT"
+
+# --- RUN SYNC ---
+echo "Running rsync..."
+rsync -avz --delete "$LOCAL_SYNC_DIR/" "$REMOTE_SYNC_DIR/"
+
+# --- UNMOUNT ---
+echo "Unmounting..."
+diskutil unmount "$MOUNT_POINT"
+
+echo "Done."
+</pre>
+
+<div id="Alias To Mount, Sync, And Unmount-How This Maps to Your Existing Alias"><h3 id="How This Maps to Your Existing Alias" class="header"><a href="#Alias To Mount, Sync, And Unmount-How This Maps to Your Existing Alias">How This Maps to Your Existing Alias</a></h3></div>
+
+<p>
+Your alias:
+</p>
+
+<pre bash>
+rsync -avz --delete ~/Desktop/xcode_projects /Volumes/my_user/Desktop/xcode_projects
+</pre>
+
+<p>
+The script above does the same thing, but:
+</p>
+<ul>
+<li>
+mounts the Mac mini at a predictable path (~/mnt/macmini)
+
+<li>
+syncs to that path
+
+<li>
+unmounts afterward
+
+</ul>
+<p>
+No Finder navigation required.
+</p>
+
+<div id="Alias To Mount, Sync, And Unmount-If You Want a One‑Word Command"><h3 id="If You Want a One‑Word Command" class="header"><a href="#Alias To Mount, Sync, And Unmount-If You Want a One‑Word Command">If You Want a One‑Word Command</a></h3></div>
+
+<p>
+Save the script as:
+</p>
+
+<pre bash>
+~/bin/xcsync
+</pre>
+
+<p>
+Make it executable:
+</p>
+
+<pre bash>
+chmod +x ~/bin/xcsync
+</pre>
+
+<p>
+Then add this alias to your shell config:
+</p>
+
+<pre bash>
+alias xcsync="~/bin/xcsync"
+</pre>
+
+<p>
+Now you can run:
+</p>
+
+<pre bash>
+xcsync
+</pre>
+
+<p>
+...and it will mount → sync → unmount automatically.
+</p>
+
+
 <div id="Finder Desktop Volume Icons"><h1 id="Finder Desktop Volume Icons" class="header"><a href="#Finder Desktop Volume Icons">Finder Desktop Volume Icons</a></h1></div>
 
 <div id="Finder Desktop Volume Icons-QUESTION"><h2 id="QUESTION" class="header"><a href="#Finder Desktop Volume Icons-QUESTION">QUESTION</a></h2></div>
@@ -381,664 +507,13 @@ Uncheck the box next to Connected servers.
 </ul>
 <p>
 <br>
+</p>
+
+<p>
 <hr>
 </p>
 
-<table>
-<tr>
-<td>
-MOST OF THE REST OF THIS PAGE IS CRAP.
-</td>
-</tr>
-</table>
-
-<div id="Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page..."><h2 id="Ai After Exhasperation of the rest of the page..." class="header"><a href="#Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...">Ai After Exhasperation of the rest of the page...</a></h2></div>
-
 <p>
-When you use an SSH key, you bypass the slow interactive password challenge entirely. Instead, your Macs perform an instantaneous, cryptographic handshake. This shaves seconds off the initial connection time, which makes scripts and <code>rsync</code> aliases fire off almost instantly.
-</p>
-
-<p>
-Here is how to set up lightning-fast, passwordless SSH keys between your two Macs in under two minutes.
-</p>
-
-<div id="Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-Step 1: Generate a Key Pair on Machine 1"><h3 id="Step 1: Generate a Key Pair on Machine 1" class="header"><a href="#Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-Step 1: Generate a Key Pair on Machine 1">Step 1: Generate a Key Pair on Machine 1</a></h3></div>
-
-<p>
-We will use an Ed25519 key, which is the most modern, secure, and computationally fast encryption algorithm available.
-</p>
-
-<p>
-Open a terminal on Machine 1 (your main Mac) and run:
-</p>
-
-<pre bash>
-ssh-keygen -t ed25519 -C "my-mac-sync-key"
-</pre>
-
-<ul>
-<li>
-Press Enter three times to accept the defaults (leave the passphrase blank, as adding a passphrase forces you to type it in anyway, defeating our automated speed goal).
-
-</ul>
-<p>
-This creates two files in a hidden directory:
-</p>
-
-<ul>
-<li>
-<code>id_ed25519</code> (Your Private Key — keep this safe on Machine 1).
-
-<li>
-<code>id_ed25519.pub</code> (Your Public Key — the "lock" we are going to copy to the Mac Mini).
-
-</ul>
-<div id="Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-Step 2: Copy the Key to the Mac Mini"><h3 id="Step 2: Copy the Key to the Mac Mini" class="header"><a href="#Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-Step 2: Copy the Key to the Mac Mini">Step 2: Copy the Key to the Mac Mini</a></h3></div>
-
-<p>
-macOS doesn't come with the standard Linux <code>ssh-copy-id</code> tool by default, but you can copy the key over securely with this one-liner.
-</p>
-
-<p>
-Run this command from Machine 1 (replace user and <code>macmini.local</code> with your actual details):
-</p>
-
-<pre bash>
-cat ~/.ssh/id_ed25519.pub | ssh user@macmini.local "mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; cat &gt;&gt; ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys"
-</pre>
-
-<ul>
-<li>
-Type your Mac Mini account password one last time to authorize the transfer.
-
-</ul>
-<div id="Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-Step 3: Switch Your Alias Back to the Speed Engine (SSH)"><h3 id="Step 3: Switch Your Alias Back to the Speed Engine (SSH)" class="header"><a href="#Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-Step 3: Switch Your Alias Back to the Speed Engine (SSH)">Step 3: Switch Your Alias Back to the Speed Engine (SSH)</a></h3></div>
-
-<p>
-Because SSH keys are incredibly fast and secure, you can abandon the slow SMB File Sharing method entirely. Go into your <code>~/.zshrc</code> file on Machine 1 and change your alias back to using native SSH, matching your new setup:
-</p>
-
-<pre bash>
-alias sync-to-m2="rsync -avz --delete ~/Desktop/xcode_projects/ user@macmini.local:/Users/user/Desktop/xcode_projects/"
-</pre>
-
-
-<p>
-Run <code>source ~/.zshrc</code> to reload.
-</p>
-
-<div id="Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-The Result"><h3 id="The Result" class="header"><a href="#Finder Desktop Volume Icons-Ai After Exhasperation of the rest of the page...-The Result">The Result</a></h3></div>
-
-<p>
-Test it out by running your alias. You will notice:
-</p>
-
-<ul>
-<li>
-It will never ask you for a password again.
-
-<li>
-The connection initialization is instantaneous.
-
-<li>
-Because <code>rsync</code> is communicating natively via SSH rather than scanning individual security signatures on a mounted file server (SMB), your sync speeds will be blazingly fast.
-
-</ul>
-<div id="Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)"><h2 id="The Native macOS Sync (File Sharing / SMB)" class="header"><a href="#Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)">The Native macOS Sync (File Sharing / SMB)</a></h2></div>
-
-<table>
-<tr>
-<td>
-SUPERSLOW!
-</td>
-</tr>
-</table>
-
-<p>
-Let’s take a breath, step completely back, and hit the reset button. Since you own both Macs, you are logged into the same user account, and you just want your Xcode projects to sync without the technical headache, let’s look at the easiest, most modern ways to do this.
-</p>
-
-<p>
-Instead of forcing a command-line utility to break through Apple's security gates via SSH, we can use Apple's built-in File Sharing. This mounts your Mac Mini's hard drive directly onto your main Mac's Finder sidebar like a USB thumb drive.
-</p>
-
-<p>
-Once mounted, you can use standard terminal commands (including local <code>rsync</code>) completely error-free, because macOS natively trusts this connection.
-</p>
-
-<div id="Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 1: Turn on File Sharing on the Mac Mini"><h3 id="Step 1: Turn on File Sharing on the Mac Mini" class="header"><a href="#Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 1: Turn on File Sharing on the Mac Mini">Step 1: Turn on File Sharing on the Mac Mini</a></h3></div>
-
-<ul>
-<li>
-On the macs, go to System Settings &gt; General &gt; Sharing.
-
-<li>
-Toggle File Sharing to ON.
-
-<li>
-Click the small info (i) icon next to it. Under "Shared Folders", make sure your User folder is listed.
-
-</ul>
-<div id="Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 2: Connect from your Main Mac"><h3 id="Step 2: Connect from your Main Mac" class="header"><a href="#Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 2: Connect from your Main Mac">Step 2: Connect from your Main Mac</a></h3></div>
-
-<ul>
-<li>
-On your main Mac, open Finder.
-
-<li>
-In the top menu bar, click Go &gt; Connect to Server... (or press Cmd + K).
-
-<li>
-Type: <code>smb://&lt;mac_name&gt;.local</code> and click <code>Connect</code>.
-
-<li>
-It will ask for your username and password (use your Mac Mini login credentials).
-
-<li>
-Choose your main hard drive or user folder to mount.
-
-</ul>
-<p>
-Your 2nd Mac is now sitting in your Finder sidebar! You can drag and drop files natively.
-</p>
-
-<div id="Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 3: Run your rsync effortlessly"><h3 id="Step 3: Run your rsync effortlessly" class="header"><a href="#Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 3: Run your rsync effortlessly">Step 3: Run your rsync effortlessly</a></h3></div>
-
-<p>
-Because the 2nd Mac is now mounted locally on your main Mac, it shows up in a hidden folder called <code>/Volumes/</code>. This means you can run <code>rsync</code> as a local-to-local command. It bypasses SSH, port 22, and sshd-session entirely!
-</p>
-
-<div id="Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 3: Run your rsync effortlessly-Open your terminal on your Main Mac and run this:"><h4 id="Open your terminal on your Main Mac and run this:" class="header"><a href="#Finder Desktop Volume Icons-The Native macOS Sync (File Sharing / SMB)-Step 3: Run your rsync effortlessly-Open your terminal on your Main Mac and run this:">Open your terminal on your Main Mac and run this:</a></h4></div>
-
-<pre bash>
-rsync -avz --delete ~/Desktop/xcode_projects/ /Volumes/YOUR_MAC_MINI_SHARE_NAME/Desktop/xcode_projects/
-</pre>
-
-<p>
-(You can find the exact name of the volume by typing <code>ls /Volumes/</code> in your terminal).
-</p>
-
-<p>
-This gives you the best of both worlds: the lightning-fast, smart mirroring power of <code>rsync</code> without any of the network security errors
-<br>
-<hr>
-<br>
-</p>
-<div id="The Messy Thing that Never Worked"><h1 id="The Messy Thing that Never Worked" class="header"><a href="#The Messy Thing that Never Worked">The Messy Thing that Never Worked</a></h1></div>
-
-<table>
-<tr>
-<td>
-This proved to be a total mess. Keeping for future reference.
-</td>
-</tr>
-</table>
-
-<p>
-Here is a complete, step-by-step documentation guide for setting up bidirectional synchronization across your two Macs using <code>rsync</code> and macOS Local Hostnames.
-</p>
-
-<p>
-Save this guide into your Vimwiki or a reference document so you can look back at it whenever you need to configure or run a sync.
-</p>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames"><h2 id="Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames">Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames</a></h2></div>
-
-<p>
-This guide establishes a seamless, two-way manual syncing routine between your primary machine (Machine 1) and secondary machine (Machine 2) over your home Wi-Fi network.
-</p>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Architectural Overview"><h3 id="Architectural Overview" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Architectural Overview">Architectural Overview</a></h3></div>
-
-<p>
-By using Apple's built-in <span id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Architectural Overview-Bonjour network service"></span><strong id="Bonjour network service">Bonjour network service</strong>, your Macs can discover each other using a persistent domain extension (<code>.local</code>) instead of relying on shifting IP addresses.
-</p>
-
-<pre bash>
-[Machine 1]  --- (rsync over SSH via Name.local) ---&gt;  [Machine 2]
-</pre>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)"><h3 id="Part 1: Initial Setup (One-Time Configuration)" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)">Part 1: Initial Setup (One-Time Configuration)</a></h3></div>
-
-<p>
-You must configure the receiving machine so it has a readable network name and permission to accept secure files.
-</p>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.1: Find and Verify the Local Hostname"><h4 id="Step 1.1: Find and Verify the Local Hostname" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.1: Find and Verify the Local Hostname">Step 1.1: Find and Verify the Local Hostname</a></h4></div>
-
-<ul>
-<li>
-Walk over to Machine 2 (the machine you intend to sync files to).
-
-<li>
-Open System Settings &gt; General &gt; Sharing.
-
-<li>
-Scroll down to the very bottom to find the Local hostname section.
-
-<li>
-Note down the name exactly as it appears (e.g., <code>Mac-Mini.local</code> or <code>My-MacBook-Pro.local</code>).
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.2: Enable Remote Login Permissions"><h4 id="Step 1.2: Enable Remote Login Permissions" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.2: Enable Remote Login Permissions">Step 1.2: Enable Remote Login Permissions</a></h4></div>
-
-<ul>
-<li>
-While still in System Settings &gt; General &gt; Sharing on Machine 2, look for the Remote Login toggle.
-
-<li>
-Toggle the switch to ON.
-
-<li>
-Click the small info icon (<code>i</code>) next to the toggle and verify that your standard macOS user account is checked under "Allow access to:".
-
-<li>
-Note down your macOS <span id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 1: Initial Setup (One-Time Configuration)-Step 1.2: Enable Remote Login Permissions-account shortname"></span><strong id="account shortname">account shortname</strong> (the name of your home user folder).
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines"><h3 id="File Sharing on Both Machines" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines">File Sharing on Both Machines</a></h3></div>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-Step 1: Grant Permission on Machine 1 (Your Main Mac)"><h4 id="Step 1: Grant Permission on Machine 1 (Your Main Mac)" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-Step 1: Grant Permission on Machine 1 (Your Main Mac)">Step 1: Grant Permission on Machine 1 (Your Main Mac)</a></h4></div>
-<ul>
-<li>
-Since rsync is trying to read files from ~/Desktop/xcode_projects/, your local terminal application needs Full Disk Access.
-
-<li>
-Open System Settings &gt; Privacy &amp; Security &gt; Full Disk Access.
-
-<li>
-Look for your terminal application in the list (e.g., Terminal, iTerm2, or Ghostty if you use a third-party app).
-
-<li>
-Toggle the switch to ON.
-
-</ul>
-<p>
-If you run rsync inside a standalone code editor like VS Code or Xcode's terminal, make sure that app is toggled ON as well.
-</p>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-Step 2: Grant Permission on Machine 2 (The Mac Mini)"><h4 id="Step 2: Grant Permission on Machine 2 (The Mac Mini)" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-Step 2: Grant Permission on Machine 2 (The Mac Mini)">Step 2: Grant Permission on Machine 2 (The Mac Mini)</a></h4></div>
-
-<p>
-When Machine 1 logs into the Mac Mini via SSH, it spins up a background process called sshd (Remote Login) to write the files to the Mac Mini's Desktop. We must give that background tool permission to modify the desktop.
-</p>
-
-<ul>
-<li>
-Walk over to your Mac Mini (or screen share into it).
-
-<li>
-Go to System Settings &gt; Privacy &amp; Security &gt; Full Disk Access.
-
-<li>
-Look for Remote Login (sshd) in the list and toggle it to ON.
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-💡 What if Remote Login (sshd) isn't in the list?"><h4 id="💡 What if Remote Login (sshd) isn't in the list?" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-💡 What if Remote Login (sshd) isn't in the list?">💡 What if Remote Login (sshd) isn't in the list?</a></h4></div>
-
-<p>
-If you don't see it, click the small + (plus) icon at the bottom of the Full Disk Access list to add it manually. Press <code>&lt;Cmd&gt;&lt;Shift&gt;</code> + <code>G</code> to open the path finder, paste this exact system path, and hit enter:
-</p>
-<ul>
-<li>
-<code>/usr/libexec/sshd</code>
-
-<li>
-Select <code>sshd-session</code> and add it, ensuring it is toggled to ON.
-
-<li>
-Restart your Terminal and Run Again
-
-</ul>
-<p>
-Once the permissions are toggled on both machines, macOS requires you to completely restart the app for the changes to take effect:
-</p>
-
-<ul>
-<li>
-Close your terminal application completely (Cmd + Q).
-
-<li>
-Reopen your terminal.
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-zsh"><h4 id="zsh" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-File Sharing on Both Machines-zsh">zsh</a></h4></div>
-
-<ul>
-<li>
-Go to System Settings &gt; Privacy &amp; Security &gt; Full Disk Access.
-
-<li>
-Click the + icon at the bottom.
-
-<li>
-Press Cmd + Shift + G to open the path finder, paste this path, and hit enter:
-
-</ul>
-  
-<pre bash>
-/bin/zsh
-</pre>
-
-<ul>
-<li>
-Select zsh, add it, and ensure it is toggled ON.
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)"><h3 id="Part 2: Testing the Connection (The Dry Run)" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)">Part 2: Testing the Connection (The Dry Run)</a></h3></div>
-
-<p>
-Before modifying actual data, use <code>rsync</code>'s simulation mode to verify that your directory paths match perfectly.
-</p>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.1: Run a Simulation from Machine 1"><h4 id="Step 2.1: Run a Simulation from Machine 1" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.1: Run a Simulation from Machine 1">Step 2.1: Run a Simulation from Machine 1</a></h4></div>
-
-<p>
-Open your terminal or a Tmux pane on Machine 1 and run the following command.
-</p>
-
-<p>
-<blockquote>
-⚠️ The Trailing Slash Rule: Note the trailing slash on the source directory /tutorials/. This ensures that <code>rsync</code> copies the contents of your tutorial directory into the target destination, rather than copying the parent folder itself.
-</blockquote>
-</p>
-
-<pre bash>
-rsync -avzn --delete /path/to/local/tutorials/ username@TARGET-NAME.local:/path/to/remote/tutorials/
-</pre>
-
-<ul>
-<li>
-Replace <code>username</code> with Machine 2's <code>shortname</code>.
-
-<li>
-Replace <code>TARGET-NAME.local</code> with the hostname found in Step 1.1.
-
-<li>
-The <code>-n</code> flag tells <code>rsync</code> to execute a Dry Run.
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Test the hostname with a basic &quot;Ping&quot;"><h4 id="Test the hostname with a basic &quot;Ping&quot;" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Test the hostname with a basic &quot;Ping&quot;">Test the hostname with a basic "Ping"</a></h4></div>
-
-<p>
-If the command fails, try using Ping. We need to see if Machine 1 can even look up <code>&lt;machine_name&gt;.local</code>.
-Open your terminal on Machine 1 and type:
-</p>
-
-<pre bash>
-ping macmini.local
-</pre>
-<p>
-If it says <code>ping: cannot resolve &lt;machine_name&gt;.local: Unknown host</code>: Your home Wi-Fi router isn't properly broadcasting Apple's Bonjour names between devices.
-</p>
-
-<p>
-If it shows lines of numbers like <code>64 bytes from...</code>: Great news! The network name works perfectly, meaning something is blocking the SSH connection itself.
-</p>
-
-<p>
-Press <code>&lt;Ctrl&gt;</code> + <code>C</code> to stop the ping if it keeps going.
-</p>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.2: Establish SSH Trust"><h4 id="Step 2.2: Establish SSH Trust" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 2: Testing the Connection (The Dry Run)-Step 2.2: Establish SSH Trust">Step 2.2: Establish SSH Trust</a></h4></div>
-
-<p>
-When you execute the test command above, your terminal will display a security warning:
-</p>
-
-<pre text>
-The authenticity of host 'target-name.local' can't be established.
-Are you sure you want to continue connecting (yes/no/[fingerprint])?
-</pre>
-
-<ul>
-<li>
-Type <code>yes</code> and press Enter. This permanently saves Machine 2 to your Mac's known hosts list.
-
-<li>
-Type Machine 2's user login password when prompted.
-
-<li>
-Review the terminal output. It will display a list of all files and hidden <code>.git</code> historical metrics it <em>intends</em> to sync without modifying any real files.
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)"><h3 id="Part 3: Creating Permanent Terminal Shortcuts (The Workflow)" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)">Part 3: Creating Permanent Terminal Shortcuts (The Workflow)</a></h3></div>
-
-<p>
-To remove the friction of typing long paths and server addresses every time you study, map your synchronization commands to short command-line aliases.
-</p>
-
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.1: Add the Push Shortcut to Machine 1"><h4 id="Step 3.1: Add the Push Shortcut to Machine 1" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.1: Add the Push Shortcut to Machine 1">Step 3.1: Add the Push Shortcut to Machine 1</a></h4></div>
-
-<ul>
-<li>
-On Machine 1, open your shell layout file (usually ~/.zshrc or ~/.bashrc).
-
-<li>
-Add the following line at the bottom of the file (remove the -n flag so it performs the actual file transfer):
-
-</ul>
-  
-<pre bash>
-alias sync-to-m2="rsync -avz --delete /path/to/local/tutorials/ username@TARGET-NAME.local:/path/to/remote/tutorials/"
-</pre>
-
-<ul>
-<li>
-Save the file and reload your shell configuration: <code>source ~/.zshrc</code>
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.2: Add the Pull Shortcut to Machine 2"><h4 id="Step 3.2: Add the Pull Shortcut to Machine 2" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 3: Creating Permanent Terminal Shortcuts (The Workflow)-Step 3.2: Add the Pull Shortcut to Machine 2">Step 3.2: Add the Pull Shortcut to Machine 2</a></h4></div>
-
-<p>
-To achieve true bidirectional synchronization, reverse the path logic on your secondary machine so you can push your updates back whenever you work away from your primary desk.
-</p>
-
-<ul>
-<li>
-Walk over to Machine 2, open its shell configuration file (<code>~/.zshrc</code>).
-
-<li>
-Add a matching reflection alias pointing back to Machine 1's local hostname:
-
-</ul>
-  
-<pre bash>
-alias sync-to-m1="rsync -avz --delete /path/to/remote/tutorials/ username@MACHINE-1-NAME.local:/path/to/local/tutorials/"
-</pre>
-
-<p>
-(Ensure Remote Login is toggled on inside Machine 1's Sharing settings as well to make this step operational).
-</p>
-
-<ul>
-<li>
-Save and reload the shell: source ~/.zshrc
-
-</ul>
-<div id="The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 4: Daily Operational Workflow Rule"><h3 id="Part 4: Daily Operational Workflow Rule" class="header"><a href="#The Messy Thing that Never Worked-Step-by-Step Guide: Syncing Git Repos via rsync and Local Hostnames-Part 4: Daily Operational Workflow Rule">Part 4: Daily Operational Workflow Rule</a></h3></div>
-
-<p>
-Because <code>rsync</code> with a <code>--delete</code> flag completely mirrors one environment to another, adopt this strict operational rule to prevent accidentally erasing code updates:
-</p>
-
-<table>
-<tr>
-<td>
-💡 The Golden Rule: Always run your sync command from the machine you just finished coding on immediately before switching desks.
-</td>
-</tr>
-</table>
-
-<ul>
-<li>
-Finish work on Machine 1: Type <code>sync-to-m2</code> in your terminal. Wait for the file transfer to hit 100%.
-
-<li>
-Move to Machine 2: Wake it up. Open your tutorial folders or check out specific Git stage milestones (<code>git checkout &lt;commit&gt;</code>). Your workspaces are instantly aligned.
-
-<li>
-Finish work on Machine 2: Type <code>sync-to-m1</code> in your terminal to save your progress back to your primary workstation drive.
-
-</ul>
- 
-<div id="The Messy Thing that Never Worked-The Delete Flag"><h2 id="The Delete Flag" class="header"><a href="#The Messy Thing that Never Worked-The Delete Flag">The Delete Flag</a></h2></div>
-
-<p>
-The <code>--delete</code> flag is what turns <code>rsync</code> from a simple file copier into a true mirroring engine.
-</p>
-
-<p>
-Without it, <code>rsync</code> only looks at what needs to be added or updated. With it, <code>rsync</code> also looks at what needs to be cleaned up.
-</p>
-
-<p>
-Here is exactly what that means for your tutorial repositories and why it is so significant for your specific workflow.
-</p>
-
-<div id="The Messy Thing that Never Worked-The Delete Flag-The Default Behavior (Without --delete)"><h3 id="The Default Behavior (Without --delete)" class="header"><a href="#The Messy Thing that Never Worked-The Delete Flag-The Default Behavior (Without --delete)">The Default Behavior (Without --delete)</a></h3></div>
-
-<p>
-If you run <code>rsync</code> without the <code>--delete</code> flag, the sync is strictly additive.
-</p>
-
-<p>
-Imagine you are working in your <code>tutorials</code> folder on Machine 1:
-</p>
-
-<ul>
-<li>
-You decide a project called <code>Bad-Experiment</code> was a mistake, and you delete the entire folder from your computer.
-
-<li>
-You run your <code>rsync</code> command without the <code>--delete</code> flag.
-
-<li>
-<span id="The Messy Thing that Never Worked-The Delete Flag-The Default Behavior (Without --delete)-The Result"></span><strong id="The Result">The Result</strong>: <code>rsync</code> copies over your new work, but it completely ignores the deleted folder. <code>Bad-Experiment</code> will remain sitting on Machine 2 forever. Over months of learning, Machine 2 will become a "ghost town" cluttered with old, abandoned files and folders that you deleted weeks ago on your primary machine.
-
-</ul>
-<div id="The Messy Thing that Never Worked-The Delete Flag-The Mirror Behavior (With --delete)"><h3 id="The Mirror Behavior (With --delete)" class="header"><a href="#The Messy Thing that Never Worked-The Delete Flag-The Mirror Behavior (With --delete)">The Mirror Behavior (With --delete)</a></h3></div>
-
-<p>
-When you include <code>--delete</code>, you are telling <code>rsync</code>: <em>"Make the destination look exactly like the source. If a file doesn't exist on my main machine anymore, destroy it on the backup machine too."</em>
-</p>
-
-<pre text>
-Source (Machine 1)         Destination (Machine 2)
-  ├── Project A              ├── Project A
-  └── Project B              ├── Project B
-                             └── Bad-Experiment  ❌ (rsync deletes this)
-</pre>
-
-<p>
-Now, your backup machine remains perfectly pristine, matching your primary workspace file-for-file.
-</p>
-
-<div id="The Messy Thing that Never Worked-The Delete Flag-⚠️ Why it matters for Git repos (The &quot;Detached HEAD&quot; Gotcha)"><h3 id="⚠️ Why it matters for Git repos (The &quot;Detached HEAD&quot; Gotcha)" class="header"><a href="#The Messy Thing that Never Worked-The Delete Flag-⚠️ Why it matters for Git repos (The &quot;Detached HEAD&quot; Gotcha)">⚠️ Why it matters for Git repos (The "Detached HEAD" Gotcha)</a></h3></div>
-
-<p>
-Because you use <code>git checkout &lt;commit-hash&gt;</code> to jump back and forth between different stages of your tutorials, the <code>--delete</code> flag is absolutely critical.
-</p>
-
-<p>
-When you jump back to a very early commit in Git, newer files and folders physically disappear from your hard drive (Git hides them in its internal history). If you sync your machines while sitting on an early commit <em>without</em> the <code>--delete</code> flag, the second machine won't remove those newer files. Your working directory on Machine 2 will become a confusing hybrid mix of early commits and late commits mashed together, which can break your code builds.
-</p>
-
-<p>
-The <code>--delete</code> flag ensures that whatever state your Git repository is currently sitting in on Machine 1 is perfectly, identically replicated on Machine 2.
-</p>
-
-<div id="The Messy Thing that Never Worked-The Delete Flag-The Golden Safety Rule"><h3 id="The Golden Safety Rule" class="header"><a href="#The Messy Thing that Never Worked-The Delete Flag-The Golden Safety Rule">The Golden Safety Rule</a></h3></div>
-
-<p>
-Because <code>--delete</code> has the power to erase files on the destination machine, you must always adhere to the operational workflow rule: <em>Only sync from the machine you just finished coding on.</em> If you accidentally code for three hours on Machine 2, walk over to Machine 1, and run <code>sync-to-m2</code> (which pushes Machine 1's old state to Machine 2), the --delete flag will instantly wipe out those three hours of new work on Machine 2 because those files don't exist on Machine 1 yet!
-</p>
-
-<p>
-(This is why we used the -n dry-run flag earlier—it lets you double-check exactly what files --delete intends to erase before any real damage can happen).
-</p>
-
-<div id="Not working"><h1 id="Not working" class="header"><a href="#Not working">Not working</a></h1></div>
-
-<p>
-When an SSH server abruptly closes a connection the exact millisecond you authenticate, it isn't a problem with your password, network, or rsync. It means the sshd-session binary on the Mac Mini is crashing or intentionally killing its own process because macOS is denying it permission to spawn the environment.
-</p>
-
-<p>
-This happens if there is a corrupted permission cache or if macOS security gets trapped in a loop. Let's force macOS to reset its security database for these specific tools.
-</p>
-
-<p>
-Step 1: Nuclear Reset of Full Disk Access Caches
-</p>
-
-<p>
-We need to tell the Mac Mini's internal security database (tccutil) to wipe out and reset the permissions for Remote Login and the Shell, forcing macOS to re-evaluate them cleanly.
-</p>
-
-<p>
-Walk over to the Mac Mini (or screen share into it), open its terminal, and run these two commands:
-</p>
-
-<p>
-Bash
-sudo tccutil reset SystemPolicyAllFiles com.apple.Terminal
-sudo tccutil reset SystemPolicyAllFiles /usr/libexec/sshd-session
-(It will prompt you for your Mac Mini password to authorize the reset).
-</p>
-
-<p>
-Step 2: The Re-Apply Sequence
-</p>
-
-<p>
-Now that the database is clean, let's re-apply the permissions in the specific sequence macOS expects.
-</p>
-
-<p>
-On the Mac Mini:
-</p>
-
-<p>
-Go to System Settings &gt; Privacy &amp; Security &gt; Full Disk Access.
-</p>
-
-<p>
-If sshd-session, Terminal, or zsh are still in the list, highlight them and click the - (minus) button to delete them entirely.
-</p>
-
-<p>
-Go to System Settings &gt; General &gt; Sharing.
-</p>
-
-<p>
-Turn Remote Login completely OFF.
-</p>
-
-<p>
-Turn Remote Login back ON. (This triggers macOS to automatically re-add the fresh sshd-session architecture back into the system privacy database).
-</p>
-
-<p>
-Go back to Privacy &amp; Security &gt; Full Disk Access, locate Remote Login (sshd) or sshd-session, and ensure it is toggled ON.
-</p>
-
-<p>
-Step 3: Run the Direct Diagnostic Test
-</p>
-
-<p>
-Before trying rsync, let's use the simplest baseline test to see if the Mac Mini will let you in at all. From Machine 1, run a completely empty SSH connection:
-</p>
-
-<p>
-Bash
-ssh user@macmini.local
-If it logs you in and gives you a command prompt (user@macmini ~ %): We won! The security loop is broken. Type exit to close it, and your rsync alias will now run perfectly.
-</p>
-
-<p>
-If it still says Connection closed: There is a deeper configuration mismatch in the SSH daemon configuration file itself. If this happens, please run ssh -vvv user@macmini.local and paste the last 10 lines of output. The "triple verbose" flag will print out a live step-by-step log of the exact handshake packet that causes the Mac Mini to drop the connection.
 <a href="unix_tools_index.html">Unix Tools</a>
 </p>
 
