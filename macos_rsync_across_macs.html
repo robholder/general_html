@@ -347,17 +347,31 @@ fi
 
 # --- MOUNT REMOTE SHARE ---
 echo "Mounting remote share..."
-mount_smbfs "//$REMOTE_USER@$REMOTE_HOST/$REMOTE_SHARE" "$MOUNT_POINT"
 
-# Verify mount succeeded
-if ! mount | grep -q "$MOUNT_POINT"; then
+# Use AppleScript to mount via Finder (utilizes your saved Keychain password)
+osascript -e "mount volume \"smb://$REMOTE_HOST/$REMOTE_SHARE\""
+
+# Give macOS a couple of seconds to finalize the network mount
+sleep 2
+
+# Verify mount succeeded (Finder mounts inside /Volumes by default)
+# We update the MOUNT_POINT dynamically to match where Finder put it
+MOUNT_POINT="/Volumes/$REMOTE_SHARE"
+
+if [ ! -d "$MOUNT_POINT" ]; then
     echo "ERROR: Mount failed."
     exit 1
 fi
 
+# Update your sync dir path to match the new Finder mount point
+REMOTE_SYNC_DIR="$MOUNT_POINT/Desktop/xcode_projects"
+
 # --- RUN SYNC ---
 echo "Running rsync..."
-rsync -avzn --delete "$LOCAL_SYNC_DIR/" "$REMOTE_SYNC_DIR/"
+## Dummy run (-n)
+#rsync -avzn --delete "$LOCAL_SYNC_DIR/" "$REMOTE_SYNC_DIR/"
+## Full run
+rsync -avz --delete "$LOCAL_SYNC_DIR/" "$REMOTE_SYNC_DIR/"
 
 # --- UNMOUNT CLEANLY ---
 echo "Unmounting..."
