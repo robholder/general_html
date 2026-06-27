@@ -111,6 +111,117 @@ struct ContentView: View {
 <span id="Ai Insight-Why This Works Beautifully-The Color Cycle"></span><strong id="The Color Cycle">The Color Cycle</strong>: In the HSB (Hue, Saturation, Brightness) color space, a <code>hue</code> of <code>0.0</code> is red, <code>0.3</code> is green, <code>0.6</code> is blue, and it wraps right back around to red at <code>1.0</code>. As you scroll a row from the bottom to the top, it will shift dynamically across the entire rainbow spectrum!
 
 </ul>
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Is any way of extracting those out of the view?
+</p>
+
+<p>
+I've been led to consider taking math OUT of the <code>ContentView</code> struct/view, perhaps by making a dedicated struct/view that can be placed as a view within the <code>ContentView</code> (to simplify the view body).
+</p>
+
+<p>
+Am I correct in assuming this is desirable? If so, how can we best achieve it?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+ 
+<p>
+You are 100% correct in assuming this is desirable. In fact, it's one of the best habits you can form in SwiftUI.
+</p>
+
+<p>
+When a single view handles layout, scrolling, geometry math, text rendering, and style mutations all in one place, it turns into what developers call a <span id="Ai Insight-ANSWER-&quot;Massive View.&quot;"></span><strong id="&quot;Massive View.&quot;">"Massive View."</strong> It makes the code harder to read, harder to debug, and forces SwiftUI to do extra work tracking body changes.
+</p>
+
+<p>
+By extracting the row into its own dedicated subview, we achieve two major wins:
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-Separation of Concerns"></span><strong id="Separation of Concerns">Separation of Concerns</strong>: <code>ContentView</code> handles the scrolling list container. The subview handles the visual presentation of a single row.
+
+<li>
+<span id="Ai Insight-ANSWER-Readability"></span><strong id="Readability">Readability</strong>: Your code instantly reads like a clean layout blueprint.
+
+</ul>
+<p>
+Here is the best way to refactor this by creating a dedicated <code>ScrollRow</code> subview.
+</p>
+
+<div id="Ai Insight-ANSWER-The Refactored Solution"><h3 id="The Refactored Solution" class="header"><a href="#Ai Insight-ANSWER-The Refactored Solution">The Refactored Solution</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        GeometryReader { fullView in
+            ScrollView(.vertical) {
+                VStack(spacing: 0) {
+                    ForEach(0..&lt;50) { index in
+                        // We pass the parent container's total height down to each row
+                        ScrollRow(index: index, parentHeight: fullView.size.height)
+                            .frame(height: 40)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Extracted Subview
+struct ScrollRow: View {
+    let index: Int
+    let parentHeight: CGFloat
+    
+    var body: some View {
+        GeometryReader { proxy in
+            // All the heavy math is cleanly calculated right here
+            let currentMidY = proxy.frame(in: .global).midY
+            let positionRatio = currentMidY / parentHeight
+            
+            let dynamicColor = Color(
+                hue: Double(positionRatio),
+                saturation: 0.8,
+                brightness: 0.9
+            )
+            
+            Text("Row #\(index)")
+                .font(.title)
+                .frame(maxWidth: .infinity)
+                .background(dynamicColor)
+                .scaleEffect(
+                    CGFloat(0.5 + (0.5 * positionRatio))
+                )
+                .rotation3DEffect(
+                    .degrees(Double(currentMidY - parentHeight / 2) / 3),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+                .opacity(
+                    max(0.0, 1.0 - Double(abs(currentMidY - parentHeight / 2) / 200.0))
+                )
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Why this approach works best"><h3 id="Why this approach works best" class="header"><a href="#Ai Insight-ANSWER-Why this approach works best">Why this approach works best</a></h3></div>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-Why this approach works best-Passing the Parent Height"></span><strong id="Passing the Parent Height">Passing the Parent Height</strong>: The inner <code>GeometryReader</code> inside <code>ScrollRow</code> only knows about its <em>own</em> tiny frame (40 points high). It has no idea how big the screen is. By passing <code>fullView.size.height</code> as a dependency (<code>parentHeight</code>), the subview has everything it needs to calculate the perfect screen ratio.
+
+<li>
+<span id="Ai Insight-ANSWER-Why this approach works best-Encapsulation"></span><strong id="Encapsulation">Encapsulation</strong>: Notice how <code>ContentView</code> is now incredibly clean. If you ever want to change how the text looks, add an image, or adjust the animations, you only have to look at the isolated <code>ScrollRow</code> struct.
+
+</ul>
 <p>
 <hr>
 <br>
