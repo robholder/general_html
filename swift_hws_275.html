@@ -89,7 +89,23 @@ Since we want to range from <code>0.5</code> to <code>1.0</code> instead of <cod
 <div id="Ai Insight-ANSWER-The Solution"><h3 id="The Solution" class="header"><a href="#Ai Insight-ANSWER-The Solution">The Solution</a></h3></div>
 
 <p>
-Here is how you add that modifier to your code. Note that I've also re-aligned your <code>rotation3DEffect</code> back to the horizontal axis <code>(x: 1, y: 0, z: 0)</code> so it doesn't skew weirdly when mixing with the new scale effect:
+Here is how you add that modifier to your code.
+</p>
+
+<table>
+<tr>
+<td>
+NOTE: I decided NOT to use the following re-alignment - I'm keeping it vertical to create the helix effect.
+</td>
+</tr>
+</table>
+
+<p>
+The following could be re-aligned with the <code>rotation3DEffect</code> back to the horizontal axis <code>(x: 1, y: 0, z: 0)</code> so it doesn't skew weirdly when mixing with the new scale effect:
+</p>
+
+<p>
+(The following code ignores the paragraph above.)
 </p>
 
 <pre swift>
@@ -145,6 +161,74 @@ struct ContentView: View {
 <span id="Ai Insight-ANSWER-Breaking Down the Math-At the absolute bottom edge"></span><strong id="At the absolute bottom edge">At the absolute bottom edge</strong>: <code>midY</code> matches the full screen height. The fraction becomes <code>1.0</code>. The math reads: <code>0.5 + (0.5 * 1.0) = 1.0</code>. Your row blooms to its <span id="Ai Insight-ANSWER-Breaking Down the Math-100% regular size"></span><strong id="100% regular size">100% regular size</strong>.
 
 </ul>
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Why use:
+</p>
+<ul>
+<li>
+<code>0.5 + (0.5 * (proxy.frame(in: .global) .midY / fullView.size.height)))</code>
+
+</ul>
+<p>
+Why not just:
+</p>
+<ul>
+<li>
+<code>(proxy.frame(in: .global) .midY / fullView.size.height)</code>
+
+</ul>
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+It comes down to a subtle trap in the math that would break the rules of your challenge!
+</p>
+
+<p>
+If you use just <code>proxy.frame(in: .global).midY / fullView.size.height</code>, your scaling range will map directly from <code>0.0</code> to <code>1.0</code>.
+</p>
+
+<p>
+Here is what happens to your views at the top of the screen if you use that direct ratio:
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-At the bottom"></span><strong id="At the bottom">At the bottom</strong>: <code>midY / height</code> equals <code>1.0</code>. The scale is <code>1.0</code> (100% size). Perfect.
+
+<li>
+<span id="Ai Insight-ANSWER-In the middle"></span><strong id="In the middle">In the middle</strong>: <code>midY / height</code> equals <code>0.5</code>. The scale is <code>0.5</code> (50% size).
+
+<li>
+<span id="Ai Insight-ANSWER-At the top"></span><strong id="At the top">At the top</strong>: As a row scrolls toward the top, <code>midY</code> approaches <code>0</code>. The scale shrinks all the way down to <code>0.0</code> - making your text completely collapse and vanish into a flat horizontal line before it even leaves the screen.
+
+</ul>
+<p>
+Your challenge explicitly said: <em>"I would suggest going no smaller than 50% of the regular size."</em>
+</p>
+
+<p>
+By using the <code>0.5 + (0.5 * ratio)</code> technique, you are shrinking the range of the scaling factor, shifting the floor up from <code>0.0</code> to <code>0.5</code>.
+</p>
+
+<p>
+Think of it as splitting the scale into two halves:
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-The"></span><strong id="The">The</strong> <code>0.5</code> <span id="Ai Insight-ANSWER-out front"></span><strong id="out front">out front</strong>: This is your absolute safety floor. No matter how close <code>midY</code> gets to zero, the scale can never drop below <code>0.5</code>.
+
+<li>
+<span id="Ai Insight-ANSWER-The"></span><strong id="The">The</strong> <code>0.5 * ratio part</code>: This dynamically calculates the remaining 50% of the growth based on how far down the screen the row has traveled.
+
+</ul>
+<p>
+So when a row is at the very top (<code>ratio = 0</code>), you get <code>0.5 + 0 = 0.5</code> (exactly 50% size). When it's at the very bottom (<code>ratio = 1</code>), you get <code>0.5 + 0.5 = 1.0</code> (exactly 100% size).
+</p>
+
+
 <div id="Ai Insight-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Ai Insight-ANSWER-In Context">In Context</a></h3></div>
 
 <div id="Ai Insight-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Ai Insight-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
