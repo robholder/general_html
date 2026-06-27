@@ -495,6 +495,9 @@ If the box contains a <code>.success</code>, <code>.get()</code> hands you the v
 
 <li>
 If the box contains a <code>.failure</code>, <code>.get()</code> immediately <span id="Ai Insight-ANSWER-Feature 1: Turning a Result into a do/catch (The get() method)-throws"></span><strong id="throws">throws</strong> the error, kicking you straight into the <code>catch</code> block.
+
+</ul>
+  
 <pre swift>
 // Opening the box with get()
 do {
@@ -505,7 +508,6 @@ do {
 }
 </pre>
 
-</ul>
 <div id="Ai Insight-ANSWER-Feature 2: Turning a throwing function into a Result"><h3 id="Feature 2: Turning a throwing function into a Result" class="header"><a href="#Ai Insight-ANSWER-Feature 2: Turning a throwing function into a Result">Feature 2: Turning a throwing function into a Result</a></h3></div>
 
 <p>
@@ -540,11 +542,48 @@ If it's a <code>.success</code>: <code>map</code> reaches inside, converts <code
 If it's a <code>.failure</code>: <code>map</code> looks inside, sees an error, closes the lid, and <span id="Ai Insight-ANSWER-Feature 3: Transforming inside the box (map and mapError)-map() changes the Success-ignores your conversion entirely"></span><strong id="ignores your conversion entirely">ignores your conversion entirely</strong>. The error remains untouched.
 
 </ul>
+<p>
+Use map when you want to change the successful data inside the box, but leave any errors completely untouched.
+</p>
+
+<pre swift>
+// A Result box containing a String ("42"), or a NetworkError
+let stringResult: Result&lt;String, NetworkError&gt; = .success("42")
+
+// map() reaches inside and converts the String "42" into the Int 42
+let integerResult: Result&lt;Int, NetworkError&gt; = stringResult.map { stringValue in
+    Int(stringValue) ?? 0
+}
+
+// NOTE: If stringResult had been a .failure, map() would have ignored 
+// the integer conversion entirely and just passed the error along.
+</pre>
+
 <div id="Ai Insight-ANSWER-Feature 3: Transforming inside the box (map and mapError)-mapError() changes the Failure"><h4 id="mapError() changes the Failure" class="header"><a href="#Ai Insight-ANSWER-Feature 3: Transforming inside the box (map and mapError)-mapError() changes the Failure">mapError() changes the Failure</a></h4></div>
 
 <p>
 This does the exact opposite. It ignores successful data, but if it finds an error, it lets you translate a messy system error (like Code <em>404</em>) into a clean, readable app error (like <code>.pageNotFound</code>).
 </p>
+
+<p>
+Use mapError when you don't care about the successful data, but you want to take a messy, low-level error and translate it into a clean, custom error that your app understands.
+</p>
+
+<pre swift>
+// Custom, clean errors for our app's UI
+enum AppUIError: Error {
+    case connectionLost
+}
+
+// A Result box containing a String, but holding a messy system URLSession error
+let systemResult: Result&lt;String, Error&gt; = .failure(URLError(.notConnectedToInternet))
+
+// mapError() ignores success, but catches the system error and swaps it out
+let cleanResult: Result&lt;String, AppUIError&gt; = systemResult.mapError { systemError in
+    // Turn any internet-related system error into our clean .connectionLost case
+    return AppUIError.connectionLost
+}
+</pre>
 
 <p>
 <hr>
