@@ -38,6 +38,110 @@
 Make views adjust their scale depending on their vertical position, with views near the bottom being large and views near the top being small. I would suggest going no smaller than 50% of the regular size.
 
 </ul>
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+My guess is that I need a modifier after the opacity (or maybe before the <code>rotation3DEffect</code>?).
+</p>
+
+<p>
+Can you point me to a solution? 
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You are exactly on the right track thinking about a new modifier! The modifier you want is called <code>.scaleEffect()</code>.
+</p>
+
+<p>
+Order-wise, it is generally best practice to put spatial transformations like scaling and rotations <em>before</em> you apply opacity or layout constraints, ensuring that the visual effect scales smoothly from its structural center.
+</p>
+
+<div id="Ai Insight-ANSWER-The Scaling Strategy"><h3 id="The Scaling Strategy" class="header"><a href="#Ai Insight-ANSWER-The Scaling Strategy">The Scaling Strategy</a></h3></div>
+
+<p>
+For this challenge, we want a linear transformation from the top of the screen to the bottom:
+</p>
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-The Scaling Strategy-At the very top of the screen"></span><strong id="At the very top of the screen">At the very top of the screen</strong> (<code>midY = 0</code>): The scale should be exactly <code>0.5</code> (50% size).
+
+<li>
+<span id="Ai Insight-ANSWER-The Scaling Strategy-At the very bottom of the screen"></span><strong id="At the very bottom of the screen">At the very bottom of the screen</strong> (<code>midY = fullView.size.height</code>): The scale should be exactly <code>1.0</code> (100% full size).
+
+</ul>
+<p>
+To translate this into a formula, we can find the card's position as a ratio of the total screen height (<code>proxy.frame(in: .global).midY / fullView.size.height</code>). This gives us a value ranging from <code>0.0</code> at the top to <code>1.0</code> at the bottom.
+</p>
+
+<p>
+Since we want to range from <code>0.5</code> to <code>1.0</code> instead of <code>0.0</code> to <code>1.0</code>, we can map it like this:
+</p>
+
+<ul>
+<li>
+<code>Scale = 0.5 + ( 0.5 x  midY/ScreenHeight)</code>
+
+</ul>
+<div id="Ai Insight-ANSWER-The Solution"><h3 id="The Solution" class="header"><a href="#Ai Insight-ANSWER-The Solution">The Solution</a></h3></div>
+
+<p>
+Here is how you add that modifier to your code. Note that I've also re-aligned your <code>rotation3DEffect</code> back to the horizontal axis <code>(x: 1, y: 0, z: 0)</code> so it doesn't skew weirdly when mixing with the new scale effect:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    let colors: [Color] = [.red, .green, .blue, .orange, .pink, .purple, .yellow]
+    
+    var body: some View {
+        GeometryReader { fullView in
+            ScrollView(.vertical) {
+                VStack(spacing: 0) { // Using a VStack helps keep row frames stable
+                    ForEach(0..&lt;50) { index in
+                        GeometryReader { proxy in
+                            Text("Row #\(index)")
+                                .font(.title)
+                                .frame(maxWidth: .infinity)
+                                .background(colors[index % 7])
+                                // 1. SCALE EFFECT FIRST
+                                .scaleEffect(
+                                    CGFloat(0.5 + (0.5 * (proxy.frame(in: .global).midY / fullView.size.height)))
+                                )
+                                // 2. ROTATION EFFECT
+                                .rotation3DEffect(
+                                    .degrees(Double(proxy.frame(in: .global).midY - fullView.size.height / 2) / 5),
+                                    axis: (x: 1, y: 0, z: 0)
+                                )
+                                // 3. OPACITY EFFECT
+                                .opacity(
+                                    max(0.0, 1.0 - Double(abs(proxy.frame(in: .global).midY - fullView.size.height / 2) / 200.0))
+                                )
+                        }
+                        .frame(height: 40)
+                    }
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Breaking Down the Math"><h3 id="Breaking Down the Math" class="header"><a href="#Ai Insight-ANSWER-Breaking Down the Math">Breaking Down the Math</a></h3></div>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-Breaking Down the Math-At the absolute top edge"></span><strong id="At the absolute top edge">At the absolute top edge</strong>: <code>midY</code> is <code>0</code>. The math reads: <code>0.5 + (0.5 * 0) = 0.5</code>. Your row scales down perfectly to <span id="Ai Insight-ANSWER-Breaking Down the Math-50% size"></span><strong id="50% size">50% size</strong>.
+
+<li>
+<span id="Ai Insight-ANSWER-Breaking Down the Math-At the absolute middle"></span><strong id="At the absolute middle">At the absolute middle</strong>: <code>midY</code> is exactly half the screen height. The fraction becomes <code>0.5</code>. The math reads: <code>0.5 + (0.5 * 0.5) = 0.75</code>. Your row sits at <span id="Ai Insight-ANSWER-Breaking Down the Math-75% size"></span><strong id="75% size">75% size</strong>.
+
+<li>
+<span id="Ai Insight-ANSWER-Breaking Down the Math-At the absolute bottom edge"></span><strong id="At the absolute bottom edge">At the absolute bottom edge</strong>: <code>midY</code> matches the full screen height. The fraction becomes <code>1.0</code>. The math reads: <code>0.5 + (0.5 * 1.0) = 1.0</code>. Your row blooms to its <span id="Ai Insight-ANSWER-Breaking Down the Math-100% regular size"></span><strong id="100% regular size">100% regular size</strong>.
+
+</ul>
 <p>
 <hr>
 <br>
