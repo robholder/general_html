@@ -355,11 +355,197 @@ Your assumption was spot on. For raw scroll performance, <span id="Ai Insight-Th
 By treating the subview as a pure "visual skin" (<code>VisualRowView</code>) that just accepts final numbers, you get the absolute best of both worlds: your layout file remains a clear blueprint, your math is organized, and your scroll view remains butter-smooth.
 </p>
 
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Right now, the helix of rotating text view items only appear from 200 pixels down, and disappear 200 before the bottom of the screen. I'd like the color spectrum (hues of 0.0 to 1.0) to start and finish within the text views when they have some opacity. How do I tweak the math (the position ratio) for the hue to achieve this?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+To match the color spectrum exactly to the visible window of your rows, we need to map the hue's <code>0.0</code> to <code>1.0</code> range to the <span id="Ai Insight-ANSWER-clamped 400-pixel zone"></span><strong id="clamped 400-pixel zone">clamped 400-pixel zone</strong> in the center of the screen, rather than the full height of the device.
+</p>
+
+<p>
+Right now, your opacity is controlled by this calculation:
+</p>
+<ul>
+<li>
+<code>abs(currentMidY - screenHeight / 2) / 200.0</code>
+
+</ul>
+<p>
+This tells us that a row completely fades out when it is more than <span id="Ai Insight-ANSWER-200 pixels away from the center line."></span><strong id="200 pixels away from the center line.">200 pixels away from the center line.</strong> Therefore, your visible window starts exactly at <code>(screenHeight / 2) - 200</code> and ends at <code>(screenHeight / 2) + 200</code>.
+</p>
+
+<div id="Ai Insight-ANSWER-The Math Tweak"><h3 id="The Math Tweak" class="header"><a href="#Ai Insight-ANSWER-The Math Tweak">The Math Tweak</a></h3></div>
+
+<p>
+To make the hue span perfectly across this 400-pixel visible window, we can calculate a new <code>colorRatio</code>.
+</p>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-The Math Tweak-Find the distance from the top visibility threshold"></span><strong id="Find the distance from the top visibility threshold">Find the distance from the top visibility threshold</strong>: <code>currentMidY - (screenHeight / 2 - 200)</code>
+
+<li>
+<span id="Ai Insight-ANSWER-The Math Tweak-Divide by the total visible span (400 pixels)"></span><strong id="Divide by the total visible span (400 pixels)">Divide by the total visible span (400 pixels)</strong>: This gives us a neat <code>0.0</code> to <code>1.0</code> ratio.
+
+<li>
+<span id="Ai Insight-ANSWER-The Math Tweak-Clamp the result"></span><strong id="Clamp the result">Clamp the result</strong>: We wrap it in <code>max(0.0, min(1.0, ...))</code> so rows that wander outside the 400-pixel window don't bleed into invalid color values.
+
+</ul>
+<div id="Ai Insight-ANSWER-The Updated Code"><h3 id="The Updated Code" class="header"><a href="#Ai Insight-ANSWER-The Updated Code">The Updated Code</a></h3></div>
+
+<p>
+Here is how you update the calculations inside your <code>ContentView</code>:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    var body: some View {
+        GeometryReader { fullView in
+            ScrollView(.vertical) {
+                VStack(spacing: 0) {
+                    ForEach(0..&lt;50) { index in
+                        GeometryReader { proxy in
+                            let currentMidY = proxy.frame(in: .global).midY
+                            let screenHeight = fullView.size.height
+                            
+                            // 1. Standard position ratio for the overall scaling
+                            let positionRatio = currentMidY / screenHeight
+                            let scale = 0.5 + (0.5 * positionRatio)
+                            let rotation = Double(currentMidY - screenHeight / 2) / 3
+                            let opacity = max(0.0, 1.0 - Double(abs(currentMidY - screenHeight / 2) / 200.0))
+                            
+                            // 2. THE TWEAK: Map hue strictly to the 400px visible window
+                            let visibleStart = (screenHeight / 2) - 200
+                            let rawColorRatio = (currentMidY - visibleStart) / 400.0
+                            let colorRatio = max(0.0, min(1.0, rawColorRatio)) // Safety clamp between 0.0 and 1.0
+                            
+                            let dynamicColor = Color(
+                                hue: Double(colorRatio), 
+                                saturation: 0.8, 
+                                brightness: 0.9
+                            )
+                            
+                            VisualRowView(
+                                text: "Row #\(index)",
+                                backgroundColor: dynamicColor,
+                                scale: scale,
+                                rotation: rotation,
+                                opacity: opacity
+                            )
+                        }
+                        .frame(height: 40)
+                    }
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-How it Behaves Now"><h3 id="How it Behaves Now" class="header"><a href="#Ai Insight-ANSWER-How it Behaves Now">How it Behaves Now</a></h3></div>
+
+<ul>
+<li>
+<span id="Ai Insight-ANSWER-How it Behaves Now-As a row fades in at the top boundary"></span><strong id="As a row fades in at the top boundary">As a row fades in at the top boundary</strong> (<code>currentMidY = center - 200</code>): The <code>colorRatio</code> evaluates to exactly <code>0.0</code>. The row emerges as a crisp Red.
+
+<li>
+<span id="Ai Insight-ANSWER-How it Behaves Now-As a row crosses the exact center of the screen"></span><strong id="As a row crosses the exact center of the screen">As a row crosses the exact center of the screen</strong> (<code>currentMidY = center</code>): The <code>colorRatio</code> evaluates to <code>0.5</code>. It transitions beautifully into a vibrant Teal/Cyan.
+
+<li>
+<span id="Ai Insight-ANSWER-How it Behaves Now-As a row fades out at the bottom boundary"></span><strong id="As a row fades out at the bottom boundary">As a row fades out at the bottom boundary</strong> (<code>currentMidY = center + 200</code>): The <code>colorRatio</code> reaches <code>1.0</code>. It wraps the spectrum completely back into Red/Magenta right before it vanishes.
+
+</ul>
+<div id="Ai Insight-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Ai Insight-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Ai Insight-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Ai Insight-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+
+struct ContentView: View {
+    var body: some View {
+        GeometryReader { fullView in
+            ScrollView(.vertical) {
+                VStack(spacing: 0) {
+                    ForEach(0..&lt;50) { index in
+                        GeometryReader { proxy in
+                            let currentMidY = proxy.frame(in: .global).midY
+                            let screenHeight = fullView.size.height
+                            
+                            // 1. Standard position ratio for the overall scaling
+                            let positionRatio = currentMidY / screenHeight
+                            let scale = 0.5 + (0.5 * positionRatio)
+                            let rotation = Double(currentMidY - screenHeight / 2) / 3
+                            let opacity = max(0.0, 1.0 - Double(abs(currentMidY - screenHeight / 2) / 200.0))
+                            
+                            // 2. THE TWEAK: Map hue strictly to the 400px visible window
+                            let visibleStart = (screenHeight / 2) - 200
+                            let rawColorRatio = (currentMidY - visibleStart) / 400.0
+                            let colorRatio = max(0.0, min(1.0, rawColorRatio)) // Safety clamp between 0.0 and 1.0
+                            
+                            let dynamicColor = Color(
+                                hue: Double(colorRatio),
+                                saturation: 0.8,
+                                brightness: 0.9
+                            )
+                            
+                            VisualRowView(
+                                text: "Row #\(index)",
+                                backgroundColor: dynamicColor,
+                                scale: scale,
+                                rotation: rotation,
+                                opacity: opacity
+                            )
+                        }
+                        .frame(height: 40)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Pure Presentation Subview (Super Lightweight)
+struct VisualRowView: View {
+    let text: String
+    let backgroundColor: Color
+    let scale: CGFloat
+    let rotation: Double
+    let opacity: Double
+    
+    var body: some View {
+        Text(text)
+            .font(.title)
+            .frame(maxWidth: .infinity)
+            .background(backgroundColor)
+            .scaleEffect(scale)
+            .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0))
+            .opacity(opacity)
+    }
+}
+
+    
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 <hr>
 <br>
 </p>
 
+<ul>
+<li>
+<a href="swift_hws_277.html">Hacking With Swift - 277 - What you learned</a>
+
+</ul>
  
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
