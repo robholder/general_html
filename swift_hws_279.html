@@ -814,6 +814,205 @@ struct ContentView: View {
 }
 </pre>
 
+<div id="My Workings-Vertical and Horizontal Support"><h2 id="Vertical and Horizontal Support" class="header"><a href="#My Workings-Vertical and Horizontal Support">Vertical and Horizontal Support</a></h2></div>
+
+<p>
+To transition your Dice Roller app beautifully into landscape mode, we will use the Vertical Size Class trick (@Environment(\.verticalSizeClass)).
+</p>
+
+<p>
+When the screen turns horizontal, your vertical space is cut in half. To handle this elegantly, our structural code will automatically switch the core container from a vertical VStack into a side-by-side HStack. This places your large 240x240 dice artwork on the left, and groups your result card and action button cleanly on the right.
+</p>
+
+<div id="My Workings-Vertical and Horizontal Support-🛠️ Key Architectural Changes Made"><h3 id="🛠️ Key Architectural Changes Made" class="header"><a href="#My Workings-Vertical and Horizontal Support-🛠️ Key Architectural Changes Made">🛠️ Key Architectural Changes Made</a></h3></div>
+
+<ul>
+<li>
+<span id="My Workings-Vertical and Horizontal Support-🛠️ Key Architectural Changes Made-Extracted Subviews"></span><strong id="Extracted Subviews">Extracted Subviews</strong> (<code>diceImageSection</code>, etc.): Because the layout renders elements differently depending on the math inside the <code>if/else</code> wrapper, repeating long code block definitions twice makes files messy. Pulling components down into small variables makes the core layout flow clean and simple.
+
+<li>
+<span id="My Workings-Vertical and Horizontal Support-🛠️ Key Architectural Changes Made-Intelligent Sizing Toggles"></span><strong id="Intelligent Sizing Toggles">Intelligent Sizing Toggles</strong>: Inside the subviews, you will notice ternary inline modifiers like <code>verticalSizeClass == .compact ? 180 : 240</code>. This safely downsizes the image and text sizing slightly when horizontal so that compact screens (like an iPhone SE or Pro Mini) don't get clipping errors or cut-off interfaces!
+
+</ul>
+<p>
+Here is your fully responsive code, complete with layout optimizations for both orientations:
+</p>
+
+<pre swift>
+import SwiftUI
+
+extension Color {
+    static let midnightTop = Color(red: 0.11, green: 0.14, blue: 0.20)
+    static let midnightBottom = Color(red: 0.07, green: 0.08, blue: 0.11)
+    
+    static let auroraTop = Color(red: 0.50, green: 0.55, blue: 0.75)
+    static let auroraBottom = Color(red: 0.70, green: 0.75, blue: 0.90)
+}
+
+struct ContentView: View {
+    @Environment(\.colorScheme) var currentScheme
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+    
+    @State private var sides = 6
+    @State private var result = 1
+    
+    let diceOptions = [2, 4, 6, 8, 9, 12, 20]
+    
+    var diceImageName: String {
+        let formattedNumber = String(format: "%02d", sides)
+        return "dice_sides_\(formattedNumber)"
+    }
+    
+    var actionWord: String {
+        sides == 2 ? "Flip" : "Roll"
+    }
+    
+    var objectWord: String {
+        sides == 2 ? "Coin" : "\(sides)-Sided Die"
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: currentScheme == .dark
+                    ? [.midnightTop, .midnightBottom]
+                    : [.auroraTop, .auroraBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: verticalSizeClass == .compact ? 8 : 30) {
+                    
+                    // TITLE SECTION
+                    VStack(spacing: 2) {
+                        Text("DICE")
+                            .font(.system(size: verticalSizeClass == .compact ? 32 : 60, weight: .black, design: .rounded))
+                            .tracking(2)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.primary, .primary.opacity(0.6)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .shadow(color: currentScheme == .dark ? .black.opacity(0.3) : .clear, radius: 2, y: 2)
+                        
+                        Text("VIRTUAL SIMULATOR")
+                            .font(.system(size: verticalSizeClass == .compact ? 10 : 20, weight: .bold))
+                            .tracking(3)
+                            .foregroundColor(.secondary)
+                    }
+                    // Snugs the text right up against the top edge of the safe area in landscape
+                    .padding(.top, verticalSizeClass == .compact ? 0 : 10)
+                    
+                    // ADAPTIVE CONTAINER SPLIT
+                    if verticalSizeClass == .compact {
+                        HStack(spacing: 32) {
+                            Spacer()
+                            diceImageSection
+                            
+                            VStack(spacing: 12) {
+                                resultCardSection
+                                actionButtonSection
+                            }
+                            .frame(maxWidth: 380)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                    } else {
+                        VStack(spacing: 30) {
+                            //Spacer()
+                            diceImageSection
+                            resultCardSection
+                            //Spacer()
+                            actionButtonSection
+                        }
+                    }
+                }
+                // --- THE FIXED SPACE MODIFIER ---
+                // Completely collapses the invisible navigation gap only when flipped sideways
+                .navigationBarHidden(verticalSizeClass == .compact)
+            }
+        }
+    }
+    
+    // Extracted parts stay exactly the same as your previous build
+    private var diceImageSection: some View {
+        VStack(spacing: 4) {
+            Image(diceImageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: verticalSizeClass == .compact ? 130 : 200,
+                       height: verticalSizeClass == .compact ? 130 : 200)
+                .foregroundColor(.primary)
+                .padding(verticalSizeClass == .compact ? 26 : 45)
+                .background(
+                    Circle()
+                        .fill(Color(.secondarySystemGroupedBackground))
+                        .shadow(color: .black.opacity(0.26), radius: 12, y: 6)
+                )
+                .contextMenu {
+                    Picker("Change Sides", selection: $sides) {
+                        ForEach(diceOptions, id: \.self) { option in
+                            Text("\(option) Sides")
+                        }
+                    }
+                }
+            
+            Text("Hold image to quick-change sides")
+                .font(.system(size: verticalSizeClass == .compact ? 11 : 15, weight: .bold))
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var resultCardSection: some View {
+        VStack(spacing: 2) {
+            Text("CURRENT \(actionWord.uppercased())")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+            
+            Text("\(result)")
+                .font(.system(size: verticalSizeClass == .compact ? 44 : 84, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, verticalSizeClass == .compact ? 10 : 24)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .padding(.horizontal, verticalSizeClass == .compact ? 0 : 24)
+    }
+    
+    private var actionButtonSection: some View {
+        Button {
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            result = Int.random(in: 1...sides)
+        } label: {
+            Text("\(actionWord) \(objectWord)")
+                .font(.title3)
+                .fontWeight(.bold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, verticalSizeClass == .compact ? 12 : 16)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .padding(.horizontal, verticalSizeClass == .compact ? 0 : 24)
+        .padding(.bottom, verticalSizeClass == .compact ? 5 : 20)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
 <p>
 <hr>
 <br>
