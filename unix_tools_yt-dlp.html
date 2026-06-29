@@ -1455,7 +1455,7 @@ If you are putting these files on a mobile device or a player that hates MP4 sub
 <table>
 <tr>
 <td>
-UNTESTES
+UNTESTED
 </td>
 </tr>
 </table>
@@ -1523,6 +1523,334 @@ When the download finishes, you will see exactly two files in your folder with m
 <code>VideoTitle.en.srt</code>
 
 </ul>
+<div id="Using Python to Split SRT"><h1 id="Using Python to Split SRT" class="header"><a href="#Using Python to Split SRT">Using Python to Split SRT</a></h1></div>
+
+<table>
+<tr>
+<td>
+THIS WORKED FOR ME.
+</td>
+</tr>
+</table>
+
+<p>
+Here is a Python script that uses <code>yt-dlp</code> to fetch the video's chapter timestamps, reads your master <code>.srt</code> file, and <span id="Using Python to Split SRT-chops the subtitles into perfectly timed, individual"></span><strong id="chops the subtitles into perfectly timed, individual">chops the subtitles into perfectly timed, individual</strong> <code>.srt</code> <span id="Using Python to Split SRT-files"></span><strong id="files">files</strong> for each chapter.
+</p>
+
+<div id="Using Python to Split SRT-Step 1: Prep your files"><h3 id="Step 1: Prep your files" class="header"><a href="#Using Python to Split SRT-Step 1: Prep your files">Step 1: Prep your files</a></h3></div>
+
+<p>
+Ensure you have downloaded the full video chapters and the single <code>.srt</code> file into the same folder using these two commands:
+</p>
+
+<pre bash>
+# 1. Download the split MP4 chapters
+yt-dlp --split-chapters --remux-video mp4 "YOUR_VIDEO_URL"
+
+# 2. Download the master English subtitle file
+yt-dlp --write-auto-subs --sub-langs en --convert-subs srt --skip-download "YOUR_VIDEO_URL"
+</pre>
+
+<div id="Using Python to Split SRT-Step 2: The Python Script"><h3 id="Step 2: The Python Script" class="header"><a href="#Using Python to Split SRT-Step 2: The Python Script">Step 2: The Python Script</a></h3></div>
+
+<p>
+Save the code below as <code>split_srt.py</code> inside that same folder. It requires zero external dependencies (it only uses standard Python libraries).
+</p>
+
+<pre python>
+import os
+import re
+import subprocess
+import json
+from datetime import timedelta
+
+# =====================================================================
+# CONFIGURATION: Update these two lines with your video URL and SRT filename
+# =====================================================================
+VIDEO_URL = "YOUR_VIDEO_URL_HERE"
+MASTER_SRT = "YOUR_DOWNLOADED_SUBTITLE_FILE.en.srt"
+# =====================================================================
+
+def get_chapters(url):
+    """Uses yt-dlp to extract chapter data from the video."""
+    print("Extracting chapter metadata via yt-dlp...")
+    cmd = ["yt-dlp", "--dump-json", "--skip-download", url]
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    
+    if result.returncode != 0:
+        raise Exception(f"Failed to fetch metadata: {result.stderr}")
+        
+    data = json.loads(result.stdout)
+    chapters = data.get("chapters", [])
+    
+    if not chapters:
+        # Fallback: if no formal chapters, check if duration is available to make 1 big block
+        duration = data.get("duration", 99999)
+        return [{"title": "Full Video", "start_time": 0.0, "end_time": float(duration)}]
+        
+    return chapters
+
+def parse_srt_time(time_str):
+    """Converts '01:23:45,678' into a timedelta object."""
+    h, m, s = time_str.split(':')
+    s, ms = s.split(',')
+    return timedelta(hours=int(h), minutes=int(m), seconds=int(s), milliseconds=int(ms))
+
+def format_srt_time(td):
+    """Converts a timedelta object back into '00:00:00,000' SRT format."""
+    total_seconds = int(td.total_seconds())
+    h = total_seconds // 3600
+    m = (total_seconds % 3600) // 60
+    s = total_seconds % 60
+    ms = int(td.microseconds / 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+def clean_filename(name):
+    """Removes illegal filesystem characters."""
+    return re.sub(r'[\\/*?:"&lt;&gt;|]', "", name)
+
+def split_srt_by_chapters(srt_path, url):
+    if not os.path.exists(srt_path):
+        print(f"Error: Could not find master SRT file: {srt_path}")
+        return
+
+    chapters = get_chapters(url)
+    print(f"Found {len(chapters)} chapters. Processing subtitles...")
+
+    # Read and parse the master SRT file into memory blocks
+    with open(srt_path, "r", encoding="utf-8") as f:
+        srt_content = f.read().replace('\r\n', '\n')
+        
+    # Split by double newlines to isolate each subtitle subtitle card
+    blocks = srt_content.strip().split('\n\n')
+    parsed_blocks = []
+    
+    time_pattern = re.compile(r'(\d{2}:\d{2}:\d{2},\d{3}) --&gt; (\d{2}:\d{2}:\d{2},\d{3})')
+    
+    for block in blocks:
+        lines = block.split('\n')
+        if len(lines) &gt;= 2:
+            match = time_pattern.search(lines[1])
+            if match:
+                start_td = parse_srt_time(match.group(1))
+                end_td = parse_srt_time(match.group(2))
+                text_lines = lines[2:]
+                parsed_blocks.append((start_td, end_td, text_lines))
+
+    # Slice out subtitle chunks for each chapter
+    base_name = os.path.splitext(srt_path)[0]
+    
+    for idx, chap in enumerate(chapters, start=1):
+        chap_title = clean_filename(chap['title'])
+        chap_start = timedelta(seconds=chap['start_time'])
+        chap_end = timedelta(seconds=chap['end_time'])
+        
+        # Format matching yt-dlp's naming pattern: Title - [idx] ChapterName.en.srt
+        output_filename = f"{base_name} - [{idx:02d}] {chap_title}.en.srt"
+        
+        chapter_subs = []
+        sub_counter = 1
+        
+        for start_td, end_td, text_lines in parsed_blocks:
+            # Check if this subtitle card overlaps with or falls within the chapter timeline
+            if start_td &gt;= chap_start and start_td &lt; chap_end:
+                # Shift time backward relative to the start of this specific chapter clip
+                new_start = start_td - chap_start
+                new_end = end_td - chap_start
+                
+                # Prevent sub time leaking past video end
+                if new_end &gt; (chap_end - chap_start):
+                    new_end = chap_end - chap_start
+                
+                time_line = f"{format_srt_time(new_start)} --&gt; {format_srt_time(new_end)}"
+                
+                chapter_subs.append(f"{sub_counter}\n{time_line}\n" + "\n".join(text_lines))
+                sub_counter += 1
+        
+        # Save the new chapter SRT file
+        if chapter_subs:
+            with open(output_filename, "w", encoding="utf-8") as out_f:
+                out_f.write("\n\n".join(chapter_subs) + "\n")
+            print(f"Generated: {output_filename}")
+        else:
+            print(f"Skipped (No dialogue found): {output_filename}")
+
+if __name__ == "__main__":
+    split_srt_by_chapters(MASTER_SRT, VIDEO_URL)
+</pre>
+
+<div id="Using Python to Split SRT-Step 3: Run the script"><h3 id="Step 3: Run the script" class="header"><a href="#Using Python to Split SRT-Step 3: Run the script">Step 3: Run the script</a></h3></div>
+
+<p>
+Open your terminal/command prompt, navigate to that folder, and run:
+</p>
+
+<pre bash>
+python split_srt.py
+</pre>
+
+<div id="Using Python to Split SRT-Step 3: Run the script-How it solves your problem:"><h4 id="How it solves your problem:" class="header"><a href="#Using Python to Split SRT-Step 3: Run the script-How it solves your problem:">How it solves your problem:</a></h4></div>
+
+<ul>
+<li>
+It queries <code>yt-dlp</code> under the hood to figure out the exact millisecond timestamps where Chapter 1, Chapter 2, etc., start and end.
+
+<li>
+It loops through your master <code>.srt</code> file and isolates the sentences that belong in each chapter.
+
+<li>
+<span id="Using Python to Split SRT-Step 3: Run the script-How it solves your problem:-Crucially, it shifts the time backwards"></span><strong id="Crucially, it shifts the time backwards">Crucially, it shifts the time backwards</strong>. If Chapter 2 starts at <code>00:05:00</code> in the main video, a subtitle at <code>00:05:12</code> is modified to start at <code>00:00:12</code> so it lines up flawlessly with your split MP4 file.
+
+</ul>
+<div id="Using Python to Split SRT-Args Version"><h2 id="Args Version" class="header"><a href="#Using Python to Split SRT-Args Version">Args Version</a></h2></div>
+
+<p>
+Put in the same directory as the subtitle.srt file and run like this:
+</p>
+
+<pre bash>
+python split_srt_arg.py "YOUR_SUBTITLES.srt" "https://youtu.be/YOUR_YOUTUBE_URL" en
+</pre>
+
+<p>
+The code (save as <code>split_srt_arg.py</code>)
+</p>
+
+<pre python>
+import os
+import re
+import sys
+import subprocess
+import json
+from datetime import timedelta
+
+def get_chapters(url):
+    """Uses yt-dlp to extract chapter data from the video."""
+    print("Extracting chapter metadata via yt-dlp...")
+    cmd = ["yt-dlp", "--dump-json", "--skip-download", url]
+    
+    # This is the complete line connecting all your fragments:
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    
+    if result.returncode != 0:
+        raise Exception(f"Failed to fetch metadata: {result.stderr}")
+        
+    data = json.loads(result.stdout)
+    chapters = data.get("chapters", [])
+
+    if not chapters:
+        duration = data.get("duration", 99999)
+        return [{"title": "Full Video", "start_time": 0.0, "end_time": float(duration)}]
+        
+    return chapters
+
+def parse_srt_time(time_str):
+    """Converts '01:23:45,678' into a timedelta object."""
+    h, m, s = time_str.split(':')
+    s, ms = s.split(',')
+    return timedelta(hours=int(h), minutes=int(m), seconds=int(s), milliseconds=int(ms))
+
+def format_srt_time(td):
+    """Converts a timedelta object back into '00:00:00,000' SRT format."""
+    total_seconds = int(td.total_seconds())
+    h = total_seconds // 3600
+    m = (total_seconds % 3600) // 60
+    s = total_seconds % 60
+    ms = int(td.microseconds / 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+def clean_filename(name):
+    """Removes illegal filesystem characters."""
+    return re.sub(r'[\\/*?:"&lt;&gt;|]', "", name)
+
+def split_srt_by_chapters(srt_path, url, lang_code):
+    if not os.path.exists(srt_path):
+        print(f"Error: Could not find master SRT file: {srt_path}")
+        return
+
+    try:
+        chapters = get_chapters(url)
+    except Exception as e:
+        print(e)
+        return
+
+    print(f"Found {len(chapters)} chapters. Processing subtitles...")
+
+    with open(srt_path, "r", encoding="utf-8") as f:
+        srt_content = f.read().replace('\r\n', '\n')
+        
+    blocks = srt_content.strip().split('\n\n')
+    parsed_blocks = []
+    time_pattern = re.compile(r'(\d{2}:\d{2}:\d{2},\d{3}) --&gt; (\d{2}:\d{2}:\d{2},\d{3})')
+    
+    for block in blocks:
+        lines = block.split('\n')
+        if len(lines) &gt;= 2:
+            match = time_pattern.search(lines[0]) if len(lines) &gt; 1 else None
+            if not match:
+                match = time_pattern.search(block)
+            if match:
+                try:
+                    start_td = parse_srt_time(match.group(1))
+                    end_td = parse_srt_time(match.group(2))
+                    text_lines = lines[2:] if match.string == lines[0] else lines[1:]
+                    parsed_blocks.append((start_td, end_td, text_lines))
+                except ValueError:
+                    continue
+
+    base_name, _ = os.path.splitext(srt_path)
+    if base_name.endswith(f".{lang_code}"):
+        base_name = base_name[:-(len(lang_code) + 1)]
+    
+    for idx, chap in enumerate(chapters, start=1):
+        chap_title = clean_filename(chap['title'])
+        chap_start = timedelta(seconds=chap['start_time'])
+        chap_end = timedelta(seconds=chap['end_time'])
+        
+        output_filename = f"{base_name} - [{idx:02d}] {chap_title}.{lang_code}.srt"
+        
+        chapter_subs = []
+        sub_counter = 1
+        
+        for start_td, end_td, text_lines in parsed_blocks:
+            if start_td &gt;= chap_start and start_td &lt; chap_end:
+                new_start = start_td - chap_start
+                new_end = end_td - chap_start
+                
+                if new_end &gt; (chap_end - chap_start):
+                    new_end = chap_end - chap_start
+                
+                time_line = f"{format_srt_time(new_start)} --&gt; {format_srt_time(new_end)}"
+                chapter_subs.append(f"{sub_counter}\n{time_line}\n" + "\n".join(text_lines))
+                sub_counter += 1
+        
+        if chapter_subs:
+            with open(output_filename, "w", encoding="utf-8") as out_f:
+                out_f.write("\n\n".join(chapter_subs) + "\n")
+            print(f"Generated: {output_filename}")
+        else:
+            print(f"Skipped (No dialogue found): {output_filename}")
+
+if __name__ == "__main__":
+    if len(sys.argv) &lt; 4:
+        print("Usage: python split_srt.py &lt;SRT_FILE_PATH&gt; &lt;VIDEO_URL&gt; &lt;LANG_CODE&gt;")
+        print("Example: python split_srt.py lecture.en.srt https://youtu.be en")
+        sys.exit(1)
+        
+    srt_file_arg = sys.argv[1]
+    url_arg = sys.argv[2]
+    lang_arg = sys.argv[3]
+    
+    split_srt_by_chapters(srt_file_arg, url_arg, lang_arg)
+</pre>
+
+
+<p>
+<br>
+<hr>
+</p>
+
+
 <p>
 <a href="unix_tools_index.html">Unix Tools</a>
 </p>
