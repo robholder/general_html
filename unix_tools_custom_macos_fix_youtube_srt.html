@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_custom_macos_fix_youtube_srt</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Python - Fix directory of YouTube srt files (double lines)"><h1 id="Python - Fix directory of YouTube srt files (double lines)" class="header"><a href="#Python - Fix directory of YouTube srt files (double lines)">Python - Fix directory of YouTube srt files (double lines)</a></h1></div>
+
+<p>
+Here is the complete, working batch script with comprehensive inline documentation explaining exactly how each step parses, filters, tracks, and rewires the data structures.python#!/usr/bin/env python3
+</p>
+
+<pre python>
+"""
+SRT Subtitle Cleaner Utility
+----------------------------
+This script automates the cleanup of speech-to-text rolling subtitle artifacts.
+It removes empty timestamp frames, collapses rapid single-frame flash duplicates, 
+and strips out consecutive line overlaps (where the final line of block A matches 
+the first line of block B).
+"""
+
+import sys
+import os
+import re
+import glob
+
+def parse_srt(file_path):
+    """
+    Parses a raw SRT file into a list of structured dictionaries.
+    
+    Args:
+        file_path (str): Path to the subtitle file.
+        
+    Returns:
+        list: A list of dicts, where each dict represents a caption block:
+              { 'timestamp': str, 'text': str, 'lines': list }
+    """
+    # Open the file safely. 'errors=ignore' handles non-standard characters gracefully.
+    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+    
+    # Subtitle blocks are separated by blank lines. This regex splits on single or 
+    # multiple newlines containing optional whitespace.
+    raw_blocks = re.split(r'\n\s*\n', content.strip())
+    parsed_blocks = []
+    
+    for rb in raw_blocks:
+        # Split each individual block into lines and strip trailing/leading spaces.
+        # Filter out completely empty lines within the block.
+        lines = [line.strip() for line in rb.splitlines() if line.strip()]
+        
+        # We need to find where the subtitle timing arrow is. 
+        # We don't assume it's line index 1 because index counters can sometimes be corrupt.
+        ts_index = -1
+        for idx, line in enumerate(lines):
+            if "--&gt;" in line:
+                ts_index = idx
+                break
+                
+        # If a valid timestamp arrow is found, we process this block.
+        if ts_index != -1:
+            timestamp_str = lines[ts_index]
+            
+            # Everything after the timestamp line is the actual text payload.
+            # We explicitly cast to str to enforce data safety.
+            text_lines = [str(l) for l in lines[ts_index + 1:]]
+            
+            # Create a single unbroken text string to allow broad substring matches later.
+            text_content = " ".join(text_lines)
+            
+            parsed_blocks.append({
+                'timestamp': timestamp_str,
+                'text': text_content,
+                'lines': text_lines
+            })
+            
+    return parsed_blocks
+
+def clean_subtitles(blocks):
+    """
+    Applies filtering rules to remove empty blocks, collapse flash-frames,
+    and drop rolling duplicate line overlaps.
+    
+    Args:
+        blocks (list): Structured dictionaries from parse_srt().
+        
+    Returns:
+        list: Filtered and optimized subtitle blocks.
+    """
+    cleaned = []
+    i = 0
+    n = len(blocks)
+    
+    # -------------------------------------------------------------------------
+    # PASS 1: Drop empty blocks and absorb rapid "flash" subtitle sequences.
+    # -------------------------------------------------------------------------
+    while i &lt; n:
+        curr_block = blocks[i]
+        
+        # If the block has no text payload (like block 1 in your example), skip it.
+        if not curr_block['text'].strip():
+            i += 1
+            continue
+            
+        # If there's a next block available, check for a flash repetition.
+        if i + 1 &lt; n:
+            next_block = blocks[i + 1]
+            
+            # If the next block begins exactly with what the current block says,
+            # it means the current block is a shorter "flash" precursor framework.
+            if next_block['text'].startswith(curr_block['text']):
+                # Split timestamps to isolate start and end times.
+                # e.g., "00:00:01,000 --&gt; 00:00:03,000" becomes ["00:00:01,000 ", " 00:00:03,000"]
+                curr_start = curr_block['timestamp'].split("--&gt;")[0].strip()
+                next_end = next_block['timestamp'].split("--&gt;")[1].strip()
+                
+                # Merge timings: Give the next block the early start time of the current block.
+                next_block['timestamp'] = f"{curr_start} --&gt; {next_end}"
+                
+                # Advance the counter to skip the current block, absorbing it into the next.
+                i += 1
+                continue
+                
+        # If no optimization applies, keep the block and check the next one.
+        cleaned.append(curr_block)
+        i += 1
+
+    # -------------------------------------------------------------------------
+    # PASS 2: Detect and strip rolling multi-line overlaps.
+    # -------------------------------------------------------------------------
+    # Iterate through the newly cleaned list up to the second-to-last item.
+    for idx in range(len(cleaned) - 1):
+        curr_b = cleaned[idx]
+        next_b = cleaned[idx + 1]
+        
+        # Ensure both blocks actually contain text lines to compare.
+        if curr_b['lines'] and next_b['lines']:
+            # Grab the absolute last line of text from the current caption frame.
+            last_line_curr = str(curr_b['lines'][-1]).lower().strip()
+            # Grab the absolute first line of text from the subsequent caption frame.
+            first_line_next = str(next_b['lines'][0]).lower().strip()
+            
+            # If they match exactly, the transcription artifact is rolling text over.
+            if last_line_curr == first_line_next:
+                # Remove index 0 (the top line) from the subsequent block.
+                next_b['lines'].pop(0)
+                # Re-compile its unified string property to keep data state accurate.
+                next_b['text'] = " ".join(next_b['lines'])
+                
+    # Return the collection, dropping any block that became entirely empty 
+    # after its text lines were stripped away.
+    return [b for b in cleaned if b['lines']]
+
+def save_srt(cleaned_blocks, output_path):
+    """
+    Formats the structured data back into standard SRT schema layout.
+    
+    Args:
+        cleaned_blocks (list): The refined block dictionaries.
+        output_path (str): Destination file path.
+    """
+    with open(output_path, 'w', encoding='utf-8') as f:
+        # Enumerate with start=1 guarantees a clean, contiguous index counter order
+        # from 1 to N, fixing gaps left by deleted blocks.
+        for index, block in enumerate(cleaned_blocks, start=1):
+            f.write(f"{index}\n")
+            f.write(f"{block['timestamp']}\n")
+            for line in block['lines']:
+                f.write(f"{line}\n")
+            # SRT requires a trailing blank line at the end of every complete block.
+            f.write("\n")
+
+def process_file(input_path):
+    """
+    Manages the sequential pipeline for processing an individual file.
+    """
+    # Extract file path segments (e.g., "/path/file.srt" -&gt; "/path/file" and ".srt")
+    base, ext = os.path.splitext(input_path)
+    # Define output file path using a tracking suffix
+    output_path = f"{base}_fixed{ext}"
+    
+    # Run the core operations pipeline
+    raw_blocks = parse_srt(input_path)
+    cleaned_blocks = clean_subtitles(raw_blocks)
+    save_srt(cleaned_blocks, output_path)
+
+def main():
+    """
+    Application Entrypoint.
+    Handles system input arguments, directory scanning, and batch loop execution.
+    """
+    # Check if a folder parameter was passed via command line.
+    # Default to the active directory '.' if no folder was provided.
+    folder_path = sys.argv[1] if len(sys.argv) &gt; 1 else '.'
+    
+    # Safety Check: Verify the path exists and is actually a folder.
+    if not os.path.isdir(folder_path):
+        print(f"Error: Folder '{folder_path}' not found or is not a directory.")
+        sys.exit(1)
+        
+    # Build a search pattern string to query .srt files (handling casing like .SRT)
+    search_pattern = os.path.join(folder_path, "*.[sS][rR][tT]")
+    srt_files = glob.glob(search_pattern)
+    
+    # Safety Guard: Skip any file already containing "_fixed" in the name 
+    # to avoid reprocessing files generated during previous runs.
+    files_to_process = [f for f in srt_files if "_fixed" not in os.path.basename(f)]
+    
+    if not files_to_process:
+        print(f"No original SRT files found to process in: {os.path.abspath(folder_path)}")
+        sys.exit(0)
+        
+    print(f"Found {len(files_to_process)} file(s). Starting batch cleanup...")
+    success_count = 0
+    
+    # Loop over and execute updates on each isolated subtitle file.
+    for file_path in files_to_process:
+        filename = os.path.basename(file_path)
+        try:
+            process_file(file_path)
+            print(f"  [✓] Cleaned: {filename}")
+            success_count += 1
+        except Exception as e:
+            # Fault Tolerance: If an individual file fails due to serious structural 
+            # corruption, print an alert but let the script proceed to process remaining files.
+            print(f"  [✗] Failed to process {filename}: {e}")
+            
+    print(f"\nBatch processing finished! {success_count}/{len(files_to_process)} files updated.")
+
+# Prevents execution side-effects if this file is ever imported elsewhere as a module.
+if __name__ == '__main__':
+    main()
+</pre>
+
+<div id="Python - Fix directory of YouTube srt files (double lines)-Key Concept Guide"><h3 id="Key Concept Guide" class="header"><a href="#Python - Fix directory of YouTube srt files (double lines)-Key Concept Guide">Key Concept Guide</a></h3></div>
+
+<ul>
+<li>
+<code>re.split(r'\n\s*\n', ...)</code>: Explodes the file contents into distinct array blocks by looking for blank empty dividers. This isolates our problem space block-by-block.
+
+<li>
+<code>ts_index</code>: Scans dynamically for --&gt;. Instead of hardcoding "line 2 is always the time," this finds the time range dynamically, making the script robust against file format irregularities.
+
+<li>
+<code>next_block['text'].startswith(...)</code>: Solves the "flash frames" problem. If Block 2 is contained inside the start of Block 3, it dynamically fuses their timestamps and safely steps past the redundant duplicate.
+
+<li>
+<code>next_b['lines'].pop(0)</code>: Solves the "rolling text transitions" problem. It isolates strings down to array entries, uses <code>.lower().strip()</code> to eliminate matching discrepancies caused by casing or white-spaces, and ejects the repeated line cleanly.
+
+</ul>
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
