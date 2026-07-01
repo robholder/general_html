@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_private_vars</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Private Vars"><h1 id="Swift - Private Vars" class="header"><a href="#Swift - Private Vars">Swift - Private Vars</a></h1></div>
+
+<p>
+In Swift, the <code>private</code> keyword is an <span id="Swift - Private Vars-access control"></span><strong id="access control">access control</strong> modifier. When you mark a view property as <code>private var</code>, you are telling the compiler: <span id="Swift - Private Vars-&quot;This piece of code belongs strictly to"></span><strong id="&quot;This piece of code belongs strictly to">"This piece of code belongs strictly to</strong> <code>ContentView.swift</code>. <span id="Swift - Private Vars-No other file, struct, or object in this entire app is allowed to look at it or use it.&quot;"></span><strong id="No other file, struct, or object in this entire app is allowed to look at it or use it.&quot;">No other file, struct, or object in this entire app is allowed to look at it or use it."</strong>
+</p>
+
+<p>
+By default, if you don't type <code>private</code>, Swift treats the property as <code>internal</code>, meaning any other file inside your app project could theoretically reach inside your view and try to grab or render that sub-view.
+</p>
+
+<p>
+Here is exactly what those restrictions mean in practice for your notes:
+</p>
+
+<div id="Swift - Private Vars-🔒 What private Restricts (and Protects)"><h2 id="🔒 What private Restricts (and Protects)" class="header"><a href="#Swift - Private Vars-🔒 What private Restricts (and Protects)">🔒 What private Restricts (and Protects)</a></h2></div>
+
+<div id="Swift - Private Vars-🔒 What private Restricts (and Protects)-1. It Blocks Scope Leakage"><h3 id="1. It Blocks Scope Leakage" class="header"><a href="#Swift - Private Vars-🔒 What private Restricts (and Protects)-1. It Blocks Scope Leakage">1. It Blocks Scope Leakage</a></h3></div>
+
+<p>
+Because your dice image layout (<code>diceImageSection</code>) relies on state variables like <code>＄sides</code> and <code>diceImageName</code> which live inside <code>ContentView</code>, it only makes sense inside this specific view.
+</p>
+
+<p>
+If you had a second view file in your project (for example, a <code>SettingsView.swift</code>), typing <code>SettingsView().diceImageSection</code> would throw an immediate compiler error. The outside world cannot see it.
+</p>
+
+<div id="Swift - Private Vars-🔒 What private Restricts (and Protects)-2. It Speeds Up Xcode's Auto-Complete"><h3 id="2. It Speeds Up Xcode's Auto-Complete" class="header"><a href="#Swift - Private Vars-🔒 What private Restricts (and Protects)-2. It Speeds Up Xcode's Auto-Complete">2. It Speeds Up Xcode's Auto-Complete</a></h3></div>
+
+<p>
+As your app grows, you will have dozens of files. If every button, card, and layout section you extract is accessible globally, your Xcode auto-complete menu will become an unreadable mess of hundreds of choices. Marking layout variables as <code>private</code> hides them from the global menu, keeping your global workspace clean.
+</p>
+
+<div id="Swift - Private Vars-🔒 What private Restricts (and Protects)-3. It Optimizes Compiler Efficiency"><h3 id="3. It Optimizes Compiler Efficiency" class="header"><a href="#Swift - Private Vars-🔒 What private Restricts (and Protects)-3. It Optimizes Compiler Efficiency">3. It Optimizes Compiler Efficiency</a></h3></div>
+
+<p>
+When the Swift compiler translates your code into a physical app, it looks for ways to make the app run faster. If it sees a view property marked <code>private</code>, it knows with 100% certainty that no other file will ever try to modify or call it. This allows the compiler to perform hidden speed optimizations (like "dead code elimination" and inline rendering) that make your interface snappier.
+</p>
+
+<div id="Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs"><h2 id="🏗️ Extracted View Variables vs. Standalone Structs" class="header"><a href="#Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs">🏗️ Extracted View Variables vs. Standalone Structs</a></h2></div>
+
+<p>
+When organizing SwiftUI files, you have two ways to break up your code. The <code>private</code> keyword behaves slightly differently depending on which one you choose:
+</p>
+
+<div id="Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Method A: Extracted Properties (What we used)"><h3 id="Method A: Extracted Properties (What we used)" class="header"><a href="#Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Method A: Extracted Properties (What we used)">Method A: Extracted Properties (What we used)</a></h3></div>
+
+<p>
+You declare variables inside the parent view. They must be marked <code>private</code> because they are structurally embedded inside the main view's body boundaries.
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var sides = 6
+
+    var body: some View {
+        VStack { diceImageSection }
+    }
+
+    // 🔒 Restricted: Lives inside ContentView, can read 'sides' directly
+    private var diceImageSection: some View {
+        Image("dice_\(sides)")
+    }
+}
+</pre>
+
+<div id="Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Method B: Standalone Structs (The Alternative)"><h3 id="Method B: Standalone Structs (The Alternative)" class="header"><a href="#Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Method B: Standalone Structs (The Alternative)">Method B: Standalone Structs (The Alternative)</a></h3></div>
+
+<p>
+If you move the code completely <em>outside</em> of <code>ContentView</code> into its own separate struct block, it can no longer be a <code>private var</code>. It becomes its own independent entity. To limit its scope, you would mark the entire struct as <code>private</code>:
+</p>
+
+<pre swift>
+// 🔒 Restricted: Only files/code inside this specific physical .swift text file can see this struct
+private struct DiceImageSection: View {
+    let sides: Int // Must pass data in manually now!
+    
+    var body: some View {
+        Image("dice_\(sides)")
+    }
+}
+</pre>
+
+<div id="Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Rule of Thumb for Your Notes:"><h3 id="Rule of Thumb for Your Notes:" class="header"><a href="#Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Rule of Thumb for Your Notes:">Rule of Thumb for Your Notes:</a></h3></div>
+
+<p>
+Always default to making your extracted layout properties <code>private var</code>. It enforces a clean separation of concerns, ensures your sub-views don't accidentally get misused by other parts of your app, and signals to other developers (and your future self) that this layout block is a specialized piece of design tailored for this file alone.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
