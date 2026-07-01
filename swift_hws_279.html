@@ -1332,16 +1332,102 @@ When working with tabs or split screens in SwiftUI, think of your database as a 
 </p>
 
 <p>
-Instead of <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View A"></span><strong id="View A">View A</strong> trying to push a button inside <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View B"></span><strong id="View B">View B</strong> to save something, <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View A"></span><strong id="View A">View A</strong> writes directly to the shared database. Because <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View B"></span><strong id="View B">View B</strong> is watching that database with <code>@Query</code>, it will instantly see the new entry pop up on its screen automatically!
+Instead of <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View A"></span><strong id="View A">View A</strong> trying to push a button inside <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View B"></span><strong id="View B">View B</strong> to save something, <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View A"></span><strong id="View A">View A</strong> writes directly to the shared database. Because <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View B"></span><strong id="View B">View B</strong> is watching that database with <code>@Query</code>, t will instantly see the new entry pop up on its screen automatically!
 </p>
 
-<div id="Errors-QUESTION"><h2 id="QUESTION" class="header"><a href="#Errors-QUESTION">QUESTION</a></h2></div>
+<div id="Combining Views with TabView"><h1 id="Combining Views with TabView" class="header"><a href="#Combining Views with TabView">Combining Views with TabView</a></h1></div>
+
+<p>
+To combine your views using a tab bar layout, you will use SwiftUI's native <code>TabView</code> container.
+</p>
+
+<p>
+The best practice here is to create a new, clean "parent" view (let's call it <code>MainTabView.swift</code>) that acts as the coordinator holding both your <code>ContentView</code> and <code>RollHistoryView</code>.
+</p>
+
+<p>
+Here is the exact implementation to get tabs up and running, plus how to link them cleanly.
+</p>
+
+<div id="Combining Views with TabView-Step 1: Create the Tab Coordinator View"><h3 id="Step 1: Create the Tab Coordinator View" class="header"><a href="#Combining Views with TabView-Step 1: Create the Tab Coordinator View">Step 1: Create the Tab Coordinator View</a></h3></div>
+
+<p>
+Create a new SwiftUI View file named <code>MainTabView.swift</code>. This view will serve as the new root of your interface.
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct MainTabView: View {
+    var body: some View {
+        TabView {
+            // --- TAB 1: DICE ROLLER ---
+            ContentView()
+                .tabItem {
+                    Label("Roll", systemImage: "dice.fill")
+                }
+            
+            // --- TAB 2: HISTORY ---
+            RollHistoryView()
+                .tabItem {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }
+        }
+    }
+}
+
+#Preview {
+    MainTabView()
+        .modelContainer(for: DiceRoll.self, inMemory: true)
+}
+</pre>
+
+<div id="Combining Views with TabView-Step 2: Update Your App Root Entry Point"><h3 id="Step 2: Update Your App Root Entry Point" class="header"><a href="#Combining Views with TabView-Step 2: Update Your App Root Entry Point">Step 2: Update Your App Root Entry Point</a></h3></div>
+
+<p>
+Now that <code>MainTabView</code> is the main screen of your app, you need to tell your app file to launch it instead of launching <code>ContentView</code> directly.
+</p>
+
+<p>
+Open your main app entry file (e.g., <code>DiceApp.swift</code> or whatever your project root file is named) and swap out the view:
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+@main
+struct DiceApp: App {
+    var body: some Scene {
+        WindowGroup {
+            // 🔄 SWAP THIS: Change ContentView() to MainTabView()
+            MainTabView() 
+        }
+        .modelContainer(for: DiceRoll.self) // Keeps your database active for both tabs!
+    }
+}
+</pre>
+
+<div id="Combining Views with TabView-📝 Key TabView Concepts for Your Reference Notes"><h2 id="📝 Key TabView Concepts for Your Reference Notes" class="header"><a href="#Combining Views with TabView-📝 Key TabView Concepts for Your Reference Notes">📝 Key TabView Concepts for Your Reference Notes</a></h2></div>
+
+<ul>
+<li>
+<code>.tabItem { ... }</code>: This modifier must be attached directly to the views <em>inside</em> the <code>TabView</code>. It dictates what icon and text appear in the bottom bar for that specific screen.
+
+<li>
+<code>Label("Text", systemImage: "name")</code>: This is the standard, cleanest way to build a tab item. It combines a string title with an Apple SF Symbol icon automatically.
+
+<li>
+Shared Database State: Notice how <code>.modelContainer(for: DiceRoll.self)</code> remains attached at the topmost app level. Because it wraps around <code>MainTabView</code>, both <code>ContentView</code> and <code>RollHistoryView</code> inherit access to the exact same database environment seamlessly.
+
+</ul>
+<div id="Combining Views with TabView-QUESTION"><h2 id="QUESTION" class="header"><a href="#Combining Views with TabView-QUESTION">QUESTION</a></h2></div>
 
 <p>
 What is the significance of <code>final class &lt;ClassName&gt;</code>? What is the <code>final</code> keyword?
 </p>
 
-<div id="Errors-ANSWER"><h2 id="ANSWER" class="header"><a href="#Errors-ANSWER">ANSWER</a></h2></div>
+<div id="Combining Views with TabView-ANSWER"><h2 id="ANSWER" class="header"><a href="#Combining Views with TabView-ANSWER">ANSWER</a></h2></div>
 
 <p>
 In Swift, the <code>final</code> keyword is an access modifier applied to classes. When you mark a class as <code>final</code>, you are telling the compiler: <em>"This class is complete. It is the end of the line, and no other class is allowed to inherit from it or subclass it."</em>
@@ -1355,7 +1441,7 @@ By default, regular Swift classes can be extended through inheritance (e.g., a <
 Here is exactly why this keyword is significant, especially when working with modern app architectures like SwiftData or MVVM.
 </p>
 
-<div id="Errors-ANSWER-1. Preventing Accidental Inheritance (Safety)"><h3 id="1. Preventing Accidental Inheritance (Safety)" class="header"><a href="#Errors-ANSWER-1. Preventing Accidental Inheritance (Safety)">1. Preventing Accidental Inheritance (Safety)</a></h3></div>
+<div id="Combining Views with TabView-ANSWER-1. Preventing Accidental Inheritance (Safety)"><h3 id="1. Preventing Accidental Inheritance (Safety)" class="header"><a href="#Combining Views with TabView-ANSWER-1. Preventing Accidental Inheritance (Safety)">1. Preventing Accidental Inheritance (Safety)</a></h3></div>
 
 <p>
 The primary architectural reason to use <code>final</code> is to protect your data models.
@@ -1377,31 +1463,31 @@ class SuperDiceRoll: DiceRoll { ... }
 By making it <code>final</code>, you guarantee that a <code>DiceRoll</code> object will always just be a plain <code>DiceRoll</code> object anywhere in your app.
 </p>
 
-<div id="Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)"><h3 id="2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)" class="header"><a href="#Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)">2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)</a></h3></div>
+<div id="Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)"><h3 id="2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)" class="header"><a href="#Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)">2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)</a></h3></div>
 
 <p>
 This is where <code>final</code> becomes a secret weapon for app performance.
 </p>
 
 <p>
-When a class is <em>not</em> marked final, the CPU has to use a process called <span id="Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Dynamic Dispatch"></span><strong id="Dynamic Dispatch">Dynamic Dispatch</strong> at runtime. Every time your app calls a method on that class, the computer has to pause and double-check: <em>"Wait, is this the base class method, or did a subclass override this function with a different version?"</em> This lookup happens via an internal table (called a vtable) and takes a tiny fraction of a second.
+When a class is <em>not</em> marked final, the CPU has to use a process called <span id="Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Dynamic Dispatch"></span><strong id="Dynamic Dispatch">Dynamic Dispatch</strong> at runtime. Every time your app calls a method on that class, the computer has to pause and double-check: <em>"Wait, is this the base class method, or did a subclass override this function with a different version?"</em> This lookup happens via an internal table (called a vtable) and takes a tiny fraction of a second.
 </p>
 
 <p>
-When you add <code>final</code>, you promise the compiler that these methods will never be overridden. The compiler can throw away the lookup table and use <span id="Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Static Dispatch"></span><strong id="Static Dispatch">Static Dispatch</strong> (or Direct Dispatch). The compiler points the CPU directly to the exact memory address of the code it needs to run.
+When you add <code>final</code>, you promise the compiler that these methods will never be overridden. The compiler can throw away the lookup table and use <span id="Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Static Dispatch"></span><strong id="Static Dispatch">Static Dispatch</strong> (or Direct Dispatch). The compiler points the CPU directly to the exact memory address of the code it needs to run.
 </p>
 
-<div id="Errors-Analogy for Your Notes:"><h2 id="Analogy for Your Notes:" class="header"><a href="#Errors-Analogy for Your Notes:">Analogy for Your Notes:</a></h2></div>
+<div id="Combining Views with TabView-Analogy for Your Notes:"><h2 id="Analogy for Your Notes:" class="header"><a href="#Combining Views with TabView-Analogy for Your Notes:">Analogy for Your Notes:</a></h2></div>
 
 <ul>
 <li>
-<span id="Errors-Analogy for Your Notes:-Dynamic Dispatch (Standard Class)"></span><strong id="Dynamic Dispatch (Standard Class)">Dynamic Dispatch (Standard Class)</strong>: Looking up a word in a physical dictionary every time you want to see what it means.
+<span id="Combining Views with TabView-Analogy for Your Notes:-Dynamic Dispatch (Standard Class)"></span><strong id="Dynamic Dispatch (Standard Class)">Dynamic Dispatch (Standard Class)</strong>: Looking up a word in a physical dictionary every time you want to see what it means.
 
 <li>
-<span id="Errors-Analogy for Your Notes:-Static Dispatch (final Class)"></span><strong id="Static Dispatch (final Class)">Static Dispatch (final Class)</strong>: Having the definition memorized so you can recite it instantly without checking a book.
+<span id="Combining Views with TabView-Analogy for Your Notes:-Static Dispatch (final Class)"></span><strong id="Static Dispatch (final Class)">Static Dispatch (final Class)</strong>: Having the definition memorized so you can recite it instantly without checking a book.
 
 </ul>
-<div id="Errors-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet"><h3 id="🛠️ Summary for Your Reference Sheet" class="header"><a href="#Errors-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet">🛠️ Summary for Your Reference Sheet</a></h3></div>
+<div id="Combining Views with TabView-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet"><h3 id="🛠️ Summary for Your Reference Sheet" class="header"><a href="#Combining Views with TabView-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet">🛠️ Summary for Your Reference Sheet</a></h3></div>
 
 <ul>
 <li>
