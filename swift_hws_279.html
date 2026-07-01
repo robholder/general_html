@@ -1191,13 +1191,157 @@ struct RollHistoryView: View {
 <code>modelContext</code>: The brain that handles the actual data manipulation (<code>.insert()</code> and <code>.delete()</code>). <code>SwiftData</code> saves automatically behind the scenes when views shift or apps close.
 
 </ul>
-<div id="Storing Results-QUESTION"><h2 id="QUESTION" class="header"><a href="#Storing Results-QUESTION">QUESTION</a></h2></div>
+<div id="Errors"><h1 id="Errors" class="header"><a href="#Errors">Errors</a></h1></div>
+
+<div id="Errors-QUESTION"><h2 id="QUESTION" class="header"><a href="#Errors-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I added <code>saveRoll</code> to the <code>actionButtonSection</code> view, but I get a scope error, "Cannot find 'saveRoll' in scope":
+</p>
+
+<pre swift>
+    private var actionButtonSection: some View {
+        Button {
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            result = Int.random(in: 1...sides)
+            saveRoll(result: result, sides: sides) // Added this line
+        } label: {
+        // ...etc.
+</pre>
+
+<p>
+What's going on? 
+</p>
+
+<div id="Errors-ANSWER"><h2 id="ANSWER" class="header"><a href="#Errors-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This is a classic architecture puzzle when breaking an app into separate views!
+</p>
+
+<p>
+The compiler is complaining because <code>ContentView</code> has no idea that the <code>saveRoll</code> function exists. In Swift, functions inside a struct belong exclusively to instances of that struct. Because <code>saveRoll</code> lives inside <code>RollHistoryView</code>, <code>ContentView</code> cannot see it or call it directly across the fence.
+</p>
+
+<p>
+To fix this, we need to move the data-saving logic into <code>ContentView</code> where the roll actually happens.
+</p>
+
+<div id="Errors-ANSWER-🛠️ The SwiftData Solution"><h3 id="🛠️ The SwiftData Solution" class="header"><a href="#Errors-ANSWER-🛠️ The SwiftData Solution">🛠️ The SwiftData Solution</a></h3></div>
+
+<p>
+Because <code>SwiftData</code> shares a single database "context" across your entire app via the Environment, <code>ContentView</code> doesn't actually need to ask <code>RollHistoryView</code> to save anything. It can insert the new roll directly into the database himself!
+</p>
+
+<p>
+Here is how to update your two files to fix the error:
+</p>
+
+<div id="Errors-ANSWER-🛠️ The SwiftData Solution-Step 1: Update ContentView.swift"><h4 id="Step 1: Update ContentView.swift" class="header"><a href="#Errors-ANSWER-🛠️ The SwiftData Solution-Step 1: Update ContentView.swift">Step 1: Update ContentView.swift</a></h4></div>
+
+<p>
+Give <code>ContentView</code> access to the <code>SwiftData</code> database scratchpad (<code>modelContext</code>), and move the database insertion logic right inside your button block.
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData // 1. Make sure SwiftData is imported here!
+
+struct ContentView: View {
+    // 2. Add the environment context to access the database
+    @Environment(\.modelContext) private var modelContext
+    
+    @State private var sides = 6
+    @State private var result = 1
+    // ... your other properties ...
+
+    private var actionButtonSection: some View {
+        Button {
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            
+            let newResult = Int.random(in: 1...sides)
+            result = newResult
+            
+            // 3. Create and insert the object directly right here!
+            let newRoll = DiceRoll(result: newResult, sides: sides)
+            modelContext.insert(newRoll)
+            
+        } label: {
+            Text("\(actionWord) \(objectWord)")
+                // ... your styling ...
+        }
+        // ... your modifiers ...
+    }
+}
+</pre>
+
+<div id="Errors-ANSWER-🛠️ The SwiftData Solution-Step 2: Clean up RollHistoryView.swift"><h4 id="Step 2: Clean up RollHistoryView.swift" class="header"><a href="#Errors-ANSWER-🛠️ The SwiftData Solution-Step 2: Clean up RollHistoryView.swift">Step 2: Clean up RollHistoryView.swift</a></h4></div>
+
+<p>
+Now that <code>ContentView</code> is handling the creation and insertion of the roll, your history view just needs to focus on managing its 50-item limit whenever the list updates.
+</p>
+
+<p>
+You can change <code>enforceHistoryLimit</code> to run automatically using Swift's <code>.onChange</code> modifier whenever the <code>rolls</code> array updates:
+</p>
+
+<pre swift>
+struct RollHistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \DiceRoll.timestamp, order: .reverse) private var rolls: [DiceRoll]
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(rolls) { roll in
+                    // ... your row UI ...
+                }
+                .onDelete(perform: deleteRolls)
+            }
+            .navigationTitle("History")
+            // Automatically trim the database whenever the count changes
+            .onChange(of: rolls.count) {
+                enforceHistoryLimit()
+            }
+        }
+    }
+    
+    private func enforceHistoryLimit() {
+        if rolls.count &gt; 50 {
+            let excessRolls = rolls.suffix(from: 50)
+            for oldRoll in excessRolls {
+                modelContext.delete(oldRoll)
+            }
+        }
+    }
+    
+    private func deleteRolls(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(rolls[index])
+        }
+    }
+}
+</pre>
+
+<div id="Errors-ANSWER-📝 Architecture Note for Your Sheets"><h3 id="📝 Architecture Note for Your Sheets" class="header"><a href="#Errors-ANSWER-📝 Architecture Note for Your Sheets">📝 Architecture Note for Your Sheets</a></h3></div>
+
+<p>
+When working with tabs or split screens in SwiftUI, think of your database as a shared cloud above your views.
+</p>
+
+<p>
+Instead of <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View A"></span><strong id="View A">View A</strong> trying to push a button inside <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View B"></span><strong id="View B">View B</strong> to save something, <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View A"></span><strong id="View A">View A</strong> writes directly to the shared database. Because <span id="Errors-ANSWER-📝 Architecture Note for Your Sheets-View B"></span><strong id="View B">View B</strong> is watching that database with <code>@Query</code>, it will instantly see the new entry pop up on its screen automatically!
+</p>
+
+<div id="Errors-QUESTION"><h2 id="QUESTION" class="header"><a href="#Errors-QUESTION">QUESTION</a></h2></div>
 
 <p>
 What is the significance of <code>final class &lt;ClassName&gt;</code>? What is the <code>final</code> keyword?
 </p>
 
-<div id="Storing Results-ANSWER"><h2 id="ANSWER" class="header"><a href="#Storing Results-ANSWER">ANSWER</a></h2></div>
+<div id="Errors-ANSWER"><h2 id="ANSWER" class="header"><a href="#Errors-ANSWER">ANSWER</a></h2></div>
 
 <p>
 In Swift, the <code>final</code> keyword is an access modifier applied to classes. When you mark a class as <code>final</code>, you are telling the compiler: <em>"This class is complete. It is the end of the line, and no other class is allowed to inherit from it or subclass it."</em>
@@ -1211,7 +1355,7 @@ By default, regular Swift classes can be extended through inheritance (e.g., a <
 Here is exactly why this keyword is significant, especially when working with modern app architectures like SwiftData or MVVM.
 </p>
 
-<div id="Storing Results-ANSWER-1. Preventing Accidental Inheritance (Safety)"><h3 id="1. Preventing Accidental Inheritance (Safety)" class="header"><a href="#Storing Results-ANSWER-1. Preventing Accidental Inheritance (Safety)">1. Preventing Accidental Inheritance (Safety)</a></h3></div>
+<div id="Errors-ANSWER-1. Preventing Accidental Inheritance (Safety)"><h3 id="1. Preventing Accidental Inheritance (Safety)" class="header"><a href="#Errors-ANSWER-1. Preventing Accidental Inheritance (Safety)">1. Preventing Accidental Inheritance (Safety)</a></h3></div>
 
 <p>
 The primary architectural reason to use <code>final</code> is to protect your data models.
@@ -1233,31 +1377,31 @@ class SuperDiceRoll: DiceRoll { ... }
 By making it <code>final</code>, you guarantee that a <code>DiceRoll</code> object will always just be a plain <code>DiceRoll</code> object anywhere in your app.
 </p>
 
-<div id="Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)"><h3 id="2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)" class="header"><a href="#Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)">2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)</a></h3></div>
+<div id="Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)"><h3 id="2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)" class="header"><a href="#Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)">2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)</a></h3></div>
 
 <p>
 This is where <code>final</code> becomes a secret weapon for app performance.
 </p>
 
 <p>
-When a class is <em>not</em> marked final, the CPU has to use a process called <span id="Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Dynamic Dispatch"></span><strong id="Dynamic Dispatch">Dynamic Dispatch</strong> at runtime. Every time your app calls a method on that class, the computer has to pause and double-check: <em>"Wait, is this the base class method, or did a subclass override this function with a different version?"</em> This lookup happens via an internal table (called a vtable) and takes a tiny fraction of a second.
+When a class is <em>not</em> marked final, the CPU has to use a process called <span id="Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Dynamic Dispatch"></span><strong id="Dynamic Dispatch">Dynamic Dispatch</strong> at runtime. Every time your app calls a method on that class, the computer has to pause and double-check: <em>"Wait, is this the base class method, or did a subclass override this function with a different version?"</em> This lookup happens via an internal table (called a vtable) and takes a tiny fraction of a second.
 </p>
 
 <p>
-When you add <code>final</code>, you promise the compiler that these methods will never be overridden. The compiler can throw away the lookup table and use <span id="Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Static Dispatch"></span><strong id="Static Dispatch">Static Dispatch</strong> (or Direct Dispatch). The compiler points the CPU directly to the exact memory address of the code it needs to run.
+When you add <code>final</code>, you promise the compiler that these methods will never be overridden. The compiler can throw away the lookup table and use <span id="Errors-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Static Dispatch"></span><strong id="Static Dispatch">Static Dispatch</strong> (or Direct Dispatch). The compiler points the CPU directly to the exact memory address of the code it needs to run.
 </p>
 
-<div id="Storing Results-Analogy for Your Notes:"><h2 id="Analogy for Your Notes:" class="header"><a href="#Storing Results-Analogy for Your Notes:">Analogy for Your Notes:</a></h2></div>
+<div id="Errors-Analogy for Your Notes:"><h2 id="Analogy for Your Notes:" class="header"><a href="#Errors-Analogy for Your Notes:">Analogy for Your Notes:</a></h2></div>
 
 <ul>
 <li>
-<span id="Storing Results-Analogy for Your Notes:-Dynamic Dispatch (Standard Class)"></span><strong id="Dynamic Dispatch (Standard Class)">Dynamic Dispatch (Standard Class)</strong>: Looking up a word in a physical dictionary every time you want to see what it means.
+<span id="Errors-Analogy for Your Notes:-Dynamic Dispatch (Standard Class)"></span><strong id="Dynamic Dispatch (Standard Class)">Dynamic Dispatch (Standard Class)</strong>: Looking up a word in a physical dictionary every time you want to see what it means.
 
 <li>
-<span id="Storing Results-Analogy for Your Notes:-Static Dispatch (final Class)"></span><strong id="Static Dispatch (final Class)">Static Dispatch (final Class)</strong>: Having the definition memorized so you can recite it instantly without checking a book.
+<span id="Errors-Analogy for Your Notes:-Static Dispatch (final Class)"></span><strong id="Static Dispatch (final Class)">Static Dispatch (final Class)</strong>: Having the definition memorized so you can recite it instantly without checking a book.
 
 </ul>
-<div id="Storing Results-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet"><h3 id="🛠️ Summary for Your Reference Sheet" class="header"><a href="#Storing Results-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet">🛠️ Summary for Your Reference Sheet</a></h3></div>
+<div id="Errors-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet"><h3 id="🛠️ Summary for Your Reference Sheet" class="header"><a href="#Errors-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet">🛠️ Summary for Your Reference Sheet</a></h3></div>
 
 <ul>
 <li>
