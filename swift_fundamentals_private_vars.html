@@ -24,7 +24,17 @@
 <div id="Swift - Private Vars"><h1 id="Swift - Private Vars" class="header"><a href="#Swift - Private Vars">Swift - Private Vars</a></h1></div>
 
 <p>
-In Swift, the <code>private</code> keyword is an <span id="Swift - Private Vars-access control"></span><strong id="access control">access control</strong> modifier. When you mark a view property as <code>private var</code>, you are telling the compiler: <span id="Swift - Private Vars-&quot;This piece of code belongs strictly to"></span><strong id="&quot;This piece of code belongs strictly to">"This piece of code belongs strictly to</strong> <code>ContentView.swift</code>. <span id="Swift - Private Vars-No other file, struct, or object in this entire app is allowed to look at it or use it.&quot;"></span><strong id="No other file, struct, or object in this entire app is allowed to look at it or use it.&quot;">No other file, struct, or object in this entire app is allowed to look at it or use it."</strong>
+In Swift, the <code>private</code> keyword is an <span id="Swift - Private Vars-access control"></span><strong id="access control">access control</strong> modifier.
+</p>
+
+<p>
+When you mark a view property as <code>private var</code>, you are telling the compiler:
+</p>
+
+<p>
+<blockquote>
+<span id="Swift - Private Vars-&quot;This piece of code belongs strictly to the"></span><strong id="&quot;This piece of code belongs strictly to the">"This piece of code belongs strictly to the</strong> <code>ContentView</code> <span id="Swift - Private Vars-struct. No other file, struct, or object in this entire app is allowed to look at it or use it.&quot;"></span><strong id="struct. No other file, struct, or object in this entire app is allowed to look at it or use it.&quot;">struct. No other file, struct, or object in this entire app is allowed to look at it or use it."</strong>
+</blockquote>
 </p>
 
 <p>
@@ -40,7 +50,7 @@ Here is exactly what those restrictions mean in practice for your notes:
 <div id="Swift - Private Vars-🔒 What private Restricts (and Protects)-1. It Blocks Scope Leakage"><h3 id="1. It Blocks Scope Leakage" class="header"><a href="#Swift - Private Vars-🔒 What private Restricts (and Protects)-1. It Blocks Scope Leakage">1. It Blocks Scope Leakage</a></h3></div>
 
 <p>
-Because your dice image layout (<code>diceImageSection</code>) relies on state variables like <code>＄sides</code> and <code>diceImageName</code> which live inside <code>ContentView</code>, it only makes sense inside this specific view.
+If you have sub-views which have been pared away from the main view code like <code>diceImageSection</code> for example (to call on for different orientation perhaps), it makes sense to put them inside the specific view -  <code>ContentView</code> for example.
 </p>
 
 <p>
@@ -62,7 +72,11 @@ When the Swift compiler translates your code into a physical app, it looks for w
 <div id="Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs"><h2 id="🏗️ Extracted View Variables vs. Standalone Structs" class="header"><a href="#Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs">🏗️ Extracted View Variables vs. Standalone Structs</a></h2></div>
 
 <p>
-When organizing SwiftUI files, you have two ways to break up your code. The <code>private</code> keyword behaves slightly differently depending on which one you choose:
+When organizing SwiftUI files, you have two ways to break up your code.
+</p>
+
+<p>
+The <code>private</code> keyword behaves slightly differently depending on which one you choose:
 </p>
 
 <div id="Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Method A: Extracted Properties (What we used)"><h3 id="Method A: Extracted Properties (What we used)" class="header"><a href="#Swift - Private Vars-🏗️ Extracted View Variables vs. Standalone Structs-Method A: Extracted Properties (What we used)">Method A: Extracted Properties (What we used)</a></h3></div>
@@ -109,6 +123,135 @@ private struct DiceImageSection: View {
 Always default to making your extracted layout properties <code>private var</code>. It enforces a clean separation of concerns, ensures your sub-views don't accidentally get misused by other parts of your app, and signals to other developers (and your future self) that this layout block is a specialized piece of design tailored for this file alone.
 </p>
 
+
+<div id="Swift - Private Vars-Scope"><h2 id="Scope" class="header"><a href="#Swift - Private Vars-Scope">Scope</a></h2></div>
+
+<p>
+When you apply the <code>private</code> keyword to a top-level, free-standing entity (like a struct, class, or global variable written outside of any other curly braces), the physical <code>.swift</code> file itself becomes its bounding container.
+</p>
+
+<p>
+In this specific scenario, when adding <code>private</code> the file essentially acts as the outermost "wall" restricting access to that entity.
+</p>
+
+<p>
+Here is how that looks visually and structurally in your code:
+</p>
+
+<div id="Swift - Private Vars-Scope-🏗️ Top-Level private in Practice"><h3 id="🏗️ Top-Level private in Practice" class="header"><a href="#Swift - Private Vars-Scope-🏗️ Top-Level private in Practice">🏗️ Top-Level private in Practice</a></h3></div>
+
+<p>
+Imagine you have a file named <code>CustomComponents.swift</code>:
+</p>
+
+<pre swift>
+// Physical File: CustomComponents.swift
+
+// 🔒 Top-level private: The file is the container.
+// Only code written inside this exact text file can see or use this struct.
+private struct SecretBackgroundModifier: ViewModifier {
+    func body(content: Content) -&gt; some View {
+        content.background(Color.purple.opacity(0.2))
+    }
+}
+
+// 🌐 Public/Internal view: Accessible to the whole app.
+struct SharedCardView: View {
+    var body: some View {
+        Text("Hello World")
+            .modifier(SecretBackgroundModifier()) // ✅ ALLOWED: Inside the same file!
+    }
+}
+</pre>
+
+<p>
+If you try to go into your main <code>ContentView.swift</code> file and write <code>.modifier(SecretBackgroundModifier())</code>, Xcode will give you a compiler error saying it cannot find that modifier in scope.
+</p>
+
+<div id="Swift - Private Vars-Scope-📝 The Golden Rule"><h3 id="📝 The Golden Rule" class="header"><a href="#Swift - Private Vars-Scope-📝 The Golden Rule">📝 The Golden Rule</a></h3></div>
+
+<p>
+The scope of the <code>private</code> keyword is always determined by the closest pair of matching curly braces <code>{ }</code> surrounding it.
+</p>
+
+<ul>
+<li>
+If it is inside a <code>struct { ... }</code>, it is locked to that struct.
+
+<li>
+If it is at the root of the file with no braces around it, it locks to the entire file.
+
+</ul>
+<div id="Swift - Private Vars-Restricting to a File"><h2 id="Restricting to a File" class="header"><a href="#Swift - Private Vars-Restricting to a File">Restricting to a File</a></h2></div>
+
+<p>
+If you want something to be accessible anywhere within the same physical <code>.swift</code> file, Swift has a different keyword for that called <code>fileprivate</code>.
+</p>
+
+<p>
+Here is exactly how the two scopes compare:
+</p>
+
+<div id="Swift - Private Vars-Restricting to a File-🔎 private vs fileprivate"><h3 id="🔎 private vs fileprivate" class="header"><a href="#Swift - Private Vars-Restricting to a File-🔎 private vs fileprivate">🔎 private vs fileprivate</a></h3></div>
+
+<div id="Swift - Private Vars-Restricting to a File-🔎 private vs fileprivate-1. private (Scoped to the Curly Braces)"><h4 id="1. private (Scoped to the Curly Braces)" class="header"><a href="#Swift - Private Vars-Restricting to a File-🔎 private vs fileprivate-1. private (Scoped to the Curly Braces)">1. private (Scoped to the Curly Braces)</a></h4></div>
+
+<p>
+When you declare <code>private var diceImageSection</code>, it can <code>only</code> be seen inside the curly braces of <code>struct ContentView</code>. If you write a completely separate struct further down in the exact same file, that second struct is blocked from seeing it.
+</p>
+
+<pre swift>
+// Physical File: ContentView.swift
+
+struct ContentView: View {
+    private var actionWord = "Roll" // 🔒 Completely hidden from the outside world
+}
+
+struct SecondaryView: View {
+    var body: some View {
+        // ❌ COMPILER ERROR: 
+        // Even though it's in the same file, SecondaryView cannot see 'actionWord'
+        Text(ContentView().actionWord) 
+    }
+}
+</pre>
+
+<p>
+Note: Swift does allow <code>private</code> properties to be shared with extensions of that same struct, as long as the extension lives in that same physical file.
+</p>
+
+<div id="Swift - Private Vars-Restricting to a File-🔎 private vs fileprivate-2. fileprivate (Scoped to the Text File)"><h4 id="2. fileprivate (Scoped to the Text File)" class="header"><a href="#Swift - Private Vars-Restricting to a File-🔎 private vs fileprivate-2. fileprivate (Scoped to the Text File)">2. fileprivate (Scoped to the Text File)</a></h4></div>
+
+<p>
+If you change the keyword to <code>fileprivate</code>, you are telling the compiler: <em>"Anyone standing inside this physical text file can share this variable, but keep it hidden from all other files in the app."</em>
+</p>
+
+<pre swift>
+// Physical File: ContentView.swift
+
+struct ContentView: View {
+    fileprivate var actionWord = "Roll" 
+}
+
+struct SecondaryView: View {
+    var body: some View {
+        // ✅ ALLOWED!
+        // Because it's 'fileprivate' and inside the same physical file.
+        Text(ContentView().actionWord) 
+    }
+}
+</pre>
+
+<div id="Swift - Private Vars-Restricting to a File-📝 Summary for your Reference Sheet"><h3 id="📝 Summary for your Reference Sheet" class="header"><a href="#Swift - Private Vars-Restricting to a File-📝 Summary for your Reference Sheet">📝 Summary for your Reference Sheet</a></h3></div>
+
+<ul>
+<li>
+<code>private</code> = "Only visible inside my specific <code>struct</code> or <code>class</code> container blocks." (This is what you should default to 95% of the time).
+
+<li>
+<code>fileprivate</code> = "Visible to any code written inside this physical <code>.swift</code> text file, but hidden from other files."
+
+</ul>
 <p>
 <br>
 <hr>
