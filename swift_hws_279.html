@@ -1028,6 +1028,15 @@ struct ContentView: View {
 
 <div id="Storing Results"><h1 id="Storing Results" class="header"><a href="#Storing Results">Storing Results</a></h1></div>
 
+<ul>
+<li>
+Store the results using JSON or SwiftData - anywhere they are persistent.
+
+</ul>
+<p>
+<em>In other words, store the history of dice throw results.</em>
+</p>
+
 <p>
 To use <code>SwiftData</code>, you <span id="Storing Results-do not"></span><strong id="do not">do not</strong> store the array itself in the database. Instead, you turn the individual item (a single dice roll) into a blueprint class marked with <code>@Model</code>.
 </p>
@@ -1146,7 +1155,7 @@ struct RollHistoryView: View {
     }
     
     /// Automatically drops the oldest items if history exceeds 50
-    private var enforceHistoryLimit() {
+    private func enforceHistoryLimit() {
         // Because @Query sorts them newest first, the oldest items are at the end.
         // If we have more than 50, we remove everything past index 49.
         if rolls.count &gt; 50 {
@@ -1180,6 +1189,93 @@ struct RollHistoryView: View {
 
 <li>
 <code>modelContext</code>: The brain that handles the actual data manipulation (<code>.insert()</code> and <code>.delete()</code>). <code>SwiftData</code> saves automatically behind the scenes when views shift or apps close.
+
+</ul>
+<div id="Storing Results-QUESTION"><h2 id="QUESTION" class="header"><a href="#Storing Results-QUESTION">QUESTION</a></h2></div>
+
+<p>
+What is the significance of <code>final class &lt;ClassName&gt;</code>? What is the <code>final</code> keyword?
+</p>
+
+<div id="Storing Results-ANSWER"><h2 id="ANSWER" class="header"><a href="#Storing Results-ANSWER">ANSWER</a></h2></div>
+
+<p>
+In Swift, the <code>final</code> keyword is an access modifier applied to classes. When you mark a class as <code>final</code>, you are telling the compiler: <em>"This class is complete. It is the end of the line, and no other class is allowed to inherit from it or subclass it."</em>
+</p>
+
+<p>
+By default, regular Swift classes can be extended through inheritance (e.g., a <code>Dog</code> class might inherit from an <code>Animal</code> class). Adding <code>final</code> shuts that door permanently.
+</p>
+
+<p>
+Here is exactly why this keyword is significant, especially when working with modern app architectures like SwiftData or MVVM.
+</p>
+
+<div id="Storing Results-ANSWER-1. Preventing Accidental Inheritance (Safety)"><h3 id="1. Preventing Accidental Inheritance (Safety)" class="header"><a href="#Storing Results-ANSWER-1. Preventing Accidental Inheritance (Safety)">1. Preventing Accidental Inheritance (Safety)</a></h3></div>
+
+<p>
+The primary architectural reason to use <code>final</code> is to protect your data models.
+</p>
+
+<p>
+In your Dice app, your <code>DiceRoll</code> class is a rigid blueprint meant to map directly to a database table. It has specific properties like <code>timestamp</code> and <code>result</code>. Allowing another developer (or your future self) to subclass it could accidentally break your database layout or introduce unexpected bugs.
+</p>
+
+<pre swift>
+final class DiceRoll { ... }
+
+// ❌ COMPILER ERROR:
+// "Inheritance from a final class 'DiceRoll'"
+class SuperDiceRoll: DiceRoll { ... } 
+</pre>
+
+<p>
+By making it <code>final</code>, you guarantee that a <code>DiceRoll</code> object will always just be a plain <code>DiceRoll</code> object anywhere in your app.
+</p>
+
+<div id="Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)"><h3 id="2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)" class="header"><a href="#Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)">2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)</a></h3></div>
+
+<p>
+This is where <code>final</code> becomes a secret weapon for app performance.
+</p>
+
+<p>
+When a class is <em>not</em> marked final, the CPU has to use a process called <span id="Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Dynamic Dispatch"></span><strong id="Dynamic Dispatch">Dynamic Dispatch</strong> at runtime. Every time your app calls a method on that class, the computer has to pause and double-check: <em>"Wait, is this the base class method, or did a subclass override this function with a different version?"</em> This lookup happens via an internal table (called a vtable) and takes a tiny fraction of a second.
+</p>
+
+<p>
+When you add <code>final</code>, you promise the compiler that these methods will never be overridden. The compiler can throw away the lookup table and use <span id="Storing Results-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Static Dispatch"></span><strong id="Static Dispatch">Static Dispatch</strong> (or Direct Dispatch). The compiler points the CPU directly to the exact memory address of the code it needs to run.
+</p>
+
+<div id="Storing Results-Analogy for Your Notes:"><h2 id="Analogy for Your Notes:" class="header"><a href="#Storing Results-Analogy for Your Notes:">Analogy for Your Notes:</a></h2></div>
+
+<ul>
+<li>
+<span id="Storing Results-Analogy for Your Notes:-Dynamic Dispatch (Standard Class)"></span><strong id="Dynamic Dispatch (Standard Class)">Dynamic Dispatch (Standard Class)</strong>: Looking up a word in a physical dictionary every time you want to see what it means.
+
+<li>
+<span id="Storing Results-Analogy for Your Notes:-Static Dispatch (final Class)"></span><strong id="Static Dispatch (final Class)">Static Dispatch (final Class)</strong>: Having the definition memorized so you can recite it instantly without checking a book.
+
+</ul>
+<div id="Storing Results-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet"><h3 id="🛠️ Summary for Your Reference Sheet" class="header"><a href="#Storing Results-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet">🛠️ Summary for Your Reference Sheet</a></h3></div>
+
+<ul>
+<li>
+What it does: Prevents a class from being subclassed (no inheritance allowed).
+
+<li>
+Why we use it:
+
+<ul>
+<li>
+Intent: Signals that this class is a specialized, standalone tool or data model (like a SwiftData entity).
+
+<li>
+Performance: Optimizes your code, resulting in faster execution speeds by bypassing runtime method lookups.
+
+</ul>
+<li>
+Best Practice: In modern Swift, default to making every class final. If you later discover that you absolutely need to inherit from it, you can easily remove the keyword.
 
 </ul>
 <p>
