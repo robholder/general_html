@@ -1638,6 +1638,104 @@ Performance: Optimizes your code, resulting in faster execution speeds by bypass
 Best Practice: In modern Swift, default to making every class final. If you later discover that you absolutely need to inherit from it, you can easily remove the keyword.
 
 </ul>
+<div id="Challenge - Haptic Feedback"><h1 id="Challenge - Haptic Feedback" class="header"><a href="#Challenge - Haptic Feedback">Challenge - Haptic Feedback</a></h1></div>
+
+<ul>
+<li>
+Add haptic feedback when dice are rolled.
+
+</ul>
+<div id="Challenge - Haptic Feedback-QUESTION"><h2 id="QUESTION" class="header"><a href="#Challenge - Haptic Feedback-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I would like to add haptic feedback on the <code>actionButtonSection</code> which holds the dice roll function. How do I do this?
+</p>
+
+<div id="Challenge - Haptic Feedback-QUESTION"><h2 id="QUESTION" class="header"><a href="#Challenge - Haptic Feedback-QUESTION">QUESTION</a></h2></div>
+
+<p>
+You already have the foundation for it right inside your button block!
+</p>
+
+<pre swift>
+let impact = UIImpactFeedbackGenerator(style: .medium)
+impact.impactOccurred()
+</pre>
+
+<p>
+This code works perfectly, but there is one modern catch: <code>UIImpactFeedbackGenerator</code> belongs to <span id="Challenge - Haptic Feedback-QUESTION-UIKit"></span><strong id="UIKit">UIKit</strong> (Apple's older framework). While it works fine in SwiftUI, modern SwiftUI apps have a native, cleaner way to handle haptics using the <code>.sensoryFeedback</code> modifier.
+</p>
+
+<p>
+Using the SwiftUI native way is cleaner because it completely separates your logic from your layout, automatically prepares the Taptic Engine for zero latency, and matches modern iOS design standards.
+</p>
+
+<p>
+Here are the two best ways to do this.
+</p>
+
+<div id="Challenge - Haptic Feedback-QUESTION-Option 1: The Modern SwiftUI Way (Recommended)"><h3 id="Option 1: The Modern SwiftUI Way (Recommended)" class="header"><a href="#Challenge - Haptic Feedback-QUESTION-Option 1: The Modern SwiftUI Way (Recommended)">Option 1: The Modern SwiftUI Way (Recommended)</a></h3></div>
+
+<p>
+Instead of instantiating a generator inside the button action, you can trigger a haptic pulse by telling SwiftUI to watch a variable (like your <code>result</code>) for changes. Whenever <code>result</code> changes, iOS plays the haptic feedback.
+</p>
+
+<pre swift>
+private var actionButtonSection: some View {
+    Button {
+        let newResult = Int.random(in: 1...sides)
+        result = newResult
+        
+        let newRoll = DiceRoll(result: result, sides: sides)
+        modelContext.insert(newRoll)
+    } label: {
+        Text("\(actionWord) \(objectWord)")
+            // ... your styles ...
+    }
+    // 🎲 Add this modifier to the button or the outer view container:
+    // It triggers a tactile "impact" whenever the 'result' variable changes value.
+    .sensoryFeedback(.impact(weight: .medium, intensity: 1.0), trigger: result)
+}
+</pre>
+
+<div id="Challenge - Haptic Feedback-QUESTION-Option 2: The CoreHaptics / UIKit Way (Fixing why yours might feel latent)"><h3 id="Option 2: The CoreHaptics / UIKit Way (Fixing why yours might feel latent)" class="header"><a href="#Challenge - Haptic Feedback-QUESTION-Option 2: The CoreHaptics / UIKit Way (Fixing why yours might feel latent)">Option 2: The CoreHaptics / UIKit Way (Fixing why yours might feel latent)</a></h3></div>
+
+<p>
+If you prefer keeping the haptic inside the button closure closure (Option A style), the code you have is correct. However, if you notice a tiny, frustrating delay between pressing the button and feeling the click, it's because the phone didn't have time to "spin up" the vibration motor.
+</p>
+
+<p>
+To fix that, you must call <code>.prepare()</code> a split second before the impact:
+</p>
+
+<pre swift>
+Button {
+    let impact = UIImpactFeedbackGenerator(style: .medium)
+    impact.prepare() // ⚡️ Wakes up the Taptic engine so there is 0ms delay
+    impact.impactOccurred()
+    
+    let newResult = Int.random(in: 1...sides)
+    result = newResult
+    // ... rest of saving code ...
+}
+</pre>
+
+<div id="Challenge - Haptic Feedback-📝 Haptic Style Guide for Your Notes"><h2 id="📝 Haptic Style Guide for Your Notes" class="header"><a href="#Challenge - Haptic Feedback-📝 Haptic Style Guide for Your Notes">📝 Haptic Style Guide for Your Notes</a></h2></div>
+
+<p>
+When picking a sensory feedback style, match the physical action of your UI:
+</p>
+<ul>
+<li>
+<code>.sensoryFeedback(.impact(weight: .light), trigger: result)</code>: Great for small dice (like a d4 or d6) or minor UI taps.
+
+<li>
+<code>.sensoryFeedback(.impact(weight: .heavy), trigger: result)</code>: Perfect for rolling a heavy d20, creating a satisfying "thud."
+
+<li>
+<code>.sensoryFeedback(.selection, trigger: result)</code>: A very subtle ticking click—excellent if you have a scroll wheel or slider to change your dice sides.
+
+</ul>
 <p>
 <hr>
 <br>
