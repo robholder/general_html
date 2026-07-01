@@ -1349,7 +1349,7 @@ The best practice here is to create a new, clean "parent" view (let's call it <c
 Here is the exact implementation to get tabs up and running, plus how to link them cleanly.
 </p>
 
-<div id="Combining Views with TabView-Step 1: Create the Tab Coordinator View"><h3 id="Step 1: Create the Tab Coordinator View" class="header"><a href="#Combining Views with TabView-Step 1: Create the Tab Coordinator View">Step 1: Create the Tab Coordinator View</a></h3></div>
+<div id="Combining Views with TabView-Step 1: Create the Tab Coordinator View"><h2 id="Step 1: Create the Tab Coordinator View" class="header"><a href="#Combining Views with TabView-Step 1: Create the Tab Coordinator View">Step 1: Create the Tab Coordinator View</a></h2></div>
 
 <p>
 Create a new SwiftUI View file named <code>MainTabView.swift</code>. This view will serve as the new root of your interface.
@@ -1382,7 +1382,7 @@ struct MainTabView: View {
 }
 </pre>
 
-<div id="Combining Views with TabView-Step 2: Update Your App Root Entry Point"><h3 id="Step 2: Update Your App Root Entry Point" class="header"><a href="#Combining Views with TabView-Step 2: Update Your App Root Entry Point">Step 2: Update Your App Root Entry Point</a></h3></div>
+<div id="Combining Views with TabView-Step 2: Update Your App Root Entry Point"><h2 id="Step 2: Update Your App Root Entry Point" class="header"><a href="#Combining Views with TabView-Step 2: Update Your App Root Entry Point">Step 2: Update Your App Root Entry Point</a></h2></div>
 
 <p>
 Now that <code>MainTabView</code> is the main screen of your app, you need to tell your app file to launch it instead of launching <code>ContentView</code> directly.
@@ -1421,13 +1421,143 @@ struct DiceApp: App {
 Shared Database State: Notice how <code>.modelContainer(for: DiceRoll.self)</code> remains attached at the topmost app level. Because it wraps around <code>MainTabView</code>, both <code>ContentView</code> and <code>RollHistoryView</code> inherit access to the exact same database environment seamlessly.
 
 </ul>
-<div id="Combining Views with TabView-QUESTION"><h2 id="QUESTION" class="header"><a href="#Combining Views with TabView-QUESTION">QUESTION</a></h2></div>
+<div id="Edit Button (for deletion)"><h1 id="Edit Button (for deletion)" class="header"><a href="#Edit Button (for deletion)">Edit Button (for deletion)</a></h1></div>
+
+<div id="Edit Button (for deletion)-QUESTION"><h2 id="QUESTION" class="header"><a href="#Edit Button (for deletion)-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I'd like to add an edit button to allow for selecting rolls to delete in addition to the standard swipe delete for the History view. How do I accomplish this functionality?
+</p>
+
+<div id="Edit Button (for deletion)-ANSWER"><h2 id="ANSWER" class="header"><a href="#Edit Button (for deletion)-ANSWER">ANSWER</a></h2></div>
+
+<p>
+To add a selective Edit mode alongside your standard swipe-to-delete behavior, you will want to take advantage of SwiftUI's native <code>EditButton</code>.
+</p>
+
+<p>
+When you place an <code>EditButton</code> in a toolbar, SwiftUI automatically manages an underlying environment state called <code>editMode</code>. When clicked, it tells the accompanying <code>List</code> component to display selection circles next to every single row.
+</p>
+
+<p>
+Here is how to update your <code>RollHistoryView.swift</code> to add full Edit/Select multi-deletion capabilities:
+</p>
+
+<div id="Edit Button (for deletion)-ANSWER-🛠️ Updated RollHistoryView.swift"><h3 id="🛠️ Updated RollHistoryView.swift" class="header"><a href="#Edit Button (for deletion)-ANSWER-🛠️ Updated RollHistoryView.swift">🛠️ Updated RollHistoryView.swift</a></h3></div>
+
+<p>
+We need to add three things to your existing code:
+</p>
+<ul>
+<li>
+A <code>@State</code> tracking variable to hold the selected IDs of rows the user clicks.
+
+<li>
+An <code>.editMode</code> toolbar button.
+
+<li>
+A Delete button that appears only when items are selected.
+
+</ul>
+  
+<pre swift>
+struct RollHistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \DiceRoll.timestamp, order: .reverse) private var rolls: [DiceRoll]
+    
+    // 1. Tracks which items are currently checked/selected in Edit Mode
+    @State private var selectedRollIDs = Set&lt;PersistentIdentifier&gt;()
+    
+    var body: some View {
+        NavigationStack {
+            // 2. Pass the selection set binding directly to the List
+            List(selection: $selectedRollIDs) {
+                ForEach(rolls) { roll in
+                    HStack {
+                        Text("Rolled a d\(roll.sides)")
+                        Spacer()
+                        Text("\(roll.result)")
+                            .font(.headline)
+                    }
+                }
+                .onDelete(perform: deleteRolls) // Keeps standard swipe-to-delete active!
+            }
+            .navigationTitle("History")
+            // 3. Add the native Edit button to the top right corner
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    EditButton()
+                }
+                
+                // 4. Add a "Trash" button to the bottom or top bar when items are selected
+                if !selectedRollIDs.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(role: .destructive, action: deleteSelectedRolls) {
+                            Label("Delete Selected", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+            .onChange(of: rolls.count) {
+                enforceHistoryLimit()
+            }
+        }
+    }
+    
+    // MARK: - Core Database Functions
+    
+    /// Deletes multiple rows selected via Edit Mode checkbox circles
+    private func deleteSelectedRolls() {
+        // Loop through our database array and find matches for the selected IDs
+        for roll in rolls {
+            if selectedRollIDs.contains(roll.id) {
+                modelContext.delete(roll)
+            }
+        }
+        
+        // Clear out the selection set so the trash can icon goes away cleanly
+        selectedRollIDs.removeAll()
+    }
+    
+    private func enforceHistoryLimit() {
+        if rolls.count &gt; 50 {
+            let excessRolls = rolls.suffix(from: 50)
+            for oldRoll in excessRolls {
+                modelContext.delete(oldRoll)
+            }
+        }
+    }
+    
+    private func deleteRolls(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(rolls[index])
+        }
+    }
+}
+</pre>
+
+<div id="Edit Button (for deletion)-ANSWER-📝 Multi-Selection Concepts for your Notes"><h3 id="📝 Multi-Selection Concepts for your Notes" class="header"><a href="#Edit Button (for deletion)-ANSWER-📝 Multi-Selection Concepts for your Notes">📝 Multi-Selection Concepts for your Notes</a></h3></div>
+
+<ul>
+<li>
+<code>List(selection: $selectedRollIDs)</code>: By feeding a <code>Set</code> binding into the initializer of your <code>List</code>, you tell SwiftUI: <em>"Hey, if this app enters editMode, allow rows to be checked off and feed their unique id values directly into this basket array."</em>
+
+<li>
+<code>PersistentIdentifier</code>: This is a special, ultra-fast structural ID that SwiftData creates under the hood for every <code>@Model</code> class instance. It ensures you are targeting the exact correct database row when filtering your deletions.
+
+<li>
+<code>EditButton()</code>: This is an Apple-provided view. It contains built-in logic that shifts the parent layout environment back and forth between regular mode and edit mode, altering its own text string automatically from "Edit" to "Done".
+
+</ul>
+<div id="`final class` Keyword"><h1 id="`final class` Keyword" class="header"><a href="#`final class` Keyword"><code>final class</code> Keyword</a></h1></div>
+
+<div id="`final class` Keyword-QUESTION"><h2 id="QUESTION" class="header"><a href="#`final class` Keyword-QUESTION">QUESTION</a></h2></div>
 
 <p>
 What is the significance of <code>final class &lt;ClassName&gt;</code>? What is the <code>final</code> keyword?
 </p>
 
-<div id="Combining Views with TabView-ANSWER"><h2 id="ANSWER" class="header"><a href="#Combining Views with TabView-ANSWER">ANSWER</a></h2></div>
+<div id="`final class` Keyword-ANSWER"><h2 id="ANSWER" class="header"><a href="#`final class` Keyword-ANSWER">ANSWER</a></h2></div>
 
 <p>
 In Swift, the <code>final</code> keyword is an access modifier applied to classes. When you mark a class as <code>final</code>, you are telling the compiler: <em>"This class is complete. It is the end of the line, and no other class is allowed to inherit from it or subclass it."</em>
@@ -1441,7 +1571,7 @@ By default, regular Swift classes can be extended through inheritance (e.g., a <
 Here is exactly why this keyword is significant, especially when working with modern app architectures like SwiftData or MVVM.
 </p>
 
-<div id="Combining Views with TabView-ANSWER-1. Preventing Accidental Inheritance (Safety)"><h3 id="1. Preventing Accidental Inheritance (Safety)" class="header"><a href="#Combining Views with TabView-ANSWER-1. Preventing Accidental Inheritance (Safety)">1. Preventing Accidental Inheritance (Safety)</a></h3></div>
+<div id="`final class` Keyword-ANSWER-1. Preventing Accidental Inheritance (Safety)"><h3 id="1. Preventing Accidental Inheritance (Safety)" class="header"><a href="#`final class` Keyword-ANSWER-1. Preventing Accidental Inheritance (Safety)">1. Preventing Accidental Inheritance (Safety)</a></h3></div>
 
 <p>
 The primary architectural reason to use <code>final</code> is to protect your data models.
@@ -1463,31 +1593,31 @@ class SuperDiceRoll: DiceRoll { ... }
 By making it <code>final</code>, you guarantee that a <code>DiceRoll</code> object will always just be a plain <code>DiceRoll</code> object anywhere in your app.
 </p>
 
-<div id="Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)"><h3 id="2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)" class="header"><a href="#Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)">2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)</a></h3></div>
+<div id="`final class` Keyword-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)"><h3 id="2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)" class="header"><a href="#`final class` Keyword-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)">2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)</a></h3></div>
 
 <p>
 This is where <code>final</code> becomes a secret weapon for app performance.
 </p>
 
 <p>
-When a class is <em>not</em> marked final, the CPU has to use a process called <span id="Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Dynamic Dispatch"></span><strong id="Dynamic Dispatch">Dynamic Dispatch</strong> at runtime. Every time your app calls a method on that class, the computer has to pause and double-check: <em>"Wait, is this the base class method, or did a subclass override this function with a different version?"</em> This lookup happens via an internal table (called a vtable) and takes a tiny fraction of a second.
+When a class is <em>not</em> marked final, the CPU has to use a process called <span id="<code>final class</code> Keyword-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Dynamic Dispatch"></span><strong id="Dynamic Dispatch">Dynamic Dispatch</strong> at runtime. Every time your app calls a method on that class, the computer has to pause and double-check: <em>"Wait, is this the base class method, or did a subclass override this function with a different version?"</em> This lookup happens via an internal table (called a vtable) and takes a tiny fraction of a second.
 </p>
 
 <p>
-When you add <code>final</code>, you promise the compiler that these methods will never be overridden. The compiler can throw away the lookup table and use <span id="Combining Views with TabView-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Static Dispatch"></span><strong id="Static Dispatch">Static Dispatch</strong> (or Direct Dispatch). The compiler points the CPU directly to the exact memory address of the code it needs to run.
+When you add <code>final</code>, you promise the compiler that these methods will never be overridden. The compiler can throw away the lookup table and use <span id="<code>final class</code> Keyword-ANSWER-2. Speed Boosts Under the Hood (Static vs. Dynamic Dispatch)-Static Dispatch"></span><strong id="Static Dispatch">Static Dispatch</strong> (or Direct Dispatch). The compiler points the CPU directly to the exact memory address of the code it needs to run.
 </p>
 
-<div id="Combining Views with TabView-Analogy for Your Notes:"><h2 id="Analogy for Your Notes:" class="header"><a href="#Combining Views with TabView-Analogy for Your Notes:">Analogy for Your Notes:</a></h2></div>
+<div id="`final class` Keyword-Analogy for Your Notes:"><h2 id="Analogy for Your Notes:" class="header"><a href="#`final class` Keyword-Analogy for Your Notes:">Analogy for Your Notes:</a></h2></div>
 
 <ul>
 <li>
-<span id="Combining Views with TabView-Analogy for Your Notes:-Dynamic Dispatch (Standard Class)"></span><strong id="Dynamic Dispatch (Standard Class)">Dynamic Dispatch (Standard Class)</strong>: Looking up a word in a physical dictionary every time you want to see what it means.
+<span id="<code>final class</code> Keyword-Analogy for Your Notes:-Dynamic Dispatch (Standard Class)"></span><strong id="Dynamic Dispatch (Standard Class)">Dynamic Dispatch (Standard Class)</strong>: Looking up a word in a physical dictionary every time you want to see what it means.
 
 <li>
-<span id="Combining Views with TabView-Analogy for Your Notes:-Static Dispatch (final Class)"></span><strong id="Static Dispatch (final Class)">Static Dispatch (final Class)</strong>: Having the definition memorized so you can recite it instantly without checking a book.
+<span id="<code>final class</code> Keyword-Analogy for Your Notes:-Static Dispatch (final Class)"></span><strong id="Static Dispatch (final Class)">Static Dispatch (final Class)</strong>: Having the definition memorized so you can recite it instantly without checking a book.
 
 </ul>
-<div id="Combining Views with TabView-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet"><h3 id="🛠️ Summary for Your Reference Sheet" class="header"><a href="#Combining Views with TabView-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet">🛠️ Summary for Your Reference Sheet</a></h3></div>
+<div id="`final class` Keyword-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet"><h3 id="🛠️ Summary for Your Reference Sheet" class="header"><a href="#`final class` Keyword-Analogy for Your Notes:-🛠️ Summary for Your Reference Sheet">🛠️ Summary for Your Reference Sheet</a></h3></div>
 
 <ul>
 <li>
