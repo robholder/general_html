@@ -1026,6 +1026,167 @@ struct ContentView: View {
 <br>
 </p>
 
+<div id="Storing Results"><h1 id="Storing Results" class="header"><a href="#Storing Results">Storing Results</a></h1></div>
+
+<p>
+To use <code>SwiftData</code>, you <span id="Storing Results-do not"></span><strong id="do not">do not</strong> store the array itself in the database. Instead, you turn the individual item (a single dice roll) into a blueprint class marked with <code>@Model</code>.
+</p>
+
+<p>
+<code>SwiftData</code> then automatically generates the database behind the scenes. You use the @Query wrapper in your views to fetch those items into a regular Swift array that updates in real time.
+</p>
+
+<p>
+Here is the step-by-step blueprint to set this up for your notes.
+</p>
+
+<div id="Storing Results-Step 1: Define the Blueprint (The Model Class)"><h2 id="Step 1: Define the Blueprint (The Model Class)" class="header"><a href="#Storing Results-Step 1: Define the Blueprint (The Model Class)">Step 1: Define the Blueprint (The Model Class)</a></h2></div>
+
+<p>
+Create a new Swift file named <code>DiceRoll.swift</code>. It must be a class, not a struct, and it needs the <code>@Model</code> macro.
+</p>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+@Model
+final class DiceRoll {
+    var timestamp: Date
+    var result: Int
+    var sides: Int
+    
+    init(result: Int, sides: Int) {
+        self.timestamp = Date() // Automatically timestamps the roll
+        self.result = result
+        self.sides = sides
+    }
+}
+</pre>
+
+<div id="Storing Results-Step 2: Set Up the App Root"><h2 id="Step 2: Set Up the App Root" class="header"><a href="#Storing Results-Step 2: Set Up the App Root">Step 2: Set Up the App Root</a></h2></div>
+
+<p>
+In your main App file (e.g., <code>DiceApp.swift</code>), import <code>SwiftData</code> and attach the container to your window group. You pass the model class name here, not an array.
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+@main
+struct DiceApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // Tell SwiftData to prepare a database for saving DiceRoll objects
+        .modelContainer(for: DiceRoll.self) 
+    }
+}
+</pre>
+
+<div id="Storing Results-Step 3: Fetch, Add, Delete, and Cap the List at 50"><h2 id="Step 3: Fetch, Add, Delete, and Cap the List at 50" class="header"><a href="#Storing Results-Step 3: Fetch, Add, Delete, and Cap the List at 50">Step 3: Fetch, Add, Delete, and Cap the List at 50</a></h2></div>
+
+<p>
+In your SwiftUI view, you need two tools from <code>SwiftData</code>:
+</p>
+
+<ul>
+<li>
+<code>@Query</code>: Automatically fetches the data as an array and refreshes the UI when things change.
+
+<li>
+<code>@Environment(\.modelContext)</code>: The "scratchpad" used to insert or delete items.
+
+</ul>
+<p>
+Here is how you handle the UI logic, including your requirement to automatically trim the history to 50 items:
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+struct RollHistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+    
+    // Fetch rolls, sorting them from newest to oldest
+    @Query(sort: \DiceRoll.timestamp, order: .reverse) private var rolls: [DiceRoll]
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(rolls) { roll in
+                    HStack {
+                        Text("Rolled a d\(roll.sides)")
+                        Spacer()
+                        Text("\(roll.result)")
+                            .font(.headline)
+                    }
+                }
+                .onDelete(perform: deleteRolls) // Standard swipe-to-delete
+            }
+            .navigationTitle("History")
+        }
+    }
+    
+    // MARK: - Core Database Functions
+    
+    /// Call this function from your Dice app when a user rolls a die
+    func saveRoll(result: Int, sides: Int) {
+        // 1. Create a new roll object
+        let newRoll = DiceRoll(result: result, sides: sides)
+        
+        // 2. Insert it into the database
+        modelContext.insert(newRoll)
+        
+        // 3. Enforce the 50-item limit
+        enforceHistoryLimit()
+    }
+    
+    /// Automatically drops the oldest items if history exceeds 50
+    private var enforceHistoryLimit() {
+        // Because @Query sorts them newest first, the oldest items are at the end.
+        // If we have more than 50, we remove everything past index 49.
+        if rolls.count &gt; 50 {
+            // Grab items starting from index 50 to the end of the array
+            let excessRolls = rolls.suffix(from: 50)
+            
+            for oldRoll in excessRolls {
+                modelContext.delete(oldRoll)
+            }
+        }
+    }
+    
+    /// Handles manual List swipe-to-delete action
+    private func deleteRolls(offsets: IndexSet) {
+        for index in offsets {
+            let rollToDelete = rolls[index]
+            modelContext.delete(rollToDelete)
+        }
+    }
+}
+</pre>
+
+<div id="Storing Results-📝 Key Takeaways for your Notes"><h2 id="📝 Key Takeaways for your Notes" class="header"><a href="#Storing Results-📝 Key Takeaways for your Notes">📝 Key Takeaways for your Notes</a></h2></div>
+
+<ul>
+<li>
+<code>.modelContainer(for: DiceRoll.self)</code>: Tells the app, <em>"Get a database ready to store individual instances of DiceRoll."</em>
+
+<li>
+<code>@Query</code>: Acts like a magnet. It reaches into that container, extracts the items, puts them in a standard Swift array (<code>[DiceRoll]</code>), and watches for changes.
+
+<li>
+<code>modelContext</code>: The brain that handles the actual data manipulation (<code>.insert()</code> and <code>.delete()</code>). <code>SwiftData</code> saves automatically behind the scenes when views shift or apps close.
+
+</ul>
+<p>
+<hr>
+<br>
+</p>
+
  
 <p>
 <a href="swift_hacking_with_swift.html">Swift</a>
