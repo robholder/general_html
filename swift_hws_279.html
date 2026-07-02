@@ -1736,6 +1736,243 @@ When picking a sensory feedback style, match the physical action of your UI:
 <code>.sensoryFeedback(.selection, trigger: result)</code>: A very subtle ticking click—excellent if you have a scroll wheel or slider to change your dice sides.
 
 </ul>
+<div id="Rolling Number Illusion"><h1 id="Rolling Number Illusion" class="header"><a href="#Rolling Number Illusion">Rolling Number Illusion</a></h1></div>
+
+<p>
+To implement this, you will use a <code>Timer</code> that fires very quickly (e.g., every 0.1 seconds), randomizes the number on screen, keeps track of how many times it has fired, and then destroys itself after a set duration to reveal the true final score.
+</p>
+
+<p>
+Here is the step-by-step logic blueprint to add to your notes, along with the refactored code to make it work.
+</p>
+
+<div id="Rolling Number Illusion-🧠 The Logic Blueprint"><h2 id="🧠 The Logic Blueprint" class="header"><a href="#Rolling Number Illusion-🧠 The Logic Blueprint">🧠 The Logic Blueprint</a></h2></div>
+
+<p>
+Instead of updating the number and saving it to the database instantly when the button is pressed, the process now splits into a timeline:
+</p>
+
+<ul>
+<li>
+<span id="Rolling Number Illusion-🧠 The Logic Blueprint-The Click"></span><strong id="The Click">The Click</strong>: The user taps the button. We disable the button temporarily so they can't spam it.
+
+<li>
+<span id="Rolling Number Illusion-🧠 The Logic Blueprint-The Rattle (The Loop)"></span><strong id="The Rattle (The Loop)">The Rattle (The Loop)</strong>: A timer starts ticking every <code>0.08</code> seconds. On every tick, we overwrite the <code>result</code> property with a random number.
+
+<li>
+<span id="Rolling Number Illusion-🧠 The Logic Blueprint-The Stop"></span><strong id="The Stop">The Stop</strong>: Once the timer ticks say, 15 times (~1.2 seconds), we cancel the timer, calculate the <code>actual</code> final result, save it to SwiftData, and unlock the button.
+
+</ul>
+<div id="Rolling Number Illusion-🛠️ Step-by-Step Code Update for ContentView.swift"><h2 id="🛠️ Step-by-Step Code Update for ContentView.swift" class="header"><a href="#Rolling Number Illusion-🛠️ Step-by-Step Code Update for ContentView.swift">🛠️ Step-by-Step Code Update for ContentView.swift</a></h2></div>
+
+<p>
+We need to add a few pieces of state to coordinate the timeline, and then update the button's action block.
+</p>
+
+<div id="Rolling Number Illusion-🛠️ Step-by-Step Code Update for ContentView.swift-1. Add New State Variables"><h3 id="1. Add New State Variables" class="header"><a href="#Rolling Number Illusion-🛠️ Step-by-Step Code Update for ContentView.swift-1. Add New State Variables">1. Add New State Variables</a></h3></div>
+
+<p>
+Add these near your other <code>@State</code> properties at the top of your <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var isRolling = false              // Disables the button during the animation
+@State private var timerTicksRemaining = 0       // Counts down how many times the number changes
+@State private var rollTimer: Timer? = nil        // Holds our active timer object
+</pre>
+
+<div id="Rolling Number Illusion-🛠️ Step-by-Step Code Update for ContentView.swift-2. Update the actionButtonSection"><h3 id="2. Update the actionButtonSection" class="header"><a href="#Rolling Number Illusion-🛠️ Step-by-Step Code Update for ContentView.swift-2. Update the actionButtonSection">2. Update the actionButtonSection</a></h3></div>
+
+<p>
+Replace your current button action with this animated timer sequence:
+</p>
+
+<pre swift>
+private var actionButtonSection: some View {
+    Button {
+        // 1. Prevent overlapping rolls
+        guard !isRolling else { return }
+        isRolling = true
+        
+        // 2. Set the length of the animation (e.g., 15 rapid updates)
+        timerTicksRemaining = 15
+        
+        // 3. Play an initial "startup" haptic
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.prepare()
+        impact.impactOccurred()
+        
+        // 4. Start the rapid rattling timer
+        rollTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { timer in
+            if timerTicksRemaining &gt; 0 {
+                // --- THE RATTLE ---
+                // Keep flickering the onscreen display to a random number
+                result = Int.random(in: 1...sides)
+                timerTicksRemaining -= 1
+                
+                // Optional: Provide a light tick sound/vibration per flip
+                let tick = UIImpactFeedbackGenerator(style: .light)
+                tick.impactOccurred(intensity: 0.5)
+                
+            } else {
+                // --- THE SETTLE ---
+                // 5. Time's up! Stop the timer loop
+                timer.invalidate()
+                rollTimer = nil
+                
+                // 6. Establish the permanent, final score
+                let finalResult = Int.random(in: 1...sides)
+                result = finalResult
+                
+                // 7. Push to your SwiftData History database
+                let newRoll = DiceRoll(result: finalResult, sides: sides)
+                modelContext.insert(newRoll)
+                
+                // 8. Re-enable the button for the next turn
+                isRolling = false
+            }
+        }
+        
+    } label: {
+        Text(isRolling ? "Rolling..." : "\(actionWord) \(objectWord)")
+            .font(.title3)
+            .fontWeight(.bold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, verticalSizeClass == .compact ? 12 : 16)
+    }
+    .buttonStyle(.borderedProminent)
+    .controlSize(.large)
+    // 9. Gray out or disable the button while the timer is actively ticking
+    .disabled(isRolling) 
+    .padding(.horizontal, verticalSizeClass == .compact ? 0 : 24)
+    .padding(.bottom, verticalSizeClass == .compact ? 5 : 20)
+}
+</pre>
+
+<div id="Rolling Number Illusion-📝 Critical Timer Notes for Your Reference Sheets"><h2 id="📝 Critical Timer Notes for Your Reference Sheets" class="header"><a href="#Rolling Number Illusion-📝 Critical Timer Notes for Your Reference Sheets">📝 Critical Timer Notes for Your Reference Sheets</a></h2></div>
+
+<ul>
+<li>
+<code>Timer.scheduledTimer(...)</code>: This creates an asynchronous loop running on the device's main processing loop (<code>RunLoop</code>). It executes whatever code is inside its trailing closure block at your specified <code>withTimeInterval</code> rate.
+
+<li>
+<code>timer.invalidate()</code>: This is the absolute most important command when dealing with timers. If you do not call <code>.invalidate()</code>, the timer will loop endlessly in the background forever, eating up battery life and crashing your logic.
+
+<li>
+<code>guard !isRolling else { return }</code>: This is a defensive programming wall. If the user mashes the button three times rapidly, this line completely stops execution so that the app doesn't spin up three conflicting timers at the same time.
+
+<li>
+<span id="Rolling Number Illusion-📝 Critical Timer Notes for Your Reference Sheets-The Micro-Haptic Integration"></span><strong id="The Micro-Haptic Integration">The Micro-Haptic Integration</strong>: By pairing a <code>.light</code> haptic with every decrement of <code>timerTicksRemaining</code>, the physical phone will literally shake rhythmically in the user's hand matching the numbers changing on screen. It creates a highly responsive, physical sensation.
+
+</ul>
+<div id="Rolling Number Illusion-QUESTION"><h2 id="QUESTION" class="header"><a href="#Rolling Number Illusion-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Can we use the more modern haptic approach here? (Instead of the UIKit approach?)
+</p>
+
+<div id="Rolling Number Illusion-ANSWER"><h2 id="ANSWER" class="header"><a href="#Rolling Number Illusion-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, absolutely! We can migrate this entirely to the modern SwiftUI approach.
+</p>
+
+<p>
+To do this natively, we shouldn't use <code>result</code> as the trigger directly, because if the randomizer rolls the same number twice in a row during the rattle, the value won't change, and a haptic tick will be skipped.
+</p>
+
+<p>
+Instead, we can create a custom state enum called <code>RollHapticState</code>. As the timer ticks, we update this state, and a single <code>.sensoryFeedback</code> modifier reads it to play <span id="Rolling Number Illusion-ANSWER-light impacts"></span><strong id="light impacts">light impacts</strong> during the roll, and a <span id="Rolling Number Illusion-ANSWER-heavy impact"></span><strong id="heavy impact">heavy impact</strong> when the die settles!
+</p>
+
+<div id="Rolling Number Illusion-ANSWER-🛠️ The Modern SwiftUI Native Implementation"><h3 id="🛠️ The Modern SwiftUI Native Implementation" class="header"><a href="#Rolling Number Illusion-ANSWER-🛠️ The Modern SwiftUI Native Implementation">🛠️ The Modern SwiftUI Native Implementation</a></h3></div>
+
+<div id="Rolling Number Illusion-ANSWER-🛠️ The Modern SwiftUI Native Implementation-1. Add the Haptic State tracking"><h4 id="1. Add the Haptic State tracking" class="header"><a href="#Rolling Number Illusion-ANSWER-🛠️ The Modern SwiftUI Native Implementation-1. Add the Haptic State tracking">1. Add the Haptic State tracking</a></h4></div>
+
+<p>
+Add this small enum and state variable to the top of your <code>ContentView</code>:
+</p>
+
+<pre swift>
+// A clean tracking enum for our custom haptic timeline
+enum RollHapticState: Equatable {
+    case idle
+    case rattling(Int) // Stores the ticks remaining so every tick is uniquely recognized
+    case settled
+}
+
+@State private var hapticState: RollHapticState = .idle
+</pre>
+
+<div id="Rolling Number Illusion-ANSWER-🛠️ The Modern SwiftUI Native Implementation-2. Update the Timer Code (Stripped of UIKit)"><h4 id="2. Update the Timer Code (Stripped of UIKit)" class="header"><a href="#Rolling Number Illusion-ANSWER-🛠️ The Modern SwiftUI Native Implementation-2. Update the Timer Code (Stripped of UIKit)">2. Update the Timer Code (Stripped of UIKit)</a></h4></div>
+
+<p>
+Now, look how much cleaner the timer loop becomes when we remove the bulky <code>UIImpactFeedbackGenerator</code> lines. We just tell our state what is happening:
+</p>
+
+<pre swift>
+private var actionButtonSection: some View {
+    Button {
+        guard !isRolling else { return }
+        isRolling = true
+        timerTicksRemaining = 15
+        
+        rollTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { timer in
+            if timerTicksRemaining &gt; 0 {
+                result = Int.random(in: 1...sides)
+                timerTicksRemaining -= 1
+                
+                // 🔄 MODERN TRIGGER: Tell SwiftUI we are rattling (and pass the countdown)
+                hapticState = .rattling(timerTicksRemaining)
+                
+            } else {
+                timer.invalidate()
+                rollTimer = nil
+                
+                let finalResult = Int.random(in: 1...sides)
+                result = finalResult
+                
+                let newRoll = DiceRoll(result: finalResult, sides: sides)
+                modelContext.insert(newRoll)
+                
+                // 🔄 MODERN TRIGGER: Tell SwiftUI we officially stopped!
+                hapticState = .settled
+                isRolling = false
+            }
+        }
+        
+    } label: {
+        Text(isRolling ? "Rolling..." : "\(actionWord) \(objectWord)")
+            // ... styles ...
+    }
+    .buttonStyle(.borderedProminent)
+    .disabled(isRolling)
+    // 🎲 ATTACH THE MODERN SENSORY FEEDBACK MODIFIER HERE:
+    .sensoryFeedback(trigger: hapticState) { oldValue, newValue in
+        switch newValue {
+        case .rattling:
+            // Light physical ticks while the numbers fly by
+            return .impact(weight: .light, intensity: 0.6) 
+        case .settled:
+            // A satisfying heavy thud when the final number lands
+            return .impact(weight: .heavy) 
+        case .idle:
+            return nil
+        }
+    }
+}
+</pre>
+
+<div id="Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:"><h3 id="📝 Why this is structurally superior for your notes:" class="header"><a href="#Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:">📝 Why this is structurally superior for your notes:</a></h3></div>
+
+<p>
+By using the flexible block version of <code>.sensoryFeedback(trigger:) { oldValue, newValue in ... }</code>, you are leveraging the advanced pattern from your cheat sheet.
+</p>
+
+<p>
+The timer focus is now <span id="Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:-purely logic"></span><strong id="purely logic">purely logic</strong> (calculating numbers and intervals), while the visual/tactile response is handed entirely over to SwiftUI's view layout engine to deal with.
+</p>
+
 <p>
 <hr>
 <br>
