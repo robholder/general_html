@@ -2021,7 +2021,6 @@ Updated struct:
             }
         }
     }
-}
 </pre>
 
 <div id="Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:"><h3 id="📝 Why this is structurally superior for your notes:" class="header"><a href="#Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:">📝 Why this is structurally superior for your notes:</a></h3></div>
@@ -2033,6 +2032,148 @@ By using the flexible block version of <code>.sensoryFeedback(trigger:) { oldVal
 <p>
 The timer focus is now <span id="Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:-purely logic"></span><strong id="purely logic">purely logic</strong> (calculating numbers and intervals), while the visual/tactile response is handed entirely over to SwiftUI's view layout engine to deal with.
 </p>
+
+<div id="Rolling Number Illusion-QUESTION"><h2 id="QUESTION" class="header"><a href="#Rolling Number Illusion-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Is it possible to speed up the numbers? And perhaps reduce the overall length of the rattle?
+</p>
+
+<div id="Rolling Number Illusion-ANSWER"><h2 id="ANSWER" class="header"><a href="#Rolling Number Illusion-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, absolutely! You can control both the speed and the duration by adjusting two numbers in your timer setup:
+</p>
+
+<ul>
+<li>
+Speed (How fast the numbers flick): Controlled by <code>withTimeInterval</code>. A smaller number makes the ticks faster.
+
+<li>
+Duration (How long the roll lasts): Controlled by <code>timerTicksRemaining</code>. Fewer ticks mean the animation finishes sooner.
+
+</ul>
+<p>
+Right now, your timer ticks every <code>0.08</code> seconds for <code>15</code> iterations, which takes about 1.2 seconds total (0.08×15).
+If you want a super fast, snappy rattle that settles in about half a second, change the interval to 0.04 seconds and the total ticks to 12 (0.04×12=0.48 seconds).
+</p>
+
+<p>
+Here are the lines you need to adjust inside your <code>actionButtonSection</code>:
+</p>
+
+<pre swift>
+private var actionButtonSection: some View {
+    Button {
+        guard !isRolling else { return }
+        isRolling = true
+        
+        // ⏱️ 1. REDUCE DURATION: Change from 15 to 12 total ticks
+        timerTicksRemaining = 12 
+        
+        // ⚡️ 2. SPEED UP: Change interval from 0.08 to 0.04 seconds (twice as fast!)
+        rollTimer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { timer in
+            if timerTicksRemaining &gt; 0 {
+                result = Int.random(in: 1...sides)
+                timerTicksRemaining -= 1
+                hapticState = .rattling(timerTicksRemaining)
+            } else {
+                // ... rest of your settling logic stays exactly the same ...
+</pre>
+
+<div id="Rolling Number Illusion-ANSWER-📝 Tuning Guide for Your Notes"><h3 id="📝 Tuning Guide for Your Notes" class="header"><a href="#Rolling Number Illusion-ANSWER-📝 Tuning Guide for Your Notes">📝 Tuning Guide for Your Notes</a></h3></div>
+
+<p>
+Think of these two variables as your animation knobs:
+</p>
+<ul>
+<li>
+<code>withTimeInterval</code>: Adjusts the frequency. <code>0.03</code> to <code>0.05</code> feels like a blurring, high-speed slot machine. <code>0.1</code> feels like a deliberate, dramatic countdown.
+
+<li>
+<code>timerTicksRemaining</code>: Adjusts the length. Keep this between <code>10</code> and <code>15</code> when using high speeds so the user's eye has just enough time to register the blurring animation before it stops!
+
+</ul>
+<div id="Rolling Number Illusion-QUESTION"><h2 id="QUESTION" class="header"><a href="#Rolling Number Illusion-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Can the numbers appear gray as they rattle through and settle on black for the last number?
+</p>
+
+<div id="Rolling Number Illusion-ANSWER"><h2 id="ANSWER" class="header"><a href="#Rolling Number Illusion-ANSWER">ANSWER</a></h2></div>
+
+<p>
+That is a brilliant design touch! Changing the visual state of the text to match the physical state of the rolling animation makes the final result stand out with a punchy, conclusive feel.
+</p>
+
+<p>
+To achieve this, we can take advantage of your existing <code>isRolling</code> state variable. In SwiftUI, you can conditionally set modifiers like <code>.foregroundStyle()</code> using a quick inline ternary operator (<code>condition ? trueValue : falseValue</code>).
+</p>
+
+<p>
+Let’s implement this for your <code>resultCardSection</code>.
+</p>
+
+<div id="Rolling Number Illusion-ANSWER-🛠️ The Fix: Update your resultCardSection"><h3 id="🛠️ The Fix: Update your resultCardSection" class="header"><a href="#Rolling Number Illusion-ANSWER-🛠️ The Fix: Update your resultCardSection">🛠️ The Fix: Update your resultCardSection</a></h3></div>
+
+<p>
+Locate the <code>resultCardSection</code> property in your <code>ContentView.swift</code> file. Update the color modifier on the large result <code>Text</code> block so that it dynamically alters its color based on whether the dice is currently rolling:
+</p>
+
+<pre swift>
+private var resultCardSection: some View {
+    VStack(spacing: 2) {
+        Text("CURRENT \(actionWord.uppercased())")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .foregroundColor(.secondary)
+            .tracking(1.5)
+        
+        Text("\(result)")
+            .font(.system(size: verticalSizeClass == .compact ? 44 : 84, weight: .bold, design: .rounded))
+            
+            // 🎨 THE DYNAMIC COLOR TWEAK:
+            // If rolling, make it gray (secondary style). If settled, make it black/primary.
+            .foregroundStyle(isRolling ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, verticalSizeClass == .compact ? 10 : 24)
+    .background(
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .fill(Color(.secondarySystemGroupedBackground))
+    )
+    .padding(.horizontal, verticalSizeClass == .compact ? 0 : 24)
+}
+</pre>
+
+<div id="Rolling Number Illusion-ANSWER-📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)"><h3 id="📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)" class="header"><a href="#Rolling Number Illusion-ANSWER-📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)">📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)</a></h3></div>
+
+<p>
+Because your app looks like it supports both Light Mode and Dark Mode beautifully (using your custom <code>.midnight</code> and <code>.aurora</code> gradients), using <code>.secondary</code> and <code>.primary</code> as shown above is the cleanest approach. It means:
+</p>
+
+<ul>
+<li>
+<span id="Rolling Number Illusion-ANSWER-📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)-While Rolling"></span><strong id="While Rolling">While Rolling</strong>: It turns a muted slate gray in light mode, and a soft silver gray in dark mode.
+
+<li>
+<span id="Rolling Number Illusion-ANSWER-📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)-On Settle"></span><strong id="On Settle">On Settle</strong>: It snaps to crisp black in light mode, and brilliant white in dark mode.
+
+</ul>
+<div id="Rolling Number Illusion-ANSWER-📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)-✨ Want to make it pop even more? Add an animation scale!"><h4 id="✨ Want to make it pop even more? Add an animation scale!" class="header"><a href="#Rolling Number Illusion-ANSWER-📝 Multi-Color &amp; Dynamic Gradients Variant (Bonus Note)-✨ Want to make it pop even more? Add an animation scale!">✨ Want to make it pop even more? Add an animation scale!</a></h4></div>
+
+<p>
+If you want that final black/white number to literally "pop" forward when it settles, you can attach a scale effect to that same text object that responds to the roll finishing:
+</p>
+
+<pre swift>
+Text("\(result)")
+    .font(.system(size: verticalSizeClass == .compact ? 44 : 84, weight: .bold, design: .rounded))
+    .foregroundStyle(isRolling ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+    // 💥 Pop effect: shrinks slightly while rattling, scales to full 1.0 when it hits home
+    .scaleEffect(isRolling ? 0.9 : 1.0) 
+    .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isRolling)
+</pre>
 
 <p>
 <hr>
