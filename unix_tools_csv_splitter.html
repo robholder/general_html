@@ -97,12 +97,12 @@ def split_csv_by_month(input_file, output_dir):
                     file_name = f"Statement_{date_obj.year}_{date_obj.month:02d}.csv"
                     file_path = os.path.join(output_dir, file_name)
                     
-                    # Open the new file
                     outfile = open(file_path, mode='w', newline='', encoding='utf-8')
-                    writer = csv.DictWriter(outfile, fieldnames=headers)
+                    
+                    # ADDED extrasaction='ignore' HERE to bypass Chase's trailing columns safely
+                    writer = csv.DictWriter(outfile, fieldnames=headers, extrasaction='ignore')
                     writer.writeheader()  # Re-instate headings
                     
-                    # Store the file handle and writer so we can keep using them
                     monthly_writers[year_month_key] = (outfile, writer)
                 
                 # 4. Write the row to the appropriate monthly file
@@ -226,7 +226,9 @@ def split_csv_by_month(input_file, output_dir):
                     file_path = os.path.join(output_dir, file_name)
                     
                     outfile = open(file_path, mode='w', newline='', encoding='utf-8')
-                    writer = csv.DictWriter(outfile, fieldnames=headers)
+                    
+                    # ADDED extrasaction='ignore' HERE to bypass Chase's trailing columns safely
+                    writer = csv.DictWriter(outfile, fieldnames=headers, extrasaction='ignore')
                     writer.writeheader()  # Re-instate headings
                     
                     monthly_writers[year_month_key] = (outfile, writer)
@@ -303,7 +305,201 @@ Because we used <code>argparse</code>, Python automatically built a help menu fo
 python split_bank_csv.py --help
 </pre>
 
+<div id="Quick Action Version"><h1 id="Quick Action Version" class="header"><a href="#Quick Action Version">Quick Action Version</a></h1></div>
 
+<div id="Quick Action Version-QUESTION"><h2 id="QUESTION" class="header"><a href="#Quick Action Version-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Can we incorporate the whole script into the Automator script (so there are no dependencies)?
+</p>
+
+<div id="Quick Action Version-ANSWER"><h2 id="ANSWER" class="header"><a href="#Quick Action Version-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, absolutely. Embedding the Python code directly into Automator is much cleaner because it makes the Quick Action entirely self-contained. You can move or share the Quick Action without worrying about breaking a file path.
+</p>
+
+<p>
+Here is how to embed the entire script directly into Automator:
+</p>
+
+<div id="Quick Action Version-ANSWER-Step 1: Configure Automator"><h3 id="Step 1: Configure Automator" class="header"><a href="#Quick Action Version-ANSWER-Step 1: Configure Automator">Step 1: Configure Automator</a></h3></div>
+
+<ul>
+<li>
+Create a new Quick Action in Automator.
+
+<li>
+Ensure the top settings are still set to:
+
+<ul>
+<li>
+Workflow receives current: files or folders
+
+<li>
+in: Finder.app
+
+</ul>
+<li>
+In the left-hand library search bar, type "Run Shell Script" and drag that action into the main workflow area on the right. ("Run Shell Script" is under 'Utilities'.) 
+
+<li>
+In your Run Shell Script action, change the Shell dropdown from <code>/bin/bash</code> (or <code>/bin/zsh</code>) to <code>/usr/bin/python3</code>.
+
+<li>
+Ensure Pass input is set to as arguments.
+
+</ul>
+<div id="Quick Action Version-ANSWER-Step 2: Paste the Self-Contained Code"><h3 id="Step 2: Paste the Self-Contained Code" class="header"><a href="#Quick Action Version-ANSWER-Step 2: Paste the Self-Contained Code">Step 2: Paste the Self-Contained Code</a></h3></div>
+
+<p>
+Clear out any text currently in the box and paste the following code block. This version is specifically adapted to read the file paths directly from macOS's system arguments array (<code>sys.argv</code>):
+</p>
+
+<pre python>
+import csv
+from datetime import datetime
+import os
+import sys
+
+def split_csv_by_month(input_file):
+    # Dynamically find the directory where the source file lives
+    source_dir = os.path.dirname(os.path.abspath(input_file))
+    output_dir = os.path.join(source_dir, 'monthly_statements')
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    monthly_writers = {}
+
+    try:
+        with open(input_file, mode='r', newline='', encoding='utf-8') as infile:
+            reader = csv.DictReader(infile)
+            headers = reader.fieldnames
+            
+            if not headers:
+                return
+
+            for row in reader:
+                date_str = row.get('Posting Date')
+                if not date_str:
+                    continue
+                
+                try:
+                    date_obj = datetime.strptime(date_str.strip(), '%m/%d/%Y')
+                except ValueError:
+                    try:
+                        date_obj = datetime.strptime(date_str.strip(), '%Y-%m-%d')
+                    except ValueError:
+                        continue
+
+                year_month_key = (date_obj.year, date_obj.month)
+
+                if year_month_key not in monthly_writers:
+                    file_name = f"Statement_{date_obj.year}_{date_obj.month:02d}.csv"
+                    file_path = os.path.join(output_dir, file_name)
+                    
+                    outfile = open(file_path, mode='w', newline='', encoding='utf-8')
+                    writer = csv.DictWriter(outfile, fieldnames=headers, extrasaction='ignore')
+                    writer.writeheader()
+                    
+                    monthly_writers[year_month_key] = (outfile, writer)
+                
+                _, writer = monthly_writers[year_month_key]
+                writer.writerow(row)
+
+    finally:
+        for outfile, _ in monthly_writers.values():
+            outfile.close()
+
+if __name__ == "__main__":
+    # sys.argv[1:] captures all files passed by Finder when you right-click
+    for file_path in sys.argv[1:]:
+        # Basic safety check to ensure we are only processing CSV files
+        if file_path.lower().endswith('.csv'):
+            split_csv_by_month(file_path)
+</pre>
+
+<div id="Quick Action Version-ANSWER-Step 3: Save and Run"><h3 id="Step 3: Save and Run" class="header"><a href="#Quick Action Version-ANSWER-Step 3: Save and Run">Step 3: Save and Run</a></h3></div>
+
+<ul>
+<li>
+Press <code>Cmd + S</code> to save the workflow.
+
+<li>
+Name it something like <code>Split Bank CSV by Month</code>.
+
+</ul>
+<p>
+Now, the entire Python engine lives right inside the workflow file (<code>~/Library/Services/Split Bank CSV by Month.workflow)</code>. You can delete the old standalone <code>.py</code> file from your computer entirely - this Quick Action is now fully independent and portable!
+</p>
+
+<div id="Quick Action Version-QUESTION"><h2 id="QUESTION" class="header"><a href="#Quick Action Version-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Where can I find the Automator scripts? (I'm curious if these can be transferred or shared with other account/machines.)
+</p>
+
+<div id="Quick Action Version-ANSWER"><h2 id="ANSWER" class="header"><a href="#Quick Action Version-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You can absolutely transfer and share these scripts with other accounts or machines! Because we eliminated external script dependencies and packed the whole Python code inside the Quick Action, sharing it is incredibly easy.
+</p>
+
+<div id="Quick Action Version-ANSWER-Where Quick Actions Are Located"><h3 id="Where Quick Actions Are Located" class="header"><a href="#Quick Action Version-ANSWER-Where Quick Actions Are Located">Where Quick Actions Are Located</a></h3></div>
+
+<p>
+Every custom Quick Action you create is saved as a packaged bundle with a <code>.workflow</code> extension. They live in a hidden folder inside your user directory:
+</p>
+
+<pre bash>
+~/Library/Services/
+</pre>
+
+<div id="Quick Action Version-ANSWER-How to find it quickly in Finder:"><h3 id="How to find it quickly in Finder:" class="header"><a href="#Quick Action Version-ANSWER-How to find it quickly in Finder:">How to find it quickly in Finder:</a></h3></div>
+
+<ul>
+<li>
+Open a Finder window.
+
+<li>
+In the top macOS menu bar, click Go &gt; Go to Folder... (or press <code>Cmd + Shift + G</code>).
+
+<li>
+Type or paste exactly this: <code>~/Library/Services</code> and press Enter.
+
+</ul>
+<p>
+Inside that folder, you will see a file named exactly what you named your action (e.g., <code>Split Bank CSV by Month.workflow</code>).
+</p>
+
+<div id="Quick Action Version-ANSWER-How to Share or Move It"><h3 id="How to Share or Move It" class="header"><a href="#Quick Action Version-ANSWER-How to Share or Move It">How to Share or Move It</a></h3></div>
+
+<p>
+To transfer the Quick Action to another user account or an entirely separate Mac, follow these steps:
+</p>
+
+<div id="Quick Action Version-ANSWER-How to Share or Move It-1. Copy the File"><h4 id="1. Copy the File" class="header"><a href="#Quick Action Version-ANSWER-How to Share or Move It-1. Copy the File">1. Copy the File</a></h4></div>
+
+<p>
+Grab the <code>.workflow</code> file from your <code>~/Library/Services</code> folder and share it however you like (via AirDrop, email, USB drive, Slack, etc.).
+</p>
+
+<div id="Quick Action Version-ANSWER-How to Share or Move It-2. Install on the Destination Mac"><h4 id="2. Install on the Destination Mac" class="header"><a href="#Quick Action Version-ANSWER-How to Share or Move It-2. Install on the Destination Mac">2. Install on the Destination Mac</a></h4></div>
+
+<p>
+On the target Mac or account, simply double-click the <code>.workflow</code> file. macOS will recognize it as an Automator package and show a prompt asking: "Do you want to install this Quick Action?"
+</p>
+
+<p>
+Click Install, and macOS will automatically move it into that specific user's <code>~/Library/Services folder</code>.
+</p>
+
+<div id="Quick Action Version-ANSWER-How to Share or Move It-3. Ready to Use"><h4 id="3. Ready to Use" class="header"><a href="#Quick Action Version-ANSWER-How to Share or Move It-3. Ready to Use">3. Ready to Use</a></h4></div>
+
+<p>
+The new machine will instantly have the right-click menu functionality. Because it uses <code>/usr/bin/python3</code> (built straight into macOS) and handles any standard CSV formatting automatically, it will work right out of the box without requiring any environment setup!
+</p>
 
 <p>
 <a href="unix_tools_index.html">Unix Tools</a>
