@@ -2404,9 +2404,66 @@ Add the <code>.onDisappear</code> block right at the bottom of the main structur
 Cascading State Cleanup: Because you already have a defensive <code>.onChange(of: customEditMode)</code> routine watching your state, changing <code>customEditMode = .inactive</code> inside <code>.onDisappear</code> triggers a clean domino effect. It instantly zeroes out the <code>selectedRollIDs</code> set, ensuring no ghost selections are left lurking in memory when the user returns to the tab!
 
 </ul>
-<div id="Exit Edit Mode-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Exit Edit Mode-ANSWER-In Context">In Context</a></h3></div>
+<div id="Saving Selected Die"><h1 id="Saving Selected Die" class="header"><a href="#Saving Selected Die">Saving Selected Die</a></h1></div>
 
-<div id="Exit Edit Mode-ANSWER-In Context-DiceRollApp.swift"><h4 id="DiceRollApp.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-DiceRollApp.swift">DiceRollApp.swift</a></h4></div>
+<div id="Saving Selected Die-QUESTION"><h2 id="QUESTION" class="header"><a href="#Saving Selected Die-QUESTION">QUESTION</a></h2></div>
+
+<p>
+As the app stands, the app always opens up with a 6 sided dice when opened after quitting. Is it possible to store the selected dice so that it keeps the last dice regardless of when it's quit or opened?
+</p>
+
+<div id="Saving Selected Die-ANSWER"><h2 id="ANSWER" class="header"><a href="#Saving Selected Die-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, absolutely! To make the app remember the last selected die across app launches and completely closed quits, you want to use Apple's native <code>@AppStorage</code> property wrapper.
+</p>
+
+<p>
+<code>@AppStorage</code> is a specialized SwiftUI wrapper around <code>UserDefaults</code>. It reads and writes values directly to the device’s permanent lightweight storage. Best of all, it acts exactly like a regular <code>@State</code> variable—meaning the moment you change its value, your layout instantly updates!
+</p>
+
+<div id="Saving Selected Die-ANSWER-🛠️ The Update for ContentView.swift"><h3 id="🛠️ The Update for ContentView.swift" class="header"><a href="#Saving Selected Die-ANSWER-🛠️ The Update for ContentView.swift">🛠️ The Update for ContentView.swift</a></h3></div>
+
+<p>
+Open your <code>ContentView.swift</code> file and locate your current sides property:
+</p>
+
+<pre swift>
+@State private var sides = 6
+</pre>
+
+<p>
+Swap that line out for the modern <code>@AppStorage</code> equivalent. You don't need to change any other code in your file; everything else will adapt seamlessly:
+</p>
+
+<pre swift>
+// 💾 SWAP STATE FOR APPSTORAGE:
+// "selectedDiceSides" is the unique database key string saved to the phone's disk.
+// If the phone has never run the app before, it defaults safely to 6.
+@AppStorage("selectedDiceSides") private var sides: Int = 6
+</pre>
+
+<div id="Saving Selected Die-ANSWER-📝 AppStorage Key Reference for your Notes"><h3 id="📝 AppStorage Key Reference for your Notes" class="header"><a href="#Saving Selected Die-ANSWER-📝 AppStorage Key Reference for your Notes">📝 AppStorage Key Reference for your Notes</a></h3></div>
+
+<ul>
+<li>
+<span id="Saving Selected Die-ANSWER-📝 AppStorage Key Reference for your Notes-Automatic Persistence"></span><strong id="Automatic Persistence">Automatic Persistence</strong>: Every time your user changes the dice type via your context menu (<code>.contextMenu { Picker(...) }</code>), <code>@AppStorage</code> intercepts that change behind the scenes and flashes the new number onto the device's hard disk instantly.
+
+<li>
+<span id="Saving Selected Die-ANSWER-📝 AppStorage Key Reference for your Notes-Launch Retrieval"></span><strong id="Launch Retrieval">Launch Retrieval</strong>: When the app is force-quit and relaunched, iOS looks up the <code>"selectedDiceSides"</code> key name before rendering the screen, pulling up <code>20</code>, <code>12</code>, or whatever was last selected, instead of resetting blindly to <code>6</code>.
+
+<li>
+<span id="Saving Selected Die-ANSWER-📝 AppStorage Key Reference for your Notes-Supported Types"></span><strong id="Supported Types">Supported Types</strong>: <code>@AppStorage</code> works natively with lightweight data types like <code>Int</code>, <code>Double</code>, <code>String</code>, <code>Bool</code>, and <code>URL</code>. It's perfect for layout preferences, settings toggles, or default selections like this!
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+<div id="Saving Selected Die-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Saving Selected Die-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Saving Selected Die-ANSWER-In Context-DiceRollApp.swift"><h4 id="DiceRollApp.swift" class="header"><a href="#Saving Selected Die-ANSWER-In Context-DiceRollApp.swift">DiceRollApp.swift</a></h4></div>
 
 <pre swift>
 import SwiftData
@@ -2425,7 +2482,7 @@ struct DiceRollApp: App {
 }
 </pre>
 
-<div id="Exit Edit Mode-ANSWER-In Context-DiceRoll.swift"><h4 id="DiceRoll.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-DiceRoll.swift">DiceRoll.swift</a></h4></div>
+<div id="Saving Selected Die-ANSWER-In Context-DiceRoll.swift"><h4 id="DiceRoll.swift" class="header"><a href="#Saving Selected Die-ANSWER-In Context-DiceRoll.swift">DiceRoll.swift</a></h4></div>
 
 <pre swift>
 import Foundation
@@ -2446,7 +2503,7 @@ final class DiceRoll {
 }
 </pre>
 
-<div id="Exit Edit Mode-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+<div id="Saving Selected Die-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Saving Selected Die-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
 
 <pre swift>
 import SwiftData
@@ -2467,7 +2524,7 @@ struct ContentView: View {
     @Environment(\.colorScheme) var currentScheme
     @Environment(\.verticalSizeClass) var verticalSizeClass
     
-    @State private var sides = 6
+    @AppStorage("selectedDiceSides") private var sides: Int = 6
     @State private var result = 1
     
     @State private var isRolling = false // Disables the button during the animation
@@ -2688,7 +2745,7 @@ struct ContentView: View {
 }
 </pre>
 
-<div id="Exit Edit Mode-ANSWER-In Context-RollHistoryView.swift"><h4 id="RollHistoryView.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-RollHistoryView.swift">RollHistoryView.swift</a></h4></div>
+<div id="Saving Selected Die-ANSWER-In Context-RollHistoryView.swift"><h4 id="RollHistoryView.swift" class="header"><a href="#Saving Selected Die-ANSWER-In Context-RollHistoryView.swift">RollHistoryView.swift</a></h4></div>
 
 <pre swift>
 import SwiftUI
@@ -2797,7 +2854,7 @@ struct RollHistoryView: View {
 }
 </pre>
 
-<div id="Exit Edit Mode-ANSWER-In Context-MainTabView.swift"><h4 id="MainTabView.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-MainTabView.swift">MainTabView.swift</a></h4></div>
+<div id="Saving Selected Die-ANSWER-In Context-MainTabView.swift"><h4 id="MainTabView.swift" class="header"><a href="#Saving Selected Die-ANSWER-In Context-MainTabView.swift">MainTabView.swift</a></h4></div>
 
 <pre swift>
 import SwiftData
