@@ -2334,6 +2334,76 @@ struct DynamicHistoryView: View {
 <code>Set</code> Operations: A <code>Set</code> is preferred over an <code>Array</code> for selections because checking if an element exists (<code>.contains</code>) or clearing items takes constant (O(1)) time, keeping the UI stutter-free even on large lists.
 
 </ul>
+<div id="Exit Edit Mode"><h1 id="Exit Edit Mode" class="header"><a href="#Exit Edit Mode">Exit Edit Mode</a></h1></div>
+
+<div id="Exit Edit Mode-QUESTION"><h2 id="QUESTION" class="header"><a href="#Exit Edit Mode-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I have one more request for the RollHistoryView: Can we have the edit mode exit when we go to another view via the tabs? Right now, the RollHistoryView remains in edit mode even when the user navigates away from the view.
+</p>
+
+<div id="Exit Edit Mode-ANSWER"><h2 id="ANSWER" class="header"><a href="#Exit Edit Mode-ANSWER">ANSWER</a></h2></div>
+
+<p>
+That is a very thoughtful UX detail! When a user taps away to another tab, they expect the app to reset its temporary states so they return to a clean, non-destructive screen later on.
+</p>
+
+<p>
+To make this happen, we need to let <code>RollHistoryView</code> know when it disappears from the screen. SwiftUI gives us the perfect tool for this: the <code>.onDisappear</code> modifier.
+</p>
+
+<p>
+By adding this modifier to the outer navigation container inside <code>RollHistoryView</code>, you can automatically reset your edit mode state to <code>.inactive</code> the exact millisecond the user taps the "Roll" tab.
+</p>
+
+<div id="Exit Edit Mode-ANSWER-🛠️ The Update for RollHistoryView.swift"><h3 id="🛠️ The Update for RollHistoryView.swift" class="header"><a href="#Exit Edit Mode-ANSWER-🛠️ The Update for RollHistoryView.swift">🛠️ The Update for RollHistoryView.swift</a></h3></div>
+
+<p>
+Add the <code>.onDisappear</code> block right at the bottom of the main structural stack in your view. It should sit right alongside your <code>.onChange</code> modifiers:
+</p>
+
+<pre swift>
+    var body: some View {
+        NavigationStack {
+            List(selection: $selectedRollIDs) {
+                ForEach(rolls) { roll in
+                    // ... row layout ...
+                }
+                .onDelete(perform: deleteRolls)
+            }
+            .navigationTitle("History")
+            .environment(\.editMode, $customEditMode)
+            .toolbar {
+                // ... toolbars ...
+            }
+            .onChange(of: rolls.count) {
+                enforceHistoryLimit()
+            }
+            .onChange(of: customEditMode) { _, newValue in
+                if !newValue.isEditing {
+                    selectedRollIDs.removeAll()
+                }
+            }
+            // 🔄 THE FIX: Reset the edit mode whenever this tab is switched away!
+            .onDisappear {
+                customEditMode = .inactive
+                // Note: Our .onChange(of: customEditMode) block above will 
+                // automatically catch this change and clear selectedRollIDs for us!
+            }
+        }
+    }
+</pre>
+
+<div id="Exit Edit Mode-ANSWER-📝 Lifecycle Notes for Your Reference Sheet"><h3 id="📝 Lifecycle Notes for Your Reference Sheet" class="header"><a href="#Exit Edit Mode-ANSWER-📝 Lifecycle Notes for Your Reference Sheet">📝 Lifecycle Notes for Your Reference Sheet</a></h3></div>
+
+<ul>
+<li>
+<code>.onDisappear { ... }</code>: This closure executes automatically whenever a view moves out of the active rendering tree. In a standard <code>TabView</code> setup, switching tabs triggers <code>.onDisappear</code> on the departing view and <code>.onAppear</code> on the arriving view.
+
+<li>
+Cascading State Cleanup: Because you already have a defensive <code>.onChange(of: customEditMode)</code> routine watching your state, changing <code>customEditMode = .inactive</code> inside <code>.onDisappear</code> triggers a clean domino effect. It instantly zeroes out the <code>selectedRollIDs</code> set, ensuring no ghost selections are left lurking in memory when the user returns to the tab!
+
+</ul>
 <p>
 <hr>
 <br>
