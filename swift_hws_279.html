@@ -1963,6 +1963,67 @@ private var actionButtonSection: some View {
 }
 </pre>
 
+<p>
+Updated struct:
+</p>
+
+<pre swift>
+    private var actionButtonSection: some View {
+        Button {
+            guard !isRolling else { return }
+            isRolling = true
+            timerTicksRemaining = 15
+            
+            rollTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { timer in
+                if timerTicksRemaining &gt; 0 {
+                    result = Int.random(in: 1...sides)
+                    timerTicksRemaining -= 1
+                    hapticState = .rattling(timerTicksRemaining)
+                } else {
+                    timer.invalidate()
+                    rollTimer = nil
+                    
+                    let finalResult = Int.random(in: 1...sides)
+                    result = finalResult
+                    
+                    let newRoll = DiceRoll(result: finalResult, sides: sides)
+                    modelContext.insert(newRoll)
+                    
+                    hapticState = .settled
+                    isRolling = false
+                }
+            }
+            
+        } label: {
+            // --- ONE UNIFIED LABEL BLOCK ---
+            Text(isRolling ? "Rolling..." : "\(actionWord) \(objectWord)")
+                .font(.title3)
+                .fontWeight(.bold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, verticalSizeClass == .compact ? 10 : 10)
+        }
+        // --- ONE UNIFIED MODIFIER BLOCK ---
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(isRolling)
+        .padding(.horizontal, verticalSizeClass == .compact ? 0 : 24)
+        .padding(.bottom, verticalSizeClass == .compact ? 5 : 30)
+        
+        // 🎲 MODERN ADVANCED HAPTIC TIMELINE:
+        .sensoryFeedback(trigger: hapticState) { oldValue, newValue in
+            switch newValue {
+            case .rattling:
+                return .impact(weight: .light, intensity: 0.6)
+            case .settled:
+                return .impact(weight: .heavy)
+            case .idle:
+                return nil
+            }
+        }
+    }
+}
+</pre>
+
 <div id="Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:"><h3 id="📝 Why this is structurally superior for your notes:" class="header"><a href="#Rolling Number Illusion-ANSWER-📝 Why this is structurally superior for your notes:">📝 Why this is structurally superior for your notes:</a></h3></div>
 
 <p>
