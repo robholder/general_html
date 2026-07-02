@@ -2175,6 +2175,148 @@ Text("\(result)")
     .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isRolling)
 </pre>
 
+<div id="Select All Button"><h1 id="Select All Button" class="header"><a href="#Select All Button">Select All Button</a></h1></div>
+
+<div id="Select All Button-QUESTION"><h2 id="QUESTION" class="header"><a href="#Select All Button-QUESTION">QUESTION</a></h2></div>
+
+<p>
+For the <code>RollHistoryView</code>, is it possible to have a 'Select All' button appear when the 'Edit' button is pressed? (In that way, in addition to selecting items to delete, all items can be selected to delete.)
+</p>
+
+<div id="Select All Button-ANSWER"><h2 id="ANSWER" class="header"><a href="#Select All Button-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, that is absolutely possible! It is a great quality-of-life feature for users who want to purge their entire roll history with a single tap instead of clicking 50 circles individually.
+</p>
+
+<p>
+To do this, we can take advantage of SwiftUI's <code>editMode</code> environment variable. This allows <code>RollHistoryView</code> to actively spy on the native <code>EditButton()</code>. When it sees the environment shift into <code>.active</code>, we can conditionally show a "Select All" button in our toolbar.
+</p>
+
+<p>
+Here is how to update your <code>RollHistoryView.swift</code> to add the "Select All" functionality.
+</p>
+
+<div id="Select All Button-🛠️ Updated RollHistoryView"><h2 id="🛠️ Updated RollHistoryView" class="header"><a href="#Select All Button-🛠️ Updated RollHistoryView">🛠️ Updated RollHistoryView</a></h2></div>
+
+<p>
+We will grab the built-in <code>\.editMode</code> from the environment and add a button that dumps every single roll ID into your <code>selectedRollIDs</code> set at once.
+</p>
+
+<pre swift>
+struct RollHistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \DiceRoll.timestamp, order: .reverse) private var rolls: [DiceRoll]
+    
+    // 1. Read the system edit mode state to know when the user presses "Edit"
+    @Environment(\.editMode) private var editMode
+    
+    @State private var selectedRollIDs = Set&lt;PersistentIdentifier&gt;()
+    
+    var body: some View {
+        NavigationStack {
+            List(selection: $selectedRollIDs) {
+                ForEach(rolls) { roll in
+                    HStack {
+                        Text("Rolled a d\(roll.sides)")
+                        Spacer()
+                        Text("\(roll.result)")
+                            .font(.headline)
+                    }
+                }
+                .onDelete(perform: deleteRolls)
+            }
+            .navigationTitle("History")
+            .toolbar {
+                // --- LEFT SIDE TOOLBAR ---
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 16) {
+                        // 2. Trash icon appears when items are selected
+                        if !selectedRollIDs.isEmpty {
+                            Button(role: .destructive, action: deleteSelectedRolls) {
+                                Label("Delete Selected", systemImage: "trash")
+                            }
+                        }
+                        
+                        // 3. "Select All" appears ONLY when Edit Mode is active and list isn't empty
+                        if editMode?.wrappedValue.isEditing == true &amp;&amp; !rolls.isEmpty {
+                            Button(action: selectAllRolls) {
+                                Text(selectedRollIDs.count == rolls.count ? "Deselect All" : "Select All")
+                            }
+                        }
+                    }
+                }
+                
+                // --- RIGHT SIDE TOOLBAR ---
+                ToolbarItem(placement: .topBarTrailing) {
+                    EditButton()
+                }
+            }
+            .onChange(of: rolls.count) {
+                enforceHistoryLimit()
+            }
+            // 4. Clean up selections automatically if the user presses "Done" to exit edit mode
+            .onChange(of: editMode?.wrappedValue) { _, newValue in
+                if newValue?.isEditing == false {
+                    selectedRollIDs.removeAll()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Core Database Functions
+    
+    /// Toggles between selecting every item in the database or clearing the selection
+    private func selectAllRolls() {
+        if selectedRollIDs.count == rolls.count {
+            // If everything is already selected, clear it out (Deselect All)
+            selectedRollIDs.removeAll()
+        } else {
+            // Otherwise, map all current roll database IDs into our selection basket
+            let allIDs = rolls.map { $0.id }
+            selectedRollIDs = Set(allIDs)
+        }
+    }
+    
+    private func deleteSelectedRolls() {
+        for roll in rolls {
+            if selectedRollIDs.contains(roll.id) {
+                modelContext.delete(roll)
+            }
+        }
+        selectedRollIDs.removeAll()
+    }
+    
+    private func enforceHistoryLimit() {
+        if rolls.count &gt; 50 {
+            let excessRolls = rolls.suffix(from: 50)
+            for oldRoll in excessRolls {
+                modelContext.delete(oldRoll)
+            }
+        }
+    }
+    
+    private func deleteRolls(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(rolls[index])
+        }
+    }
+}
+</pre>
+
+<div id="Select All Button-🛠️ Updated RollHistoryView-📝 Key Details for Your Reference Sheets"><h3 id="📝 Key Details for Your Reference Sheets" class="header"><a href="#Select All Button-🛠️ Updated RollHistoryView-📝 Key Details for Your Reference Sheets">📝 Key Details for Your Reference Sheets</a></h3></div>
+
+<ul>
+<li>
+<code>@Environment(\.editMode)</code>: This reads a binding managed by SwiftUI. It contains an enum that is either <code>.inactive</code> or <code>.active</code>.
+
+<li>
+<code>editMode?.wrappedValue.isEditing</code>: This is a convenient Boolean helper property provided by Apple that returns <code>true</code> specifically when the interface shifts into its editing state.
+
+<li>
+Dynamic Button Text: Notice how the button reads <code>selectedRollIDs.count == rolls.count</code>. This makes the button context-aware. If the user hits "Select All", the button text instantly transforms into "Deselect All" to allow them to reverse their decision cleanly!
+
+</ul>
 <p>
 <hr>
 <br>
