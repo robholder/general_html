@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_csv_splitter</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Python - CSV Splitter"><h1 id="Python - CSV Splitter" class="header"><a href="#Python - CSV Splitter">Python - CSV Splitter</a></h1></div>
+
+<div id="Python - CSV Splitter-Splitting CSVs by Month"><h2 id="Splitting CSVs by Month" class="header"><a href="#Python - CSV Splitter-Splitting CSVs by Month">Splitting CSVs by Month</a></h2></div>
+
+<p>
+Here is a complete Python script to handle this for you. It uses Python's built-in <code>csv</code> and <code>datetime</code> modules, so you don't need to install any external libraries (like <code>pandas</code>).
+</p>
+
+<p>
+The script reads your master CSV file, looks at the Posting Date for each row, figures out the month and year, and automatically groups and saves them into individual monthly files with the original headers intact.
+</p>
+
+<div id="Python - CSV Splitter-The Python Script"><h2 id="The Python Script" class="header"><a href="#Python - CSV Splitter-The Python Script">The Python Script</a></h2></div>
+
+<pre python>
+import csv
+from datetime import datetime
+import os
+
+# --- CONFIGURATION ---
+# Replace 'master_bank_file.csv' with the actual path to your downloaded file
+INPUT_FILE = 'master_bank_file.csv'
+# The directory where you want the monthly files to be saved (current directory by default)
+OUTPUT_DIR = 'monthly_statements'
+# ---------------------
+
+def split_csv_by_month(input_file, output_dir):
+    # Create the output directory if it doesn't exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created directory: {output_dir}")
+
+    # Dictionary to hold file handles and csv.writer objects for each month
+    # Structure: {(year, month): (file_object, csv_writer_object)}
+    monthly_writers = {}
+
+    try:
+        with open(input_file, mode='r', newline='', encoding='utf-8') as infile:
+            # Use DictReader so we can access columns by their heading names
+            reader = csv.DictReader(infile)
+            headers = reader.fieldnames
+            
+            if not headers:
+                print("Error: The input CSV file is empty or missing headers.")
+                return
+
+            print("Processing rows...")
+            row_count = 0
+
+            for row in reader:
+                # 1. Extract the Posting Date
+                date_str = row.get('Posting Date')
+                if not date_str:
+                    continue  # Skip rows with missing dates
+                
+                # 2. Parse the date to extract year and month
+                # NOTE: Adjust the format '%m/%d/%Y' if your bank uses a different format 
+                # (e.g., '%Y-%m-%d' or '%d/%m/%Y')
+                try:
+                    # Trying standard MM/DD/YYYY first
+                    date_obj = datetime.strptime(date_str.strip(), '%m/%d/%Y')
+                except ValueError:
+                    try:
+                        # Fallback for YYYY-MM-DD just in case
+                        date_obj = datetime.strptime(date_str.strip(), '%Y-%m-%d')
+                    except ValueError:
+                        print(f"Skipping row due to unexpected date format: {date_str}")
+                        continue
+
+                year_month_key = (date_obj.year, date_obj.month)
+
+                # 3. If this is a new month, create a new file and write the headers
+                if year_month_key not in monthly_writers:
+                    file_name = f"Statement_{date_obj.year}_{date_obj.month:02d}.csv"
+                    file_path = os.path.join(output_dir, file_name)
+                    
+                    # Open the new file
+                    outfile = open(file_path, mode='w', newline='', encoding='utf-8')
+                    writer = csv.DictWriter(outfile, fieldnames=headers)
+                    writer.writeheader()  # Re-instate headings
+                    
+                    # Store the file handle and writer so we can keep using them
+                    monthly_writers[year_month_key] = (outfile, writer)
+                
+                # 4. Write the row to the appropriate monthly file
+                _, writer = monthly_writers[year_month_key]
+                writer.writerow(row)
+                row_count += 1
+
+            print(f"Success! Processed {row_count} rows into {len(monthly_writers)} monthly files.")
+
+    except FileNotFoundError:
+        print(f"Error: The file '{input_file}' was not found. Please check the path.")
+    finally:
+        # Clean up: Close all open output files safely
+        for outfile, _ in monthly_writers.values():
+            outfile.close()
+
+if __name__ == "__main__":
+    split_csv_by_month(INPUT_FILE, OUTPUT_DIR)
+</pre>
+
+<div id="Python - CSV Splitter-How to use it:"><h2 id="How to use it:" class="header"><a href="#Python - CSV Splitter-How to use it:">How to use it:</a></h2></div>
+
+<ul>
+<li>
+<span id="Python - CSV Splitter-How to use it:-Save the Script"></span><strong id="Save the Script">Save the Script</strong>: Copy the code above and save it as split_bank_csv.py.
+
+<li>
+<span id="Python - CSV Splitter-How to use it:-Place your CSV"></span><strong id="Place your CSV">Place your CSV</strong>: Put your large, multi-month bank CSV file in the same folder as the script, and make sure its filename matches the INPUT_FILE variable in the script (currently set to 'master_bank_file.csv').
+
+<li>
+<span id="Python - CSV Splitter-How to use it:-Run the Script"></span><strong id="Run the Script">Run the Script</strong>: Open your terminal or command prompt, navigate to the folder, and run:
+
+</ul>
+  
+<pre bash>
+python split_bank_csv.py
+</pre>
+  
+<ul>
+<li>
+<span id="Python - CSV Splitter-How to use it:-Check the Output"></span><strong id="Check the Output">Check the Output</strong>: A new folder called monthly_statements will appear, containing files named like Statement_2026_01.csv, Statement_2026_02.csv, etc., each complete with your original headings.
+
+</ul>
+<div id="Python - CSV Splitter-How to use it:-⚠️ One Quick Thing to Double-Check"><h3 id="⚠️ One Quick Thing to Double-Check" class="header"><a href="#Python - CSV Splitter-How to use it:-⚠️ One Quick Thing to Double-Check">⚠️ One Quick Thing to Double-Check</a></h3></div>
+
+<p>
+Banks format dates differently depending on where you live and who you bank with. In the script, I used the standard US format: <code>MM/DD/YYYY</code> (e.g., <code>05/23/2026</code>).
+</p>
+
+<p>
+If your bank formats dates differently—for instance, <code>DD/MM/YYYY</code> - you'll just need to tweak line 39 in the script:
+For <code>DD/MM/YYYY</code> (e.g., <code>23/05/2026</code>), change '%m/%d/%Y' to '%d/%m/%Y'.
+</p>
+
+<div id="Python - CSV Splitter-QUESTION"><h2 id="QUESTION" class="header"><a href="#Python - CSV Splitter-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Can you adjust this so the file name becomes an argument to supply to the scrip?
+</p>
+
+<div id="Python - CSV Splitter-ANSWER"><h2 id="ANSWER" class="header"><a href="#Python - CSV Splitter-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Here is the adjusted script. I've updated it to use Python's built-in <code>argparse</code> module.
+</p>
+
+<p>
+Now, instead of editing the code every time, you can pass the file name directly from your terminal or command prompt when you run it.
+</p>
+
+<div id="Python - CSV Splitter-ANSWER-The Updated Python Script"><h3 id="The Updated Python Script" class="header"><a href="#Python - CSV Splitter-ANSWER-The Updated Python Script">The Updated Python Script</a></h3></div>
+
+<pre python>
+import argparse
+import csv
+from datetime import datetime
+import os
+
+def split_csv_by_month(input_file, output_dir):
+    # Create the output directory if it doesn't exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created directory: {output_dir}")
+
+    # Dictionary to hold file handles and csv.writer objects for each month
+    monthly_writers = {}
+
+    try:
+        with open(input_file, mode='r', newline='', encoding='utf-8') as infile:
+            reader = csv.DictReader(infile)
+            headers = reader.fieldnames
+            
+            if not headers:
+                print("Error: The input CSV file is empty or missing headers.")
+                return
+
+            print(f"Processing '{input_file}'...")
+            row_count = 0
+
+            for row in reader:
+                # 1. Extract the Posting Date
+                date_str = row.get('Posting Date')
+                if not date_str:
+                    continue  # Skip rows with missing dates
+                
+                # 2. Parse the date to extract year and month
+                try:
+                    date_obj = datetime.strptime(date_str.strip(), '%m/%d/%Y')
+                except ValueError:
+                    try:
+                        date_obj = datetime.strptime(date_str.strip(), '%Y-%m-%d')
+                    except ValueError:
+                        print(f"Skipping row due to unexpected date format: {date_str}")
+                        continue
+
+                year_month_key = (date_obj.year, date_obj.month)
+
+                # 3. If this is a new month, create a new file and write the headers
+                if year_month_key not in monthly_writers:
+                    file_name = f"Statement_{date_obj.year}_{date_obj.month:02d}.csv"
+                    file_path = os.path.join(output_dir, file_name)
+                    
+                    outfile = open(file_path, mode='w', newline='', encoding='utf-8')
+                    writer = csv.DictWriter(outfile, fieldnames=headers)
+                    writer.writeheader()  # Re-instate headings
+                    
+                    monthly_writers[year_month_key] = (outfile, writer)
+                
+                # 4. Write the row to the appropriate monthly file
+                _, writer = monthly_writers[year_month_key]
+                writer.writerow(row)
+                row_count += 1
+
+            print(f"Success! Processed {row_count} rows into {len(monthly_writers)} monthly files.")
+
+    except FileNotFoundError:
+        print(f"Error: The file '{input_file}' was not found. Please check the path.")
+    finally:
+        # Clean up: Close all open output files safely
+        for outfile, _ in monthly_writers.values():
+            outfile.close()
+
+if __name__ == "__main__":
+    # Set up argument parsing
+    parser = argparse.ArgumentParser(
+        description="Split a multi-month bank CSV file into individual monthly files."
+    )
+    # This makes the filename a required positional argument
+    parser.add_argument(
+        'filename', 
+        help="The path to the bank CSV file you want to split."
+    )
+    # This adds an optional argument for the output directory, defaulting to 'monthly_statements'
+    parser.add_argument(
+        '-o', '--output', 
+        default='monthly_statements',
+        help="The directory to save the split files (default: 'monthly_statements')"
+    )
+    
+    args = parser.parse_args()
+
+    # Run the function with the arguments supplied by the user
+    split_csv_by_month(args.filename, args.output)
+</pre>
+
+<div id="Python - CSV Splitter-ANSWER-How to run it now:"><h3 id="How to run it now:" class="header"><a href="#Python - CSV Splitter-ANSWER-How to run it now:">How to run it now:</a></h3></div>
+
+<p>
+You can pass the filename directly after the script name.
+</p>
+
+<div id="Python - CSV Splitter-ANSWER-How to run it now:-Basic usage:"><h4 id="Basic usage:" class="header"><a href="#Python - CSV Splitter-ANSWER-How to run it now:-Basic usage:">Basic usage:</a></h4></div>
+
+<pre bash>
+python split_bank_csv.py my_bank_export.csv
+</pre>
+
+<p>
+If you want to save the output to a custom folder name:
+</p>
+<ul>
+<li>
+I also added an optional -o flag in case you want to change the target folder on the fly:
+
+</ul>
+  
+<pre bash>
+python split_bank_csv.py my_bank_export.csv -o Q1_Statements
+</pre>
+
+<div id="Python - CSV Splitter-ANSWER-How to run it now:-Need a reminder of how to use it?"><h4 id="Need a reminder of how to use it?" class="header"><a href="#Python - CSV Splitter-ANSWER-How to run it now:-Need a reminder of how to use it?">Need a reminder of how to use it?</a></h4></div>
+
+<p>
+Because we used <code>argparse</code>, Python automatically built a help menu for you. If you ever forget the syntax, just type:
+</p>
+
+<pre bash>
+python split_bank_csv.py --help
+</pre>
+
+
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
