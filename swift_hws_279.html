@@ -2404,6 +2404,429 @@ Add the <code>.onDisappear</code> block right at the bottom of the main structur
 Cascading State Cleanup: Because you already have a defensive <code>.onChange(of: customEditMode)</code> routine watching your state, changing <code>customEditMode = .inactive</code> inside <code>.onDisappear</code> triggers a clean domino effect. It instantly zeroes out the <code>selectedRollIDs</code> set, ensuring no ghost selections are left lurking in memory when the user returns to the tab!
 
 </ul>
+<div id="Exit Edit Mode-ANSWER-In Context"><h3 id="In Context" class="header"><a href="#Exit Edit Mode-ANSWER-In Context">In Context</a></h3></div>
+
+<div id="Exit Edit Mode-ANSWER-In Context-DiceRollApp.swift"><h4 id="DiceRollApp.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-DiceRollApp.swift">DiceRollApp.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+@main
+struct DiceRollApp: App {
+    var body: some Scene {
+        WindowGroup {
+            MainTabView()
+        }
+        // Tell SwiftData to prepare a database for saving DiceRoll objects
+        .modelContainer(for: DiceRoll.self)
+    }
+}
+</pre>
+
+<div id="Exit Edit Mode-ANSWER-In Context-DiceRoll.swift"><h4 id="DiceRoll.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-DiceRoll.swift">DiceRoll.swift</a></h4></div>
+
+<pre swift>
+import Foundation
+import SwiftData
+
+
+@Model
+final class DiceRoll {
+    var timestamp: Date
+    var result: Int
+    var sides: Int
+    
+    init(result: Int, sides: Int) {
+        self.timestamp = Date() // Automatically timestamps the roll
+        self.result = result
+        self.sides = sides
+    }
+}
+</pre>
+
+<div id="Exit Edit Mode-ANSWER-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+extension Color {
+    static let midnightTop = Color(red: 0.11, green: 0.14, blue: 0.20)
+    static let midnightBottom = Color(red: 0.07, green: 0.08, blue: 0.11)
+    
+    static let auroraTop = Color(red: 0.50, green: 0.55, blue: 0.75)
+    static let auroraBottom = Color(red: 0.70, green: 0.75, blue: 0.90)
+}
+
+struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    
+    @Environment(\.colorScheme) var currentScheme
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+    
+    @State private var sides = 6
+    @State private var result = 1
+    
+    @State private var isRolling = false // Disables the button during the animation
+    @State private var timerTicksRemaining = 0 // Countdown for number changes
+    @State private var rollTimer: Timer? = nil // Holds our active timer object
+    @State private var TimeInterval = 0.08
+    
+    // A clean tracking enum for our custom haptic timeline
+    enum RollHapticState: Equatable {
+        case idle
+        case rattling(Int) // Stores the ticks remaining so every tick is uniquely recognized
+        case settled
+    }
+    
+    @State private var hapticState: RollHapticState = .idle
+    
+    let diceOptions = [2, 4, 6, 8, 9, 12, 20]
+    
+    var diceImageName: String {
+        let formattedNumber = String(format: "%02d", sides)
+        return "dice_sides_\(formattedNumber)"
+    }
+    
+    var actionWord: String {
+        sides == 2 ? "Flip" : "Roll"
+    }
+    
+    var objectWord: String {
+        sides == 2 ? "Coin" : "\(sides)-Sided Die"
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: currentScheme == .dark
+                    ? [.midnightTop, .midnightBottom]
+                    : [.auroraTop, .auroraBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                // Adjust the overall vertical spacing of the whole VStack here:
+                VStack(spacing: verticalSizeClass == .compact ? 8 : 2) {
+                    
+                    // TITLE SECTION
+                    VStack(spacing: 2) {
+                        Text("DICE")
+                            .font(.system(size: verticalSizeClass == .compact ? 40 : 50, weight: .black, design: .rounded))
+                            .tracking(2)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.primary, .primary.opacity(0.6)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .shadow(color: currentScheme == .dark ? .black.opacity(0.3) : .clear, radius: 2, y: 2)
+                        
+                        Text("SIMULATOR")
+                            .font(.system(size: verticalSizeClass == .compact ? 20 : 20, weight: .bold))
+                            .tracking(3)
+                            .foregroundColor(.secondary)
+                    }
+                    // Snugs the text right up against the top edge of the safe area in landscape
+                    .padding(.top, verticalSizeClass == .compact ? 0 : 10)
+                    
+                    // ADAPTIVE CONTAINER SPLIT
+                    if verticalSizeClass == .compact {
+                        HStack(spacing: 32) {
+                            Spacer()
+                            diceImageSection
+                            
+                            VStack(spacing: 12) {
+                                resultCardSection
+                                actionButtonSection
+                            }
+                            .frame(maxWidth: 380)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                    } else {
+                        VStack(spacing: 10) {
+                            //Spacer()
+                            diceImageSection
+                            resultCardSection
+                            Spacer()
+                            actionButtonSection
+                            //Spacer()
+                            Spacer()
+                        }
+                    }
+                }
+                // --- THE FIXED SPACE MODIFIER ---
+                // Completely collapses the invisible navigation gap only when flipped sideways
+                .navigationBarHidden(verticalSizeClass == .compact)
+            }
+        }
+    }
+    
+    // Extracted parts stay exactly the same as your previous build
+    private var diceImageSection: some View {
+        VStack(spacing: 1) {
+            Image(diceImageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: verticalSizeClass == .compact ? 140 : 140,
+                       height: verticalSizeClass == .compact ? 140 : 200)
+                .foregroundColor(.primary)
+                .padding(verticalSizeClass == .compact ? 28 : 32)
+                .background(
+                    Circle()
+                        .fill(Color(
+                            //.secondarySystemGroupedBackground))
+                            .white))
+                        .shadow(color: .black.opacity(0.26), radius: 12, y: 6)
+                )
+                .contextMenu {
+                    Picker("Change Sides", selection: $sides) {
+                        ForEach(diceOptions, id: \.self) { option in
+                            Text("\(option) Sides")
+                        }
+                    }
+                }
+            
+            Text("Hold image to quick-change sides")
+                .font(.system(size: verticalSizeClass == .compact ? 15 : 15, weight: .bold))
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var resultCardSection: some View {
+        VStack(spacing: 2) {
+            Text("CURRENT \(actionWord.uppercased())")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+                .tracking(1.5)
+            
+            Text("\(result)")
+                .font(.system(size: verticalSizeClass == .compact ? 44 : 44, weight: .bold, design: .rounded))
+                // 🎨 THE DYNAMIC COLOR TWEAK:
+                // If rolling, make it gray (secondary style). If settled, make it black/primary.
+                .foregroundStyle(isRolling ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                // 💥 Pop effect: shrinks slightly while rattling, scales to full 1.0 when it hits home
+                .scaleEffect(isRolling ? 0.9 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isRolling)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, verticalSizeClass == .compact ? 10 : 24)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(currentScheme == .dark ? .darkGray: .secondarySystemGroupedBackground))
+        )
+        .padding(.horizontal, verticalSizeClass == .compact ? 0 : 24)
+    }
+    
+    private var actionButtonSection: some View {
+        Button {
+            guard !isRolling else { return }
+            isRolling = true
+            timerTicksRemaining = 10
+            
+            rollTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
+                if timerTicksRemaining &gt; 0 {
+                    result = Int.random(in: 1...sides)
+                    timerTicksRemaining -= 1
+                    hapticState = .rattling(timerTicksRemaining)
+                } else {
+                    timer.invalidate()
+                    rollTimer = nil
+                    
+                    let finalResult = Int.random(in: 1...sides)
+                    result = finalResult
+                    
+                    let newRoll = DiceRoll(result: finalResult, sides: sides)
+                    modelContext.insert(newRoll)
+                    
+                    hapticState = .settled
+                    isRolling = false
+                }
+            }
+            
+        } label: {
+            // --- ONE UNIFIED LABEL BLOCK ---
+            //Text(isRolling ? "Rolling..." : "\(actionWord) \(objectWord)")
+            Text("\(actionWord) \(objectWord)")
+                .font(.title3)
+                .fontWeight(.bold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, verticalSizeClass == .compact ? 10 : 10)
+        }
+        // --- ONE UNIFIED MODIFIER BLOCK ---
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(isRolling)
+        .padding(.horizontal, verticalSizeClass == .compact ? 0 : 24)
+        .padding(.bottom, verticalSizeClass == .compact ? 5 : 30)
+        
+        // 🎲 MODERN ADVANCED HAPTIC TIMELINE:
+        .sensoryFeedback(trigger: hapticState) { oldValue, newValue in
+            switch newValue {
+            case .rattling:
+                return .impact(weight: .light, intensity: 0.6)
+            case .settled:
+                return .impact(weight: .heavy)
+            case .idle:
+                return nil
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Exit Edit Mode-ANSWER-In Context-RollHistoryView.swift"><h4 id="RollHistoryView.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-RollHistoryView.swift">RollHistoryView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+struct RollHistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \DiceRoll.timestamp, order: .reverse) private var rolls: [DiceRoll]
+    
+    // 1. Core State Trackers
+    @State private var customEditMode: EditMode = .inactive
+    @State private var selectedRollIDs = Set&lt;PersistentIdentifier&gt;()
+    
+    var body: some View {
+        NavigationStack {
+            // 2. Pass the selection set binding directly to the List
+            List(selection: $selectedRollIDs) {
+                ForEach(rolls) { roll in
+                    HStack {
+                        Text("Rolled a d\(roll.sides)")
+                        Spacer()
+                        Text("\(roll.result)")
+                            .font(.headline)
+                    }
+                }
+                .onDelete(perform: deleteRollsBySwipe) // Keeps standard swipe-to-delete active
+            }
+            .navigationTitle("History")
+            
+            // 3. CRITICAL: Inject your local state down to the list view hierarchy
+            .environment(\.editMode, $customEditMode)
+            
+            .toolbar {
+                // --- LEFT SIDE: ACTIONS ---
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 16) {
+                        // Action A: Delete Selected Items Button
+                        if !selectedRollIDs.isEmpty {
+                            Button(role: .destructive, action: deleteSelectedRolls) {
+                                Label("Delete Selected", systemImage: "trash")
+                            }
+                        }
+                        
+                        // Action B: Context-Aware Select All Button
+                        if customEditMode.isEditing &amp;&amp; !rolls.isEmpty {
+                            Button(action: toggleSelectAll) {
+                                Text(selectedRollIDs.count == rolls.count ? "Deselect All" : "Select All")
+                            }
+                        }
+                    }
+                }
+                
+                // --- RIGHT SIDE: TOGGLE ---
+                ToolbarItem(placement: .topBarTrailing) {
+                    // Custom Edit/Done toggle with built-in animation
+                    Button(customEditMode.isEditing ? "Done" : "Edit") {
+                        withAnimation {
+                            customEditMode = customEditMode.isEditing ? .inactive : .active
+                        }
+                    }
+                }
+            }
+            // 4. Housekeeping: Auto-clear checkboxes if the user closes edit mode
+            .onChange(of: customEditMode) { _, newValue in
+                if !newValue.isEditing {
+                    selectedRollIDs.removeAll()
+                }
+            }
+            // 🔄 THE FIX: Reset the edit mode whenever this tab is switched away!
+            .onDisappear {
+                customEditMode = .inactive
+                // Note: Our .onChange(of: customEditMode) block above will
+                // automatically catch this change and clear selectedRollIDs for us!
+            }
+        }
+    }
+    
+    // MARK: - Logic Operations
+    
+    /// Mass-toggles the selection state of the entire list
+    private func toggleSelectAll() {
+        if selectedRollIDs.count == rolls.count {
+            selectedRollIDs.removeAll() // If everything is selected, clear everything
+        } else {
+            let allIDs = rolls.map { $0.id } // Otherwise, map all database IDs into the set
+            selectedRollIDs = Set(allIDs)
+        }
+    }
+    
+    /// Processes database deletion for all active selections
+    private func deleteSelectedRolls() {
+        for roll in rolls {
+            if selectedRollIDs.contains(roll.id) {
+                modelContext.delete(roll)
+            }
+        }
+        selectedRollIDs.removeAll() // Clear selection basket
+    }
+    
+    /// Fallback standard swipe-to-delete logic
+    private func deleteRollsBySwipe(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(rolls[index])
+        }
+    }
+}
+</pre>
+
+<div id="Exit Edit Mode-ANSWER-In Context-MainTabView.swift"><h4 id="MainTabView.swift" class="header"><a href="#Exit Edit Mode-ANSWER-In Context-MainTabView.swift">MainTabView.swift</a></h4></div>
+
+<pre swift>
+import SwiftData
+import SwiftUI
+
+
+struct MainTabView: View {
+    var body: some View {
+        TabView {
+            // --- TAB 1: DICE ROLLER ---
+            ContentView()
+                .tabItem {
+                    Label("Roll", systemImage: "dice.fill")
+                }
+            // --- TAB 2: HISTORY
+            RollHistoryView()
+                .tabItem {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }
+        }
+    }
+}
+
+#Preview {
+    MainTabView()
+        .modelContainer(for: DiceRoll.self, inMemory: true)
+}
+</pre>
+
 <p>
 <hr>
 <br>
