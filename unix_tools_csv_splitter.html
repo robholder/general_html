@@ -468,6 +468,71 @@ Name it something like <code>Split Bank CSV by Month</code>.
 Now, the entire Python engine lives right inside the workflow file (<code>~/Library/Services/Split Bank CSV by Month.workflow)</code>. You can delete the old standalone <code>.py</code> file from your computer entirely - this Quick Action is now fully independent and portable!
 </p>
 
+<div id="Quick Action Version - CSV Splitter-Demystifying the _ (Throwaway) Variable"><h2 id="Demystifying the _ (Throwaway) Variable" class="header"><a href="#Quick Action Version - CSV Splitter-Demystifying the _ (Throwaway) Variable">Demystifying the _ (Throwaway) Variable</a></h2></div>
+
+<p>
+Let's dissect those exact lines you highlighted:
+</p>
+
+<pre python>
+_, writer = monthly_writers[year_month_key]
+writer.writerow(row)
+</pre>
+
+<p>
+In Python, the underscore <code>_</code> is a conventional, widely recognized variable name that explicitly translates to: <em>"I am forced to unpack something here, but I don't care about this specific value, so throw it away."</em>
+</p>
+
+<div id="Quick Action Version - CSV Splitter-Demystifying the _ (Throwaway) Variable-Why do we use it here?"><h3 id="Why do we use it here?" class="header"><a href="#Quick Action Version - CSV Splitter-Demystifying the _ (Throwaway) Variable-Why do we use it here?">Why do we use it here?</a></h3></div>
+
+<p>
+When we initialized our month files earlier in the script (Line 66), we stored a tuple (a pair of items) inside our tracker dictionary for safekeeping:
+</p>
+
+<pre python>
+monthly_writers[year_month_key] = (outfile, writer)
+</pre>
+
+<ul>
+<li>
+Item 1: <code>outfile</code> (The actual, raw system file stream. We need this later to close the file).
+
+<li>
+Item 2: <code>writer</code> (The CSV tool used to write rows).
+
+</ul>
+<p>
+When it's time to actually append a transaction row to a file, we only need the <code>writer</code> object. If we wrote the line like this:
+</p>
+
+<pre sython>
+writer = monthly_writers[year_month_key]
+</pre>
+
+<p>
+<code>writer</code> would accidentally become the entire two-item tuple <code>(outfile, writer)</code>. Running <code>writer.writerow(row)</code> would then crash, because a tuple doesn't know how to write CSV rows.
+</p>
+
+<p>
+To extract just the tool we need, we use <span id="Quick Action Version - CSV Splitter-Demystifying the _ (Throwaway) Variable-Why do we use it here?-tuple unpacking"></span><strong id="tuple unpacking">tuple unpacking</strong>.
+</p>
+
+<p>
+If we wanted to capture everything, we'd write:
+</p>
+
+<pre python>
+outfile, writer = monthly_writers[year_month_key]
+</pre>
+
+<p>
+But because we don't need to do anything with the raw <code>outfile</code> until the very end of the script when closing it down, assigning it to a real variable name triggers code linter warnings about "unused variables."
+</p>
+
+<p>
+By using <code>_</code>, we tell Python (and anyone reading our code): _"Fetch the pair of items stored for this month. Put the first item (the file stream) into the garbage bin <em>, and give me the second item (the CSV writer tool) as writer."</em>
+</p>
+
 <div id="Quick Action Version - CSV Splitter-QUESTION"><h2 id="QUESTION" class="header"><a href="#Quick Action Version - CSV Splitter-QUESTION">QUESTION</a></h2></div>
 
 <p>
