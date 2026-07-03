@@ -363,59 +363,93 @@ import os
 import sys
 
 def split_csv_by_month(input_file):
-    # Dynamically find the directory where the source file lives
+    # 1. PATH SETUP &amp; DIRECTORY CREATION
+    # 'os.path.abspath' gets the full, absolute path of the file you right-clicked.
+    # 'os.path.dirname' strips away the filename, leaving just the folder path.
     source_dir = os.path.dirname(os.path.abspath(input_file))
+    
+    # Define where the output goes: a folder named 'monthly_statements' inside that same source folder.
     output_dir = os.path.join(source_dir, 'monthly_statements')
 
+    # If the 'monthly_statements' folder doesn't exist yet, create it automatically.
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # 2. FILE TRACKER TRACKING
+    # This dictionary acts as a rolling ledger of active file handles.
+    # It maps a specific (year, month) tuple to an active file object and a CSV writer object.
+    # Format: {(2026, 7): (file_object, writer_object)}
     monthly_writers = {}
 
     try:
+        # 3. READING THE MASTER FILE
+        # Open the bank file you right-clicked. 'newline=""' prevents double-spacing bugs on Windows/macOS.
         with open(input_file, mode='r', newline='', encoding='utf-8') as infile:
+            # DictReader treats the first row as headers. Every subsequent row becomes a dictionary
+            # where the column names are keys (e.g., row['Amount'] -&gt; '$45.00')
             reader = csv.DictReader(infile)
-            headers = reader.fieldnames
+            headers = reader.fieldnames # Capture the exact header names to reuse later
             
+            # If the CSV is empty or corrupted, stop immediately to avoid errors
             if not headers:
                 return
 
+            # 4. PROCESSING ROW BY ROW
             for row in reader:
+                # Look at the 'Posting Date' column for the current transaction row
                 date_str = row.get('Posting Date')
                 if not date_str:
-                    continue
+                    continue # If a row has no date (like an accidental blank line), skip it
                 
+                # 5. DATE PARSING &amp; SANITIZATION
+                # Convert the raw text string into a Python datetime object so we can read months/years.
                 try:
+                    # Attempt standard US format (MM/DD/YYYY)
                     date_obj = datetime.strptime(date_str.strip(), '%m/%d/%Y')
                 except ValueError:
                     try:
+                        # Fallback: Attempt ISO format (YYYY-MM-DD) if the bank switched layouts
                         date_obj = datetime.strptime(date_str.strip(), '%Y-%m-%d')
                     except ValueError:
-                        continue
+                        continue # If the date is completely unreadable, skip the row entirely
 
+                # Create a unique key combination for this specific transaction's month and year
                 year_month_key = (date_obj.year, date_obj.month)
 
+                # 6. DYNAMIC FILE CREATION
+                # If this is the first time we've encountered this specific month, create its file!
                 if year_month_key not in monthly_writers:
+                    # Construct a clean filename, ensuring the month is always 2 digits (e.g., '07' instead of '7')
                     file_name = f"Statement_{date_obj.year}_{date_obj.month:02d}.csv"
                     file_path = os.path.join(output_dir, file_name)
                     
+                    # Open the brand-new file for writing ('w')
                     outfile = open(file_path, mode='w', newline='', encoding='utf-8')
-                    writer = csv.DictWriter(outfile, fieldnames=headers, extrasaction='ignore')
-                    writer.writeheader()
                     
+                    # Set up the writer. 'extrasaction="ignore"' ensures Chase's hidden/empty 
+                    # trailing columns don't crash our script.
+                    writer = csv.DictWriter(outfile, fieldnames=headers, extrasaction='ignore')
+                    writer.writeheader() # Instantly write the headers at the very top row
+                    
+                    # Store both the open file handler and the writer in our dictionary tracker
                     monthly_writers[year_month_key] = (outfile, writer)
                 
+                # 7. WRITING THE ROW
+                # Retrieve the specific writer for this month, ignoring the raw file handle
                 _, writer = monthly_writers[year_month_key]
-                writer.writerow(row)
+                writer.writerow(row) # Append the transaction row to the end of that file
 
     finally:
+        # 8. RESOURCE CLEANUP
+        # Once the loop finishes (or if something crashes), safely shut down every file we opened.
+        # This forces macOS to save everything securely to disk and prevents data corruption.
         for outfile, _ in monthly_writers.values():
             outfile.close()
 
 if __name__ == "__main__":
-    # sys.argv[1:] captures all files passed by Finder when you right-click
+    # 'sys.argv[1:]' gathers all the file paths passed into the script from Finder via Automator.
     for file_path in sys.argv[1:]:
-        # Basic safety check to ensure we are only processing CSV files
+        # Safety net: only trigger the processing engine if the file is genuinely a CSV.
         if file_path.lower().endswith('.csv'):
             split_csv_by_month(file_path)
 </pre>
