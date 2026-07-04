@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>macos_quick_actions_csv_splitter</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="macos.html">MacOS</a>
+</p>
+
+<div id="Python - Quick Action - CSV Splitter"><h1 id="Python - Quick Action - CSV Splitter" class="header"><a href="#Python - Quick Action - CSV Splitter">Python - Quick Action - CSV Splitter</a></h1></div>
+
+<p>
+Here is how to embed an entire Python script to remove square brackets directly into Automator:
+</p>
+
+<div id="Python - Quick Action - CSV Splitter-Step 1: Configure Automator"><h3 id="Step 1: Configure Automator" class="header"><a href="#Python - Quick Action - CSV Splitter-Step 1: Configure Automator">Step 1: Configure Automator</a></h3></div>
+
+<ul>
+<li>
+Create a new Quick Action in Automator.
+
+<li>
+Ensure the top settings are still set to:
+
+<ul>
+<li>
+Workflow receives current: files or folders
+
+<li>
+in: Finder.app
+
+</ul>
+<li>
+In the left-hand library search bar, type "Run Shell Script" and drag that action into the main workflow area on the right. ("Run Shell Script" is under 'Utilities'.) 
+
+<li>
+In your Run Shell Script action, change the Shell dropdown from <code>/bin/bash</code> (or <code>/bin/zsh</code>) to <code>/usr/bin/python3</code>.
+
+<li>
+Ensure Pass input is set to as arguments.
+
+</ul>
+<div id="Python - Quick Action - CSV Splitter-Step 2: Paste the Self-Contained Code"><h3 id="Step 2: Paste the Self-Contained Code" class="header"><a href="#Python - Quick Action - CSV Splitter-Step 2: Paste the Self-Contained Code">Step 2: Paste the Self-Contained Code</a></h3></div>
+
+<p>
+Clear out any text currently in the box and paste the following code block. This version is specifically adapted to read the file paths directly from macOS's system arguments array (<code>sys.argv</code>):
+</p>
+
+<pre python>
+import csv
+from datetime import datetime
+import os
+import sys
+
+def split_csv_by_month(input_file):
+    # 1. PATH SETUP &amp; DIRECTORY CREATION
+    # 'os.path.abspath' gets the full, absolute path of the file you right-clicked.
+    # 'os.path.dirname' strips away the filename, leaving just the folder path.
+    source_dir = os.path.dirname(os.path.abspath(input_file))
+    
+    # Define where the output goes: a folder named 'monthly_statements' inside that same source folder.
+    output_dir = os.path.join(source_dir, 'monthly_statements')
+
+    # If the 'monthly_statements' folder doesn't exist yet, create it automatically.
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # 2. FILE TRACKER TRACKING
+    # This dictionary acts as a rolling ledger of active file handles.
+    # It maps a specific (year, month) tuple to an active file object and a CSV writer object.
+    # Format: {(2026, 7): (file_object, writer_object)}
+    monthly_writers = {}
+
+    try:
+        # 3. READING THE MASTER FILE
+        # Open the bank file you right-clicked. 'newline=""' prevents double-spacing bugs on Windows/macOS.
+        with open(input_file, mode='r', newline='', encoding='utf-8') as infile:
+            # DictReader treats the first row as headers. Every subsequent row becomes a dictionary
+            # where the column names are keys (e.g., row['Amount'] -&gt; '$45.00')
+            reader = csv.DictReader(infile)
+            headers = reader.fieldnames # Capture the exact header names to reuse later
+            
+            # If the CSV is empty or corrupted, stop immediately to avoid errors
+            if not headers:
+                return
+
+            # 4. PROCESSING ROW BY ROW
+            for row in reader:
+                # Look at the 'Posting Date' column for the current transaction row
+                date_str = row.get('Posting Date')
+                if not date_str:
+                    continue # If a row has no date (like an accidental blank line), skip it
+                
+                # 5. DATE PARSING &amp; SANITIZATION
+                # Convert the raw text string into a Python datetime object so we can read months/years.
+                try:
+                    # Attempt standard US format (MM/DD/YYYY)
+                    date_obj = datetime.strptime(date_str.strip(), '%m/%d/%Y')
+                except ValueError:
+                    try:
+                        # Fallback: Attempt ISO format (YYYY-MM-DD) if the bank switched layouts
+                        date_obj = datetime.strptime(date_str.strip(), '%Y-%m-%d')
+                    except ValueError:
+                        continue # If the date is completely unreadable, skip the row entirely
+
+                # Create a unique key combination for this specific transaction's month and year
+                year_month_key = (date_obj.year, date_obj.month)
+
+                # 6. DYNAMIC FILE CREATION
+                # If this is the first time we've encountered this specific month, create its file!
+                if year_month_key not in monthly_writers:
+                    # Construct a clean filename, ensuring the month is always 2 digits (e.g., '07' instead of '7')
+                    file_name = f"Statement_{date_obj.year}_{date_obj.month:02d}.csv"
+                    file_path = os.path.join(output_dir, file_name)
+                    
+                    # Open the brand-new file for writing ('w')
+                    outfile = open(file_path, mode='w', newline='', encoding='utf-8')
+                    
+                    # Set up the writer. 'extrasaction="ignore"' ensures Chase's hidden/empty 
+                    # trailing columns don't crash our script.
+                    writer = csv.DictWriter(outfile, fieldnames=headers, extrasaction='ignore')
+                    writer.writeheader() # Instantly write the headers at the very top row
+                    
+                    # Store both the open file handler and the writer in our dictionary tracker
+                    monthly_writers[year_month_key] = (outfile, writer)
+                
+                # 7. WRITING THE ROW
+                # Retrieve the specific writer for this month, ignoring the raw file handle
+                _, writer = monthly_writers[year_month_key]
+                writer.writerow(row) # Append the transaction row to the end of that file
+
+    finally:
+        # 8. RESOURCE CLEANUP
+        # Once the loop finishes (or if something crashes), safely shut down every file we opened.
+        # This forces macOS to save everything securely to disk and prevents data corruption.
+        for outfile, _ in monthly_writers.values():
+            outfile.close()
+
+if __name__ == "__main__":
+    # 'sys.argv[1:]' gathers all the file paths passed into the script from Finder via Automator.
+    for file_path in sys.argv[1:]:
+        # Safety net: only trigger the processing engine if the file is genuinely a CSV.
+        if file_path.lower().endswith('.csv'):
+            split_csv_by_month(file_path)
+</pre>
+
+<div id="Python - Quick Action - CSV Splitter-Step 3: Save and Run"><h3 id="Step 3: Save and Run" class="header"><a href="#Python - Quick Action - CSV Splitter-Step 3: Save and Run">Step 3: Save and Run</a></h3></div>
+
+<ul>
+<li>
+Press <code>Cmd + S</code> to save the workflow.
+
+<li>
+Name it something like <code>Split Bank CSV by Month</code>.
+
+</ul>
+<p>
+Now, the entire Python engine lives right inside the workflow file (<code>~/Library/Services/Split Bank CSV by Month.workflow)</code>. You can delete the old standalone <code>.py</code> file from your computer entirely - this Quick Action is now fully independent and portable!
+</p>
+
+<div id="Python - Quick Action - CSV Splitter-Demystifying the _ (Throwaway) Variable"><h2 id="Demystifying the _ (Throwaway) Variable" class="header"><a href="#Python - Quick Action - CSV Splitter-Demystifying the _ (Throwaway) Variable">Demystifying the _ (Throwaway) Variable</a></h2></div>
+
+<p>
+Let's dissect those exact lines you highlighted:
+</p>
+
+<pre python>
+_, writer = monthly_writers[year_month_key]
+writer.writerow(row)
+</pre>
+
+<p>
+In Python, the underscore <code>_</code> is a conventional, widely recognized variable name that explicitly translates to: <em>"I am forced to unpack something here, but I don't care about this specific value, so throw it away."</em>
+</p>
+
+<div id="Python - Quick Action - CSV Splitter-Demystifying the _ (Throwaway) Variable-Why do we use it here?"><h3 id="Why do we use it here?" class="header"><a href="#Python - Quick Action - CSV Splitter-Demystifying the _ (Throwaway) Variable-Why do we use it here?">Why do we use it here?</a></h3></div>
+
+<p>
+When we initialized our month files earlier in the script (Line 66), we stored a tuple (a pair of items) inside our tracker dictionary for safekeeping:
+</p>
+
+<pre python>
+monthly_writers[year_month_key] = (outfile, writer)
+</pre>
+
+<ul>
+<li>
+Item 1: <code>outfile</code> (The actual, raw system file stream. We need this later to close the file).
+
+<li>
+Item 2: <code>writer</code> (The CSV tool used to write rows).
+
+</ul>
+<p>
+When it's time to actually append a transaction row to a file, we only need the <code>writer</code> object. If we wrote the line like this:
+</p>
+
+<pre sython>
+writer = monthly_writers[year_month_key]
+</pre>
+
+<p>
+<code>writer</code> would accidentally become the entire two-item tuple <code>(outfile, writer)</code>. Running <code>writer.writerow(row)</code> would then crash, because a tuple doesn't know how to write CSV rows.
+</p>
+
+<p>
+To extract just the tool we need, we use <span id="Python - Quick Action - CSV Splitter-Demystifying the _ (Throwaway) Variable-Why do we use it here?-tuple unpacking"></span><strong id="tuple unpacking">tuple unpacking</strong>.
+</p>
+
+<p>
+If we wanted to capture everything, we'd write:
+</p>
+
+<pre python>
+outfile, writer = monthly_writers[year_month_key]
+</pre>
+
+<p>
+But because we don't need to do anything with the raw <code>outfile</code> until the very end of the script when closing it down, assigning it to a real variable name triggers code linter warnings about "unused variables."
+</p>
+
+<p>
+By using <code>_</code>, we tell Python (and anyone reading our code): _"Fetch the pair of items stored for this month. Put the first item (the file stream) into the garbage bin <em>, and give me the second item (the CSV writer tool) as writer."</em>
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+
+<p>
+<a href="macos.html">MacOS</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

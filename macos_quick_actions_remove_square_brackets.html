@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>macos_quick_actions_remove_square_brackets</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="macos.html">MacOS</a>
+</p>
+
+<div id="Python - Quick Action - Remove Square Brackets"><h1 id="Python - Quick Action - Remove Square Brackets" class="header"><a href="#Python - Quick Action - Remove Square Brackets">Python - Quick Action - Remove Square Brackets</a></h1></div>
+
+<div id="Python - Quick Action - Remove Square Brackets-Existing 'bin' Script"><h2 id="Existing 'bin' Script" class="header"><a href="#Python - Quick Action - Remove Square Brackets-Existing 'bin' Script">Existing 'bin' Script</a></h2></div>
+
+<pre python>
+import os
+import re
+import sys
+
+# 1. UPDATED REGEX: Matches [anything inside] followed by an optional underscore (_)
+bracket_pattern = re.compile(r'\[[^\]]*\]_?')
+
+# 2. Process each file passed from the Finder selection
+for full_old_path in sys.argv[1:]:
+    
+    # Extract the directory path and the individual filename
+    folder_path = os.path.dirname(full_old_path)
+    filename = os.path.basename(full_old_path)
+    
+    # Skip if it's a directory or if it doesn't contain brackets
+    if not os.path.isfile(full_old_path):
+        continue
+        
+    if '[' in filename and ']' in filename:
+        # Remove the bracketed portion (and trailing underscore if it exists)
+        cleaned_name = bracket_pattern.sub('', filename)
+
+        # FIX 1: Convert any multiple spaces into a single space
+        cleaned_name = re.sub(r'\s+', ' ', cleaned_name)
+
+        # FIX 2: Look for a space right before a dot and remove it (e.g., " .mp3" -&gt; ".mp3")
+        cleaned_name = re.sub(r'\s+\.', '.', cleaned_name)
+
+        # Wipe out any stray leading/trailing spaces at the very ends of the string
+        cleaned_name = cleaned_name.strip()
+
+        # 3. Safety Check: Make sure we aren't creating an empty filename 
+        name_part, ext_part = os.path.splitext(cleaned_name)
+        if not name_part.strip():
+            continue 
+
+        # Create the full path for the new file name
+        full_new_path = os.path.join(folder_path, cleaned_name)
+
+        # 4. Handle filename collisions (safeguard if file already exists)
+        counter = 1
+        while os.path.exists(full_new_path):
+            new_name = f"{name_part}_{counter}{ext_part}"
+            full_new_path = os.path.join(folder_path, new_name)
+            counter += 1
+
+        # Physically rename the file on your hard drive!
+        os.rename(full_old_path, full_new_path)
+</pre>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-Creating Quick Action Version"><h2 id="Creating Quick Action Version" class="header"><a href="#Ai Insight-Creating Quick Action Version">Creating Quick Action Version</a></h2></div>
+
+<p>
+Adapting the existing script into a Quick Action is incredibly straightforward. Since you are already passing file selection details dynamically from Finder, we just need to swap out your hardcoded <code>folder_path = "."</code> and <code>os.listdir()</code> steps.
+</p>
+
+<p>
+Instead, Python will read the files you have highlighted right from the command line using <code>sys.argv</code>.
+</p>
+
+<p>
+Here is how to set it up, along with the updated, bulletproof script.
+</p>
+
+<div id="Ai Insight-Creating Quick Action Version-Step 1: Create the Quick Action in Automator"><h3 id="Step 1: Create the Quick Action in Automator" class="header"><a href="#Ai Insight-Creating Quick Action Version-Step 1: Create the Quick Action in Automator">Step 1: Create the Quick Action in Automator</a></h3></div>
+
+<ul>
+<li>
+Open Automator on your Mac and select <span id="Ai Insight-Creating Quick Action Version-Step 1: Create the Quick Action in Automator-New Document &gt; Quick Action"></span><strong id="New Document &gt; Quick Action">New Document &gt; Quick Action</strong>.
+
+<li>
+Configure the top adjustment settings exactly like this so it knows to target files:
+
+<ul>
+<li>
+Workflow receives current: <code>files or folders</code>
+
+<li>
+in: <code>Finder.app</code>
+
+</ul>
+<li>
+In the left-hand actions library, search for <span id="Ai Insight-Creating Quick Action Version-Step 1: Create the Quick Action in Automator-&quot;Run Shell Script&quot;"></span><strong id="&quot;Run Shell Script&quot;">"Run Shell Script"</strong> and drag it into the main workflow window.
+
+<li>
+Configure the settings inside the Run Shell Script box:
+
+<ul>
+<li>
+Shell: <code>/usr/bin/python3</code>
+
+<li>
+Pass input: <span id="Ai Insight-Creating Quick Action Version-Step 1: Create the Quick Action in Automator-as arguments"></span><strong id="as arguments">as arguments</strong> (This is critical; it changes how Python receives the file selections).
+
+</ul>
+</ul>
+<div id="Ai Insight-Creating Quick Action Version-Step 2: The Adapted Python Script"><h3 id="Step 2: The Adapted Python Script" class="header"><a href="#Ai Insight-Creating Quick Action Version-Step 2: The Adapted Python Script">Step 2: The Adapted Python Script</a></h3></div>
+
+<p>
+Clear out any template code inside that Automator text box and paste this updated version:
+</p>
+
+<pre python>
+import os
+import re
+import sys
+
+# 1. Compile the regex pattern to find [anything inside brackets]
+bracket_pattern = re.compile(r'\[[^\]]*\]')
+
+# 2. Process each file passed from the Finder selection
+# sys.argv[1:] captures all the files you currently have highlighted
+for full_old_path in sys.argv[1:]:
+    
+    # Extract the directory path and the individual filename
+    folder_path = os.path.dirname(full_old_path)
+    filename = os.path.basename(full_old_path)
+    
+    # Skip if it's a directory or if it doesn't contain brackets
+    if not os.path.isfile(full_old_path):
+        continue
+        
+    if '[' in filename and ']' in filename:
+        # Remove the bracketed portion
+        cleaned_name = bracket_pattern.sub('', filename)
+
+        # FIX 1: Convert any multiple spaces into a single space
+        cleaned_name = re.sub(r'\s+', ' ', cleaned_name)
+
+        # FIX 2: Look for a space right before a dot and remove it (e.g., " .mp3" -&gt; ".mp3")
+        cleaned_name = re.sub(r'\s+\.', '.', cleaned_name)
+
+        # Wipe out any stray leading/trailing spaces at the very ends of the string
+        cleaned_name = cleaned_name.strip()
+
+        # 3. Safety Check: Make sure we aren't creating an empty filename 
+        # (e.g., if the entire file name was just "[test].mp3")
+        name_part, ext_part = os.path.splitext(cleaned_name)
+        if not name_part.strip():
+            continue # Skip to avoid breaking the file layout
+
+        # Create the full path for the new file name
+        full_new_path = os.path.join(folder_path, cleaned_name)
+
+        # 4. Handle filename collisions (safeguard if file already exists)
+        counter = 1
+        while os.path.exists(full_new_path):
+            new_name = f"{name_part}_{counter}{ext_part}"
+            full_new_path = os.path.join(folder_path, new_name)
+            counter += 1
+
+        # Physically rename the file on your hard drive!
+        os.rename(full_old_path, full_new_path)
+</pre>
+
+<div id="Ai Insight-Creating Quick Action Version-Step 3: Save and Run"><h3 id="Step 3: Save and Run" class="header"><a href="#Ai Insight-Creating Quick Action Version-Step 3: Save and Run">Step 3: Save and Run</a></h3></div>
+
+<ul>
+<li>
+Press <code>Cmd + S</code> to save the Quick Action.
+
+<li>
+Name it something descriptive, complete with your style of header symbols, like: <code>🏷️Strip Brackets from Name</code>.
+
+<li>
+Open Finder, select one or multiple files that have brackets in their names (e.g., <code>My Video [1080p].mp4</code>), right-click, choose Quick Actions, and trigger your new script.
+
+</ul>
+<div id="Ai Insight-What Changed in the Adaptation?"><h2 id="What Changed in the Adaptation?" class="header"><a href="#Ai Insight-What Changed in the Adaptation?">What Changed in the Adaptation?</a></h2></div>
+
+<ul>
+<li>
+<span id="Ai Insight-What Changed in the Adaptation?-Dynamic Scoping"></span><strong id="Dynamic Scoping">Dynamic Scoping</strong>: Instead of searching an entire static folder using <code>os.listdir('.')</code>, the script handles <em>only</em> the specific item paths you visually select in your Finder window. This means you can run it on a single file or highlight 50 files across different folders simultaneously.
+
+<li>
+<span id="Ai Insight-What Changed in the Adaptation?-Collision Safeguard"></span><strong id="Collision Safeguard">Collision Safeguard</strong>: I added a safety loop at the bottom. If you have <code>Song [Mix A].mp3</code> and <code>Song [Mix B].mp3</code> in the same folder, stripping the brackets would normally cause them both to try to become <code>Song.mp3</code>, which would crash the script or overwrite data. The loop automatically steps in and creates <code>Song_1.mp3</code> instead!
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+<p>
+<a href="macos.html">MacOS</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
