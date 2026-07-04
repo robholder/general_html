@@ -30,26 +30,30 @@
 <div id="Python - Quick Action - Remove Square Brackets-Existing 'bin' Script"><h2 id="Existing 'bin' Script" class="header"><a href="#Python - Quick Action - Remove Square Brackets-Existing 'bin' Script">Existing 'bin' Script</a></h2></div>
 
 <pre python>
+#!/usr/bin/env python3
 import os
 import re
-import sys
 
-# 1. UPDATED REGEX: Matches [anything inside] followed by an optional underscore (_)
-bracket_pattern = re.compile(r'\[[^\]]*\]_?')
+# 1. Set the path to the folder containing your files
+folder_path = "."
 
-# 2. Process each file passed from the Finder selection
-for full_old_path in sys.argv[1:]:
-    
-    # Extract the directory path and the individual filename
-    folder_path = os.path.dirname(full_old_path)
-    filename = os.path.basename(full_old_path)
-    
-    # Skip if it's a directory or if it doesn't contain brackets
+# 2. Compile the regex pattern to find [anything inside brackets]
+bracket_pattern = re.compile(r'\[[^\]]*\]')
+
+# 3. Read the actual files from the disk
+files = os.listdir(folder_path)
+
+print("Starting file renaming process...")
+
+for filename in files:
+    # Skip folders, only look at files
+    full_old_path = os.path.join(folder_path, filename)
     if not os.path.isfile(full_old_path):
         continue
-        
+
+    # Check if the filename contains brackets
     if '[' in filename and ']' in filename:
-        # Remove the bracketed portion (and trailing underscore if it exists)
+        # Remove the bracketed portion
         cleaned_name = bracket_pattern.sub('', filename)
 
         # FIX 1: Convert any multiple spaces into a single space
@@ -61,23 +65,14 @@ for full_old_path in sys.argv[1:]:
         # Wipe out any stray leading/trailing spaces at the very ends of the string
         cleaned_name = cleaned_name.strip()
 
-        # 3. Safety Check: Make sure we aren't creating an empty filename 
-        name_part, ext_part = os.path.splitext(cleaned_name)
-        if not name_part.strip():
-            continue 
-
         # Create the full path for the new file name
         full_new_path = os.path.join(folder_path, cleaned_name)
 
-        # 4. Handle filename collisions (safeguard if file already exists)
-        counter = 1
-        while os.path.exists(full_new_path):
-            new_name = f"{name_part}_{counter}{ext_part}"
-            full_new_path = os.path.join(folder_path, new_name)
-            counter += 1
-
         # Physically rename the file on your hard drive!
         os.rename(full_old_path, full_new_path)
+        print(f"Renamed: '{filename}' -&gt; '{cleaned_name}'")
+
+print("Finished!")
 </pre>
 
 <div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
@@ -134,16 +129,23 @@ Pass input: <span id="Ai Insight-Creating Quick Action Version-Step 1: Create th
 Clear out any template code inside that Automator text box and paste this updated version:
 </p>
 
+<p>
+Note: The pattern is adjusted to remove any trailing underscores after the closing square bracket.
+</p>
+
+<p>
+We can modify it to look <code>for \]_?</code>. The <code>?</code> symbol in regex means "optional" (0 or 1 matches). This tells the script: "Find the closing bracket, and if there happens to be an underscore immediately following it, grab that too and wipe them both out together."
+</p>
+
 <pre python>
 import os
 import re
 import sys
 
-# 1. Compile the regex pattern to find [anything inside brackets]
-bracket_pattern = re.compile(r'\[[^\]]*\]')
+# 1. UPDATED REGEX: Matches [anything inside] followed by an optional underscore (_)
+bracket_pattern = re.compile(r'\[[^\]]*\]_?')
 
 # 2. Process each file passed from the Finder selection
-# sys.argv[1:] captures all the files you currently have highlighted
 for full_old_path in sys.argv[1:]:
     
     # Extract the directory path and the individual filename
@@ -155,7 +157,7 @@ for full_old_path in sys.argv[1:]:
         continue
         
     if '[' in filename and ']' in filename:
-        # Remove the bracketed portion
+        # Remove the bracketed portion (and trailing underscore if it exists)
         cleaned_name = bracket_pattern.sub('', filename)
 
         # FIX 1: Convert any multiple spaces into a single space
@@ -168,10 +170,9 @@ for full_old_path in sys.argv[1:]:
         cleaned_name = cleaned_name.strip()
 
         # 3. Safety Check: Make sure we aren't creating an empty filename 
-        # (e.g., if the entire file name was just "[test].mp3")
         name_part, ext_part = os.path.splitext(cleaned_name)
         if not name_part.strip():
-            continue # Skip to avoid breaking the file layout
+            continue 
 
         # Create the full path for the new file name
         full_new_path = os.path.join(folder_path, cleaned_name)
@@ -210,6 +211,61 @@ Open Finder, select one or multiple files that have brackets in their names (e.g
 <span id="Ai Insight-What Changed in the Adaptation?-Collision Safeguard"></span><strong id="Collision Safeguard">Collision Safeguard</strong>: I added a safety loop at the bottom. If you have <code>Song [Mix A].mp3</code> and <code>Song [Mix B].mp3</code> in the same folder, stripping the brackets would normally cause them both to try to become <code>Song.mp3</code>, which would crash the script or overwrite data. The loop automatically steps in and creates <code>Song_1.mp3</code> instead!
 
 </ul>
+<div id="The Same Script EXCEPT For Braces Instead"><h1 id="The Same Script EXCEPT For Braces Instead" class="header"><a href="#The Same Script EXCEPT For Braces Instead">The Same Script EXCEPT For Braces Instead</a></h1></div>
+
+<pre python>
+import os
+import re
+import sys
+
+# 1. UPDATED REGEX: Matches (anything inside) followed by an optional underscore (_)
+# We use \( and \) to target literal parentheses
+parenthesis_pattern = re.compile(r'\([^)]*\)_?')
+
+# 2. Process each file passed from the Finder selection
+for full_old_path in sys.argv[1:]:
+    
+    # Extract the directory path and the individual filename
+    folder_path = os.path.dirname(full_old_path)
+    filename = os.path.basename(full_old_path)
+    
+    # Skip if it's a directory or if it doesn't contain parentheses
+    if not os.path.isfile(full_old_path):
+        continue
+        
+    if '(' in filename and ')' in filename:
+        # Remove the parenthesis portion (and trailing underscore if it exists)
+        cleaned_name = parenthesis_pattern.sub('', filename)
+
+        # FIX 1: Convert any multiple spaces into a single space
+        cleaned_name = re.sub(r'\s+', ' ', cleaned_name)
+
+        # FIX 2: Look for a space right before a dot and remove it (e.g., " .mp3" -&gt; ".mp3")
+        cleaned_name = re.sub(r'\s+\.', '.', cleaned_name)
+
+        # Wipe out any stray leading/trailing spaces at the very ends of the string
+        cleaned_name = cleaned_name.strip()
+
+        # 3. Safety Check: Make sure we aren't creating an empty filename 
+        name_part, ext_part = os.path.splitext(cleaned_name)
+        if not name_part.strip():
+            continue 
+
+        # Create the full path for the new file name
+        full_new_path = os.path.join(folder_path, cleaned_name)
+
+        # 4. Handle filename collisions (safeguard if file already exists)
+        counter = 1
+        while os.path.exists(full_new_path):
+            new_name = f"{name_part}_{counter}{ext_part}"
+            full_new_path = os.path.join(folder_path, new_name)
+            counter += 1
+
+        # Physically rename the file on your hard drive!
+        os.rename(full_old_path, full_new_path)
+</pre>
+
+
 <p>
 <br>
 <hr>
