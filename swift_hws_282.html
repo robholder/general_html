@@ -421,6 +421,85 @@ SwiftData will automatically scan the <code>User</code> class, see that it relie
 However, explicitly listing them all in an array (like the first example) is considered best practice because it makes it obvious to anyone reading the code exactly what models the app is managing.
 </p>
 
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+In the example code, why wouldn't this syntax work? (Omitting the <code>let newUser = User(id: "Taylor Swift")</code> dance.)
+</p>
+
+<pre swift>
+    Button("Tap Me") {
+
+        selectedUser = User(id: "Taylor Swift")
+
+        modelContext.insert(selectedUser)
+
+    }
+</pre>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This syntax doesn't work because <code>selectedUser</code> is an Optional type (<code>User?</code>), but SwiftData's <code>modelContext.insert()</code> requires a concrete, non-optional object (<code>User</code>).
+</p>
+
+<div id="Ai Insight-ANSWER-The Core Problem"><h3 id="The Core Problem" class="header"><a href="#Ai Insight-ANSWER-The Core Problem">The Core Problem</a></h3></div>
+
+<p>
+When you declared your state variable earlier, you typed it like this:
+</p>
+
+<pre swift>
+@State private var selectedUser: User? = nil
+</pre>
+
+<p>
+The question mark means <code>selectedUser</code> is a box that might hold a <code>User</code>, or it might be empty (<code>nil</code>).
+</p>
+
+<p>
+Even though you instantly put a user inside that box on the line right above it, Swift's compiler is strict. It looks at <code>modelContext.insert(selectedUser)</code> and says: <em>"Hey, you are trying to hand me an Optional box. What if that box is empty? I am not allowed to insert nil into the database!"</em>
+</p>
+
+<div id="Ai Insight-ANSWER-How to Fix It"><h3 id="How to Fix It" class="header"><a href="#Ai Insight-ANSWER-How to Fix It">How to Fix It</a></h3></div>
+
+<p>
+To make the compiler happy, you must initialize the <code>User</code> into a temporary, non-optional constant first, insert <em>that</em> into the context, and then assign it to your state.
+</p>
+
+<div id="Ai Insight-ANSWER-How to Fix It-The Correct Way:"><h4 id="The Correct Way:" class="header"><a href="#Ai Insight-ANSWER-How to Fix It-The Correct Way:">The Correct Way:</a></h4></div>
+
+<pre swift>
+Button("Tap Me") {
+    // 1. Create a concrete, non-optional User constant
+    let newUser = User(id: "Taylor Swift")
+    
+    // 2. Insert the concrete object (SwiftData loves this)
+    modelContext.insert(newUser)
+    
+    // 3. Put it into your optional state box to trigger the sheet
+    selectedUser = newUser
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-How to Fix It-An Alternative Way (Force Unwrapping):"><h4 id="An Alternative Way (Force Unwrapping):" class="header"><a href="#Ai Insight-ANSWER-How to Fix It-An Alternative Way (Force Unwrapping):">An Alternative Way (Force Unwrapping):</a></h4></div>
+
+<p>
+If you absolutely wanted to keep your original line order, you would have to use an exclamation mark <code>!</code> to "force unwrap" the optional, promising Swift that you know for a fact the box isn't empty:
+</p>
+
+<pre swift>
+Button("Tap Me") {
+    selectedUser = User(id: "Taylor Swift")
+    modelContext.insert(selectedUser!) // The '!' forces it to be non-optional
+}
+</pre>
+
+<p>
+Note: While this works, the first method using <code>let newUser</code> is considered much better practice in Swift because force-unwrapping (<code>!</code>) can cause your app to crash if you ever accidentally use it on something that actually is <code>nil</code>.
+</p>
+
 <p>
 <hr>
 <br>
