@@ -346,6 +346,82 @@ Because <code>User</code> is now tied to a database ecosystem, <code>ContentView
 
 <p>
 And don't forget to add a <code>.modelContainer(for: User.self)</code> to the App struct.
+</p>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+If tracking multiple SwiftData classes, should these be in an array or a stack of <code>.modelContainer</code> lines?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+You should not stack multiple separate <code>.modelContainer</code> lines. Stacking them actually creates entirely separate database files that can't easily talk to each other or share relationships.
+</p>
+
+<p>
+Here is exactly how you write it in an <code>App</code> struct, along with a look at what happens behind the scenes.
+</p>
+
+<div id="Ai Insight-ANSWER-The Code Syntax"><h3 id="The Code Syntax" class="header"><a href="#Ai Insight-ANSWER-The Code Syntax">The Code Syntax</a></h3></div>
+
+<p>
+Instead of passing a single class like <code>User.self</code>, you pass an array literal <code>[User.self, Post.self, Order.self]</code> like this:
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // Pass all of your @Model classes inside an array here:
+        .modelContainer(for: [User.self, Post.self, Order.self])
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-Pro-Tip: The &quot;Relationship&quot; Shortcut"><h3 id="Pro-Tip: The &quot;Relationship&quot; Shortcut" class="header"><a href="#Ai Insight-ANSWER-Pro-Tip: The &quot;Relationship&quot; Shortcut">Pro-Tip: The "Relationship" Shortcut</a></h3></div>
+
+<p>
+SwiftData is smart. If your models have relationships with one another (for example, if your <code>User</code> class has a property that links to a <code>Post</code> class), you only need to list the parent class.
+</p>
+
+<pre swift>
+@Model
+class User {
+    var id: String
+    var posts: [Post] // Relationship links User to Post
+}
+
+@Model
+class Post {
+    var title: String
+}
+</pre>
+
+<p>
+If your models are linked like the example above, you can actually just write:
+</p>
+
+<pre swift>
+.modelContainer(for: User.self)
+</pre>
+
+<p>
+SwiftData will automatically scan the <code>User</code> class, see that it relies on <code>Post</code>, and implicitly load the <code>Post</code> table into the exact same database container for you!
+</p>
+
+<p>
+However, explicitly listing them all in an array (like the first example) is considered best practice because it makes it obvious to anyone reading the code exactly what models the app is managing.
+</p>
+
+<p>
 <hr>
 <br>
 </p>
