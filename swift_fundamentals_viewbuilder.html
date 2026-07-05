@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_viewbuilder</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="@ViewBuilder"><h1 id="@ViewBuilder" class="header"><a href="#@ViewBuilder">@ViewBuilder</a></h1></div>
+
+<p>
+At its core, <code>@ViewBuilder</code> is a special <span id="@ViewBuilder-compiler attribute"></span><strong id="compiler attribute">compiler attribute</strong> (specifically, a custom result builder) that allows SwiftUI to interpret a list of separate views and combine them into a single, cohesive layout structure.
+</p>
+
+<p>
+Whenever you write a list of views inside curly braces <code>{ }</code>, <code>@ViewBuilder</code> is secretly working behind the scenes to glue them together.
+</p>
+
+<div id="@ViewBuilder-1. Why do we need @ViewBuilder?"><h2 id="1. Why do we need @ViewBuilder?" class="header"><a href="#@ViewBuilder-1. Why do we need @ViewBuilder?">1. Why do we need @ViewBuilder?</a></h2></div>
+
+<p>
+To understand why it exists, you have to look at standard Swift code vs. SwiftUI code.
+</p>
+
+<p>
+In standard Swift, a function can only return <span id="@ViewBuilder-1. Why do we need @ViewBuilder?-one single thing"></span><strong id="one single thing">one single thing</strong>. If you try to write three strings or integers back-to-back without separating them, Swift gets confused and throws a compiler error:
+</p>
+
+<pre swift>
+// ❌ Standard Swift Error: "Consecutive statements on a line must be separated by ';'"
+func getWords() -&gt; String {
+    "Hello"
+    "World"
+}
+</pre>
+
+<p>
+However, in SwiftUI, you do this constantly with views inside containers like <code>VStack</code>, <code>HStack</code>, or <code>Group</code>:
+</p>
+
+<pre swift>
+//  This works perfectly! But why?
+VStack {
+    Text("Hello")
+    Text("World")
+}
+</pre>
+
+<p>
+The reason this works is that the closure <code>{ }</code> attached to a <code>VStack</code> is secretly marked with the <code>@ViewBuilder</code> attribute.
+</p>
+
+<p>
+Behind the scenes, the Swift compiler intercepts that list of views and automatically rewrites it into a special container type called a <code>TupleView</code> (e.g., <code>TupleView&lt;(Text, Text)&gt;</code>). It turns your separate view declarations into a single return type that SwiftUI can draw on the screen.
+</p>
+
+<div id="@ViewBuilder-2. Where is it used by default?"><h2 id="2. Where is it used by default?" class="header"><a href="#@ViewBuilder-2. Where is it used by default?">2. Where is it used by default?</a></h2></div>
+
+<p>
+You are using <code>@ViewBuilder</code> every day without even typing it, because Apple baked it into all the standard layout containers. If you command-click on a <code>VStack</code> initializer in Xcode, you will see its definition looks roughly like this:
+</p>
+
+<pre wift>
+init(..., @ViewBuilder content: () -&gt; Content)
+</pre>
+
+<p>
+The <code>body</code> property of every SwiftUI view also has an implicit <code>@ViewBuilder</code> wrapped around it. That is why you can stack multiple views inside a body property if they are wrapped in a container, or use <code>if/else</code> logic freely.
+</p>
+
+<div id="@ViewBuilder-3. When do YOU need to type @ViewBuilder?"><h2 id="3. When do YOU need to type @ViewBuilder?" class="header"><a href="#@ViewBuilder-3. When do YOU need to type @ViewBuilder?">3. When do YOU need to type @ViewBuilder?</a></h2></div>
+
+<p>
+You will need to explicitly type <code>@ViewBuilder</code> yourself whenever you start building <span id="@ViewBuilder-3. When do YOU need to type @ViewBuilder?-custom, reusable container views"></span><strong id="custom, reusable container views">custom, reusable container views</strong>.
+</p>
+
+<p>
+For example, imagine you want to create a custom "Card" view wrapper that gives whatever content you put inside it a rounded corner, a white background, and a subtle drop shadow.
+</p>
+
+<div id="@ViewBuilder-3. When do YOU need to type @ViewBuilder?-The Code Example:"><h3 id="The Code Example:" class="header"><a href="#@ViewBuilder-3. When do YOU need to type @ViewBuilder?-The Code Example:">The Code Example:</a></h3></div>
+
+<pre swift>
+import SwiftUI
+
+// A custom reusable card container
+struct CustomCardView&lt;Content: View&gt;: View {
+    let title: String
+    
+    // 1. We mark our custom content closure with @ViewBuilder
+    @ViewBuilder let content: () -&gt; Content
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.blue)
+            
+            // 2. Execute the view builder block to inject the views
+            content()
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+// How you use it in your app:
+struct ContentView: View {
+    var body: some View {
+        VStack {
+            // Because 'content:' is a @ViewBuilder, we can pass ANY list of views inside the braces!
+            CustomCardView(title: "User Profile") {
+                Text("John Doe")
+                Text("Software Engineer")
+                Button("Follow") { }
+            }
+            
+            CustomCardView(title: "System Status") {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                    Text("All systems operational")
+                }
+            }
+        }
+        .padding()
+    }
+}
+</pre>
+
+<div id="@ViewBuilder-4. Key Rules of @ViewBuilder"><h2 id="4. Key Rules of @ViewBuilder" class="header"><a href="#@ViewBuilder-4. Key Rules of @ViewBuilder">4. Key Rules of @ViewBuilder</a></h2></div>
+
+<ul>
+<li>
+The 10-View Limit (Historically): In older versions of SwiftUI, a <code>@ViewBuilder</code> could only hold a maximum of 10 child views inside a single block. If you went to 11, Xcode threw a cryptic error. Modern Swift has mostly eliminated this restriction, but if you have a massive layout, it's still best practice to break it chunks using <code>Group</code> or sub-views.
+
+<li>
+Logic Support: <code>@ViewBuilder</code> natively understands if, <code>if/else</code>, and <code>switch</code> statements. It does <em>not</em> natively support complex loops like <code>for-in</code> inside its blocks (which is why we use <code>ForEach</code> instead).
+
+</ul>
+<div id="@ViewBuilder-4. Key Rules of @ViewBuilder-Summary Rule of Thumb"><h3 id="Summary Rule of Thumb" class="header"><a href="#@ViewBuilder-4. Key Rules of @ViewBuilder-Summary Rule of Thumb">Summary Rule of Thumb</a></h3></div>
+
+<p>
+Think of <code>@ViewBuilder</code> as the <span id="@ViewBuilder-4. Key Rules of @ViewBuilder-Summary Rule of Thumb-invisible construction worker"></span><strong id="invisible construction worker">invisible construction worker</strong> of SwiftUI. It takes individual, loose pieces of layout material (your views) and bundles them up into a single package so SwiftUI can safely render them onto the screen.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
