@@ -295,9 +295,10 @@ Here is a complete, production-ready example of how this is done in code:
 <pre swift>
 import SwiftUI
 
-// 1. Define your data models
+// The 'Identifiable' protocol allows SwiftUI to uniquely tell these categories apart using the 'id'.
+// The 'Hashable' protocol allows SwiftUI to use this struct as a "Value" for navigation selections.
 struct Category: Identifiable, Hashable {
-    let id = UUID()
+    let id = UUID() // Automatically generates a totally unique ID string
     let name: String
     let icon: String
 }
@@ -308,12 +309,13 @@ struct Item: Identifiable, Hashable {
     let description: String
 }
 
-struct ContentView: View {
-    // 2. State variables to track selections across columns
+struct ThreeColumnNavigationView: View {
+    // These @State variables are the "brains" of your navigation.
+    // They start as 'nil' (empty) because nothing is selected yet.
     @State private var selectedCategory: Category?
     @State private var selectedItem: Item?
     
-    // Sample Data
+    // Fake data to populate our lists
     let categories = [
         Category(name: "Inbox", icon: "tray.fill"),
         Category(name: "Sent", icon: "paperplane.fill"),
@@ -327,10 +329,14 @@ struct ContentView: View {
     ]
 
     var body: some View {
-        // 3. Initialize the 3-column NavigationSplitView
+        // Step 1: Create the 3-column frame. SwiftUI expects 3 blocks of code inside it.
         NavigationSplitView {
-            // COLUMN 1: Sidebar
+            
+            // --- COLUMN 1: SIDEBAR ---
+            // We pass the 'categories' array to the list. 
+            // 'selection: $selectedCategory' means: "When a user taps an item, save it into our @State variable."
             List(categories, selection: $selectedCategory) { category in
+                // 'category' is a single item from the array that we are currently drawing on screen.
                 NavigationLink(value: category) {
                     Label(category.name, systemImage: category.icon)
                 }
@@ -338,42 +344,46 @@ struct ContentView: View {
             .navigationTitle("Categories")
             
         } content: {
-            // COLUMN 2: Content (Updates based on Column 1 selection)
+            
+            // --- COLUMN 2: CONTENT (MIDDLE COLUMN) ---
+            // "if let" safely checks: Is a category actually selected right now?
             if let selectedCategory {
+                // If yes, show a list of items. When one is tapped, save it to '$selectedItem'.
                 List(sampleItems, selection: $selectedItem) { item in
                     NavigationLink(value: item) {
                         Text(item.name)
                     }
                 }
-                .navigationTitle(selectedCategory.name)
+                .navigationTitle(selectedCategory.name) // Dynamically changes title to "Inbox", "Sent", etc.
             } else {
+                // If no category is selected yet, show this placeholder text instead of a blank column.
                 Text("Select a category")
                     .foregroundColor(.secondary)
             }
             
         } detail: {
-            // COLUMN 3: Detail (Updates based on Column 2 selection)
+            
+            // --- COLUMN 3: DETAIL (RIGHT COLUMN) ---
+            // Safely check: Did the user tap an item in the middle column yet?
             if let selectedItem {
+                // If yes, draw the final screen with the title and description text.
                 VStack(alignment: .leading, spacing: 16) {
                     Text(selectedItem.name)
                         .font(.largeTitle)
                         .bold()
                     Text(selectedItem.description)
                         .font(.body)
-                    Spacer()
+                    Spacer() // Pushes content to the top
                 }
                 .padding()
                 .navigationTitle("Details")
             } else {
+                // Placeholder text if they haven't picked an item yet.
                 Text("Select an item to view details")
                     .foregroundColor(.secondary)
             }
         }
     }
-}
-
-#Preview {
-    ContentView()
 }
 </pre>
 
@@ -392,6 +402,66 @@ Reactive Columns: Because the <code>content</code> block relies on <code>selecte
 </ul>
 <p>
 On your M4 iPad Air simulator, this will automatically display as three side-by-side columns when held in landscape mode.
+</p>
+
+<div id="Ai Insight-Three Panels-De-mystifying the Code"><h3 id="De-mystifying the Code" class="header"><a href="#Ai Insight-Three Panels-De-mystifying the Code">De-mystifying the Code</a></h3></div>
+
+<div id="Ai Insight-Three Panels-De-mystifying the Code-1. What does the { category in } part mean?"><h4 id="1. What does the { category in } part mean?" class="header"><a href="#Ai Insight-Three Panels-De-mystifying the Code-1. What does the { category in } part mean?">1. What does the { category in } part mean?</a></h4></div>
+
+<p>
+This is what Swift calls a Closure (specifically, trailing closure syntax). Think of it as a factory assembly line loop.
+</p>
+
+<p>
+When you write:
+</p>
+
+<pre swift>
+List(categories) { category in
+    Text(category.name)
+}
+</pre>
+
+<p>
+You are telling SwiftUI: <em>"Hey, take my array of 3 categories. Run through them one by one. Every time you pull one out, temporarily name it category, and run the code inside the brackets using it."</em>
+</p>
+
+<ul>
+<li>
+First loop: It grabs the "Inbox" item → names it <code>category</code> → builds a row for Inbox.
+
+<li>
+Second loop: It grabs the "Sent" item → names it <code>category</code> → builds a row for Sent.
+
+</ul>
+<p>
+The word <code>category</code> isn't a special keyword; you could literally change it to <code>{ sausage in Text(sausage.name) }</code> and it would work exactly the same. It's just a variable name you invent on the fly for the loop to use.
+</p>
+
+<div id="Ai Insight-Three Panels-De-mystifying the Code-2. What is Hashable for?"><h4 id="2. What is Hashable for?" class="header"><a href="#Ai Insight-Three Panels-De-mystifying the Code-2. What is Hashable for?">2. What is Hashable for?</a></h4></div>
+
+<p>
+<code>Identifiable</code> gives your struct a unique ID.
+</p>
+
+<p>
+<code>Hashable</code> gives your struct a unique digital fingerprint. SwiftUI needs <code>Hashable</code> for modern navigation because of how the state management works. Look at our list binding:
+</p>
+
+<pre swift>
+List(categories, selection: $selectedCategory)
+</pre>
+
+<p>
+When a user clicks "Inbox" on the screen, SwiftUI needs to take that entire <code>Category</code> struct and store it in your <code>@State private var selectedCategory</code> variable.
+</p>
+
+<p>
+Behind the scenes, to keep track of <code>which</code> complex data object is currently selected out of millions of possibilities, Swift converts that object into a single unique mathematical integer (a "hash value").
+</p>
+
+<p>
+Rule of Thumb: In modern SwiftUI, if you ever want to pass custom data models into a <code>NavigationLink</code>, a <code>List</code> selection binding, or a <code>.navigationDestination()</code> modifier, your data struct must conform to <code>Hashable</code>. Luckily, as long as your variables inside the struct are simple things like <code>String</code>, <code>Int</code>, or <code>UUID</code>, Swift automatically does 100% of the math for you just by typing , <code>Hashable</code>.
 </p>
 
 <div id="Ai Insight-Quick Comparison Table"><h2 id="Quick Comparison Table" class="header"><a href="#Ai Insight-Quick Comparison Table">Quick Comparison Table</a></h2></div>
