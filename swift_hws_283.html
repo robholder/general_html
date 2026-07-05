@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_283</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_282.html">Hacking With Swift - 282 - Using alert() and sheet() with optionals</a>
+
+</ul>
+<div id="Hacking With Swift - 283 - Using groups as transparent layout containers"><h1 id="Hacking With Swift - 283 - Using groups as transparent layout containers" class="header"><a href="#Hacking With Swift - 283 - Using groups as transparent layout containers">Hacking With Swift - 283 - Using groups as transparent layout containers</a></h1></div>
+
+<p>
+SwiftUI’s <code>Group</code> view might seem odd at first, because it doesn’t actually affect our layout at all. However, it performs an important purpose as a transparent layout container: it gives us the ability to add SwiftUI modifiers to multiple views without changing their layout, or send back multiple views without using <code>@ViewBuilder</code>.
+</p>
+
+<p>
+For example, this <code>UserView</code> has a <code>Group</code> containing three text views:
+</p>
+
+<pre swift>
+struct UserView: View {
+    var body: some View {
+        Group {
+            Text("Name: Paul")
+            Text("Country: England")
+            Text("Pets: Luna and Arya")
+        }
+        .font(.title)
+    }
+}
+</pre>
+
+<p>
+That group contains no layout information other than applying a font all three text views, so we don’t know whether the three text views will be stacked vertically, horizontally, or by depth. This is where the transparent layout behavior of <code>Group</code> becomes important: whatever parent places a <code>UserView</code> gets to decide how its text views get arranged.
+</p>
+
+<p>
+For example, we could create a <code>ContentView</code> like this:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @State private var layoutVertically = false
+
+    var body: some View {
+        Button {
+            layoutVertically.toggle()
+        } label: { 
+            if layoutVertically {
+                VStack {
+                    UserView()
+                }
+            } else {
+                HStack {
+                    UserView()
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+That flips between vertical and horizontal layout every time the button is tapped.
+</p>
+
+<p>
+You might wonder how often you need to have alternative layouts like this, but the answer might surprise you: it’s really common! You see, this is exactly what you want to happen when trying to write code that works across multiple device sizes - if we want layout to happen vertically when horizontal space is constrained, but horizontally otherwise. Apple provides a very simple solution called size classes, which is a thoroughly vague way of telling us how much space we have for our views.
+</p>
+
+<p>
+When I say "thoroughly vague" I mean it: we have only two size classes horizontally and vertically, called "compact" and "regular". That’s it - that covers all screen sizes from the largest iPad Pro in landscape down to the smallest iPhone in portrait. That doesn’t mean it’s useless - far from it! - just that it only lets us reason about our user interfaces in the broadest terms.
+</p>
+
+<p>
+To demonstrate size classes in action, we could create a view that has a property to track the current size class so we can switch between <code>VStack</code> and <code>HStack</code> automatically:
+</p>
+
+<pre swift>
+struct ContentView: View {
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+
+    var body: some View {
+        if horizontalSizeClass == .compact {
+            VStack {
+                UserView()
+            }
+        } else {
+            HStack {
+                UserView()
+            }
+        }
+    }
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 283 - Using groups as transparent layout containers-Tip"></span><strong id="Tip">Tip</strong>: In situations like this, where you have only one view inside a stack and it doesn’t take any parameters, you can pass the view’s initializer directly to the <code>VStack</code> to make your code shorter:
+</p>
+
+<pre swift>
+if sizeClass == .compact {
+    VStack(content: UserView.init)
+} else {
+    HStack(content: UserView.init)
+}
+</pre>
+
+<p>
+I know short code isn’t everything, but this technique is pleasingly concise when you’re using this approach to grouped view layout.
+</p>
+
+<p>
+What you see when that code runs depends on the device you’re using. For example, an iPhone 15 Pro will have a compact horizontal size class in both portrait and landscape, whereas an iPhone 15 Pro Max will have a <em>regular</em> horizontal size class when in landscape.
+</p>
+
+<p>
+Regardless of whether we’re toggling our layout using size classes or buttons, the point is that <code>UserView</code> just doesn’t care - its <code>Group</code> simply groups the text views together without affecting their layout at all, so the layout arrangement <code>UserView</code> is given depends entirely on how it’s used.
+</p>
+
+<p>
+Before I'm done, I want to mention that SwiftUI does provide a view that goes some way towards making this behavior easier. It's called <code>ViewThatFits</code>, and you can provide it with several different layouts - it will automatically try each one in order until it finds one that can be fitted into the available space.
+</p>
+
+<p>
+For example, this will attempt to show a 500x200 rectangle by default, but if that can't fit into the available space it will show a 200x200 circle instead:
+</p>
+
+<pre swift>
+ViewThatFits {
+    Rectangle()
+        .frame(width: 500, height: 200)
+
+    Circle()
+        .frame(width: 200, height: 200)
+}
+</pre>
+
+<p>
+If you can use <code>ViewThatFits</code> then you should, because if you show the same view in several different forms then SwiftUI will correctly preserve that view's state as the layout changes. However, it does limit how much control you get!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+ 
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
