@@ -237,7 +237,115 @@ struct ContentView: View {
 </pre>
 
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
 <p>
+How would we do the <code>@State private var selectedUser = User? = nil</code> if <code>User</code> is a SwiftData class?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+When working with SwiftData, handling model instances in <code>@State</code> variables changes slightly because SwiftData objects are managed classes bound to a persistent context.
+</p>
+
+<p>
+If <code>User</code> is a SwiftData <code>@Model</code> class, you <span id="Ai Insight-ANSWER-can"></span><strong id="can">can</strong> still use <code>@State private var selectedUser: User? = nil</code> exactly as you wrote it. However, because it is now a class rather than a struct, there are a few important rules and adjustments you must make.
+</p>
+
+<p>
+Here is the updated, working SwiftData version of your code, followed by an explanation of what changed:
+</p>
+
+<pre swift>
+import SwiftUI
+import SwiftData
+
+@main
+struct SnowSeekerApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        // Don't forget to set a container for User class
+        .modelContainer(for: User.self)
+    }
+}
+// 1. Define your SwiftData Class (Must be a class, and must use @Model)
+@Model
+class User: Identifiable {
+    // SwiftData classes don't strictly require an 'id' property because
+    // they get a hidden persistent 'id' automatically, but keeping it as a property is fine.
+    var id: String
+    
+    init(id: String) {
+        self.id = id
+    }
+}
+
+struct ContentView: View {
+    // 2. Access the SwiftData context so we can save new users to the database
+    @Environment(\.modelContext) private var modelContext
+    
+    // 3. This stays EXACTLY the same! SwiftData models work natively with @State pointers.
+    @State private var selectedUser: User? = nil
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Selected: \(selectedUser?.id ?? "None")")
+            
+            Button("Tap Me") {
+                // 4. Create the new SwiftData object
+                let newUser = User(id: "Taylor Swift")
+                
+                // 5. CRITICAL: Insert it into your SwiftData context before using it
+                modelContext.insert(newUser)
+                
+                // 6. Assign it to your state to trigger the sheet
+                selectedUser = newUser
+            }
+        }
+        .sheet(item: $selectedUser) { user in
+            Text("Sheet for: \(user.id)")
+        }
+    }
+}
+
+#Preview {
+    // 7. Setup an in-memory container just for the Xcode preview to work
+    ContentView()
+        .modelContainer(for: User.self, inMemory: true)
+}
+</pre>
+
+<div id="Ai Insight-3 Crucial Adjustments for SwiftData"><h2 id="3 Crucial Adjustments for SwiftData" class="header"><a href="#Ai Insight-3 Crucial Adjustments for SwiftData">3 Crucial Adjustments for SwiftData</a></h2></div>
+
+<div id="Ai Insight-3 Crucial Adjustments for SwiftData-1. The @Model macro replaces struct"><h3 id="1. The @Model macro replaces struct" class="header"><a href="#Ai Insight-3 Crucial Adjustments for SwiftData-1. The @Model macro replaces struct">1. The @Model macro replaces struct</a></h3></div>
+
+<p>
+SwiftData requires your data to be a class, not a struct. When you add <code>@Model</code> above a class, SwiftData automatically injects the <code>Identifiable</code> and <code>Hashable</code> functionality behind the scenes.
+</p>
+
+<div id="Ai Insight-3 Crucial Adjustments for SwiftData-2. You must .insert() before assigning"><h3 id="2. You must .insert() before assigning" class="header"><a href="#Ai Insight-3 Crucial Adjustments for SwiftData-2. You must .insert() before assigning">2. You must .insert() before assigning</a></h3></div>
+
+<p>
+In the original struct code, <code>User(id: "Taylor Swift")</code> simply created a transient piece of data in memory.
+</p>
+
+<p>
+In SwiftData, when you instantiate a new class object, it lives in a detached state. If you try to pass a detached object into a <code>.sheet(item:)</code>, SwiftUI can lose track of it or fail to save updates. You must use <code>modelContext.insert(newUser)</code> first to register it with the database.
+</p>
+
+<div id="Ai Insight-3 Crucial Adjustments for SwiftData-3. Preview Container Requirement"><h3 id="3. Preview Container Requirement" class="header"><a href="#Ai Insight-3 Crucial Adjustments for SwiftData-3. Preview Container Requirement">3. Preview Container Requirement</a></h3></div>
+
+<p>
+Because <code>User</code> is now tied to a database ecosystem, <code>ContentView()</code> will crash in your Xcode Preview unless you attach an in-memory database container to it, which is what <code>.modelContainer(for: User.self, inMemory: true)</code> does at the very bottom of the file.
+</p>
+
+<p>
+And don't forget to add a <code>.modelContainer(for: User.self)</code> to the App struct.
 <hr>
 <br>
 </p>
