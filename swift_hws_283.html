@@ -35,6 +35,8 @@
 SwiftUI’s <code>Group</code> view might seem odd at first, because it doesn’t actually affect our layout at all. However, it performs an important purpose as a transparent layout container: it gives us the ability to add SwiftUI modifiers to multiple views without changing their layout, or send back multiple views without using <code>@ViewBuilder</code>.
 </p>
 
+<div id="Hacking With Swift - 283 - Using groups as transparent layout containers-Flip Stack Example"><h2 id="Flip Stack Example" class="header"><a href="#Hacking With Swift - 283 - Using groups as transparent layout containers-Flip Stack Example">Flip Stack Example</a></h2></div>
+
 <p>
 For example, this <code>UserView</code> has a <code>Group</code> containing three text views:
 </p>
@@ -86,8 +88,18 @@ struct ContentView: View {
 That flips between vertical and horizontal layout every time the button is tapped.
 </p>
 
+<div id="Hacking With Swift - 283 - Using groups as transparent layout containers-Size Classes"><h2 id="Size Classes" class="header"><a href="#Hacking With Swift - 283 - Using groups as transparent layout containers-Size Classes">Size Classes</a></h2></div>
+
 <p>
-You might wonder how often you need to have alternative layouts like this, but the answer might surprise you: it’s really common! You see, this is exactly what you want to happen when trying to write code that works across multiple device sizes - if we want layout to happen vertically when horizontal space is constrained, but horizontally otherwise. Apple provides a very simple solution called size classes, which is a thoroughly vague way of telling us how much space we have for our views.
+You might wonder how often you need to have alternative layouts like this, but the answer might surprise you: it’s really common!
+</p>
+
+<p>
+You see, this is exactly what you want to happen when trying to write code that works across multiple device sizes - if we want layout to happen vertically when horizontal space is constrained, but horizontally otherwise.
+</p>
+
+<p>
+Apple provides a very simple solution called size classes, which is a thoroughly vague way of telling us how much space we have for our views.
 </p>
 
 <p>
@@ -116,8 +128,16 @@ struct ContentView: View {
 }
 </pre>
 
+<table>
+<tr>
+<td>
+NOTE: This next tip doesn't play well in modern SwiftUI. See Ai Insight below.
+</td>
+</tr>
+</table>
+
 <p>
-<span id="Hacking With Swift - 283 - Using groups as transparent layout containers-Tip"></span><strong id="Tip">Tip</strong>: In situations like this, where you have only one view inside a stack and it doesn’t take any parameters, you can pass the view’s initializer directly to the <code>VStack</code> to make your code shorter:
+<span id="Hacking With Swift - 283 - Using groups as transparent layout containers-Size Classes-Tip"></span><strong id="Tip">Tip</strong>: In situations like this, where you have only one view inside a stack and it doesn’t take any parameters, you can pass the view’s initializer directly to the <code>VStack</code> to make your code shorter:
 </p>
 
 <pre swift>
@@ -140,6 +160,8 @@ What you see when that code runs depends on the device you’re using. For examp
 Regardless of whether we’re toggling our layout using size classes or buttons, the point is that <code>UserView</code> just doesn’t care - its <code>Group</code> simply groups the text views together without affecting their layout at all, so the layout arrangement <code>UserView</code> is given depends entirely on how it’s used.
 </p>
 
+<div id="Hacking With Swift - 283 - Using groups as transparent layout containers-View That Fits"><h2 id="View That Fits" class="header"><a href="#Hacking With Swift - 283 - Using groups as transparent layout containers-View That Fits">View That Fits</a></h2></div>
+
 <p>
 Before I'm done, I want to mention that SwiftUI does provide a view that goes some way towards making this behavior easier. It's called <code>ViewThatFits</code>, and you can provide it with several different layouts - it will automatically try each one in order until it finds one that can be fitted into the available space.
 </p>
@@ -161,6 +183,193 @@ ViewThatFits {
 <p>
 If you can use <code>ViewThatFits</code> then you should, because if you show the same view in several different forms then SwiftUI will correctly preserve that view's state as the layout changes. However, it does limit how much control you get!
 </p>
+
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+In the example of passing the view's initializer into a stack...
+</p>
+
+<pre swift>
+if sizeClass == .compact {
+    VStack(content: UserView.init)
+} else {
+    HStack(content: UserView.init)
+}
+</pre>
+
+<p>
+...I get this error:
+</p>
+
+<pre text>
+Call to main actor-isolated initializer 'init()' in a synchronous nonisolated context
+</pre>
+
+<p>
+What's wrong?
+</p>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+The error occurs because of stricter concurrency safety rules introduced in recent Swift updates.
+</p>
+
+<p>
+In SwiftUI, all <code>View</code> types are automatically isolated to the <code>@MainActor</code> (meaning they are strictly forced to run on the main user-interface thread to prevent crashes).
+</p>
+
+<p>
+When you write <code>UserView.init</code> as a direct function reference, you are passing the initializer into the <code>VStack</code> and <code>HStack</code> as a generic, un-isolated piece of code. The compiler panics because it cannot guarantee that this naked <code>init()</code> function won't be accidentally triggered on a dangerous background thread.
+</p>
+
+<div id="Ai Insight-ANSWER-How to Fix It"><h3 id="How to Fix It" class="header"><a href="#Ai Insight-ANSWER-How to Fix It">How to Fix It</a></h3></div>
+
+<p>
+To make the compiler happy, you just need to explicitly instantiate the view inside a standard SwiftUI <code>@ViewBuilder</code> closure (using curly braces <code>{ }</code>). This tells Swift exactly which context the initializer is running in.
+</p>
+
+<p>
+Here is the updated, error-free code (which is the same code given initially in the tutorial - but here with comments):
+</p>
+
+<pre swift>
+import SwiftUI
+
+struct UserView: View {
+    var body: some View {
+        Group {
+            Text("Name: Paul")
+            Text("Country: England")
+            Text("Pets: Luna and Arya")
+        }
+        .font(.title)
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    
+    var body: some View {
+        // Wrap the layout choices inside a container like a VStack or Group
+        // so SwiftUI can handle the conditional rendering safely.
+        Group {
+            if horizontalSizeClass == .compact {
+                // FIX: Use traditional closure braces instead of 'content: UserView.init'
+                VStack {
+                    UserView()
+                }
+            } else {
+                // FIX: Use traditional closure braces instead of 'content: UserView.init'
+                HStack {
+                    UserView()
+                }
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-ANSWER-How to Fix It-Why did Paul Hudson's code use UserView.init?"><h4 id="Why did Paul Hudson's code use UserView.init?" class="header"><a href="#Ai Insight-ANSWER-How to Fix It-Why did Paul Hudson's code use UserView.init?">Why did Paul Hudson's code use UserView.init?</a></h4></div>
+
+<p>
+When Paul Hudson originally wrote that tutorial, older versions of Swift allowed you to pass initializers as arguments (<code>UserView.init</code>) as a clever shorthand.
+</p>
+
+<p>
+However, as Apple finalized <span id="Ai Insight-ANSWER-How to Fix It-Why did Paul Hudson's code use UserView.init?-Swift 6 Data Isolation"></span><strong id="Swift 6 Data Isolation">Swift 6 Data Isolation</strong>, they locked down initializer references to prevent multithreading bugs. Wrapping your views inside standard trailing closures (<code>VStack { UserView() }</code>) ensures the code inherits the proper <code>@MainActor</code> main-thread safety automatically.
+</p>
+
+<div id="Ai Insight-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Insight-QUESTION">QUESTION</a></h2></div>
+
+<p>
+What about this syntax? Does this work in Swift 6?
+</p>
+
+<pre swift>
+ViewThatFits {
+Rectangle()
+.frame(width: 500, height: 200)
+
+Circle()
+.frame(width: 200, height: 200)}
+</pre>
+
+<div id="Ai Insight-ANSWER"><h2 id="ANSWER" class="header"><a href="#Ai Insight-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, this syntax works perfectly in Swift 6!
+</p>
+
+<p>
+In fact, using <code>ViewThatFits</code> is the modern, preferred way to handle this exact layout challenge without having to manually inspect the <code>@Environment(\.horizontalSizeClass)</code> like you did in the previous example.
+</p>
+
+<div id="Ai Insight-ANSWER-Why it works safely in Swift 6"><h3 id="Why it works safely in Swift 6" class="header"><a href="#Ai Insight-ANSWER-Why it works safely in Swift 6">Why it works safely in Swift 6</a></h3></div>
+
+<p>
+In your previous example, the compiler threw an error because <code>UserView.init</code> passed a naked function pointer across thread boundaries.
+</p>
+
+<p>
+With <code>ViewThatFits</code>, you are using standard trailing closure syntax (<code>{ ... }</code>). This closure is implicitly marked with <code>@ViewBuilder</code> and correctly inherits <code>@MainActor</code> isolation. Swift 6 is perfectly happy because it knows every view inside those braces is safely bound to the main user-interface thread.
+</p>
+
+<div id="Ai Insight-ANSWER-How ViewThatFits works behind the scenes"><h3 id="How ViewThatFits works behind the scenes" class="header"><a href="#Ai Insight-ANSWER-How ViewThatFits works behind the scenes">How ViewThatFits works behind the scenes</a></h3></div>
+
+<p>
+<code>ViewThatFits</code> acts like an automated triage system for your layouts:
+</p>
+
+<ul>
+<li>
+It evaluates your views in the exact order you list them (from top to bottom).
+
+<li>
+It looks at the first view (<code>Rectangle</code>) and tests: <em>"Can a 500-point wide box fit onto the current screen without clipping or overflowing?"</em>
+
+<li>
+If it fits (like on a large iPad or Mac screen), it renders the <code>Rectangle</code> and completely ignores the code below it.
+
+<li>
+If it <span id="Ai Insight-ANSWER-How ViewThatFits works behind the scenes-doesn't"></span><strong id="doesn't">doesn't</strong> fit (like on a vertical iPhone screen), it seamlessly drops down to the next option (<code>Circle</code>) and checks if a 200-point wide shape fits instead.
+
+</ul>
+<div id="Ai Insight-ANSWER-When to use this over horizontalSizeClass"><h3 id="When to use this over horizontalSizeClass" class="header"><a href="#Ai Insight-ANSWER-When to use this over horizontalSizeClass">When to use this over horizontalSizeClass</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Approach
+</th>
+<th>
+Best Used For
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+ViewThatFits
+</td>
+<td>
+Sizing-specific fixes. (e.g., preventing a long string of text or a button group from clipping on smaller iPhones). It responds purely to physical pixel constraints.
+</td>
+</tr>
+<tr>
+<td>
+horizontalSizeClass
+</td>
+<td>
+Structural design shifts. (e.g., completely changing an app's layout from a bottom tab bar on iPhone to a side navigation bar on iPad).
+</td>
+</tr>
+</tbody>
+</table>
 
 <p>
 <hr>
