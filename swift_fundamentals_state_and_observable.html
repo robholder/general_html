@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_state_and_observable</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - @Observable &amp; @State"><h1 id="Swift - @Observable &amp; @State" class="header"><a href="#Swift - @Observable &amp; @State">Swift - @Observable &amp; @State</a></h1></div>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types"><h2 id="The Core Concept: Value Types vs. Reference Types" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types">The Core Concept: Value Types vs. Reference Types</a></h2></div>
+
+<p>
+To understand how state works in modern SwiftUI, you must first ask: What kind of data am I tracking?
+</p>
+<ul>
+<li>
+<code>@State</code> (on its own): Used for Value Types (structs, strings, integers, arrays, enums). The data lives directly inside the view.
+
+<li>
+<code>@Observable</code> + <code>@State</code>: Used for Reference Types (classes). The data lives in a separate shared object, and the view watches it for changes.
+
+</ul>
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-1. Local Value State: @State (with Structs/Primitives)"><h3 id="1. Local Value State: @State (with Structs/Primitives)" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-1. Local Value State: @State (with Structs/Primitives)">1. Local Value State: @State (with Structs/Primitives)</a></h3></div>
+
+<p>
+When your data is simple and belongs entirely to a single view, use a struct or a primitive type combined with the <code>@State</code> property wrapper.
+</p>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-1. Local Value State: @State (with Structs/Primitives)-The Rule"><h4 id="The Rule" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-1. Local Value State: @State (with Structs/Primitives)-The Rule">The Rule</a></h4></div>
+
+<p>
+<code>@State</code> tells SwiftUI to manage the storage for this data. When the value changes, SwiftUI automatically redraws any view reading that data.
+</p>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-1. Local Value State: @State (with Structs/Primitives)-Code Blueprint"><h4 id="Code Blueprint" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-1. Local Value State: @State (with Structs/Primitives)-Code Blueprint">Code Blueprint</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct CounterView: View {
+    // Storing a simple value type directly inside the view
+    @State private var count = 0
+    @State private var userName = ""
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("\(userName)'s Count: \(count)")
+            
+            Button("Increment") {
+                count += 1 // Directly modifying triggers a redraw
+            }
+            
+            // The '$' creates a two-way binding so the Textfield can write back to 'userName'
+            TextField("Enter name", text: $userName)
+                .textFieldStyle(.roundedBorder)
+        }
+        .padding()
+    }
+}
+</pre>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-2. Object Observation: @Observable + @State (with Classes)"><h3 id="2. Object Observation: @Observable + @State (with Classes)" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-2. Object Observation: @Observable + @State (with Classes)">2. Object Observation: @Observable + @State (with Classes)</a></h3></div>
+
+<p>
+When your data is complex, manages business logic, or needs to be shared across multiple views, use a Class marked with the <code>@Observable</code> macro. To instantiate it inside a view, you pair it with <code>@State</code>.
+</p>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-2. Object Observation: @Observable + @State (with Classes)-The Rule"><h4 id="The Rule" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-2. Object Observation: @Observable + @State (with Classes)-The Rule">The Rule</a></h4></div>
+
+<p>
+The <code>@Observable</code> macro tracks property reads and writes automatically. You no longer need to type <code>@Published</code> on properties or conform to <code>ObservableObject</code>. When a view reads a property of an <code>@Observable</code> class, SwiftUI takes note and redraws only if that exact property changes.
+</p>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-2. Object Observation: @Observable + @State (with Classes)-Code Blueprint"><h4 id="Code Blueprint" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-2. Object Observation: @Observable + @State (with Classes)-Code Blueprint">Code Blueprint</a></h4></div>
+
+<pre swift>
+import SwiftUI
+import Observation // Implicitly imported by SwiftUI, but good to know
+
+// 1. Define your data model or model facade using the macro
+@Observable
+class UserProfile {
+    var name: String = "Taylor"
+    var age: Int = 26
+    var status: String = "Active"
+    
+    func celebrateBirthday() {
+        age += 1 // Changes to 'age' will only redraw views reading 'age'
+    }
+}
+
+struct ProfileView: View {
+    // 2. Instantiate the reference type using @State to keep it alive
+    @State private var profile = UserProfile()
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Reading 'name' and 'age' registers this view for updates
+            Text("Name: \(profile.name)")
+            Text("Age: \(profile.age)") 
+            
+            Button("Birthday Bash") {
+                profile.celebrateBirthday()
+            }
+            
+            // Pass the managed object down to a child view
+            ChildProfileEditor(profile: profile)
+        }
+    }
+}
+</pre>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-3. Passing @Observable Objects to Child Views"><h3 id="3. Passing @Observable Objects to Child Views" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-3. Passing @Observable Objects to Child Views">3. Passing @Observable Objects to Child Views</a></h3></div>
+
+<p>
+When you want a sub-view to read or modify your <code>@Observable</code> object, pass it as a regular property. You do not need a property wrapper on the child view to read it.
+</p>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-3. Passing @Observable Objects to Child Views-Code Blueprint"><h4 id="Code Blueprint" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-3. Passing @Observable Objects to Child Views-Code Blueprint">Code Blueprint</a></h4></div>
+
+<pre swift>
+struct ChildProfileEditor: View {
+    // 1. Just a standard, plain property! No @ObservedObject or @Binding needed to read.
+    var profile: UserProfile
+
+    var body: some View {
+        VStack {
+            Text("Editing: \(profile.name)")
+            
+            // 2. CRITICAL: If you need a two-way binding for UI controls (like Textfields),
+            // use the @Bindable wrapper locally right inside the body block.
+            @Bindable var bindableProfile = profile
+            TextField("Change Name", text: $bindableProfile.name)
+                .textFieldStyle(.roundedBorder)
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+    }
+}
+</pre>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-Quick-Reference Summary Table"><h3 id="Quick-Reference Summary Table" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-Quick-Reference Summary Table">Quick-Reference Summary Table</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+What are you tracking?
+</th>
+<th>
+Data Type
+</th>
+<th>
+Declaration Wrapper
+</th>
+<th>
+Injection in Child View
+</th>
+<th>
+Two-Way Binding Syntax ($)
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Simple Local Values (Toggle state, integers, strings)
+</td>
+<td>
+struct / Primitives
+</td>
+<td>
+@State private var ...
+</td>
+<td>
+Pass as a standard Binding (@Binding var ...)
+</td>
+<td>
+Built-in: Use $variableName
+</td>
+</tr>
+<tr>
+<td>
+Complex Complex Objects (Data stores, managers, view models)
+</td>
+<td>
+@Observable class
+</td>
+<td>
+@State private var ...
+</td>
+<td>
+Pass as a standard property (var object: Model)	Use @Bindable inside the child view body
+</td>
+<td>
+&nbsp;
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-3 Pillars of Modern Observation to Remember"><h3 id="3 Pillars of Modern Observation to Remember" class="header"><a href="#Swift - @Observable &amp; @State-The Core Concept: Value Types vs. Reference Types-3 Pillars of Modern Observation to Remember">3 Pillars of Modern Observation to Remember</a></h3></div>
+
+<ul>
+<li>
+Precision Updates: Unlike the older <code>ObservableObject</code> system, which forced the entire view hierarchy to redraw whenever any property changed, <code>@Observable</code> is precise. If <code>ProfileView</code> reads <code>profile.name</code> but doesn't read <code>profile.status</code>, a change to <code>profile.status</code> will not trigger a redraw of that view.
+
+<li>
+Implicit Binding Creation: If you don't need a text field or toggle to mutate a property, just read the property normally (e.g., <code>Text(profile.name)</code>). Only use <code>@Bindable</code> when interacting with input controls.
+
+<li>
+Memory Safety: Always use <code>@State</code> when instantiating your class inside a view (<code>@State private var profile = UserProfile()</code>). This ensures SwiftUI creates the object exactly once and doesn't accidentally destroy and recreate it when the parent view updates.
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
