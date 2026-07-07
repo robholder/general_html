@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_286</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_285.html">Hacking With Swift - 285 - Sharing @Obervable objects through SwiftUI's environment</a>
+
+</ul>
+<div id="Hacking With Swift - 286 - Building a primary list of items"><h1 id="Hacking With Swift - 286 - Building a primary list of items" class="header"><a href="#Hacking With Swift - 286 - Building a primary list of items">Hacking With Swift - 286 - Building a primary list of items</a></h1></div>
+
+<p>
+Today we’re going to implement the first half of our program, which means we’ll get a list of ski resorts, a detail view to show more information, and a <code>NavigationSplitView</code> that can show them side by side.
+</p>
+
+<p>
+That by itself shouldn’t present a problem for you, but along the way you’ll also learn about loading static example data from the bundle, controlling how <code>NavigationSplitView</code> should show primary and secondary views on iPhone, and even how to format lists of strings more neatly.
+</p>
+
+<p>
+Although you already know so much of what is needed to make this code work, we’re still here on Day 97 introducing new things to learn. I hope you’re not discouraged by that - learning is an important skill, and in programming as well as many other industries you can find yourself constantly trying new things throughout your whole career.
+</p>
+
+<p>
+That might feel hard at times, but as the Spanish painter Pablo Picasso once said:
+</p>
+
+<p>
+<blockquote>
+"I am always doing that which I cannot do, in order that I may learn how to do it."
+</blockquote>
+</p>
+
+<p>
+So, keep learning and be proud to <em>say</em> you’re still learning - it’s an important skill to have!
+</p>
+
+<div id="Hacking With Swift - 286 - Building a primary list of items-Building A Primary List Of Items"><h2 id="Building A Primary List Of Items" class="header"><a href="#Hacking With Swift - 286 - Building a primary list of items-Building A Primary List Of Items">Building A Primary List Of Items</a></h2></div>
+
+<p>
+In this app we’re going to display two views side by side, just like Apple’s Mail and Notes apps. In SwiftUI this is done by placing two views into a <code>NavigationSplitView</code>, then using a <code>NavigationLink</code> in the primary view to control what’s visible in the secondary view.
+</p>
+
+<p>
+So, we’re going to start off our project by building the primary view for our app, which will show a list of all ski resorts, along with which country they are from and how many ski runs it has - how many pistes you can ski down, sometimes called "trails" or just "slopes".
+</p>
+
+<p>
+I’ve provided some assets for this project in the GitHub repository for this book, so if you haven’t already downloaded them please do so now. You should drag resorts.json into your project navigator, then copy all the pictures into your asset catalog. You might notice that I’ve included 2x and 3x images for the countries, but only 2x pictures for the resorts. This is intentional: those flags are going to be used for both retina and Super Retina devices, but the resort pictures are designed to fill all the space on an iPad Pro - they are more than big enough for a Super Retina iPhone even at 2x resolution.
+</p>
+
+<p>
+To get our list up and running quickly, we need to define a simple <code>Resort</code> struct that can be loaded from our JSON. That means it needs to conform to <code>Codable</code>, but to make it easier to use in SwiftUI we’ll also make it conform to both <code>Hashable</code> and <code>Identifiable</code>.
+</p>
+
+<p>
+The actual data itself is mostly just strings and integers, but there’s also a string array called <code>facilities</code> that describe what else there is on the resort - I should add that this data is mostly fictional, so don’t try to use it in a real app!
+</p>
+
+<p>
+Create a new Swift file called Resort.swift, then give it this code:
+</p>
+
+<pre swift>
+struct Resort: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var country: String
+    var description: String
+    var imageCredit: String
+    var price: Int
+    var size: Int
+    var snowDepth: Int
+    var elevation: Int
+    var runs: Int
+    var facilities: [String]
+}
+</pre>
+
+<p>
+As usual, it’s a good idea to add an example value to your model so that it’s easier to show working data in your designs. This time, though, there are quite a few fields to work with and it’s helpful if they have real data, so I don’t really want to create one by hand.
+</p>
+
+<p>
+Instead, we’re going to load an array of resorts from JSON stored in our app bundle, which means we can re-use the same code we wrote for project 8 - the Bundle-Decodable.swift extension. If you still have yours, you can drop it into your new project, but if not then create a new Swift file called Bundle-Decodable.swift and give it this code:
+</p>
+
+<pre swift>
+extension Bundle {
+    func decode&lt;T: Decodable&gt;(_ file: String) -&gt; T {
+        guard let url = self.url(forResource: file, withExtension: nil) else {
+            fatalError("Failed to locate \(file) in bundle.")
+        }
+
+        guard let data = try? Data(contentsOf: url) else {
+            fatalError("Failed to load \(file) from bundle.")
+        }
+
+        let decoder = JSONDecoder()
+
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch DecodingError.keyNotFound(let key, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing key '\(key.stringValue)' - \(context.debugDescription)")
+        } catch DecodingError.typeMismatch(_, let context) {
+            fatalError("Failed to decode \(file) from bundle due to type mismatch - \(context.debugDescription)")
+        } catch DecodingError.valueNotFound(let type, let context) {
+            fatalError("Failed to decode \(file) from bundle due to missing \(type) value - \(context.debugDescription)")
+        } catch DecodingError.dataCorrupted(_) {
+            fatalError("Failed to decode \(file) from bundle because it appears to be invalid JSON.")
+        } catch {
+            fatalError("Failed to decode \(file) from bundle: \(error.localizedDescription)")
+        }
+    }
+}
+</pre>
+
+<p>
+With that in place, we can add some properties to <code>Resort</code> to store our example data, and there are two options here. The first option is to add two static properties: one to load all resorts into an array, and one to store the first item in that array, like this:
+</p>
+
+<pre swift>
+static let allResorts: [Resort] = Bundle.main.decode("resorts.json")
+static let example = allResorts[0]
+</pre>
+
+<p>
+The second is to collapse all that down to a single line of code. This requires a little bit of gentle typecasting because our <code>decode()</code> extension method needs to know what type of data it’s decoding:
+</p>
+
+<pre swift>
+static let example = (Bundle.main.decode("resorts.json") as [Resort])[0]
+</pre>
+
+<p>
+Of the two, I prefer the first option because it’s simpler and has a little more use if we wanted to show random examples rather than the same one again and again. In case you were curious, when we use <code>static let</code> for properties, Swift automatically makes them lazy - they don’t get created until they are used. This means when we try to read <code>Resort.example</code> Swift will be forced to create <code>Resort.allResorts</code> first, then send back the first item in that array for <code>Resort.example</code>. This means we can always be sure the two properties will be run in the correct order - there’s no chance of <code>example</code> going missing because <code>allResorts</code> wasn’t called yet.
+</p>
+
+<p>
+Now that our simple <code>Resort</code> struct is done, we can also use that same <code>Bundle</code> extension to add a property to <code>ContentView</code> that loads all our resorts into a single array:
+</p>
+
+<pre swift>
+let resorts: [Resort] = Bundle.main.decode("resorts.json")
+</pre>
+
+<p>
+For the body of our view, we’re going to use a <code>NavigationSplitView</code> with a <code>List</code> inside it, showing all our resorts. In each row we’re going to show:
+</p>
+
+<ul>
+<li>
+A 40x25 flag of which country the resort is in.
+
+<li>
+The name of the resort.
+
+<li>
+How many runs it has.
+
+</ul>
+<p>
+40x25 is smaller than our flag source image, and also a different aspect ratio, but we can fix that by using <code>resizable()</code>, <code>scaledToFill()</code>, and a custom frame. To make it look a little better on the screen, we’ll use a custom clip shape and a stroked overlay.
+</p>
+
+<p>
+When the row is tapped we’re going to push to a detail view showing more information about the resort, but we haven’t built that yet so instead we’ll just push to a temporary text view as a placeholder.
+</p>
+
+<p>
+Replace your current <code>body</code> property with this:
+</p>
+
+<pre swift>
+NavigationSplitView {
+    List(resorts) { resort in
+        NavigationLink(value: resort) {
+            HStack {
+                Image(resort.country)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 25)
+                    .clipShape(
+                        .rect(cornerRadius: 5)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(.black, lineWidth: 1)
+                    )
+
+                VStack(alignment: .leading) {
+                    Text(resort.name)
+                        .font(.headline)
+                    Text("\(resort.runs) runs")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+    .navigationTitle("Resorts")
+} detail: {
+    Text("Detail")
+}
+</pre>
+
+<p>
+Go ahead and run the app now and you should see it looks good enough - make sure you try it in both portrait and landscape, on both iPhone and iPad.
+</p>
+
+<p>
+Now let's try to fill in that detail view...
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+ 
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
