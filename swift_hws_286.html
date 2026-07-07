@@ -113,6 +113,8 @@ Create a new Swift file called Resort.swift, then give it this code:
 </p>
 
 <pre swift>
+import SwiftUI
+
 struct Resort: Codable, Hashable, Identifiable {
     var id: String
     var name: String
@@ -128,6 +130,8 @@ struct Resort: Codable, Hashable, Identifiable {
 }
 </pre>
 
+<div id="Building A Primary List Of Items-Loading JSON Arrays"><h2 id="Loading JSON Arrays" class="header"><a href="#Building A Primary List Of Items-Loading JSON Arrays">Loading JSON Arrays</a></h2></div>
+
 <p>
 As usual, it’s a good idea to add an example value to your model so that it’s easier to show working data in your designs. This time, though, there are quite a few fields to work with and it’s helpful if they have real data, so I don’t really want to create one by hand.
 </p>
@@ -135,6 +139,14 @@ As usual, it’s a good idea to add an example value to your model so that it’
 <p>
 Instead, we’re going to load an array of resorts from JSON stored in our app bundle, which means we can re-use the same code we wrote for project 8 - the Bundle-Decodable.swift extension. If you still have yours, you can drop it into your new project, but if not then create a new Swift file called Bundle-Decodable.swift and give it this code:
 </p>
+
+<table>
+<tr>
+<td>
+NOTE: See commented version further below.
+</td>
+</tr>
+</table>
 
 <pre swift>
 extension Bundle {
@@ -166,6 +178,8 @@ extension Bundle {
 }
 </pre>
 
+<div id="Building A Primary List Of Items-Loading JSON Arrays-Making Example Data"><h3 id="Making Example Data" class="header"><a href="#Building A Primary List Of Items-Loading JSON Arrays-Making Example Data">Making Example Data</a></h3></div>
+
 <p>
 With that in place, we can add some properties to <code>Resort</code> to store our example data, and there are two options here. The first option is to add two static properties: one to load all resorts into an array, and one to store the first item in that array, like this:
 </p>
@@ -184,8 +198,14 @@ static let example = (Bundle.main.decode("resorts.json") as [Resort])[0]
 </pre>
 
 <p>
-Of the two, I prefer the first option because it’s simpler and has a little more use if we wanted to show random examples rather than the same one again and again. In case you were curious, when we use <code>static let</code> for properties, Swift automatically makes them lazy - they don’t get created until they are used. This means when we try to read <code>Resort.example</code> Swift will be forced to create <code>Resort.allResorts</code> first, then send back the first item in that array for <code>Resort.example</code>. This means we can always be sure the two properties will be run in the correct order - there’s no chance of <code>example</code> going missing because <code>allResorts</code> wasn’t called yet.
+Of the two, I prefer the first option because it’s simpler and has a little more use if we wanted to show random examples rather than the same one again and again.
 </p>
+
+<p>
+In case you were curious, when we use <code>static let</code> for properties, Swift automatically makes them lazy - they don’t get created until they are used. This means when we try to read <code>Resort.example</code> Swift will be forced to create <code>Resort.allResorts</code> first, then send back the first item in that array for <code>Resort.example</code>. This means we can always be sure the two properties will be run in the correct order - there’s no chance of <code>example</code> going missing because <code>allResorts</code> wasn’t called yet.
+</p>
+
+<div id="Building A Primary List Of Items-Loading JSON Arrays-Loading the Data to the App"><h3 id="Loading the Data to the App" class="header"><a href="#Building A Primary List Of Items-Loading JSON Arrays-Loading the Data to the App">Loading the Data to the App</a></h3></div>
 
 <p>
 Now that our simple <code>Resort</code> struct is done, we can also use that same <code>Bundle</code> extension to add a property to <code>ContentView</code> that loads all our resorts into a single array:
@@ -194,6 +214,8 @@ Now that our simple <code>Resort</code> struct is done, we can also use that sam
 <pre swift>
 let resorts: [Resort] = Bundle.main.decode("resorts.json")
 </pre>
+
+<div id="Building A Primary List Of Items-Formatting the List Layout"><h2 id="Formatting the List Layout" class="header"><a href="#Building A Primary List Of Items-Formatting the List Layout">Formatting the List Layout</a></h2></div>
 
 <p>
 For the body of our view, we’re going to use a <code>NavigationSplitView</code> with a <code>List</code> inside it, showing all our resorts. In each row we’re going to show:
@@ -263,12 +285,12 @@ Now let's try to fill in that detail view...
 </p>
 
 <p>
-<br>
 <hr>
+<br>
 </p>
 
 
-<div id="Ai Insight and More Details"><h1 id="Ai Insight and More Details" class="header"><a href="#Ai Insight and More Details">Ai Insight and More Details</a></h1></div>
+<div id="More Details"><h1 id="More Details" class="header"><a href="#More Details">More Details</a></h1></div>
 
 <p>
 First two items in JSON file for an idea of content:
@@ -314,7 +336,142 @@ First two items in JSON file for an idea of content:
 	},
 </pre>
 
+<div id="Ai Insight"><h1 id="Ai Insight" class="header"><a href="#Ai Insight">Ai Insight</a></h1></div>
 
+<div id="Ai Insight-An Explanation Of The Bundle Extension"><h2 id="An Explanation Of The Bundle Extension" class="header"><a href="#Ai Insight-An Explanation Of The Bundle Extension">An Explanation Of The Bundle Extension</a></h2></div>
+
+<p>
+Here is the Bundle extension, fully annotated with line-by-line comments. Following the code, we’ll deeply break down how the generic parameters and protocol requirements work so you have a solid conceptual reference.
+</p>
+
+<pre swift>
+import Foundation
+
+// We extend 'Bundle' so we can call this helper function anywhere in the app 
+// using 'Bundle.main.decode("filename.json")'.
+extension Bundle {
+    
+    // --- THE FUNCTION SIGNATURE ---
+    // '&lt;T: Decodable&gt;' is a GENERIC PARAMETER with a PROTOCOL REQUIREMENT.
+    // It means: "This function can return ANY type of data you want (T), 
+    // as long as that type conforms to the Decodable protocol."
+    // It accepts a file name string and returns that type 'T'.
+    // The underscore (_) is called an argument label omission. It tells the
+    // compiler: "When someone calls this function, they don't need to type out
+    // the parameter name before passing the string."
+    func decode&lt;T: Decodable&gt;(_ file: String) -&gt; T {
+        
+        // --- STEP 1: LOCATE THE FILE ---
+        // 'self.url(forResource:...)' looks inside your app's compiled folder (the bundle) 
+        // to find where the physical file lives on the device disk.
+        guard let url = self.url(forResource: file, withExtension: nil) else {
+            // If the file spelling is wrong or missing from the target, crash explicitly
+            // with a helpful error message instead of letting the app fail mysteriously later.
+            fatalError("Failed to locate \(file) in bundle.")
+        }
+        
+        // --- STEP 2: LOAD THE RAW DATA ---
+        // 'Data(contentsOf: url)' attempts to read the raw 0s and 1s bytes from that file path.
+        // 'try?' means "return nil if this throws an error" (e.g., if the file is locked or unreadable).
+        guard let data = try? Data(contentsOf: url) else {
+            fatalError("Failed to load \(file) from bundle.")
+        }
+        
+        // --- STEP 3: INITIALIZE THE DECODER ---
+        // Create an instance of JSONDecoder, Swift's built-in engine for turning JSON into Swift objects.
+        let decoder = JSONDecoder()
+        
+        // --- STEP 4: ATTEMPT DECODING WITH EXPLICIT ERROR CATCHING ---
+        // We use a do-catch block to specifically triage EXACTLY why a JSON file might fail to decode.
+        do {
+            // 'T.self' tells the decoder: "Parse this data into whatever Swift type (T) 
+            // the calling code asked for."
+            return try decoder.decode(T.self, from: data)
+            
+        } catch DecodingError.keyNotFound(let key, let context) {
+            // Triggers if your Swift model expects a property, but it's missing entirely from the JSON text.
+            fatalError("Failed to decode \(file) from bundle due to missing key '\(key.stringValue)' - \(context.debugDescription)")
+            
+        } catch DecodingError.typeMismatch(_, let context) {
+            // Triggers if the JSON has a String (e.g., "age": "twenty"), but your Swift struct expects an Int.
+            fatalError("Failed to decode \(file) from bundle due to type mismatch - \(context.debugDescription)")
+            
+        } catch DecodingError.valueNotFound(let type, let context) {
+            // Triggers if a key exists but holds a 'null' value, and your Swift model marked it as non-optional.
+            fatalError("Failed to decode \(file) from bundle due to missing \(type) value - \(context.debugDescription)")
+            
+        } catch DecodingError.dataCorrupted(_) {
+            // Triggers if the JSON is malformed (e.g., a missing comma or broken curly brace).
+            fatalError("Failed to decode \(file) from bundle because it appears to be invalid JSON.")
+            
+        } catch {
+            // A fallback catch for any other unforeseen system or filesystem errors.
+            fatalError("Failed to decode \(file) from bundle: \(error.localizedDescription)")
+        }
+    }
+}
+</pre>
+
+<div id="Ai Insight-Concept Breakdown"><h2 id="Concept Breakdown" class="header"><a href="#Ai Insight-Concept Breakdown">Concept Breakdown</a></h2></div>
+
+<div id="Ai Insight-Concept Breakdown-1. What is the Generic Parameter <T>?"><h3 id="1. What is the Generic Parameter <T>?" class="header"><a href="#Ai Insight-Concept Breakdown-1. What is the Generic Parameter <T>?">1. What is the Generic Parameter <T>?</a></h3></div>
+
+<p>
+The <code>T</code> is a placeholder name for <span id="Ai Insight-Concept Breakdown-1. What is the Generic Parameter <T>?-Type"></span><strong id="Type">Type</strong>. It acts as a blank variable for a data type.
+</p>
+
+<p>
+Without generics, if you had a JSON file full of <code>User</code> objects and another file full of <code>Product</code> objects, you would have to write two separate functions:
+</p>
+<ul>
+<li>
+<code>func decodeUsers(_ file: String) -&gt; [User]</code>
+
+<li>
+<code>func decodeProducts(_ file: String) -&gt; [Product]</code>
+
+</ul>
+<p>
+By using <code>&lt;T&gt;</code>, you tell Swift: <em>"I don't know what kind of data structure is in this JSON file yet. Figure out what type the developer wants based on how they assign the result."</em>
+</p>
+
+<p>
+Swift infers what <code>T</code> is automatically when you use it:
+</p>
+
+<pre swift>
+// Swift looks at the variable type definition and automatically sets T = [User]
+let users: [User] = Bundle.main.decode("users.json")
+
+// Swift looks at this variable and automatically sets T = ConfigurationSettings
+let settings: ConfigurationSettings = Bundle.main.decode("settings.json")
+</pre>
+
+<div id="Ai Insight-Concept Breakdown-2. What is the Protocol Requirement : Decodable?"><h3 id="2. What is the Protocol Requirement : Decodable?" class="header"><a href="#Ai Insight-Concept Breakdown-2. What is the Protocol Requirement : Decodable?">2. What is the Protocol Requirement : Decodable?</a></h3></div>
+
+<p>
+If you just wrote <code>func decode&lt;T&gt;(_ file: String)</code>, the compiler would stop you with an error.
+</p>
+
+<p>
+Why? Because inside the function, you call:
+</p>
+
+<pre swift>
+try decoder.decode(T.self, from: data)
+</pre>
+
+<p>
+Swift's <code>JSONDecoder</code> can't just parse data into <em>anything</em>. It doesn't know how to turn JSON data into a custom UIKit Image or a CoreMedia Video stream. It only knows how to parse data into types that have explicitly opted-in to being decoded.
+</p>
+
+<p>
+By adding the <span id="Ai Insight-Concept Breakdown-2. What is the Protocol Requirement : Decodable?-Protocol Constraint"></span><strong id="Protocol Constraint">Protocol Constraint</strong> <code>: Decodable</code>, you are drawing a line in the sand. You are telling Swift: <em>"The developer can use this function for any data type they want, BUT that type must conform to the Decodable (or Codable) protocol."</em>
+</p>
+
+<p>
+If someone tries to use your extension on a custom class or struct that isn't <code>Decodable</code>, Xcode will safely reject it at compile time rather than letting the app crash in production.
+</p>
 
 <p>
 <hr>
