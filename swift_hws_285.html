@@ -82,6 +82,8 @@ struct ContentView: View {
 This is all old code: it shows passing a value into a subview directly, so it can be used there.
 </p>
 
+<div id="Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment"><h2 id="Environment" class="header"><a href="#Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment">Environment</a></h2></div>
+
 <p>
 Usually, though, we have more complex needs: what if that object needs to be shared in many places? Or what if view A needs to pass it to be view B, which needs to pass it view C, which needs to pass it view D? You can easily see how that would be pretty tedious to code.
 </p>
@@ -103,7 +105,7 @@ VStack {
 </pre>
 
 <p>
-<span id="Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Important"></span><strong id="Important">Important</strong>: This modifier is designed for classes that use the <code>@Observable</code> macro. Behind the scenes, one of the things the macro does is add conformance to a protocol called <code>Observable</code> (without the <code>@</code>!), and <em>that's</em> what the modifier is looking for.
+<span id="Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment-Important"></span><strong id="Important">Important</strong>: This modifier is designed for classes that use the <code>@Observable</code> macro. Behind the scenes, one of the things the macro does is add conformance to a protocol called <code>Observable</code> (without the <code>@</code>!), and <em>that's</em> what the modifier is looking for.
 </p>
 
 <p>
@@ -123,8 +125,16 @@ Although this mostly works well, there is one place where there's a problem and 
 </p>
 
 <p>
-<span id="Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Note"></span><strong id="Note">Note</strong>: If you're reading this after iOS 18 was released, I sincerely hope Apple has resolved this issue, but right now I'm using iOS 17 and it's an issue.
+<span id="Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment-Note"></span><strong id="Note">Note</strong>: If you're reading this after iOS 18 was released, I sincerely hope Apple has resolved this issue, but right now I'm using iOS 17 and it's an issue.
 </p>
+
+<table>
+<tr>
+<td>
+SPOILER: it wasn't!
+</td>
+</tr>
+</table>
 
 <p>
 You can see the problem with code like this:
@@ -155,6 +165,47 @@ Apple's solution for this - at least right now - is to use <code>@Bindable</code
 <p>
 That effectively means, "create a copy of my <code>player</code> property locally, then wrap it in some bindings I can use." It's a bit ugly, to be honest, and again I hope by the time you read this it's no longer needed!
 </p>
+
+<div id="Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment-In Context-ContentView.swift"><h4 id="ContentView.swift" class="header"><a href="#Hacking With Swift - 285 - Sharing @Observable objects through SwiftUI's environment-Environment-In Context-ContentView.swift">ContentView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+@Observable
+class Player {
+    var name = "Anonymous"
+    var highScore = 0
+}
+
+struct HighScoreView: View {
+    @Environment(Player.self) var player
+    
+    var body: some View {
+        // Add bindable here to make the former @Stage behavior possible
+        @Bindable var player = player
+        // This would work with @State, but needs the @Bindable to work with @Environment
+        Stepper("High score: \(player.highScore)", value: $player.highScore)
+    }
+}
+
+struct ContentView: View {
+    @State private var player = Player()
+    
+    var body: some View {
+        VStack {
+            Text("Welcome!")
+            HighScoreView()
+        }
+        .environment(player)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
 
 <p>
 <hr>
