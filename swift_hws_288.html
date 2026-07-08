@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_288</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_287.html">Hacking With Swift - 287 - Presenting a default detail view on iPad</a>
+
+</ul>
+<div id="Hacking With Swift - 288 - Creating a detail view for resorts"><h1 id="Hacking With Swift - 288 - Creating a detail view for resorts" class="header"><a href="#Hacking With Swift - 288 - Creating a detail view for resorts">Hacking With Swift - 288 - Creating a detail view for resorts</a></h1></div>
+
+<p>
+Right now our <code>NavigationLink</code> doesn't send the user anywhere, which is fine for prototyping but obviously not good enough for our actual project. So, in this step we're going to add a new <code>ResortView</code> that shows a picture from the resort, some description text, and a list of facilities.
+</p>
+
+<p>
+<span id="Hacking With Swift - 288 - Creating a detail view for resorts-Important"></span><strong id="Important">Important</strong>: Like I said earlier, the content in my example JSON is mostly fictional, and this includes the photos - these are just generic ski photos taken from Unsplash. Unsplash photos can be used commercially or non-commercially without attribution, but I’ve included the photo credit in the JSON so you can add it later on. As for the text, this is taken from Wikipedia. If you intend to use the text in your own shipping projects, it’s important you give credit to Wikipedia and its authors and make it clear that the work is licensed under CC-BY-SA available from here:
+</p>
+
+<ul>
+<li>
+<a href="https://creativecommons.org/licenses/by-sa/3.0.">ExternalLink - Creative Commons</a>
+
+</ul>
+<p>
+To start with, our <code>ResortView</code> layout is going to be pretty simple - not much more than a scroll view, a <code>VStack</code>, an <code>Image</code>, and some <code>Text</code>. The only interesting part is that we’re going to show the resort’s facilities as a single text view using <code>resort.facilities.joined(separator: ", ")</code> to get a single string.
+</p>
+
+<p>
+Create a new SwiftUI view called <code>ResortView</code>, and give it this code to start with:
+</p>
+
+<pre swift>
+struct ResortView: View {
+    let resort: Resort
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Image(decorative: resort.id)
+                    .resizable()
+                    .scaledToFit()
+
+                Group {
+                    Text(resort.description)
+                        .padding(.vertical)
+
+                    Text("Facilities")
+                        .font(.headline)
+
+                    Text(resort.facilities.joined(separator: ", "))
+                        .padding(.vertical)
+                }
+                .padding(.horizontal)
+            }
+        }
+        .navigationTitle("\(resort.name), \(resort.country)")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+</pre>
+
+<p>
+You’ll also need to update your preview code to pass in an example resort for Xcode’s preview window:
+</p>
+
+<pre swift>
+#Preview
+    ResortView(resort: .example)
+}
+</pre>
+
+<p>
+And now we can update <code>ContentView</code> to point to our actual view - add this modifier after <code>navigationTitle()</code> there:
+</p>
+
+<pre swift>
+.navigationDestination(for: Resort.self) { resort in
+    ResortView(resort: resort)
+}
+</pre>
+
+<p>
+There’s nothing terribly interesting in our code so far, but that’s going to change now because I want to add more details to this screen - how big the resort is, roughly how much it costs, how high it is, and how deep the snow is.
+</p>
+
+<p>
+We could just put all that into a single <code>HStack</code> in <code>ResortView</code>, but that restricts what we can do in the future. So instead we’re going to group them into two views: one for resort information (price and size) and one for ski information (elevation and snow depth).
+</p>
+
+<p>
+The ski view is the easier of the two to implement, so we’ll start there: create a new SwiftUI view called <code>SkiDetailsView</code> and give it this code:
+</p>
+
+<pre swift>
+struct SkiDetailsView: View {
+    let resort: Resort
+
+    var body: some View {
+        Group {
+            VStack {
+                Text("Elevation")
+                    .font(.caption.bold())
+                Text("\(resort.elevation)m")
+                    .font(.title3)
+            }
+
+            VStack {
+                Text("Snow")
+                    .font(.caption.bold())
+                Text("\(resort.snowDepth)cm")
+                    .font(.title3)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+#Preview {
+    SkiDetailsView(resort: .example)
+}
+</pre>
+
+<p>
+Giving the <code>Group</code> view a maximum frame width of <code>.infinity</code> doesn’t actually affect the group itself, because it has no impact on layout. However, it does get passed down to its child views, which means they will automatically spread out horizontally.
+</p>
+
+<p>
+As for the resort details, this is a little trickier because of two things:
+</p>
+
+<ul>
+<li>
+The size of a resort is stored as a value from 1 to 3, but really we want to use "Small", "Average", and "Large" instead.
+
+<li>
+The price is stored as a value from 1 to 3, but we’re going to replace that with <code>＄</code>, <code>＄＄</code>, or <code>＄＄＄</code>.
+
+</ul>
+<p>
+As always, it’s a good idea to get calculations out of your SwiftUI layouts so it’s nice and clear, so we’re going to create two computed properties: <code>size</code> and <code>price</code>.
+</p>
+
+<p>
+Start by creating a new SwiftUI view called <code>ResortDetailsView</code>, and give it this property:
+</p>
+
+<pre swift>
+let resort: Resort
+</pre>
+
+<p>
+As with <code>ResortView</code>, you’ll need to update the preview struct to use some example data:
+</p>
+
+<pre swift>
+#Preview {
+    ResortDetailsView(resort: .example)
+}
+</pre>
+
+<p>
+When it comes to getting the size of the resort we could just add this property to <code>ResortDetailsView</code>:
+</p>
+
+<pre swift>
+var size: String {
+    ["Small", "Average", "Large"][resort.size - 1]
+}
+</pre>
+
+<p>
+That works, but it would cause a crash if an invalid value was used, and it’s also a bit too cryptic for my liking. Instead, it’s safer and clearer to use a <code>switch</code> block like this:
+</p>
+
+<pre swift>
+var size: String {
+    switch resort.size {
+    case 1: "Small"
+    case 2: "Average"
+    default: "Large"
+    }
+}
+</pre>
+
+<p>
+As for the <code>price</code> property, we can leverage the same repeating/count initializer we used to create example cards in project 17: <code>String(repeating:count:)</code> creates a new string by repeating a substring a certain number of times.
+</p>
+
+<p>
+So, please add this second computed property to <code>ResortDetailsView</code>:
+</p>
+
+<pre swift>
+var price: String {
+    String(repeating: "$", count: resort.price)
+}
+</pre>
+
+<p>
+Now what remains in the <code>body</code> property is simple, because we just use the two computed properties we wrote:
+</p>
+
+<pre swift>
+var body: some View {
+    Group {
+        VStack {
+            Text("Size")
+                .font(.caption.bold())
+            Text(size)
+                .font(.title3)
+        }
+
+        VStack {
+            Text("Price")
+                .font(.caption.bold())
+            Text(price)
+                .font(.title3)
+        }
+    }
+    .frame(maxWidth: .infinity)
+}
+</pre>
+
+<p>
+Again, giving the whole <code>Group</code> an infinite maximum width means these views will spread out horizontally just like those from the previous view.
+</p>
+
+<p>
+That completes our two mini views, so we can now drop them into <code>ResortView</code> - put this just before the group in <code>ResortView</code>:
+</p>
+
+<pre swift>
+HStack {
+    ResortDetailsView(resort: resort)
+    SkiDetailsView(resort: resort)
+}
+.padding(.vertical)
+.background(.primary.opacity(0.1))
+</pre>
+
+<p>
+We’re going to add to that some more in a moment, but first I want to make one small tweak: using <code>joined(separator:)</code> does an okay job of converting a string array into a single string, but we’re not here to write okay code - we’re here to write great code.
+</p>
+
+<p>
+Previously we’ve used the <code>format</code> parameter of <code>Text</code> to control the way numbers are formatted, but there’s a format for string arrays too. This is similar to using <code>joined(separator:)</code>, but rather than sending back "A, B, C" like we have right now, we get back "A, B, <em>and</em> C" - it’s more natural to read.
+</p>
+
+<p>
+Replace the current facilities text view with this:
+</p>
+
+<pre swift>
+Text(resort.facilities, format: .list(type: .and))
+    .padding(.vertical)
+</pre>
+
+<p>
+Notice how the <code>.and</code> type is there? That’s because you can also use <code>.or</code> to get "A, B, or C" if that’s what you want.
+</p>
+
+<p>
+Anyway, it’s a tiny change but I think it’s much better!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+ 
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
