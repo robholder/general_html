@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_techniques_searchable_list</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Searchable List"><h1 id="Swift - Searchable List" class="header"><a href="#Swift - Searchable List">Swift - Searchable List</a></h1></div>
+
+<div id="Swift - Searchable List-Blueprint: Implementing a Searchable List in SwiftUI"><h2 id="Blueprint: Implementing a Searchable List in SwiftUI" class="header"><a href="#Swift - Searchable List-Blueprint: Implementing a Searchable List in SwiftUI">Blueprint: Implementing a Searchable List in SwiftUI</a></h2></div>
+
+<p>
+Adding search functionality to a <code>List</code> in SwiftUI is incredibly streamlined. It requires no complex delegation - just a piece of state, a modifier, a quick computed property, and swapping out your data source.
+</p>
+
+<p>
+Here is the decoupled, 4-step framework you can copy and paste into any project.
+</p>
+
+<div id="Swift - Searchable List-The 4-Step Architecture"><h2 id="The 4-Step Architecture" class="header"><a href="#Swift - Searchable List-The 4-Step Architecture">The 4-Step Architecture</a></h2></div>
+
+<div id="Swift - Searchable List-The 4-Step Architecture-Step 1: Create the Search Text State"><h3 id="Step 1: Create the Search Text State" class="header"><a href="#Swift - Searchable List-The 4-Step Architecture-Step 1: Create the Search Text State">Step 1: Create the Search Text State</a></h3></div>
+
+<p>
+Declare a private <code>@State</code> string inside your view. This variable will actively listen to and store whatever the user types into the search bar.
+</p>
+
+<pre swift>
+@State private var searchText = ""
+</pre>
+
+<div id="Swift - Searchable List-The 4-Step Architecture-Step 2: Attach the .searchable Modifier"><h3 id="Step 2: Attach the .searchable Modifier" class="header"><a href="#Swift - Searchable List-The 4-Step Architecture-Step 2: Attach the .searchable Modifier">Step 2: Attach the .searchable Modifier</a></h3></div>
+
+<p>
+Apply the <code>.searchable</code> modifier to the inner view structure containing your list (typically right beneath your <code>.navigationTitle</code> or navigation destination modifiers). Pass it a two-way binding (<code>＄</code>) to your state string.
+</p>
+
+<pre swift>
+.searchable(text: $searchText, prompt: "Search...")
+</pre>
+
+<div id="Swift - Searchable List-The 4-Step Architecture-Step 3: Write a Filtered Computed Property"><h3 id="Step 3: Write a Filtered Computed Property" class="header"><a href="#Swift - Searchable List-The 4-Step Architecture-Step 3: Write a Filtered Computed Property">Step 3: Write a Filtered Computed Property</a></h3></div>
+
+<p>
+Create a computed property that sits right alongside your <code>body</code> variable. This property handles the actual filtering logic. If the search string is empty, it returns everything; otherwise, it filters the array using <code>localizedStandardContains()</code>, which handles uppercase/lowercase matching cleanly for users.
+</p>
+
+<pre swift>
+// Replace 'YourModelType' with your actual Struct/Class name
+var filteredItems: [YourModelType] {
+    if searchText.isEmpty {
+        return allItems // Return your baseline, unfiltered array
+    } else {
+        // Replace '.name' with the text property you want to search against
+        return allItems.filter { $0.name.localizedStandardContains(searchText) }
+    }
+}
+</pre>
+
+<div id="Swift - Searchable List-The 4-Step Architecture-Step 4: Swap the List's Data Source"><h3 id="Step 4: Swap the List's Data Source" class="header"><a href="#Swift - Searchable List-The 4-Step Architecture-Step 4: Swap the List's Data Source">Step 4: Swap the List's Data Source</a></h3></div>
+
+<p>
+Change your <code>List</code> initializer so that it reads from your new computed property (<code>filteredItems</code>) instead of the raw, static data array (<code>allItems</code>).
+</p>
+
+<pre swift>
+List(filteredItems) { item in
+    // Render your row content here
+}
+</pre>
+
+<div id="Swift - Searchable List-Standard Code Blueprint (Copy-Paste Template)"><h2 id="Standard Code Blueprint (Copy-Paste Template)" class="header"><a href="#Swift - Searchable List-Standard Code Blueprint (Copy-Paste Template)">Standard Code Blueprint (Copy-Paste Template)</a></h2></div>
+
+<p>
+Here is how those four parts assemble inside a completely standard, project-agnostic view template:
+</p>
+
+<pre swift>
+import SwiftUI
+
+// 1. A Sample Model for reference
+struct CustomItem: Identifiable {
+    let id = UUID()
+    let title: String
+}
+
+struct SearchableListView: View {
+    // Standard baseline data array
+    let allItems = [
+        CustomItem(title: "Apples"),
+        CustomItem(title: "Bananas"),
+        CustomItem(title: "Cherries")
+    ]
+    
+    // [STEP 1] State to store the active query
+    @State private var searchText = ""
+    
+    // [STEP 3] Computed property handling the filtering logic
+    var filteredItems: [CustomItem] {
+        if searchText.isEmpty {
+            return allItems
+        } else {
+            return allItems.filter { $0.title.localizedStandardContains(searchText) }
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            // [STEP 4] List reads from the computed property, NOT the raw array
+            List(filteredItems) { item in
+                Text(item.title)
+            }
+            .navigationTitle("Inventory")
+            // [STEP 2] Searchable modifier bound to state attached to the view hierarchy
+            .searchable(text: $searchText, prompt: "Search inventory")
+        }
+    }
+}
+</pre>
+
+<div id="Swift - Searchable List-Standard Code Blueprint (Copy-Paste Template)-3 Pillars to Remember for Later"><h3 id="3 Pillars to Remember for Later" class="header"><a href="#Swift - Searchable List-Standard Code Blueprint (Copy-Paste Template)-3 Pillars to Remember for Later">3 Pillars to Remember for Later</a></h3></div>
+
+<ul>
+<li>
+<code>localizedStandardContains</code> vs <code>contains</code>: Always prefer <code>localizedStandardContains()</code>. It is case-insensitive, ignores diacritics (like accents), and respects the user's localized language settings automatically.
+
+<li>
+<span id="Swift - Searchable List-Standard Code Blueprint (Copy-Paste Template)-3 Pillars to Remember for Later-Placement Matters"></span><strong id="Placement Matters">Placement Matters</strong>: The <code>.searchable</code> modifier requires a surrounding navigation view (<code>NavigationStack</code> or <code>NavigationSplitView</code>) to physically render the bar in the user interface. If you place it on a view that isn't inside a navigation container, the search bar will not appear.
+
+<li>
+<span id="Swift - Searchable List-Standard Code Blueprint (Copy-Paste Template)-3 Pillars to Remember for Later-Performance Optimization"></span><strong id="Performance Optimization">Performance Optimization</strong>: Because computed properties calculate on the fly during view redraws, this structural approach handles arrays of several thousand items beautifully. (If filtering massive datasets or database queries, you would instead shift this filtering logic into a background actor/thread via a ViewModel).
+
+</ul>
+<p>
+<hr>
+<br>
+</p>
+
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
