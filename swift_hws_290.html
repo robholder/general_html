@@ -31,6 +31,128 @@
 </ul>
 <div id="Hacking With Swift - 290 - Changing a view's layout in response to size classes"><h1 id="Hacking With Swift - 290 - Changing a view's layout in response to size classes" class="header"><a href="#Hacking With Swift - 290 - Changing a view's layout in response to size classes">Hacking With Swift - 290 - Changing a view's layout in response to size classes</a></h1></div>
 
+<p>
+SwiftUI gives us two environment values to monitor the current size class of our app, which in practice means we can show one layout when space is restricted and another when space is plentiful.
+</p>
+
+<p>
+For example, in our current layout we’re displaying the resort details and snow details in a <code>HStack</code>, like this:
+</p>
+
+<pre swift>
+HStack {
+    ResortDetailsView(resort: resort)
+    SkiDetailsView(resort: resort)
+}
+</pre>
+
+<p>
+Each of those subviews are internally using a <code>Group</code> that doesn’t add any of its own layout, so we end up with all four pieces of text laid out horizontally. This looks great when we have enough space, but when space is limited it would be helpful to switch to a 2x2 grid layout.
+</p>
+
+<p>
+To make this happen we <em>could</em> create copies of <code>ResortDetailsView</code> and <code>SkiDetailsView</code> that handle the alternative <em>layout</em>, but a much smarter solution is to have both those views remain layout neutral - to have them automatically adapt to being placed in a <code>HStack</code> or <code>VStack</code> depending on the parent that places them.
+</p>
+
+<p>
+First, add this new <code>@Environment</code> property to <code>ResortView</code>:
+</p>
+
+<pre swift>
+@Environment(\.horizontalSizeClass) var horizontalSizeClass
+</pre>
+
+<p>
+That will tell us whether we have a regular or compact size class. Very roughly:
+</p>
+
+<ul>
+<li>
+All iPhones in portrait have compact width and regular height.
+
+<li>
+Most iPhones in landscape have compact width and compact height.
+
+<li>
+Large iPhones (Plus-sized and Max devices) in landscape have regular width and compact height.
+
+<li>
+All iPads in both orientations have regular width and regular height when your app is running with the full screen.
+
+</ul>
+<p>
+Things get a little more complex for iPad when it comes to split view mode, which is when you have two apps running side by side - iOS will automatically downgrade our app to a compact size class at various points depending on the exact iPad model.
+</p>
+
+<p>
+Fortunately, to begin with all we care about are these two horizontal options: do we have lots of horizontal space (regular) or is space restricted (compact). If we have a regular amount of space, we’re going to keep the current <code>HStack</code> approach so that everything its neatly on one line, but if space is restricted we’ll ditch that and place each of the views into a <code>VStack</code>.
+</p>
+
+<p>
+So, find the <code>HStack</code> that contains <code>ResortDetailsView</code> and <code>SkiDetailsView</code> and replace it with this:
+</p>
+
+<pre swift>
+HStack {
+    if horizontalSizeClass == .compact {
+        VStack(spacing: 10) { ResortDetailsView(resort: resort) }
+        VStack(spacing: 10) { SkiDetailsView(resort: resort) }
+    } else {
+        ResortDetailsView(resort: resort)
+        SkiDetailsView(resort: resort)
+    }
+}
+.padding(.vertical)
+.background(.primary.opacity(0.1))
+</pre>
+
+<p>
+As you can see, that uses two vertical stacks placed side by side, rather than just having all four views horizontal.
+</p>
+
+<p>
+Is it perfect? Well, no. Sure, there’s a lot more space in compact layouts, which means the user can use larger Dynamic Type sizes without running out of space, but many users won’t have that problem because they’ll be using the default size or even smaller sizes.
+</p>
+
+<p>
+To make this even better we can combine a check for the app’s current horizontal size class with a check for the user’s Dynamic Type setting so that we use the flat horizontal layout unless space really is tight - if the user has a compact size class and a larger Dynamic Type setting.
+</p>
+
+<p>
+First add another property to read the current Dynamic Type setting:
+</p>
+
+<pre swift>
+@Environment(\.dynamicTypeSize) var dynamicTypeSize
+</pre>
+
+<p>
+Now modify the size class check to this:
+</p>
+
+<pre swift>
+if horizontalSizeClass == .compact &amp;&amp; dynamicTypeSize &gt; .large {
+</pre>
+
+<p>
+Now finally our layout should look great in both orientations: one single line of text in a regular size class, and two rows of vertical stacks in a compact size class when an increased font size is used. It took a little work, but we got there in the end!
+</p>
+
+<p>
+Our solution didn’t result in code duplication, which is a huge win, but it also left our two child views in a better place - they are now there just to serve up their content without specifying a layout. So, parent views can dynamically switch between <code>HStack</code> and <code>VStack</code> whenever they want, and SwiftUI will take care of the layout for us.
+</p>
+
+<p>
+Before we’re done, I want to show you one useful extra technique: you can limit the range of Dynamic Type sizes supported by a particular view. For example, you might have worked hard to support as wide a range of sizes as possible, but found that anything larger than the "extra extra extra large" setting just looks bad. In that situation you can use the <code>dynamicTypeSize()</code> modifier on a view, like this:
+</p>
+
+<pre swift>
+.dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+</pre>
+
+<p>
+That’s a one-sided range, meaning that any size up to and including <code>.xxxLarge</code> is fine, but nothing larger. Obviously it’s best to avoid setting these limits where possible, but it’s not a problem if you use it judiciously - both <code>TabView</code> and <code>NavigationStack</code>, for example, limit the size of their text labels so the UI doesn’t break.
+</p>
 
 <p>
 <hr>
