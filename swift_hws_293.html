@@ -193,6 +193,254 @@ Performance: Keeping the runtime collection as a <code>Set</code> is ideal becau
 For a real challenge, let the user sort the resorts in <code>ContentView</code> either using the default order, alphabetical order, or country order.
 
 </ul>
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight"><h2 id="Ai Insight" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight">Ai Insight</a></h2></div>
+
+<p>
+To solve this challenge elegantly, we can expand on the exact architectural concepts you've already mastered: using an <span id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-Enum"></span><strong id="Enum">Enum</strong> for type safety and utilizing a <span id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-Computed Property"></span><strong id="Computed Property">Computed Property</strong> to pipeline your data dynamically.
+</p>
+
+<p>
+Instead of writing separate filtering and sorting blocks, we will enhance <code>filteredResorts</code> to become a continuous data pipeline: <span id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-Raw Array → Filtered Array → Sorted Array"></span><strong id="Raw Array → Filtered Array → Sorted Array">Raw Array → Filtered Array → Sorted Array</strong>.
+</p>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-The 3-Step Strategy"><h3 id="The 3-Step Strategy" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-The 3-Step Strategy">The 3-Step Strategy</a></h3></div>
+
+<ul>
+<li>
+<span id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-The 3-Step Strategy-The Sort Type Enum"></span><strong id="The Sort Type Enum">The Sort Type Enum</strong>: Create an enum containing our three options (<code>defaultOrder</code>, <code>alphabetical</code>, <code>country</code>). Conforming it to <code>CaseIterable</code> and <code>Identifiable</code> makes it exceptionally easy to loop through in a picker or menu.
+
+<li>
+<span id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-The 3-Step Strategy-The State Tracking"></span><strong id="The State Tracking">The State Tracking</strong>: Add a <code>@State</code> variable to store the user's active choice.
+
+<li>
+<span id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Ai Insight-The 3-Step Strategy-The Pipeline Upgrade"></span><strong id="The Pipeline Upgrade">The Pipeline Upgrade</strong>: Modify the computed property. First, it will filter based on <code>searchText</code>. Then, it will pass that filtered result through a <code>.sorted { ... }</code> block matching the chosen enum state before handing it over to the <code>List</code>.
+
+</ul>
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Fully Documented Implementation"><h2 id="Fully Documented Implementation" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Fully Documented Implementation">Fully Documented Implementation</a></h2></div>
+
+<p>
+Here is your updated <code>ContentView.swift</code> containing the sorting menu integrated directly into the navigation toolbar.
+</p>
+
+<pre swift>
+import SwiftUI
+
+// 1. Create a type-safe representation of our sorting options.
+// CaseIterable allows us to effortlessly list all cases in a loop.
+// Identifiable allows SwiftUI to differentiate options without manual IDs.
+enum SortType: String, CaseIterable, Identifiable {
+    case defaultOrder = "Default"
+    case alphabetical = "Alphabetical"
+    case country = "Country"
+    
+    // Satisfy Identifiable using the raw value string
+    var id: String { self.rawValue }
+}
+
+struct ContentView: View {
+    let resorts: [Resort] = Bundle.main.decode("resorts.json")
+    
+    @State private var searchText = ""
+    @State private var favorites = Favorites()
+    
+    // 2. Track the active sorting method selected by the user
+    @State private var sortOrder: SortType = .defaultOrder
+    
+    // 3. This computed property acts as our master data pipeline:
+    // It filters the array first, then sorts it on the fly.
+    var filteredResorts: [Resort] {
+        // Phase A: Filtering (Your existing logic)
+        let intermediateList: [Resort]
+        if searchText.isEmpty {
+            intermediateList = resorts
+        } else {
+            intermediateList = resorts.filter { $0.name.localizedStandardContains(searchText) }
+        }
+        
+        // Phase B: Sorting based on the active state
+        switch sortOrder {
+        case .defaultOrder:
+            // Return the list exactly as it came from the JSON bundle
+            return intermediateList
+            
+        case .alphabetical:
+            // Sort ascending by the resort name string
+            return intermediateList.sorted { $0.name &lt; $1.name }
+            
+        case .country:
+            // Sort ascending by country name. 
+            // If countries match, it falls back to sorting by name so it looks neat.
+            return intermediateList.sorted {
+                if $0.country == $1.country {
+                    return $0.name &lt; $1.name
+                }
+                return $0.country &lt; $1.country
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationSplitView {
+            // The List remains completely untouched because it automatically 
+            // streams the finished array out of the updated computed property!
+            List(filteredResorts) { resort in
+                NavigationLink(value: resort) {
+                    HStack {
+                        Image(resort.country)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 40, height: 25)
+                            .clipShape(.rect(cornerRadius: 5))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .stroke(.black, lineWidth: 1)
+                            )
+                        
+                        VStack(alignment: .leading) {
+                            Text(resort.name)
+                                .font(.headline)
+                            Text("\(resort.runs) runs")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if favorites.contains(resort) {
+                        Spacer()
+                        Image(systemName: "heart.fill")
+                            .accessibilityLabel("This is a favorite resort")
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Resorts")
+            .navigationDestination(for: Resort.self) { resort in
+                ResortView(resort: resort)
+            }
+            .searchable(text: $searchText, prompt: "Search for a resort")
+            // 4. Add a toolbar button containing a contextual Menu to swap the sort state
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        // Picker wraps our choices into an interactive checkmarked list
+                        Picker("Sort Order", selection: $sortOrder) {
+                            ForEach(SortType.allCases) { type in
+                                Text(type.rawValue).tag(type)
+                            }
+                        }
+                    } label: {
+                        Label("Sort resorts", systemName: "arrow.up.arrow.down")
+                    }
+                }
+            }
+        } detail: {
+            WelcomeView()
+        }
+        .environment(favorites)
+    }
+}
+
+#Preview {
+    ContentView()
+}
+</pre>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works"><h2 id="Architectural Breakdown: How it Works" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works">Architectural Breakdown: How it Works</a></h2></div>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works-1. The Two-Tiered Country Sort"><h3 id="1. The Two-Tiered Country Sort" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works-1. The Two-Tiered Country Sort">1. The Two-Tiered Country Sort</a></h3></div>
+
+<p>
+Look closely at the <code>.country</code> sorting case:
+</p>
+
+<pre swift>
+if $0.country == $1.country { return $0.name &lt; $1.name }
+</pre>
+
+<p>
+If you only sort by <code>\(0.country &lt; \)1.country</code>, any resorts belonging to the same country will appear in a random, unpredictable order. Adding the secondary condition checks if the countries match, and if they do, alphabetizes them by name. It adds a polish that native Apple apps use.
+</p>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works-2. The .toolbar and Menu Layout"><h3 id="2. The .toolbar and Menu Layout" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works-2. The .toolbar and Menu Layout">2. The .toolbar and Menu Layout</a></h3></div>
+
+<p>
+Instead of plastering buttons directly onto the screen, placing a <code>Menu</code> inside a <code>.topBarTrailing</code> toolbar matches standard iOS design guidelines. The <code>Picker</code> automatically embeds checkmarks next to whichever <code>SortType</code> is matching the active <code>＄sortOrder</code> state.
+</p>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works-3. UI Redraw Economy"><h3 id="3. UI Redraw Economy" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Architectural Breakdown: How it Works-3. UI Redraw Economy">3. UI Redraw Economy</a></h3></div>
+
+<p>
+Because <code>filteredResorts</code> is a computed property, the sorting and filtering calculations are incredibly low-overhead. The second the user taps an option in the menu, <code>＄sortOrder</code> mutates, forcing SwiftUI to evaluate <code>filteredResorts</code> again and gracefully animate the list items into their new positions.
+</p>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable"><h2 id="CaseIterable" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable">CaseIterable</a></h2></div>
+
+<p>
+The <code>CaseIterable</code> protocol is a built-in Swift feature that does one specific job: <span id="Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable-it automatically counts and organizes all the cases of your enum into an array sequence."></span><strong id="it automatically counts and organizes all the cases of your enum into an array sequence.">it automatically counts and organizes all the cases of your enum into an array sequence.</strong>
+</p>
+
+<p>
+Normally, enums are distinct, individual choices. You can’t naturally loop through them or count them. By adding <code>: CaseIterable</code>, Swift automatically generates a special static property on your enum called <code>allCases</code>.
+</p>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable-The Core Transformation"><h3 id="The Core Transformation" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable-The Core Transformation">The Core Transformation</a></h3></div>
+
+<p>
+Imagine your enum is a collection of separate puzzle pieces. Adding <code>CaseIterable</code> collects those pieces and places them neatly into a standard Swift array.
+</p>
+
+<pre swift>
+// WITHOUT CaseIterable:
+enum SortType {
+    case defaultOrder, alphabetical, country
+}
+// You cannot loop. You cannot count. They are just isolated symbols.
+
+// WITH CaseIterable:
+enum SortType: CaseIterable {
+    case defaultOrder, alphabetical, country
+}
+// Swift secretly writes this code for you under the hood:
+// static var allCases: [SortType] = [.defaultOrder, .alphabetical, .country]
+</pre>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable-Why is this useful in SwiftUI?"><h3 id="Why is this useful in SwiftUI?" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable-Why is this useful in SwiftUI?">Why is this useful in SwiftUI?</a></h3></div>
+
+<p>
+In the <code>ContentView</code> code, we used this line to build our dropdown menu:
+</p>
+
+<pre swift>
+ForEach(SortType.allCases) { type in
+    Text(type.rawValue).tag(type)
+}
+</pre>
+
+<p>
+Because of <code>CaseIterable</code>, <code>SortType.allCases</code> behaves exactly like a standard array (e.g., <code>["Default", "Alphabetical", "Country"]</code>).
+</p>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable-Why is this useful in SwiftUI?-The Major Benefits:"><h4 id="The Major Benefits:" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-CaseIterable-Why is this useful in SwiftUI?-The Major Benefits:">The Major Benefits:</a></h4></div>
+
+<ul>
+<li>
+Automation: If you add a fourth sorting option next week (like <code>case favoriteFirst</code>), you only have to type it once inside the enum definition. You don't have to update your UI layout code because <code>SortType.allCases</code> will automatically include it on the next app build.
+
+<li>
+Array Power: Because <code>allCases</code> is an array, you get access to all standard array features instantly:
+
+<li>
+<code>SortType.allCases.count</code> (Returns 3)
+
+<li>
+<code>SortType.allCases.first</code> (Returns .defaultOrder)
+
+<li>
+<code>SortType.allCases.isEmpty</code> (Returns false)
+
+</ul>
+<p>
+In short, <code>CaseIterable</code> saves you from manually typing out arrays like <code>let options = [.defaultOrder, .alphabetical, .country]</code> and keeping them manually synchronized whenever your data requirements shift.
+</p>
+
 <p>
 <hr>
 <br>
