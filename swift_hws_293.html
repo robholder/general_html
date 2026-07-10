@@ -116,6 +116,76 @@ ZStack(alignment: .bottomLeading) { // 👈 Set alignment here
 Fill in the loading and saving methods for <code>Favorites</code>.
 
 </ul>
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Challenges-Challenge 2-Ai Insight"><h4 id="Ai Insight" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Challenges-Challenge 2-Ai Insight">Ai Insight</a></h4></div>
+
+<p>
+To bridge the Favorites class with <code>UserDefaults</code>, we have to navigate one minor limitation: <code>UserDefaults</code> does not natively store Swift <code>Set</code> types. However, it is incredibly happy storing <code>Array</code> types.
+</p>
+
+<p>
+The most elegant way to solve this is to quickly convert your <code>Set&lt;String&gt;</code> into an <code>Array&lt;String&gt;</code> right when saving, and convert it back into a <code>Set</code> when loading. This gives you the speed benefits of a <code>Set</code> during runtime (O(1) lookups) with the convenience of <code>UserDefaults</code> storage.
+</p>
+
+<p>
+Here is your completed class with the <code>init()</code> and <code>save()</code> logic fully implemented:
+</p>
+
+<pre swift>
+import SwiftUI
+
+@Observable
+class Favorites {
+    // the actual resorts the user has favorited
+    private var resorts: Set&lt;String&gt;
+    
+    // the key we're using to read/write in UserDefaults
+    private let key = "Favorites"
+    
+    init() {
+        // 1. Attempt to load the saved data as an array of Strings
+        if let savedItems = UserDefaults.standard.stringArray(forKey: key) {
+            // 2. If successful, convert the array back into a Set for fast lookups
+            resorts = Set(savedItems)
+        } else {
+            // 3. Fallback to an empty set if no previous data exists
+            resorts = []
+        }
+    }
+    
+    // returns true if our set contains this resort
+    func contains(_ resort: Resort) -&gt; Bool {
+        resorts.contains(resort.id)
+    }
+    
+    // adds the resort to our set and saves the change
+    func add(_ resort: Resort) {
+        resorts.insert(resort.id)
+        save()
+    }
+    
+    // removes the resort from our set and saves the change
+    func remove(_ resort: Resort) {
+        resorts.remove(resort.id)
+        save()
+    }
+    
+    func save() {
+        // 4. Convert the Set to an Array so UserDefaults can serialize it
+        UserDefaults.standard.set(Array(resorts), forKey: key)
+    }
+}
+</pre>
+
+<div id="Hacking With Swift - 293 - SnowSeeker: Wrap up-Challenges-Challenge 2-Why this approach works perfectly:"><h4 id="Why this approach works perfectly:" class="header"><a href="#Hacking With Swift - 293 - SnowSeeker: Wrap up-Challenges-Challenge 2-Why this approach works perfectly:">Why this approach works perfectly:</a></h4></div>
+
+<ul>
+<li>
+Performance: Keeping the runtime collection as a <code>Set</code> is ideal because checking if an item is favorited (<code>contains</code>) runs in O(1) constant time, whereas an <code>Array</code> lookup grows slower as the list grows (O(n) linear time).
+
+<li>
+<code>stringArray(forKey:)</code>: This built-in <code>UserDefaults</code> helper safely extracts the data and guarantees that you receive an array containing only strings, eliminating the need for manual type-casting.
+
+</ul>
 <p>
 <hr>
 <br>
