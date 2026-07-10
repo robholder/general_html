@@ -85,7 +85,7 @@ Things get a little more complex for iPad when it comes to split view mode, whic
 </p>
 
 <p>
-Fortunately, to begin with all we care about are these two horizontal options: do we have lots of horizontal space (regular) or is space restricted (compact). If we have a regular amount of space, we’re going to keep the current <code>HStack</code> approach so that everything its neatly on one line, but if space is restricted we’ll ditch that and place each of the views into a <code>VStack</code>.
+Fortunately, to begin with, all we care about are these two horizontal options: do we have lots of horizontal space (regular) or is space restricted (compact). If we have a regular amount of space, we’re going to keep the current <code>HStack</code> approach so that everything its neatly on one line, but if space is restricted we’ll ditch that and place each of the views into a <code>VStack</code>.
 </p>
 
 <p>
@@ -142,6 +142,8 @@ Now finally our layout should look great in both orientations: one single line o
 Our solution didn’t result in code duplication, which is a huge win, but it also left our two child views in a better place - they are now there just to serve up their content without specifying a layout. So, parent views can dynamically switch between <code>HStack</code> and <code>VStack</code> whenever they want, and SwiftUI will take care of the layout for us.
 </p>
 
+<div id="Hacking With Swift - 290 - Changing a view's layout in response to size classes-Limit Dynamic Type Size Limit"><h2 id="Limit Dynamic Type Size Limit" class="header"><a href="#Hacking With Swift - 290 - Changing a view's layout in response to size classes-Limit Dynamic Type Size Limit">Limit Dynamic Type Size Limit</a></h2></div>
+
 <p>
 Before we’re done, I want to show you one useful extra technique: you can limit the range of Dynamic Type sizes supported by a particular view. For example, you might have worked hard to support as wide a range of sizes as possible, but found that anything larger than the "extra extra extra large" setting just looks bad. In that situation you can use the <code>dynamicTypeSize()</code> modifier on a view, like this:
 </p>
@@ -153,6 +155,67 @@ Before we’re done, I want to show you one useful extra technique: you can limi
 <p>
 That’s a one-sided range, meaning that any size up to and including <code>.xxxLarge</code> is fine, but nothing larger. Obviously it’s best to avoid setting these limits where possible, but it’s not a problem if you use it judiciously - both <code>TabView</code> and <code>NavigationStack</code>, for example, limit the size of their text labels so the UI doesn’t break.
 </p>
+
+<div id="Hacking With Swift - 290 - Changing a view's layout in response to size classes-Limit Dynamic Type Size Limit-In Context"><h3 id="In Context" class="header"><a href="#Hacking With Swift - 290 - Changing a view's layout in response to size classes-Limit Dynamic Type Size Limit-In Context">In Context</a></h3></div>
+
+<div id="Hacking With Swift - 290 - Changing a view's layout in response to size classes-Limit Dynamic Type Size Limit-In Context-ResortView.swift"><h4 id="ResortView.swift" class="header"><a href="#Hacking With Swift - 290 - Changing a view's layout in response to size classes-Limit Dynamic Type Size Limit-In Context-ResortView.swift">ResortView.swift</a></h4></div>
+
+<pre swift>
+import SwiftUI
+
+struct ResortView: View {
+    let resort: Resort
+    
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Image(decorative: resort.id)
+                    .resizable()
+                    .scaledToFit()
+                
+                HStack {
+                    if horizontalSizeClass == .compact &amp;&amp; dynamicTypeSize &gt; .large {
+                        VStack(spacing: 10) { ResortDetailsView(resort: resort) }
+                        VStack(spacing: 10) { SkiDetailsView(resort: resort) }
+                    } else {
+                        ResortDetailsView(resort: resort)
+                        SkiDetailsView(resort: resort)
+                    }
+                }
+                .padding(.vertical)
+                .background(.primary.opacity(0.1))
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                
+                Group {
+                    Text(resort.description)
+                        .padding(.vertical)
+                    
+                    Text("Facilities")
+                        .font(.headline)
+                    
+                    // Standard string array joiner
+                    //Text(resort.facilities.joined(separator: ", "))
+                    //    .padding(.vertical)
+                    
+                    // Array join with better handling ('and' for last item)
+                    Text(resort.facilities, format: .list(type: .and))
+                        .padding(.vertical)
+                }
+                .padding(.horizontal)
+            }
+        }
+        .navigationTitle("\(resort.name), \(resort.country)")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+#Preview {
+    ResortView(resort: .example)
+}
+</pre>
 
 <p>
 <hr>
