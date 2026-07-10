@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_292</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_291.html">Hacking With Swift - 291 - Binding an alert to an optional string</a>
+
+</ul>
+<div id="Hacking With Swift - 292 - Letting the user mark favorites"><h1 id="Hacking With Swift - 292 - Letting the user mark favorites" class="header"><a href="#Hacking With Swift - 292 - Letting the user mark favorites">Hacking With Swift - 292 - Letting the user mark favorites</a></h1></div>
+
+<p>
+The final task for this project is to let the user assign favorites to resorts they like. This is mostly straightforward, using techniques we’ve already covered:
+</p>
+
+<ul>
+<li>
+Creating a new <code>Favorites</code> class that has a <code>Set</code> of resort IDs the user likes.
+
+<li>
+Giving it <code>add()</code>, <code>remove()</code>, and <code>contains()</code> methods that manipulate the data, while also saving any changes to <code>UserDefaults</code>.
+
+<li>
+Injecting an instance of the <code>Favorites</code> class into the environment.
+
+<li>
+Adding some new UI to call the appropriate methods.
+
+</ul>
+<p>
+Swift’s sets already contain methods for adding, removing, and checking for an element, but we’re going to add our own around them we can call a <code>save()</code> method so the user’s changes are persisted. This in turn means we can mark the favorites set using <code>private</code> access control, so we can’t accidentally bypass our methods and miss out saving.
+</p>
+
+<p>
+Create a new Swift file called Favorites.swift, replace its Foundation import with SwiftUI, then give it this code:
+</p>
+
+<pre swift>
+@Observable
+class Favorites {
+    // the actual resorts the user has favorited
+    private var resorts: Set&lt;String&gt;
+
+    // the key we're using to read/write in UserDefaults
+    private let key = "Favorites"
+
+    init() {
+        // load our saved data
+
+        // still here? Use an empty array
+        resorts = []
+    }
+
+    // returns true if our set contains this resort
+    func contains(_ resort: Resort) -&gt; Bool {
+        resorts.contains(resort.id)
+    }
+
+    // adds the resort to our set and saves the change
+    func add(_ resort: Resort) {
+        resorts.insert(resort.id)
+        save()
+    }
+
+    // removes the resort from our set and saves the change
+    func remove(_ resort: Resort) {
+        resorts.remove(resort.id)
+        save()
+    }
+
+    func save() {
+        // write out our data
+    }
+}
+</pre>
+
+<p>
+You’ll notice I’ve missed out the actual functionality for loading and saving favorites - that will be your job to fill in shortly.
+</p>
+
+<p>
+We need to create a <code>Favorites</code> instance in <code>ContentView</code> and inject it into the environment so all views can share it. So, add this new property to <code>ContentView</code>:
+</p>
+
+<pre swift>
+@State private var favorites = Favorites()
+</pre>
+
+<p>
+Now inject it into the environment by adding this modifier to the <code>NavigationSplitView</code>:
+</p>
+
+<pre swift>
+.environment(favorites)
+</pre>
+
+<p>
+Because that’s attached to the navigation split view, every view the navigation stack presents will also gain that <code>Favorites</code> instance to work with. So, we can load it from inside <code>ResortView</code> by adding this new property:
+</p>
+
+<pre swift>
+@Environment(Favorites.self) var favorites
+</pre>
+
+<p>
+<span id="Hacking With Swift - 292 - Letting the user mark favorites-Tip"></span><strong id="Tip">Tip</strong>: Make sure you modify your <code>ResortView</code> preview to inject an example <code>Favorites</code> object into the environment, so your SwiftUI preview carries on working. This will work fine: <code>.environment(Favorites())</code>.
+</p>
+
+<p>
+All this work hasn’t really accomplished much yet - sure, the <code>Favorites</code> class gets loaded when the app starts, but it isn’t actually used anywhere despite having properties to store it.
+</p>
+
+<p>
+This is easy enough to fix: we’re going to add a button at the end of the scrollview in <code>ResortView</code> so that users can either add or remove the resort from their favorites, then display a heart icon in <code>ContentView</code> for favorite resorts.
+</p>
+
+<p>
+First, add this to the end of the scrollview in <code>ResortView</code>:
+</p>
+
+<pre swift>
+Button(favorites.contains(resort) ? "Remove from Favorites" : "Add to Favorites") {
+    if favorites.contains(resort) {
+        favorites.remove(resort)
+    } else {
+        favorites.add(resort)
+    }
+}
+.buttonStyle(.borderedProminent)
+.padding()
+</pre>
+
+<p>
+Now we can show a colored heart icon next to favorite resorts in <code>ContentView</code> by adding this to the end of the <code>HStack</code> label for our <code>NavigationLink</code>:
+</p>
+
+<pre swift>
+if favorites.contains(resort) {
+    Spacer()
+    Image(systemName: "heart.fill")
+    .accessibilityLabel("This is a favorite resort")
+        .foregroundStyle(.red)
+}
+</pre>
+
+<p>
+<span id="Hacking With Swift - 292 - Letting the user mark favorites-Tip"></span><strong id="Tip">Tip</strong>: As you can see, the <code>foregroundStyle()</code> modifier works great here because our image uses SF Symbols.
+</p>
+
+<p>
+That finishes our project, so give it one last try and see what you think. Good job!
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+ 
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
