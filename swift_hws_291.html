@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_hws_291</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<ul>
+<li>
+<a href="https://www.hackingwithswift.com/100/swiftui">Weblink: 100 Days Of Swift</a>
+
+<li>
+<a href="swift_hws_290.html">Hacking With Swift - 290 - Changing a view's layout in response to size classes</a>
+
+</ul>
+<div id="Hacking With Swift - 291 - Binding an alert to an optional string"><h1 id="Hacking With Swift - 291 - Binding an alert to an optional string" class="header"><a href="#Hacking With Swift - 291 - Binding an alert to an optional string">Hacking With Swift - 291 - Binding an alert to an optional string</a></h1></div>
+
+<p>
+SwiftUI lets us present an alert with an optional source of truth inside, but it takes a little thinking to get right as you’ll see.
+</p>
+
+<p>
+To demonstrate these optional alerts in action, we’re going to rewrite the way our resort facilities are shown. Right now we have a plain text view generated like this:
+</p>
+
+<pre swift>
+Text(resort.facilities, format: .list(type: .and))
+    .padding(.vertical)
+</pre>
+
+<p>
+We’re going to replace that with icons that represent each facility, and when the user taps on one we’ll show an alert with a description of that facility.
+</p>
+
+<p>
+As usual we’re going to start small then work our way up. First, we need a way to convert facility names like "Accommodation" into an icon that can be displayed. Although this will only happen in <code>ResortView</code> right now, this functionality is exactly the kind of thing that should be available elsewhere in our project. So, we’re going to create a new struct to hold all this information for us.
+</p>
+
+<p>
+Create a new Swift file called Facility.swift, replace its Foundation import with SwiftUI, and give it this code:
+</p>
+
+<pre swift>
+struct Facility: Identifiable {
+    let id = UUID()
+    var name: String
+
+    private let icons = [
+        "Accommodation": "house",
+        "Beginners": "1.circle",
+        "Cross-country": "map",
+        "Eco-friendly": "leaf.arrow.circlepath",
+        "Family": "person.3"
+    ]
+
+    var icon: some View {    
+        if let iconName = icons[name] {
+            Image(systemName: iconName)
+                .accessibilityLabel(name)
+                .foregroundStyle(.secondary)
+        } else {
+            fatalError("Unknown facility type: \(name)")
+        }
+    }
+}
+</pre>
+
+<p>
+As you can see, that conforms to <code>Identifiable</code> so we can loop over an array of facilities with SwiftUI, and internally it looks up a given facility name in a dictionary to return the correct icon. I’ve picked out various SF Symbols icons that work well for the facilities we have, and I also used an <code>accessibilityLabel()</code> modifier for the image to make sure it works well in VoiceOver.
+</p>
+
+<p>
+The next step is to create <code>Facility</code> instances for every of the facilities in a <code>Resort</code>, which we can do in a computed property inside the <code>Resort</code> struct itself:
+</p>
+
+<pre swift>
+var facilityTypes: [Facility] {
+    facilities.map(Facility.init)
+}
+</pre>
+
+<p>
+We can now drop that facilities view into <code>ResortView</code> by replacing this code:
+</p>
+
+<pre swift>
+Text(resort.facilities, format: .list(type: .and))
+    .padding(.vertical)
+</pre>
+
+<p>
+With this:
+</p>
+
+<pre swift>
+HStack {
+    ForEach(resort.facilityTypes) { facility in
+        facility.icon
+            .font(.title)
+    }
+}
+.padding(.vertical)
+</pre>
+
+<p>
+That loops over each item in the <code>facilities</code> array, converting it to an icon and placing it into a <code>HStack</code>. I used the <code>.font(.title)</code> modifier to make the images larger - using the modifier here rather than inside <code>Facility</code> allows us more flexibility if we wanted to use these icons in other places.
+</p>
+
+<p>
+That was the easy part. The harder part comes next: we want to make the facility images into buttons, so that we can show an alert when they are tapped.
+</p>
+
+<p>
+Using the optional form of <code>alert()</code> this starts easily enough - add two new properties to <code>ResortView</code>, one to store the currently selected facility, and one to store whether an alert should currently be shown or not:
+</p>
+
+<pre swift>
+@State private var selectedFacility: Facility?
+@State private var showingFacility = false
+</pre>
+
+<p>
+Now replace the previous <code>ForEach</code> loop with this:
+</p>
+
+<pre swift>
+ForEach(resort.facilityTypes) { facility in
+    Button {
+        selectedFacility = facility
+        showingFacility = true
+    } label: {
+        facility.icon
+            .font(.title)
+    }
+}
+</pre>
+
+<p>
+We can create the alert in a very similar manner as we created the icons - by adding a dictionary to the <code>Facility</code> struct containing all the keys and values we need:
+</p>
+
+<pre swift>
+private let descriptions = [
+    "Accommodation": "This resort has popular on-site accommodation.",
+    "Beginners": "This resort has lots of ski schools.",
+    "Cross-country": "This resort has many cross-country ski routes.",
+    "Eco-friendly": "This resort has won an award for environmental friendliness.",
+    "Family": "This resort is popular with families."
+]
+</pre>
+
+<p>
+Then reading that inside another computed property:
+</p>
+
+<pre swift>
+var description: String {
+    if let message = descriptions[name] {
+        message
+    } else {
+        fatalError("Unknown facility type: \(name)")
+    }
+}
+</pre>
+
+<p>
+So far this hasn’t been tricky, but now comes the complex part. You see, the <code>selectedFacility</code> property is optional, so we need to handle it carefully:
+</p>
+
+<ul>
+<li>
+We can’t use it as the only title for our alert, because we must provide a non-optional string. We can fix that with nil coalescing.
+
+<li>
+We always want to make sure the alert reads from our optional <code>selectedFacility</code>, so it passes in the unwrapped value from there.
+
+<li>
+We don’t need any buttons in this alert, so we can let the system provide a default OK button.
+
+<li>
+We need to provide an alert message based on the unwrapped facility data, calling the new <code>message(for:)</code> method we just wrote.
+
+</ul>
+<p>
+Putting all that together, add this modifier below <code>navigationBarTitleDisplayMode()</code> in <code>ResortView</code>:
+</p>
+
+<pre swift>
+.alert(selectedFacility?.name ?? "More information", isPresented: $showingFacility, presenting: selectedFacility) { _ in
+} message: { facility in
+    Text(facility.description)
+}
+</pre>
+
+<p>
+Notice how we’re using <code>_ in</code> for the alert’s action closure because we don’t actually care about getting the unwrapped <code>Facility</code> instance there, but it is important in the <code>message</code> closure so we can display the correct description.
+</p>
+
+<p>
+<hr>
+<br>
+</p>
+
+ 
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
