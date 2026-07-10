@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_protocols_structs_vs_enum</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Protocols - Structs vs Enums"><h1 id="Swift - Protocols - Structs vs Enums" class="header"><a href="#Swift - Protocols - Structs vs Enums">Swift - Protocols - Structs vs Enums</a></h1></div>
+
+<div id="Protocols in Structs vs. Enums"><h1 id="Protocols in Structs vs. Enums" class="header"><a href="#Protocols in Structs vs. Enums">Protocols in Structs vs. Enums</a></h1></div>
+
+<p>
+In Swift, <span id="Protocols in Structs vs. Enums-Protocols are universal contracts"></span><strong id="Protocols are universal contracts">Protocols are universal contracts</strong>. A protocol declares a checklist of properties and methods that a type <em>must</em> implement, but it does not care whether the type adopting it is a <code>struct</code>, a <code>class</code>, or an <code>enum</code>.
+</p>
+
+<p>
+While structs and enums can conform to the exact same protocols to gain superpowers, they satisfy those contracts differently due to how they manage memory.
+</p>
+
+<div id="Protocols in Structs vs. Enums-1. Where Structs and Enums Overlap"><h2 id="1. Where Structs and Enums Overlap" class="header"><a href="#Protocols in Structs vs. Enums-1. Where Structs and Enums Overlap">1. Where Structs and Enums Overlap</a></h2></div>
+
+<p>
+You can apply the exact same protocol to both a struct and an enum. For example, if you want SwiftUI to be able to loop over an array of items dynamically, both types can conform to the system's <code>Identifiable</code> protocol:
+</p>
+
+<pre swift>
+// A Struct satisfying Identifiable
+struct ResortStruct: Identifiable {
+    let id: String // Satisfies the protocol contract
+    let name: String
+}
+
+// An Enum satisfying Identifiable
+enum ResortEnum: String, Identifiable {
+    case whistler, chamonix
+    
+    // Satisfies the protocol contract using its underlying raw string
+    var id: String { self.rawValue } 
+}
+</pre>
+
+<div id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge"><h2 id="2. Where Structs and Enums Diverge" class="header"><a href="#Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge">2. Where Structs and Enums Diverge</a></h2></div>
+
+<p>
+Because enums cannot store arbitrary data values in memory the way fields inside a struct do, their implementations deviate in two major architectural areas:
+</p>
+
+<div id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference A: Stored Properties vs. Computed Properties"><h3 id="Difference A: Stored Properties vs. Computed Properties" class="header"><a href="#Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference A: Stored Properties vs. Computed Properties">Difference A: Stored Properties vs. Computed Properties</a></h3></div>
+
+<ul>
+<li>
+<span id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference A: Stored Properties vs. Computed Properties-Structs"></span><strong id="Structs">Structs</strong> can satisfy a protocol property requirement using a standard <span id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference A: Stored Properties vs. Computed Properties-stored property"></span><strong id="stored property">stored property</strong> (a variable allocated in physical memory).
+
+<li>
+<span id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference A: Stored Properties vs. Computed Properties-Enums"></span><strong id="Enums">Enums</strong> are strictly forbidden from holding stored properties (outside of their primary raw value). Therefore, an enum must <em>always</em> satisfy a protocol property contract using a <span id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference A: Stored Properties vs. Computed Properties-computed property"></span><strong id="computed property">computed property</strong> (a variable with a dynamic getter block).
+<pre swift>
+protocol NamedItem {
+    var displayName: String { get }
+}
+
+// STRUCT IMPLEMENTATION (Stored)
+struct User: NamedItem {
+    let displayName: String // Stored directly in memory
+}
+
+// ENUM IMPLEMENTATION (Computed)
+enum Status: NamedItem {
+    case active, inactive
+    
+    // Must compute the value dynamically based on the current case
+    var displayName: String {
+        switch self {
+        case .active: "Active User"
+        case .inactive: "Deactivated"
+        }
+    }
+}
+</pre>
+
+</ul>
+<div id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference B: State Mutation (mutating)"><h3 id="Difference B: State Mutation (mutating)" class="header"><a href="#Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference B: State Mutation (mutating)">Difference B: State Mutation (mutating)</a></h3></div>
+
+<p>
+If a protocol requires a method that modifies the value of the object itself, it uses the <code>mutating</code> keyword.
+</p>
+<ul>
+<li>
+A <span id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference B: State Mutation (mutating)-struct"></span><strong id="struct">struct</strong> method mutates state by modifying an individual internal variable field (<code>self.count += 1</code>).
+
+<li>
+An <span id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference B: State Mutation (mutating)-enum"></span><strong id="enum">enum</strong> method mutates state by <span id="Protocols in Structs vs. Enums-2. Where Structs and Enums Diverge-Difference B: State Mutation (mutating)-completely swapping out"></span><strong id="completely swapping out">completely swapping out</strong> the active case of the object entirely.
+<pre swift>
+protocol Toggleable {
+    mutating func toggle()
+}
+
+// STRUCT MUTATION
+struct SwitchStruct: Toggleable {
+    var isOn = false
+    
+    mutating func toggle() {
+        isOn.toggle() // Modifies an internal Boolean property
+    }
+}
+
+// ENUM MUTATION
+enum SwitchEnum: Toggleable {
+    case on, off
+    
+    mutating func toggle() {
+        // Completely overwrites the entire state with a different case
+        self = (self == .on) ? .off : .on 
+    }
+}
+</pre>
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
