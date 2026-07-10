@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swift_fundamentals_userdefaults_class-based</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<div id="[[index]]"><h1 id="[[index]]" class="header"><a href="#[[index]]"><a href="index.html">index</a></a></h1></div>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<div id="Swift - Class Based UserDefaults"><h1 id="Swift - Class Based UserDefaults" class="header"><a href="#Swift - Class Based UserDefaults">Swift - Class Based UserDefaults</a></h1></div>
+
+<div id="Swift - Class Based UserDefaults-Blueprint: Class-Based UserDefaults Management with @Observable"><h2 id="Blueprint: Class-Based UserDefaults Management with @Observable" class="header"><a href="#Swift - Class Based UserDefaults-Blueprint: Class-Based UserDefaults Management with @Observable">Blueprint: Class-Based UserDefaults Management with @Observable</a></h2></div>
+
+<p>
+This reference guide isolates the architectural pattern for managing lightweight persistent data (such as a Favorites feature) globally outside of your views.
+</p>
+
+<p>
+This technique maintains a high-performance Runtime Layer (<code>Set</code>) for instantaneous user interactions, paired with a reliable Storage Layer (<code>UserDefaults</code>) for background persistence.
+</p>
+
+<div id="Swift - Class Based UserDefaults-Complete Blueprint Code (Copy-Paste Ready)"><h2 id="Complete Blueprint Code (Copy-Paste Ready)" class="header"><a href="#Swift - Class Based UserDefaults-Complete Blueprint Code (Copy-Paste Ready)">Complete Blueprint Code (Copy-Paste Ready)</a></h2></div>
+
+<p>
+This class completely encapsulates your data logic. Your views simply call <code>add()</code>, <code>remove()</code>, or <code>contains()</code>, unaware of how the data is being saved under the hood.
+</p>
+
+<pre swift>
+import SwiftUI
+
+// 1. Centralized storage key to prevent typo-driven bugs
+enum StorageKeys: String {
+    case favoritesList
+}
+
+// 2. A placeholder model representing your data item
+struct CustomItem: Identifiable {
+    let id: String
+    let name: String
+}
+
+@Observable
+class StorageManager {
+    // High-performance runtime collection (O(1) lookups)
+    private var itemIDs: Set&lt;String&gt;
+    
+    // Resolve the string value from our enum key
+    private let storageKey = StorageKeys.favoritesList.rawValue
+    
+    init() {
+        // READ STEP: Attempt to read the array from disk
+        if let savedArray = UserDefaults.standard.stringArray(forKey: storageKey) {
+            // Convert storage Array back into runtime Set
+            self.itemIDs = Set(savedArray)
+        } else {
+            // Fallback initialization if no history exists
+            self.itemIDs = []
+        }
+    }
+    
+    /// Checks if an item is stored (Runs in constant time).
+    func contains(_ item: CustomItem) -&gt; Bool {
+        itemIDs.contains(item.id)
+    }
+    
+    /// Appends an item to the collection and syncs to disk.
+    func add(_ item: CustomItem) {
+        itemIDs.insert(item.id)
+        save()
+    }
+    
+    /// Removes an item from the collection and syncs to disk.
+    func remove(_ item: CustomItem) {
+        itemIDs.remove(item.id)
+        save()
+    }
+    
+    /// Encapsulated persistence engine.
+    private func save() {
+        // WRITE STEP: Cast Set into an Array for UserDefaults serialization
+        UserDefaults.standard.set(Array(itemIDs), forKey: storageKey)
+    }
+}
+</pre>
+
+<div id="Swift - Class Based UserDefaults-View Integration Blueprint"><h2 id="View Integration Blueprint" class="header"><a href="#Swift - Class Based UserDefaults-View Integration Blueprint">View Integration Blueprint</a></h2></div>
+
+<p>
+To make this manager accessible across your entire app layout, initialize it once in your main <code>App</code> entry point, inject it into your root view environment, and pull it down wherever needed.
+</p>
+
+<div id="Swift - Class Based UserDefaults-View Integration Blueprint-1. Root Level Injection"><h3 id="1. Root Level Injection" class="header"><a href="#Swift - Class Based UserDefaults-View Integration Blueprint-1. Root Level Injection">1. Root Level Injection</a></h3></div>
+
+<pre swift>
+@main
+struct YourApp: App {
+    // Instantiate the manager once for the lifetime of the application
+    @State private var storageManager = StorageManager()
+    
+    var body: some Scene {
+        WindowGroup {
+            MainContentView()
+                .environment(storageManager) // Inject into the environment
+        }
+    }
+}
+</pre>
+
+<div id="Swift - Class Based UserDefaults-View Integration Blueprint-2. Implementation inside a View"><h3 id="2. Implementation inside a View" class="header"><a href="#Swift - Class Based UserDefaults-View Integration Blueprint-2. Implementation inside a View">2. Implementation inside a View</a></h3></div>
+
+<pre swift>
+struct ItemRowView: View {
+    let item: CustomItem
+    
+    // Read the shared instance from the environment
+    @Environment(StorageManager.self) private var storageManager
+    
+    var body: some View {
+        HStack {
+            Text(item.name)
+            Spacer()
+            
+            Button {
+                if storageManager.contains(item) {
+                    storageManager.remove(item)
+                } else {
+                    storageManager.add(item)
+                }
+            } label: {
+                Image(systemName: storageManager.contains(item) ? "heart.fill" : "heart")
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+}
+</pre>
+
+<div id="Swift - Class Based UserDefaults-View Integration Blueprint-3 Core Mechanics to Keep in Mind"><h3 id="3 Core Mechanics to Keep in Mind" class="header"><a href="#Swift - Class Based UserDefaults-View Integration Blueprint-3 Core Mechanics to Keep in Mind">3 Core Mechanics to Keep in Mind</a></h3></div>
+
+<ul>
+<li>
+<span id="Swift - Class Based UserDefaults-View Integration Blueprint-3 Core Mechanics to Keep in Mind-The Set-to-Array Transformer"></span><strong id="The Set-to-Array Transformer">The Set-to-Array Transformer</strong>: <code>UserDefaults</code> cannot natively understand or serialize a Swift <code>Set</code>. Because of this, we utilize a data transformer setup: we run our app logic inside a high-speed <code>Set</code> container, but explicitly cast it down to an <code>Array</code> (<code>Array(itemIDs)</code>) the exact moment it writes to disk.
+
+<li>
+<span id="Swift - Class Based UserDefaults-View Integration Blueprint-3 Core Mechanics to Keep in Mind-Elimination of View Redraw Overhead"></span><strong id="Elimination of View Redraw Overhead">Elimination of View Redraw Overhead</strong>: Unlike <code>@AppStorage</code>, which causes a view to invalidate and redraw the moment any key updates, an <code>@Observable</code> class allows SwiftUI to look deep inside your model properties. Your views will now only redraw if they explicitly evaluate properties targeted by a state change.
+
+<li>
+<span id="Swift - Class Based UserDefaults-View Integration Blueprint-3 Core Mechanics to Keep in Mind-Implicit Main-Thread Sync"></span><strong id="Implicit Main-Thread Sync">Implicit Main-Thread Sync</strong>: Calls to <code>UserDefaults.standard.set()</code> execute immediately on an in-memory dictionary before flushing asynchronously to disk. You do not need to wrap these operations in background tasks or manual threads for small item tracking arrays.
+
+</ul>
+<p>
+<hl>
+<br>
+</p>
+
+<p>
+<a href="swift_hacking_with_swift.html">Swift</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
