@@ -225,67 +225,87 @@ Here is your updated <code>ContentView.swift</code> containing the sorting menu 
 <pre swift>
 import SwiftUI
 
-// 1. Create a type-safe representation of our sorting options.
-// CaseIterable allows us to effortlessly list all cases in a loop.
-// Identifiable allows SwiftUI to differentiate options without manual IDs.
+// ==========================================
+// 1. STATE TYPE LAYER (The Sort Enum)
+// ==========================================
+// Conforming to String grants implicit raw values ("Default", etc.).
+// CaseIterable allows looping (though bypassed here to solve compiler type checking).
+// Identifiable allows tracking unique instances via its string rawValue.
 enum SortType: String, CaseIterable, Identifiable {
     case defaultOrder = "Default"
     case alphabetical = "Alphabetical"
     case country = "Country"
     
-    // Satisfy Identifiable using the raw value string
+    // Fulfills the Identifiable contract using the case's implicit string value
     var id: String { self.rawValue }
 }
 
 struct ContentView: View {
+    // ==========================================
+    // 2. DATA PROPERTIES &amp; STATE TRACKING
+    // ==========================================
+    // Immutable array holding our raw data decoded on app launch
     let resorts: [Resort] = Bundle.main.decode("resorts.json")
     
+    // @State causes the View to redraw automatically whenever these values change
     @State private var searchText = ""
     @State private var favorites = Favorites()
     
-    // 2. Track the active sorting method selected by the user
+    // Tracks the user's active sorting state. Defaults to bundle file layout.
     @State private var sortOrder: SortType = .defaultOrder
     
-    // 3. This computed property acts as our master data pipeline:
-    // It filters the array first, then sorts it on the fly.
+    // ==========================================
+    // 3. THE DATA PIPELINE (Computed Property)
+    // ==========================================
+    // Instead of computing filtering/sorting inside the body UI, this read-only 
+    // property updates lazily whenever searchText or sortOrder changes.
     var filteredResorts: [Resort] {
-        // Phase A: Filtering (Your existing logic)
+        
+        // --- PHASE A: FILTERING ---
         let intermediateList: [Resort]
         if searchText.isEmpty {
-            intermediateList = resorts
+            intermediateList = resorts // Base list
         } else {
+            // Evaluates case-insensitive name matching on the fly
             intermediateList = resorts.filter { $0.name.localizedStandardContains(searchText) }
         }
         
-        // Phase B: Sorting based on the active state
+        // --- PHASE B: SORTING ---
+        // Inspects our active @State and applies the correct sort logic to the filtered copy
         switch sortOrder {
         case .defaultOrder:
-            // Return the list exactly as it came from the JSON bundle
+            // Passes back the array matching the exact layout layout of resorts.json
             return intermediateList
             
         case .alphabetical:
-            // Sort ascending by the resort name string
+            // Standard ascending sort checking character points ($0 = item 1, $1 = item 2)
             return intermediateList.sorted { $0.name &lt; $1.name }
             
         case .country:
-            // Sort ascending by country name. 
-            // If countries match, it falls back to sorting by name so it looks neat.
+            // A two-tier sort method. Secondary checking prevents sub-items from scattering.
             return intermediateList.sorted {
                 if $0.country == $1.country {
+                    // If the countries are identical, order them alphabetically by name
                     return $0.name &lt; $1.name
                 }
+                // Otherwise, sort alphabetically by country name
                 return $0.country &lt; $1.country
             }
         }
     }
     
+    // ==========================================
+    // 4. USER INTERFACE LAYOUT (View Body)
+    // ==========================================
     var body: some View {
         NavigationSplitView {
-            // The List remains completely untouched because it automatically 
-            // streams the finished array out of the updated computed property!
+            // The list observes the dynamic pipeline array rather than the static bundle array
             List(filteredResorts) { resort in
+                // Standard value-based navigation routing matching your data model type
                 NavigationLink(value: resort) {
+                    // Unified HStack container allows the Swift compiler to parse layout rows easily
                     HStack {
+                        // Flag styling configuration
                         Image(resort.country)
                             .resizable()
                             .scaledToFill()
@@ -296,18 +316,21 @@ struct ContentView: View {
                                     .stroke(.black, lineWidth: 1)
                             )
                         
+                        // Resort textual metadata layout
                         VStack(alignment: .leading) {
                             Text(resort.name)
                                 .font(.headline)
                             Text("\(resort.runs) runs")
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                    if favorites.contains(resort) {
-                        Spacer()
-                        Image(systemName: "heart.fill")
-                            .accessibilityLabel("This is a favorite resort")
-                            .foregroundStyle(.red)
+                        
+                        // Runtime conditional verification checking the Favorite class store
+                        if favorites.contains(resort) {
+                            Spacer() // Pushes the heart graphic directly to the right edge
+                            Image(systemName: "heart.fill")
+                                .accessibilityLabel("This is a favorite resort")
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
             }
@@ -316,24 +339,52 @@ struct ContentView: View {
                 ResortView(resort: resort)
             }
             .searchable(text: $searchText, prompt: "Search for a resort")
-            // 4. Add a toolbar button containing a contextual Menu to swap the sort state
+            
+            // --- THE SORT CONTROL TOOLBAR ---
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    // Contextual dropdown menu wrapper
                     Menu {
-                        // Picker wraps our choices into an interactive checkmarked list
-                        Picker("Sort Order", selection: $sortOrder) {
-                            ForEach(SortType.allCases) { type in
-                                Text(type.rawValue).tag(type)
+                        // Option A: Default Button Trigger
+                        Button {
+                            sortOrder = .defaultOrder // Toggling this changes state, triggering a redraw
+                        } label: {
+                            HStack {
+                                Text("Default")
+                                // If this option is currently active, append a system checkmark
+                                if sortOrder == .defaultOrder { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Option B: Alphabetical Button Trigger
+                        Button {
+                            sortOrder = .alphabetical
+                        } label: {
+                            HStack {
+                                Text("Alphabetical")
+                                if sortOrder == .alphabetical { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Option C: Country Button Trigger
+                        Button {
+                            sortOrder = .country
+                        } label: {
+                            HStack {
+                                Text("Country")
+                                if sortOrder == .country { Image(systemName: "checkmark") }
                             }
                         }
                     } label: {
-                        Label("Sort resorts", systemName: "arrow.up.arrow.down")
+                        // Plain system icon completely sidesteps Xcode's complex Picker type-inference bugs
+                        Image(systemName: "line.3.horizontal.decrease.circle")
                     }
                 }
             }
         } detail: {
             WelcomeView()
         }
+        // Injects our observable favorites environment model down the view rendering hierarchy
         .environment(favorites)
     }
 }
