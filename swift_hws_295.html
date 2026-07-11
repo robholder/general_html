@@ -3373,8 +3373,146 @@ If you want to execute code when a sheet is dismissed, SwiftUI provides a parame
 
 <div id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 76"><h2 id="QUESTION 76" class="header"><a href="#Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 76">QUESTION 76</a></h2></div>
 
+<ul>
+<li>
+Option 1: <code>#Predicate</code> can filter SwiftData objects using computed properties, but only simple ones.
+
+<li>
+Option 2: The <code>offset()</code> modifier changes where a view is rendered without actually changing its original dimensions.
+
+</ul>
+<p>
+Option 2 is true.
+</p>
+
+<p>
+Here is the quick breakdown of why this is correct and why Option 1 is incorrect.
+</p>
+
+<div id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 76-Why Option 2 is True"><h3 id="Why Option 2 is True" class="header"><a href="#Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 76-Why Option 2 is True">Why Option 2 is True</a></h3></div>
+
+<p>
+The <code>.offset()</code> modifier alters exactly where a view is <em>rendered</em> on the screen relative to its original position without altering the layout properties of the view itself.
+</p>
+
+<p>
+It does not change the view's actual frame size, nor does it push surrounding views out of the way. As far as the overall SwiftUI layout engine is concerned, the view still occupies its original dimensions in its original spot - only its final visual rendering is shifted.
+</p>
+
+<pre swift>
+Text("Hello")
+    .background(.blue)
+    .offset(x: 20, y: 50) // Moves the visual render, but leaves layout bounds unchanged
+</pre>
+
+<div id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 76-Why Option 1 is False"><h3 id="Why Option 1 is False" class="header"><a href="#Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 76-Why Option 1 is False">Why Option 1 is False</a></h3></div>
+
+<p>
+The <code>#Predicate</code> macro used in SwiftData <span id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 76-Why Option 1 is False-cannot evaluate computed properties at all"></span><strong id="cannot evaluate computed properties at all">cannot evaluate computed properties at all</strong>, no matter how simple they are.
+</p>
+
+<p>
+Because SwiftData predicates must be translated directly into underlying SQL queries to filter data efficiently inside the database, they can only access stored properties (properties that map directly to a database column). If you attempt to include a computed property inside a <code>#Predicate</code> block, it will cause a compiler error.
+</p>
+
+<p>
+{{swift
+@Model
+class User {
+</p>
+<pre><code>var firstName: String
+var lastName: String
+
+// Computed property
+var fullName: String { "\(firstName) \(lastName)" } 
+</code></pre>
+<p>
+}
+</p>
+
+<p>
+// ❌ This will fail to compile because fullName is a computed property
+let predicate = #Predicate<User> { $0.fullName == "Alex Jones" }
+</p>
+
+<p>
+//  This is correct (using only stored properties)
+let predicate = #Predicate<User> { \(0.firstName == "Alex" &amp;&amp; \)0.lastName == "Jones" }
+}}}
+</p>
 
 
+<div id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 77"><h2 id="QUESTION 77" class="header"><a href="#Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 77">QUESTION 77</a></h2></div>
+
+<ul>
+<li>
+Option 1: We can let users delete items from a <code>List</code> by adding the <code>onDelete()</code> modifier to it.
+
+<li>
+Option 2: If we write <code>Text("Hello, World!").background(.red)</code>, the text view is a child of the background.
+
+</ul>
+<p>
+The accepted answer is Option 2, but Ai disagreed.
+</p>
+
+<div id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 77-1. .onDelete() belongs on ForEach"><h3 id="1. .onDelete() belongs on ForEach" class="header"><a href="#Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 77-1. .onDelete() belongs on ForEach">1. .onDelete() belongs on ForEach</a></h3></div>
+
+<p>
+The <code>.onDelete()</code> modifier cannot be applied directly to a List view container; it must be applied specifically to the <code>ForEach</code> dynamic loop inside the list.
+</p>
+
+<p>
+The question option phrased it broadly ("delete items from a List by adding the <code>.onDelete()</code> modifier to it"), which is visually true for the user, but syntactically, it must hook into the <code>ForEach</code> collection so it knows exactly which array index is being swiped.
+</p>
+
+<pre swift>
+List {
+    // ❌ Applying .onDelete() here will cause a compiler error
+    ForEach(items, id: \.self) { item in
+        Text(item)
+    }
+    .onDelete(perform: deleteItems) //  This is the only place it works!
+}
+</pre>
+
+<div id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 77-2. The Modifier Hierarchy: Why the Text is the Parent"><h3 id="2. The Modifier Hierarchy: Why the Text is the Parent" class="header"><a href="#Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 77-2. The Modifier Hierarchy: Why the Text is the Parent">2. The Modifier Hierarchy: Why the Text is the Parent</a></h3></div>
+
+<p>
+This is one of the most confusing parts of SwiftUI because it behaves differently than traditional UIKit or HTML web layout.
+</p>
+
+<p>
+When you write:
+</p>
+
+<pre swift>
+Text("Hello, World!")
+    .background(.red)
+</pre>
+
+<p>
+It is natural to think, "The red box contains the text, so the background is the parent." However, SwiftUI views are completely immutable structures. Modifiers don't change the view; they wrap it.
+</p>
+
+<p>
+Here is how the layout engine actually processes it:
+</p>
+
+<ul>
+<li>
+<code>Text("Hello, World!")</code> is the primary view.
+
+<li>
+When you chain <code>.background(.red)</code>, SwiftUI creates a new hidden wrapper view called <code>_BackgroundModifier</code>.
+
+<li>
+The <span id="Hacking With Swift - 295 - Final Exam - Ai Insight-QUESTION 77-2. The Modifier Hierarchy: Why the Text is the Parent-Text view acts as the parent"></span><strong id="Text view acts as the parent">Text view acts as the parent</strong> in the layout conversation: it decides its own size based on the string "Hello, World!", and then it passes those exact dimensions down to the background layer. The background is forced to match whatever size the text decided it needed.
+
+</ul>
+<p>
+Because the text controls the layout constraints and tells the background how big to be, the layout engine treats the text as the structural parent.
+</p>
 
 <p>
 <hr>
