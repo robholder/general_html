@@ -71,6 +71,14 @@ Edit tmux.conf and include Plugin Manager (TPM) settings:
 
 </ul>
   
+<table>
+<tr>
+<td>
+NOTE: This is old. Look below for tpm, resurrection and continuum.
+</td>
+</tr>
+</table>
+
 <pre bash>
 # 1. Path (keeps Stow/Symlinks happy)
 set-environment -g TMUX_PLUGIN_MANAGER_PATH '~/.config/tmux/plugins'
@@ -162,13 +170,157 @@ Pro-Tip: If you see an error about "conflicting files" during the stow step, it�
 Would you like to see a one-liner alias you can add to your shell config to keep submodules updated automatically during every pull?
 </p>
 
-<div id="Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules"><h3 id="Setting Globals for Submodule Recursive Modules" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules">Setting Globals for Submodule Recursive Modules</a></h3></div>
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup"><h1 id="Modern TPM, Resurrection &amp; Continuum Install/Setup" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup">Modern TPM, Resurrection &amp; Continuum Install/Setup</a></h1></div>
+
+<table>
+<tr>
+<td>
+NOTE: This is the modern approach to the setup.
+</td>
+</tr>
+</table>
+
+<p>
+This is the complete, self-contained reference guide to setting up TPM, Tmux-Resurrect, and Tmux-Continuum inside your shared GNU Stow layout.
+</p>
+
+<p>
+This design keeps all third-party plugin code contained directly inside your <code>~/dotfiles</code> repository, while routing the session save files to a local, untracked system directory. This ensures each machine maintains its own unique session history without polluting your shared Git repository.
+</p>
+
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture"><h2 id="The Target Architecture" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture">The Target Architecture</a></h2></div>
+
+<p>
+Because you have a single top-level directory symlink (<code>~/.config/tmux</code> pointing directly to <code>~/dotfiles/tmux/dot-config/tmux</code>), your filesystem structure will look like this:
+</p>
+
+<pre text>
+~/dotfiles/tmux/dot-config/tmux/
+├── tmux.conf            &lt;-- Tracked in Git
+└── plugins/             &lt;-- Tracked in Git (Stores third-party code)
+    └── tpm/             &lt;-- The package manager bootstrap
+</pre>
+
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 1: Bootstrap the Package Manager (TPM)"><h3 id="Step 1: Bootstrap the Package Manager (TPM)" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 1: Bootstrap the Package Manager (TPM)">Step 1: Bootstrap the Package Manager (TPM)</a></h3></div>
+
+<p>
+Run this one-time command on your Mac to create your target directory and clone TPM directly into your local dotfiles layout:
+</p>
+
+<pre bash>
+mkdir -p ~/dotfiles/tmux/dot-config/tmux/plugins/
+git clone https://github.com ~/dotfiles/tmux/dot-config/tmux/plugins/tpm
+</pre>
+
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 2: Write the Portable tmux.conf"><h3 id="Step 2: Write the Portable tmux.conf" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 2: Write the Portable tmux.conf">Step 2: Write the Portable tmux.conf</a></h3></div>
+
+<p>
+Open <code>/Users/&lt;myusername&gt;/dotfiles/tmux/dot-config/tmux/tmux.conf</code> and replace its entire contents with this configuration block.
+</p>
+
+<p>
+Note: This configuration uses universal <code>~</code> path expansions so it functions automatically across multiple machines with different usernames.tmux
+</p>
+
+<pre bash>
+# =====================================================================
+# 1. PATH CONFIGURATIONS (GNU STOW &amp; MACHINE-LOCAL COEXISTENCE)
+# =====================================================================
+# Forces TPM to install third-party plugins inside your stowed dotfiles path
+set -g @gpm_plugins_path '~/.config/tmux/plugins/'
+
+# Forces session save data to generate locally on each individual machine
+# (Bypasses dotfiles repo completely so setups remain unique)
+set -g @resurrect-dir '~/.local/share/tmux/resurrect'
+
+# =====================================================================
+# 2. PLUGIN DEFINITIONS
+# =====================================================================
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+# =====================================================================
+# 3. BACKGROUND CONTINUUM SYSTEM AUTOMATION
+# =====================================================================
+# Automatically load the last saved session state when tmux server boots up
+set -g @continuum-restore 'on'
+
+# =====================================================================
+# 4. INITIALIZE TMUX PLUGIN MANAGER
+# =====================================================================
+# This line MUST be kept at the absolute bottom of this file.
+run -b '~/.config/tmux/plugins/tpm/tpm'
+</pre>
+
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 3: Initialize the Environment"><h3 id="Step 3: Initialize the Environment" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 3: Initialize the Environment">Step 3: Initialize the Environment</a></h3></div>
+
+<p>
+Since your top-level directory link is already established by Stow, you are ready to boot up the environment:
+</p>
+
+<p>
+Kill any hung or legacy background tmux operations to start fresh:
+</p>
+
+<pre bash>
+tmux kill-server
+</pre>
+
+<p>
+Launch a clean tmux instance:
+</p>
+
+<pre bash>
+tmux
+</pre>
+
+<p>
+Download and install the remaining plugins: Press your tmux prefix key combo (Ctrl + b), release it, and then press capital <code>I</code> (<code>Shift + i</code>).
+</p>
+
+<p>
+A small terminal overlay will appear confirming that tmux-resurrect and tmux-continuum have successfully cloned into your plugins/ folder.
+</p>
+
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 4: Verify the Saving Pipelines"><h3 id="Step 4: Verify the Saving Pipelines" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 4: Verify the Saving Pipelines">Step 4: Verify the Saving Pipelines</a></h3></div>
+
+<p>
+To guarantee that everything is working across your machine-local boundaries:
+</p>
+
+<ul>
+<li>
+Force a manual environment save: Press <code>prefix</code>, then <code>Ctrl + s</code>.
+
+<li>
+Look for the brief <span id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Step 4: Verify the Saving Pipelines-&quot;Tmux environment saved!&quot;"></span><strong id="&quot;Tmux environment saved!&quot;">"Tmux environment saved!"</strong> notification on the status bar.
+
+<li>
+Confirm that the local machine generated its unique text storage matrix:
+
+</ul>
+  
+<pre bash>
+ls -la ~/.local/share/tmux/resurrect/
+</pre>
+
+<p>
+You will see a brand new timestamp file mapping today's date. Your dotfiles directory is now fully self-contained, and tmux-continuum will auto-save your active window splits in the background every 15 minutes.
+</p>
+
+<p>
+Whenever you clone this configuration onto a brand new machine, all you need to do is run Step 1 to bootstrap TPM, launch <code>tmux</code>, and press <code>prefix</code> + <code>I</code>!
+</p>
+
+
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Setting Globals for Submodule Recursive Modules"><h3 id="Setting Globals for Submodule Recursive Modules" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Setting Globals for Submodule Recursive Modules">Setting Globals for Submodule Recursive Modules</a></h3></div>
 
 <p>
 You can change Git's default behavior for the pull command. This ensures that submodules are updated across all your machines and repositories without needing extra commands. 
 </p>
 
-<div id="Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules-Run this once on each machine:"><h4 id="Run this once on each machine:" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Setting Globals for Submodule Recursive Modules-Run this once on each machine:">Run this once on each machine:</a></h4></div>
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Setting Globals for Submodule Recursive Modules-Run this once on each machine:"><h4 id="Run this once on each machine:" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Setting Globals for Submodule Recursive Modules-Run this once on each machine:">Run this once on each machine:</a></h4></div>
 
 <pre bash>
 git config --global submodule.recurse true
@@ -178,7 +330,7 @@ git config --global submodule.recurse true
 What this does: It tells Git to always include the --recurse-submodules flag for every git pull. This automatically runs git submodule update --init --recursive immediately after the pull is complete.
 </p>
 
-<div id="Config and Plugins-Stow Setup for Tmux-Stow the config:"><h3 id="Stow the config:" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Stow the config:">Stow the config:</a></h3></div>
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Stow the config:"><h3 id="Stow the config:" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Stow the config:">Stow the config:</a></h3></div>
 
 <p>
 Run stow tmux from inside your ~/dotfiles directory to symlink ~/.config/tmux/.
@@ -194,7 +346,7 @@ If you don't have a .stowrc setup and you've used the 'dot' substitution:
 stow --dotfiles tmux
 </pre>
 
-<div id="Config and Plugins-Stow Setup for Tmux-Stow the config:-Final Synchronization Tip"><h4 id="Final Synchronization Tip" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Stow the config:-Final Synchronization Tip">Final Synchronization Tip</a></h4></div>
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Stow the config:-Final Synchronization Tip"><h4 id="Final Synchronization Tip" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Stow the config:-Final Synchronization Tip">Final Synchronization Tip</a></h4></div>
 
 <p>
 Since you are using Stow, remember that while your Git files are now auto-updating, you still need to refresh the symlinks if you change your folder structure. I recommend occasionally running: 
@@ -204,7 +356,7 @@ Since you are using Stow, remember that while your Git files are now auto-updati
 stow -R tmux
 </pre>
 
-<div id="Config and Plugins-Stow Setup for Tmux-Stow the config:-Key Rules for --dotfiles"><h4 id="Key Rules for --dotfiles" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Stow the config:-Key Rules for --dotfiles">Key Rules for --dotfiles</a></h4></div>
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Stow the config:-Key Rules for --dotfiles"><h4 id="Key Rules for --dotfiles" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Stow the config:-Key Rules for --dotfiles">Key Rules for --dotfiles</a></h4></div>
 
 <ul>
 <li>
@@ -220,7 +372,7 @@ Multiple dots: A file named dot-tmux.conf will be stowed as .tmux.conf.
 Version requirement: This feature was introduced in Stow 2.3.0. Ensure your version is current by running stow --version.
 
 </ul>
-<div id="Config and Plugins-Stow Setup for Tmux-Install Plugins:"><h3 id="Install Plugins:" class="header"><a href="#Config and Plugins-Stow Setup for Tmux-Install Plugins:">Install Plugins:</a></h3></div>
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Install Plugins:"><h3 id="Install Plugins:" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Install Plugins:">Install Plugins:</a></h3></div>
 
 <ul>
 <li>
