@@ -2156,12 +2156,36 @@ Here is the corrected script.
 
 <pre bash>
 #!/usr/bin/env bash
+
+# Find the directory where this script actually lives
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+# Define the path to the companion man page (relative to the script)
+# SCRIPT_DIR is .../bootstrap/bin/
+# The man page lives in .../bootstrap/share/man/man1/bootstrap.1
+MAN_PAGE="$SCRIPT_DIR/../share/man/man1/bootstrap.1"
+
+# Check if the user asked for help
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    if [[ -f "$MAN_PAGE" ]]; then
+        # Format the man page directly to stdout (forcing the system formatter)
+        man "$MAN_PAGE"
+        exit 0
+    else
+        echo "Error: Manual page not found at $MAN_PAGE. Run 'stow bootstrap'" &gt;&amp;2
+        exit 1
+    fi
+fi
+
+# ... Script logic starts here ...
+
 set -e
 
 DOTFILES_DIR="$HOME/dotfiles"
 TARGET="$HOME"
 
 # Flags
+APPLY=0
 FORCE=0
 UNINSTALL=0
 DRYRUN=0
@@ -2237,9 +2261,13 @@ stow_package() {
 
     if [[ "$FORCE" == "1" ]]; then
       warn "Force mode enabled — backing up conflicting files"
-      echo "$conflicts" | awk '{print $NF}' | while read -r file; do
-        backup_file "$TARGET/$file"
-      done
+      if [[ "$DRYRUN" != "1" ]]; then
+        echo "$conflicts" | awk '{print $NF}' | while read -r file; do
+          backup_file "$TARGET/$file"
+        done
+      else
+        info "[DRY RUN] Would back up conflicting files"
+      fi
     else
       error "Use --force to automatically back up and continue"
       return
@@ -2264,6 +2292,12 @@ stow_package() {
 
 unstow_package() {
   local pkg="$1"
+  if [[ "$DRYRUN" == "1" ]]; then
+    info "[DRY RUN] Would unstow $pkg"
+    stow --dotfiles -Dnvt "$TARGET" "$pkg"
+    return
+  fi
+
   info "Unstowing $pkg"
   stow --dotfiles -Dt "$TARGET" "$pkg"
   success "Unstowed $pkg"
@@ -2329,6 +2363,11 @@ migrate_home() {
       continue
     fi
 
+    if [[ "$DRYRUN" == "1" ]]; then
+      info "[DRY RUN] Would migrate $file → $target"
+      continue
+    fi
+
     backup_file "$file"
     mv "$file" "$target"
     ln -s "$target" "$file"
@@ -2377,9 +2416,10 @@ main() {
 # Parse flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --apply) APPLY=1 ;;
+    --dry-run) DRYRUN=1 ;;
     --force) FORCE=1 ;;
     --uninstall) UNINSTALL=1 ;;
-    --dry-run) DRYRUN=1 ;;
     --adopt) ADOPT=1 ;;
     --verbose) VERBOSE=1 ;;
     --list) LIST=1 ;;
@@ -2393,8 +2433,15 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-main
+# Safety Gate / Dry Run Default Logic
+if [[ "$APPLY" -ne 1 &amp;&amp; "$LIST" -ne 1 ]]; then
+  DRYRUN=1
+  warn "No --apply flag detected. Running in DRY-RUN mode (safe preview)."
+  warn "To apply these changes for real, re-run with: bootstrap --apply"
+  echo ""
+fi
 
+main
 </pre>
 
 <div id="Next Step-Catching Non-existent Flags (Fail if present)-What Changed?"><h3 id="What Changed?" class="header"><a href="#Next Step-Catching Non-existent Flags (Fail if present)-What Changed?">What Changed?</a></h3></div>
@@ -2992,6 +3039,14 @@ bootstrap.1
 Or embed it in your repo.
 </p>
 
+<table>
+<tr>
+<td>
+NOTE: See Stow implementation below, so that this can be installed via Stow with the 'bootstrap' script.
+</td>
+</tr>
+</table>
+
 <pre bash>
 BOOTSTRAP(1)                User Commands                BOOTSTRAP(1)
 
@@ -2999,25 +3054,34 @@ NAME
     bootstrap – portable dotfiles bootstrap and migration tool
 
 SYNOPSIS
-    bootstrap [--apply] [--migrate] [--only PKG]
-              [--adopt] [--uninstall] [--force]
-              [--list] [--verbose]
+    bootstrap [--apply] [--dry-run] [--only PKG] [--adopt] 
+              [--uninstall] [--force] [--verbose]
+    bootstrap --migrate
+    bootstrap --list
+    bootstrap --help
 
 DESCRIPTION
     bootstrap is a portable, safety‑first dotfiles management tool
     built around GNU Stow. It treats the current working directory
     as the dotfiles root and provides interactive migration,
-    automatic backups, and dry‑run behavior by default.
+    automatic backups, and package link management.
     
-    bootstrap refuses to run if invoked from $HOME to prevent accidental
-    migration or stowing of the entire home directory.
+    To prevent accidental invocation, bootstrap defaults to DRY-RUN mode.
+    No actual changes are made to the filesystem unless the --apply flag
+    is provided explicitly.
 
-    No changes are made unless --apply is specified.
+    The script refuses to run if invoked from $HOME to prevent accidental
+    migration or stowing of the entire home directory.
 
 OPTIONS
     --apply
-           Perform real actions. Without this flag, bootstrap
-           previews all operations (dry‑run mode).
+           Perform real system operations (e.g. stowing, unstowing). 
+           Without this flag, bootstrap runs in safe preview (dry-run)
+           mode by default.
+
+    --dry-run
+           Explicitly request dry-run mode. This is the default behavior
+           if --apply is not specified.
 
     --migrate
            Scan the user’s home directory for dotfiles, display a
@@ -3063,7 +3127,7 @@ EXIT STATUS
     1      Error occurred (e.g., running from $HOME).
 
 EXAMPLES
-    Dry‑run stowing all packages:
+    Safely preview stowing all packages (Dry-Run):
            bootstrap
 
     Actually stow all packages:
@@ -3071,9 +3135,6 @@ EXAMPLES
 
     Migrate dotfiles interactively:
            bootstrap --migrate
-
-    Perform migration for real:
-           bootstrap --migrate --apply
 
     Stow only one package:
            bootstrap --only zshrc --apply
@@ -3083,7 +3144,6 @@ AUTHOR
 
 COPYRIGHT
     You may include your preferred license here.
-
 </pre>
 
 <div id="Integrate Bootstrap Script with stow (the &quot;dotfiles&quot; way)"><h1 id="Integrate Bootstrap Script with stow (the &quot;dotfiles&quot; way)" class="header"><a href="#Integrate Bootstrap Script with stow (the &quot;dotfiles&quot; way)">Integrate Bootstrap Script with stow (the "dotfiles" way)</a></h1></div>
@@ -3096,16 +3156,19 @@ Make sure you have this file:
 <li>
 Add a file in 'dotfiles'.
 
-</ul>
-<p>
+<li>
 Name it <code>.stowrc</code>
+
+<li>
 Contents:
-</p>
+
+</ul>
   
 <pre bash>
 --target=../
 --dotfiles
 </pre>
+
 <p>
 Since you are already using Stow, you can organize your man pages so that Stow symlinks them to your user's local path. This allows you to just type man bootstrap from anywhere!
 </p>
@@ -3231,6 +3294,15 @@ And because the script has that built-in safety guardrail, if you accidentally r
 
 <div id="Ai Analysis Of this Custom Bootstrap Script"><h1 id="Ai Analysis Of this Custom Bootstrap Script" class="header"><a href="#Ai Analysis Of this Custom Bootstrap Script">Ai Analysis Of this Custom Bootstrap Script</a></h1></div>
 
+<p>
+The script, manual and method of deployment has changed since this Ai interaction. Take a look at:
+</p>
+
+<ul>
+<li>
+<a href="unix_tools_stow_migrate_project.html#Integrate Bootstrap Script with stow (the &quot;dotfiles&quot; way)">#Integrate Bootstrap Script with stow (the "dotfiles" way)</a>
+
+</ul>
 <div id="Ai Analysis Of this Custom Bootstrap Script-QUESTION"><h2 id="QUESTION" class="header"><a href="#Ai Analysis Of this Custom Bootstrap Script-QUESTION">QUESTION</a></h2></div>
 
 <p>
