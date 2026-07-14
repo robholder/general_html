@@ -74,7 +74,7 @@ Edit tmux.conf and include Plugin Manager (TPM) settings:
 <table>
 <tr>
 <td>
-NOTE: This is old. Look below for tpm, resurrection and continuum.
+NOTE: Look below for tpm, resurrection and continuum in a complete tmux.config block.
 </td>
 </tr>
 </table>
@@ -177,7 +177,7 @@ Would you like to see a one-liner alias you can add to your shell config to keep
 <table>
 <tr>
 <td>
-NOTE: This is the modern approach to the setup.
+NOTE: This is the approach suggested above.
 </td>
 </tr>
 </table>
@@ -221,15 +221,16 @@ Open <code>/Users/&lt;myusername&gt;/dotfiles/tmux/dot-config/tmux/tmux.conf</co
 </p>
 
 <p>
-Note: This configuration uses universal <code>~</code> path expansions so it functions automatically across multiple machines with different usernames.tmux
+Note: This configuration uses universal <code>~</code> path expansions so it functions automatically across multiple machines with different usernames.tmux. However, the first setting uses <code>＄HOME</code>, which although thought of as 'old fashioned' in some quarters, helps guide tpm to use the correct 'dotfiles' location in cases where we use Stow.
 </p>
 
 <pre bash>
 # =====================================================================
 # 1. PATH CONFIGURATIONS (GNU STOW &amp; MACHINE-LOCAL COEXISTENCE)
 # =====================================================================
-# Forces TPM to install third-party plugins inside your stowed dotfiles path
-set -g @gpm_plugins_path '~/.config/tmux/plugins/'
+# Explicitly force TPM to install plugins in your actual home directory, 
+# preventing Stow symlink resolution from spawning folders in ~/dotfiles/
+set-environment -g TMUX_PLUGIN_MANAGER_PATH '$HOME/.config/tmux/plugins/'
 
 # Forces session save data to generate locally on each individual machine
 # (Bypasses dotfiles repo completely so setups remain unique)
@@ -241,10 +242,13 @@ set -g @resurrect-dir '~/.local/share/tmux/resurrect'
 set -g @plugin 'tmux-plugins/tpm'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
 set -g @plugin 'tmux-plugins/tmux-continuum'
-
+set -g @plugin 'catppuccin/tmux#v2.1.2'
+#set -g @plugin 'tmux-plugins/tmux-sensible'
+#
 # =====================================================================
 # 3. BACKGROUND CONTINUUM SYSTEM AUTOMATION
 # =====================================================================
+# Optional: set continuum to restore automatically
 # Automatically load the last saved session state when tmux server boots up
 set -g @continuum-restore 'on'
 
@@ -253,19 +257,30 @@ set -g @continuum-restore 'on'
 # =====================================================================
 # This line MUST be kept at the absolute bottom of this file.
 run -b '~/.config/tmux/plugins/tpm/tpm'
+
 </pre>
 
+<div id="Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Tweak If Color Settings Get Messed-Up"><h3 id="Tweak If Color Settings Get Messed-Up" class="header"><a href="#Modern TPM, Resurrection &amp; Continuum Install/Setup-The Target Architecture-Tweak If Color Settings Get Messed-Up">Tweak If Color Settings Get Messed-Up</a></h3></div>
+
 <p>
-The warning that the <code>run</code> command has to be at the end isn't strictly true (especially if you have color settings being overridden by plugin configs).
+The warning that the <code>run</code> command has to be at the end isn't strictly true (especially if you have color settings being overridden by the plugin configs).
 </p>
 
 <p>
-To maintain color settings, move your styles below the TPM run line.
+To maintain color settings, move your styles <em>below</em> the TPM run line.
 </p>
 
 <p>
-You can easily secure your styles by taking advantage of a loophole in tmux's configuration parser: The plugin manager line does not actually have to be the final line of your file.
+You can easily secure your styles by taking advantage of a loophole in tmux's configuration parser: <em>The plugin manager line does not actually have to be the final line of your file.</em>
 </p>
+
+<table>
+<tr>
+<td>
+Notice the removal of the <code>-b</code> flag on <code>run</code>. This is forcing Tmux to wait for <code>tpm</code> to finish before loading the rest of the config.
+</td>
+</tr>
+</table>
 
 <p>
 Any command placed <em>after</em> the TPM boot line runs last, effectively overriding any plugin or theme settings that loaded right before it.
@@ -277,10 +292,17 @@ Open the <code>~/dotfiles/tmux/dot-config/tmux/tmux.conf</code> file and move th
 
 <pre bash>
 # =====================================================================
-# 4. INITIALIZE TMUX PLUGIN MANAGER 
+# 4. INITIALIZE TMUX PLUGIN MANAGER
 # =====================================================================
-# TPM boots up here, initializing all your chosen themes and plugins
-run '~/.config/tmux/plugins/tpm/tpm'
+# This line MUST be kept at the absolute bottom of this file.
+# HOWEVER - to retain color changes, we have to remove -b and add the
+# color changes BELOW the plugin manager:
+# This is a copy of the -b version (if at base):
+#run -b '~/.config/tmux/plugins/tpm/tpm'
+# This is the version without -b (forcing Tmux to wait for tpm to finish
+# before loading the rest of the config).
+# (Also, this is the syntax to cope with Gnu Stow symlinks)
+run '$HOME/.config/tmux/plugins/tpm/tpm'
 
 # =====================================================================
 # 5. ABSOLUTE USER OVERRIDES (THE NEW ULTIMATE BOTTOM)
