@@ -2113,6 +2113,291 @@ a migration report file
 Just tell me where you want to take it next.
 </p>
 
+<div id="Next Step-Catching Non-existent Flags (Fail if present)"><h2 id="Catching Non-existent Flags (Fail if present)" class="header"><a href="#Next Step-Catching Non-existent Flags (Fail if present)">Catching Non-existent Flags (Fail if present)</a></h2></div>
+
+<p>
+It is incredibly common for custom Bash scripts to suffer from this "silent failure" issue when flags are parsed.
+</p>
+
+<p>
+The issue is that your <code>case</code> statement parses the flags you've defined, but if it encounters an argument it doesn't recognize (like <code>--dryrun</code>), *<span id="Next Step-Catching Non-existent Flags (Fail if present)-it simply ignores it"></span><strong id="it simply ignores it">it simply ignores it</strong>* because there is no fallback catch-all rule inside the loop. The <code>shift</code> command still runs, moving the script past the typo, and then it executes anyway.
+</p>
+
+<p>
+Fortunately, fixing this is incredibly simple. We just need to add a catch-all pattern (<code>*</code>) to the bottom of your flag parser to print an error and halt execution.
+</p>
+
+<p>
+Here is the corrected script.
+</p>
+
+<div id="Next Step-Catching Non-existent Flags (Fail if present)-The Updated Script"><h3 id="The Updated Script" class="header"><a href="#Next Step-Catching Non-existent Flags (Fail if present)-The Updated Script">The Updated Script</a></h3></div>
+
+<pre bash>
+#!/usr/bin/env bash
+set -e
+
+DOTFILES_DIR="$HOME/dotfiles"
+TARGET="$HOME"
+
+# Flags
+FORCE=0
+UNINSTALL=0
+DRYRUN=0
+ADOPT=0
+VERBOSE=0
+LIST=0
+ONLY=""
+MIGRATE=0
+
+# Colors
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+RESET="\033[0m"
+
+info()    { echo -e "${BLUE}INFO:${RESET} $1"; }
+warn()    { echo -e "${YELLOW}WARN:${RESET} $1"; }
+error()   { echo -e "${RED}ERROR:${RESET} $1"; }
+success() { echo -e "${GREEN}OK:${RESET} $1"; }
+
+# Cross-platform package detection
+detect_packages() {
+  for dir in "$DOTFILES_DIR"/*; do
+    [ -d "$dir" ] &amp;&amp; basename "$dir"
+  done
+}
+
+# Detect dotfiles in $HOME (excluding junk)
+detect_home_dotfiles() {
+  find "$HOME" -maxdepth 1 -mindepth 1 -name ".*" | while read -r file; do
+    base=$(basename "$file")
+
+    case "$base" in
+      .|..|.git|.cache|.local|.Trash|.zsh_sessions|.DS_Store)
+        continue
+        ;;
+    esac
+
+    echo "$file"
+  done
+}
+
+check_conflicts() {
+  local pkg="$1"
+  stow --dotfiles -nvt "$TARGET" "$pkg" 2&gt;&amp;1 | grep "existing target" || true
+}
+
+backup_file() {
+  local file="$1"
+  local backup="$file.backup.$(date +%Y%m%d%H%M%S)"
+  warn "Backing up $file → $backup"
+  mv "$file" "$backup"
+}
+
+ensure_directories() {
+  info "Ensuring required directories exist"
+  mkdir -p "$HOME/.config"
+  mkdir -p "$HOME/.local/share"
+}
+
+stow_package() {
+  local pkg="$1"
+
+  info "Processing package: $pkg"
+
+  local conflicts
+  conflicts=$(check_conflicts "$pkg")
+
+  if [[ -n "$conflicts" ]]; then
+    warn "Conflicts detected:"
+    echo "$conflicts"
+
+    if [[ "$FORCE" == "1" ]]; then
+      warn "Force mode enabled — backing up conflicting files"
+      echo "$conflicts" | awk '{print $NF}' | while read -r file; do
+        backup_file "$TARGET/$file"
+      done
+    else
+      error "Use --force to automatically back up and continue"
+      return
+    fi
+  fi
+
+  if [[ "$DRYRUN" == "1" ]]; then
+    info "[DRY RUN] Would stow $pkg"
+    stow --dotfiles -nvt "$TARGET" "$pkg"
+    return
+  fi
+
+  if [[ "$ADOPT" == "1" ]]; then
+    info "Adopting existing files for $pkg"
+    stow --dotfiles --adopt -vt "$TARGET" "$pkg"
+  else
+    stow --dotfiles -vt "$TARGET" "$pkg"
+  fi
+
+  success "Stowed $pkg"
+}
+
+unstow_package() {
+  local pkg="$1"
+  info "Unstowing $pkg"
+  stow --dotfiles -Dt "$TARGET" "$pkg"
+  success "Unstowed $pkg"
+}
+
+migrate_home() {
+  info "Scanning home directory for dotfiles…"
+
+  mapfile -t files &lt; &lt;(detect_home_dotfiles)
+
+  if [[ ${#files[@]} -eq 0 ]]; then
+    warn "No dotfiles found to migrate"
+    exit 0
+  fi
+
+  echo ""
+  info "Migration plan:"
+  i=1
+  for file in "${files[@]}"; do
+    base=$(basename "$file")
+    clean="${base#.}"
+    pkg="${clean%%.*}"
+    echo "  [$i] $file → $DOTFILES_DIR/$pkg/dot-$clean"
+    ((i++))
+  done
+
+  echo ""
+  read -p "Select items to migrate (e.g. '1 2 5', 'all', or 'none'): " selection
+
+  if [[ "$selection" == "none" ]]; then
+    warn "No items selected. Aborting migration."
+    exit 0
+  fi
+
+  selected_files=()
+
+  if [[ "$selection" == "all" ]]; then
+    selected_files=("${files[@]}")
+  else
+    for index in $selection; do
+      if [[ "$index" =~ ^[0-9]+$ ]] &amp;&amp; (( index &gt;= 1 &amp;&amp; index &lt;= ${#files[@]} )); then
+        selected_files+=("${files[$((index-1))]}")
+      else
+        warn "Invalid selection: $index"
+      fi
+    done
+  fi
+
+  echo ""
+  info "Migrating selected items…"
+
+  for file in "${selected_files[@]}"; do
+    base=$(basename "$file")
+    clean="${base#.}"
+    pkg="${clean%%.*}"
+
+    mkdir -p "$DOTFILES_DIR/$pkg"
+
+    target="$DOTFILES_DIR/$pkg/dot-$clean"
+
+    if [[ -e "$target" ]]; then
+      warn "Target already exists: $target"
+      continue
+    fi
+
+    backup_file "$file"
+    mv "$file" "$target"
+    ln -s "$target" "$file"
+
+    success "Migrated $file → $target"
+  done
+
+  success "Migration complete"
+}
+
+main() {
+  cd "$DOTFILES_DIR"
+
+  if [[ "$MIGRATE" == "1" ]]; then
+    migrate_home
+    exit 0
+  fi
+
+  local packages
+  packages=$(detect_packages)
+
+  if [[ "$LIST" == "1" ]]; then
+    info "Detected packages:"
+    echo "$packages"
+    exit 0
+  fi
+
+  ensure_directories
+
+  if [[ -n "$ONLY" ]]; then
+    stow_package "$ONLY"
+    exit 0
+  fi
+
+  for pkg in $packages; do
+    if [[ "$UNINSTALL" == "1" ]]; then
+      unstow_package "$pkg"
+    else
+      stow_package "$pkg"
+    fi
+  done
+
+  success "All operations complete"
+}
+
+# Parse flags
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force) FORCE=1 ;;
+    --uninstall) UNINSTALL=1 ;;
+    --dry-run) DRYRUN=1 ;;
+    --adopt) ADOPT=1 ;;
+    --verbose) VERBOSE=1 ;;
+    --list) LIST=1 ;;
+    --only) ONLY="$2"; shift ;;
+    --migrate) MIGRATE=1 ;;
+    *) 
+      error "Unknown option: $1"
+      exit 1 
+      ;;
+  esac
+  shift
+done
+
+main
+
+</pre>
+
+<div id="Next Step-Catching Non-existent Flags (Fail if present)-What Changed?"><h3 id="What Changed?" class="header"><a href="#Next Step-Catching Non-existent Flags (Fail if present)-What Changed?">What Changed?</a></h3></div>
+
+<p>
+At the very bottom of the script, inside the <code>case "$1" in</code> block, I added this catch-all:
+</p>
+
+<pre bash>
+    *) 
+      error "Unknown option: $1"
+      exit 1 
+      ;;
+
+</pre>
+
+<ul>
+<li>
+<code>*</code>: In a Bash <code>case</code> statement, the asterisk acts as a wildcard. If the argument passed to the script doesn't match any of your defined flags above it, it will hit this wildcard.
+
+<li>
+<code>exit 1</code>: This immediately stops the script from continuing to the <code>main</code> function with an error status code (<code>1</code>), protecting you from running commands with mistyped, unprotected flags.
+
+</ul>
 <div id="Next Step-README.md"><h2 id="README.md" class="header"><a href="#Next Step-README.md">README.md</a></h2></div>
 
 <p>
