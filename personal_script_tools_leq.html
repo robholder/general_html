@@ -24,7 +24,7 @@
 <div id="Python - lseq"><h1 id="Python - lseq" class="header"><a href="#Python - lseq">Python - lseq</a></h1></div>
 
 <p>
-This is a modern Python3 reinterpretation of an excellent tool originally made by Andrew Whitehurst. This has been re-written in Python3 (original was in Python2), and a few logic tweaks.
+This is a Python3 tool to list sequences of files in a directory, as a range syntax based on file stems and numbered files. Inspired by a tool written by Andrew Whitehurst.
 </p>
 
 
@@ -33,507 +33,100 @@ This is a modern Python3 reinterpretation of an excellent tool originally made b
 
 import sys
 import os
-import glob
+import argparse
 from collections import defaultdict
 
 # lseq IS A UTILITY THAT SCANS A DIRECTORY AND RETURNS FORMATTED LISTS OF
 # SEQUENCES OF FRAMES MAKING IT EASIER TO SEE WHICH FRAMES ARE MISSING,
-# WHAT THE FRAME RANGES ARE AND SO ON. IT RETURNS THE LIST IN A READABLE
-# FORMATTING
+# WHAT THE FRAME RANGES ARE AND SO ON. IT RETURNS THE LIST IN A COMPACT,
+# READABLE SYNTAX
 
-# negPad handles whether we regard -#### as four or five frame padding
-negPad = 0
-
-
-def makeFrameList(inputList, pad):
-    outputString = ""
-    if len(inputList) &gt; 1:
-        lastTestedNumber = inputList[0]
-        minRun = lastTestedNumber  # Low number in a run of consecutive frames
-        
-        # Copy list to avoid mutating the original
-        working_list = list(inputList)
-        del working_list[0]
-        
-        # Append a sentinel value so the loop processes the last run
-        working_list.append(working_list[-1] + 10)
-        maxRun = minRun            # High value in a consecutive run of frames
-        
-        for x in working_list:
-            if x == (lastTestedNumber + 1):
-                maxRun = x
-                lastTestedNumber = x
-            else:
-                if maxRun == minRun:  # Single frame all on its own
-                    if maxRun &lt; 0:
-                        outputString += str(maxRun).zfill(pad + 1) + ","
-                    else:
-                        outputString += str(maxRun).zfill(pad) + ","
-                    minRun = x
-                    maxRun = x                
-                elif maxRun != minRun and minRun &lt; maxRun:  # Legitimate run of frames
-                    outputString += f"{minRun}-{maxRun},"
-                    minRun = x    
-                    maxRun = x
-                lastTestedNumber = x
-        outputString = outputString[:-1]  # Strip trailing comma
-        
-    elif len(inputList) == 1:  # Single-frame sequence
-        if inputList[0] &lt; 0:
-            outputString = str(inputList[0]).zfill(pad + negPad)
-        else:
-            outputString = str(inputList[0]).zfill(pad)
-
-    return outputString
+# ANSI escape codes for coloring terminal text
+COLOR_RED = "\033[91m"
+COLOR_RESET = "\033[0m"
 
 
-def errorMessage():
-    print("\n\tUSAGE : lseq [OPTION] [DIRECTORY]\n")
-    print("\tlseq will list numbered sequences in an easy to read format")
-    print("\tthat will show ranges of existing files. This enables the user")
-    print("\tto easily see where files are missing and to see multiple image")
-    print("\tsequences contained within the same directory. The list is")
-    print("\tin a compact sequence format, i.e. file.1-7,0010,0015,18-20#.ext\n")
-    print("\tlseq will default to treating negative frames like abc.-001.ext as")
-    print("\ta four frame padded number. If you wish to treat such a frame as ")
-    print("\tthree frame padding add the -oldPad flag option.\n")
-    print("\tAn optional valid directory path may be specified to run the")
-    print("\tcommand on.\n\n")
-    sys.exit(1)
-
-
-def stringToInt(inputString):
-    if not inputString:
-        return 0
-    
-    tweakVal = inputString
-    if inputString.startswith("-"):
-        multVal = -1
-        tweakVal = inputString[1:]
+def format_single_frame(val, pad):
+    """
+    Formats a single frame number, preserving its absolute padding and wrapping
+    negative numbers in parentheses.
+    """
+    if val &lt; 0:
+        # Wrap negative numbers in parentheses, e.g., (-003)
+        padded_digits = str(abs(val)).zfill(pad)
+        return f"(-{padded_digits})"
     else:
-        multVal = 1
-        
-    if not tweakVal.isdigit():
-        print(f"{tweakVal} is a non-numeric frame value.")
-        return 0
-    else:
-        return int(tweakVal) * multVal
-
-
-def getFileName(inputString):
-    base = os.path.basename(inputString)
-    noExt = base.rsplit(".", 1)
-    name_part = noExt[0]
-    
-    # Work backward to find where numbers stop
-    idx = len(name_part)
-    while idx &gt; 0 and name_part[idx-1].isdigit():
-        idx -= 1
-        
-    outString = name_part[:idx]
-    if outString.endswith("-"):
-        outString = outString[:-1]  # Remove minus sign from negative frame stems
-        
-    return outString
-
-
-def getFrameNumber(inputString):
-    base = os.path.basename(inputString)
-    noExt = base.rsplit(".", 1)
-    name_part = noExt[0]
-    
-    idx = len(name_part)
-    while idx &gt; 0 and (name_part[idx-1].isdigit() or name_part[idx-1] == "-"):
-        # Make sure we don't treat a middle dash as a negative sign
-        if name_part[idx-1] == "-" and (idx - 1 &gt; 0 and name_part[idx-2].isdigit()):
-            break
-        idx -= 1
-        
-    return name_part[idx:]
-
-
-def getExtension(inputString):
-    ext = inputString.rsplit(".", 1)
-    return "." + ext[1] if len(ext) &gt; 1 else ""
-
-
-def getFramePadding(inputFrame):
-    if not inputFrame:
-        return 0
-    # Corrected padding calculation logic
-    if len(inputFrame) &gt; 1 and inputFrame.startswith("-") and inputFrame[1] == "0":
-        return len(inputFrame) - negPad
-    if len(inputFrame) &gt; 1 and inputFrame.startswith("0"):
-        return len(inputFrame)
-    return len(inputFrame)
-
-
-# ==========================================
-# MAIN EXECUTION
-# ==========================================
-
-if len(sys.argv) &gt; 3:
-    errorMessage()
-
-if len(sys.argv) &gt;= 2:
-    if sys.argv[1] in ["-h", "-help", "-H", "--help"]:
-        errorMessage()
-    if sys.argv[1] == "-oldPad":
-        negPad = 1
-
-# Build the directory path to test
-testPath = ""
-if len(sys.argv) &gt;= 2 and sys.argv[-1] != "-oldPad":
-    target = sys.argv[-1]
-    if os.path.exists(target):
-        testPath = target
-        # Ensure target ends with a slash so glob works cleanly
-        if not testPath.endswith(os.sep):
-            testPath += os.sep
-    else:
-        errorMessage()
-
-# Gather files matching pattern
-fileList = glob.glob(testPath + "*.*")
-
-if len(fileList) &lt; 1:
-    print("\n\tNo valid files found.\n")
-    sys.exit(1)
-
-# Group matching files by their unique (stem, pad, extension) signature
-sequences = defaultdict(list)
-
-for path in fileList:
-    frame_str = getFrameNumber(path)
-    if frame_str and frame_str != "NG":
-        stem = getFileName(path)
-        pad = getFramePadding(frame_str)
-        ext = getExtension(path)
-        frame_val = stringToInt(frame_str)
-        
-        # Unique identifier group
-        key = (stem, pad, ext)
-        sequences[key].append(frame_val)
-
-# Format and generate the final syntax
-outputString = "\n"
-
-for (stem, pad, ext), frames in sorted(sequences.items()):
-    frames.sort()
-    
-    # Process sequence list to ranges
-    formatted_frames = makeFrameList(frames, pad)
-    
-    if len(frames) &gt; 1:
-        outputString += f"\t{stem}{formatted_frames}#{ext}\n"
-    else:
-        outputString += f"\t{stem}{formatted_frames}{ext}\n"
-
-print(outputString)
-</pre>
-
-<div id="Python - lseq-Comprehensive breakdown of how the lseq script operates."><h2 id="Comprehensive breakdown of how the lseq script operates." class="header"><a href="#Python - lseq-Comprehensive breakdown of how the lseq script operates.">Comprehensive breakdown of how the lseq script operates.</a></h2></div>
-
-<div id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach"><h3 id="1. Overview and Approach" class="header"><a href="#Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach">1. Overview and Approach</a></h3></div>
-
-<p>
-In industries like visual effects (VFX), animation, and game development, image sequences (e.g., <code>car_render.0001.exr</code> through <code>car_render.0100.exr</code>) are the standard way to handle video. When rendering thousands of frames, it is incredibly easy for a few frames to fail or go missing.
-</p>
-
-<p>
-The purpose of <code>lseq</code> is to scan a directory, detect these sequences, and compress them into a highly readable syntax.
-</p>
-
-<p>
-Instead of showing you a massive, unreadable wall of 500 files, it groups them into elegant patterns:
-</p>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-Consecutive sequences"></span><strong id="Consecutive sequences">Consecutive sequences</strong>: <code>render.0001-0010#.exr</code>
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-Single frame gaps"></span><strong id="Single frame gaps">Single frame gaps</strong>: <code>render.0001-0010,0012,0015-0020#.exr</code>
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-Isolated files"></span><strong id="Isolated files">Isolated files</strong>: <code>image.png</code> (no sequence formatting applied)
-
-</ul>
-<div id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-The Three-Step Approach"><h4 id="The Three-Step Approach" class="header"><a href="#Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-The Three-Step Approach">The Three-Step Approach</a></h4></div>
-
-<pre text>
-[Raw Files] ────&gt; [Step 1: Deconstruct] ────&gt; [Step 2: Group &amp; Sort] ────&gt; [Step 3: Format Ranges]
-- file.0001.exr   Stem: "file"                Key: ("file", 4, ".exr")      "file.0001-0003,0005#.exr"
-- file.0002.exr   Pad:  4                     Frames: [1, 2, 3, 5]
-- file.0003.exr   Ext:  ".exr"
-- file.0005.exr   Frame: 1, 2, 3, 5
-</pre>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-The Three-Step Approach-Deconstruct"></span><strong id="Deconstruct">Deconstruct</strong>: The script looks at every file name and extracts its core structural properties: the name stem, the frame number, the padding (amount of leading zeros), and the file extension.
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-The Three-Step Approach-Group and Sort"></span><strong id="Group and Sort">Group and Sort</strong>: It groups files sharing the exact same name stem, padding, and extension. Then, it sorts the frame numbers numerically.
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-1. Overview and Approach-The Three-Step Approach-Format Ranges"></span><strong id="Format Ranges">Format Ranges</strong>: It loops through the sorted frame numbers to identify contiguous "runs" (consecutive numbers) and formats them into readable ranges (e.g., <code>0001-0010</code>) while preserving their original padding.
-
-</ul>
-<div id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown"><h3 id="2. Step-by-Step Code Breakdown" class="header"><a href="#Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown">2. Step-by-Step Code Breakdown</a></h3></div>
-
-<div id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)"><h4 id="Step 1: The Helper Functions (The Parsers)" class="header"><a href="#Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)">Step 1: The Helper Functions (The Parsers)</a></h4></div>
-
-<p>
-These functions slice and dice individual file paths into metadata components.
-</p>
-
-<p>
-<code>getFileName(inputString)</code>
-</p>
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-What it does"></span><strong id="What it does">What it does</strong>: Extracts the pure name of the file (the "stem") before the numbers start.
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-How it works"></span><strong id="How it works">How it works</strong>: It strips the extension, then walks backward (right-to-left) through the characters. Once it hits a non-digit character, it knows the frame number has ended. It cuts the string there. If a minus sign remains at the end (e.g., <code>file.-001.exr</code>), it removes it so that negative frames share the same stem as positive ones.
-
-</ul>
-<p>
-<code>getFrameNumber(inputString)</code>
-</p>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-What it does"></span><strong id="What it does">What it does</strong>: Extracts the literal digits of the frame number (including a minus sign if it is a negative frame).
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-How it works"></span><strong id="How it works">How it works</strong>: Similar to <code>getFileName</code>, it walks backward from the end of the filename. It grabs all adjacent digits and a single preceding negative sign, returning it as a string (e.g., <code>"0042"</code> or <code>"-005"</code>).
-
-</ul>
-<p>
-<code>getFramePadding(inputFrame)</code>
-</p>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-What it does"></span><strong id="What it does">What it does</strong>: Determines the character length of the frame number to preserve leading zeros.
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-How it works"></span><strong id="How it works">How it works</strong>: If the string starts with <code>0</code> (like <code>0042</code>), its length is <code>4</code>. It also contains logic for handling negative padding (defined by the <code>-oldPad</code> CLI flag) so that negative frames (like <code>-001</code>) are calculated with the correct column width.
-
-</ul>
-<p>
-<code>stringToInt(inputString)</code>
-</p>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-What it does"></span><strong id="What it does">What it does</strong>: Converts a string frame number like <code>"-0023"</code> into a true mathematical integer (<code>-23</code>).
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 1: The Helper Functions (The Parsers)-How it works"></span><strong id="How it works">How it works</strong>: It strips out any negative signs to check if the remaining characters are digits, then performs the conversion and multiplies by <code>-1</code> if it was negative.
-
-</ul>
-<div id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 2: Main Routine &amp; File Grouping (The Orchestrator)"><h4 id="Step 2: Main Routine &amp; File Grouping (The Orchestrator)" class="header"><a href="#Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 2: Main Routine &amp; File Grouping (The Orchestrator)">Step 2: Main Routine &amp; File Grouping (The Orchestrator)</a></h4></div>
-
-<p>
-This is the main body of the script that executes when you run it.
-</p>
-
-<pre python>
-# Gather files matching pattern
-fileList = glob.glob(testPath + "*.*")
-</pre>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 2: Main Routine &amp; File Grouping (The Orchestrator)-Directory Resolution"></span><strong id="Directory Resolution">Directory Resolution</strong>: The script checks if you supplied a directory argument. If not, it defaults to the current directory. It uses <code>glob.glob</code> to find all files containing at least one dot (<code>*.*</code>).
-
-</ul>
-  
-<pre python>
-sequences = defaultdict(list)
-for path in fileList:
-    ...
-    key = (stem, pad, ext)
-    sequences[key].append(frame_val)
-</pre>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 2: Main Routine &amp; File Grouping (The Orchestrator)-Grouping using a Dictionary"></span><strong id="Grouping using a Dictionary">Grouping using a Dictionary</strong> (<code>defaultdict</code>): This is a highly efficient Python 3 pattern. It creates a dictionary where the keys are a tuple of unique identifiers: <code>(stem, padding, extension)</code>. As it loops through the files, it appends each frame integer to the list mapped to that specific key.
-
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 2: Main Routine &amp; File Grouping (The Orchestrator)-Example"></span><strong id="Example">Example</strong>: Files <code>image.0001.png</code> and <code>image.0002.png</code> both map to the key <code>("image", 4, ".png")</code>. Their integers <code>[1, 2]</code> are grouped together in a list.
-
-</ul>
-<div id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 3: Range Assembly (The Engine)"><h4 id="Step 3: Range Assembly (The Engine)" class="header"><a href="#Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 3: Range Assembly (The Engine)">Step 3: Range Assembly (The Engine)</a></h4></div>
-
-<p>
-Once all files are grouped, the script loops through each unique sequence key, sorts the list of frame numbers, and hands them off to the core formatting function.
-</p>
-
-<p>
-<code>makeFrameList(inputList, pad)</code>
-</p>
-
-<p>
-This function is the heart of the script's logic. It turns <code>[1, 2, 3, 5, 10, 11, 12]</code> into <code>"0001-0003,0005,0010-0012"</code>.
-</p>
-
-<ul>
-<li>
-<span id="Python - lseq-Comprehensive breakdown of how the lseq script operates.-2. Step-by-Step Code Breakdown-Step 3: Range Assembly (The Engine)-The Sentinel Value (Preventing Edge-Case Drops)"></span><strong id="The Sentinel Value (Preventing Edge-Case Drops)">The Sentinel Value (Preventing Edge-Case Drops)</strong>: The script appends a dummy value to the end of the list:
-
-</ul>
-  
-<pre python>
-working_list.append(working_list[-1] + 10)
-</pre>
-
-<p>
-Because the algorithm determines whether to write a range <em>only</em> when the consecutive chain breaks, a sequence that ends perfectly would never trigger a write. This "sentinel" value guarantees a break at the very end, forcing the final real sequence range to compile.
-</p>
-
-<ul>
-<li>
-The Consecutive Check Loop:
-
-<ul>
-<li>
-It iterates through the sorted numbers. If the current number <code>x</code> is exactly <code>lastTestedNumber + 1</code>, it updates <code>maxRun</code> (extending the current chain).
-
-</ul>
-<li>
-The Breakpoint Check:
-
-<ul>
-<li>
-When <code>x</code> is not consecutive:
-
-<ul>
-<li>
-If <code>maxRun == minRun</code>: Only one file was in this block (a gap or single frame). It pads the single frame (e.g., <code>0005</code>) and appends it with a comma.
-
-<li>
-If <code>minRun &lt; maxRun</code>: A consecutive run occurred. It writes the range (e.g., <code>1-3</code>) and appends it.
-
-<li>
-It then resets the markers (<code>minRun</code> and <code>maxRun</code>) to the current number <code>x</code> to start tracking the next chain.
-
-</ul>
-</ul>
-</ul>
-<p>
-Finally, the script cleans up any trailing commas, formats single-file entries cleanly, and prints the completed styled sequence string directly to your terminal.
-</p>
-
-<p>
-Here's the script again with extensive comments:
-</p>
-
-<pre python>
-#!/usr/bin/env python3
-
-import sys
-import os
-import glob
-from collections import defaultdict
-
-# lseq IS A UTILITY THAT SCANS A DIRECTORY AND RETURNS FORMATTED LISTS OF
-# SEQUENCES OF FRAMES MAKING IT EASIER TO SEE WHICH FRAMES ARE MISSING,
-# WHAT THE FRAME RANGES ARE AND SO ON. IT RETURNS THE LIST IN A READABLE
-# FORMATTING
-
-# This global toggle manages how negative frame numbers are padded.
-# If negPad is 0: -0001 is evaluated as a 5-character string (5-digit padding).
-# If negPad is 1: -0001 is evaluated as 4-digit padding (ignoring the '-' sign).
-negPad = 0
+        # Standard positive padding, e.g., 002
+        return str(val).zfill(pad)
 
 
 def makeFrameList(inputList, pad):
     """
     Takes a sorted list of integer frame numbers and aggregates them into a
-    compact, comma-separated string of single frames and ranges (e.g., '0001-0005,0008,0010-0012').
+    compact string, grouping consecutive runs inside square brackets.
     """
-    outputString = ""
-    
-    # We can only evaluate sequences/gaps if we have more than one frame to compare.
-    if len(inputList) &gt; 1:
-        # Establish our starting points for consecutive frame tracking
-        lastTestedNumber = inputList[0]
-        minRun = lastTestedNumber  # Marks the lower boundary of the current sequence run
-        
-        # Clone the list to prevent mutating the original data structure outside the function
-        working_list = list(inputList)
-        
-        # Remove the first index since we've already cached it in 'lastTestedNumber' and 'minRun'
-        del working_list[0]
-        
-        # SENTINEL VALUE: Append a dummy value to force a non-consecutive break at the end.
-        # Without this, the final run or frame of the list would never trigger the logic branches
-        # below, leaving the end of your sequence completely truncated.
-        working_list.append(working_list[-1] + 10)
-        maxRun = minRun  # Marks the upper boundary of the current sequence run
-        
-        # Evaluate each frame number to see if the consecutive chain continues
-        for x in working_list:
-            # If the current frame is exactly 1 unit larger, the consecutive chain is unbroken
-            if x == (lastTestedNumber + 1):
-                maxRun = x
-                lastTestedNumber = x
-            # The chain is broken. We must now package the run we just completed.
-            else:
-                # SCENARIO A: The run consists of a single isolated frame
-                if maxRun == minRun:
-                    # Account for the extra character required by the negative sign when padding
-                    if maxRun &lt; 0:
-                        outputString += str(maxRun).zfill(pad + 1) + ","
-                    else:
-                        outputString += str(maxRun).zfill(pad) + ","
-                    # Reset the boundaries to track the next potential sequence starting at current 'x'
-                    minRun = x
-                    maxRun = x                
-                # SCENARIO B: A legitimate consecutive block of frames was captured
-                elif maxRun != minRun and minRun &lt; maxRun:
-                    outputString += f"{minRun}-{maxRun},"
-                    # Reset boundaries to current 'x'
-                    minRun = x    
-                    maxRun = x
-                
-                # Keep tracking consecutive values relative to this newly started block
-                lastTestedNumber = x
-                
-        # Slice off the trailing comma leftover from the loop's formatting
-        outputString = outputString[:-1]  
-        
-    # If the sequence literally contains just one solitary frame, skip sequence grouping
-    elif len(inputList) == 1:  
-        if inputList[0] &lt; 0:
-            outputString = str(inputList[0]).zfill(pad + negPad)
+    if not inputList:
+        return ""
+    if len(inputList) == 1:
+        return format_single_frame(inputList[0], pad)
+
+    segments = []
+    start = inputList[0]
+    prev = inputList[0]
+
+    for val in inputList[1:]:
+        if val == prev + 1:
+            prev = val
         else:
-            outputString = str(inputList[0]).zfill(pad)
+            if start == prev:
+                segments.append(format_single_frame(start, pad))
+            else:
+                segments.append(f"[{format_single_frame(start, pad)}-{format_single_frame(prev, pad)}]")
+            start = val
+            prev = val
 
-    return outputString
+    # Handle final segment
+    if start == prev:
+        segments.append(format_single_frame(start, pad))
+    else:
+        segments.append(f"[{format_single_frame(start, pad)}-{format_single_frame(prev, pad)}]")
+
+    return ",".join(segments)
 
 
-def errorMessage():
+def makeMissingFrameList(missingList, pad):
     """
-    Standard usage output block printed to stdout before terminating execution on error or help request.
+    Groups missing frames into contiguous runs and formats them,
+    enclosing ALL segments (including single frames) in square brackets,
+    separated by ', '.
     """
-    print("\n\tUSAGE : lseq [OPTION] [DIRECTORY]\n")
-    print("\tlseq will list numbered sequences in an easy to read format")
-    print("\tthat will show ranges of existing files. This enables the user")
-    print("\tto easily see where files are missing and to see multiple image")
-    print("\tsequences contained within the same directory. The list is")
-    print("\tin a compact sequence format, i.e. file.1-7,0010,0015,18-20#.ext\n")
-    print("\tlseq will default to treating negative frames like abc.-001.ext as")
-    print("\ta four frame padded number. If you wish to treat such a frame as ")
-    print("\tthree frame padding add the -oldPad flag option.\n")
-    print("\tAn optional valid directory path may be specified to run the")
-    print("\tcommand on.\n\n")
-    sys.exit(1)
+    if not missingList:
+        return ""
+    if len(missingList) == 1:
+        return f"[{format_single_frame(missingList[0], pad)}]"
+
+    segments = []
+    start = missingList[0]
+    prev = missingList[0]
+
+    for val in missingList[1:]:
+        if val == prev + 1:
+            prev = val
+        else:
+            if start == prev:
+                segments.append(f"[{format_single_frame(start, pad)}]")
+            else:
+                segments.append(f"[{format_single_frame(start, pad)}-{format_single_frame(prev, pad)}]")
+            start = val
+            prev = val
+
+    # Handle final segment
+    if start == prev:
+        segments.append(f"[{format_single_frame(start, pad)}]")
+    else:
+        segments.append(f"[{format_single_frame(start, pad)}-{format_single_frame(prev, pad)}]")
+
+    return ", ".join(segments)
 
 
 def stringToInt(inputString):
@@ -544,16 +137,14 @@ def stringToInt(inputString):
         return 0
     
     tweakVal = inputString
-    # Detect negative frame strings and isolate the digits to verify numerical validity
     if inputString.startswith("-"):
         multVal = -1
         tweakVal = inputString[1:]
     else:
         multVal = 1
         
-    # Fallback guard if the string parsing yielded structural non-digits
     if not tweakVal.isdigit():
-        print(f"{tweakVal} is a non-numeric frame value.")
+        print(f"Error: {tweakVal} is a non-numeric frame value.", file=sys.stderr)
         return 0
     else:
         return int(tweakVal) * multVal
@@ -561,26 +152,26 @@ def stringToInt(inputString):
 
 def getFileName(inputString):
     """
-    Extracts the root name stem of the sequence, cutting off extension and trailing frame numbers.
-    Example: '/path/to/my_render.-0045.exr' -&gt; 'my_render'
+    Extracts the root name stem of the sequence, cleanly stripping any trailing
+    minus signs or separator dots.
     """
-    # Isolate filename from system folder path
     base = os.path.basename(inputString)
-    # Split only on the last dot to cleanly separate extension
     noExt = base.rsplit(".", 1)
     name_part = noExt[0]
     
-    # Walk right-to-left backward down the filename string to determine where digits stop
     idx = len(name_part)
     while idx &gt; 0 and name_part[idx-1].isdigit():
         idx -= 1
         
-    # Extract the name up to the point where digits start
     outString = name_part[:idx]
     
-    # If the frame was negative (e.g., 'render.-010'), strip the lingering negative sign
+    # Strip the trailing minus sign if it was a negative frame
     if outString.endswith("-"):
         outString = outString[:-1]  
+        
+    # Strip the separator dot so we don't return "stem." as the stem name
+    if outString.endswith("."):
+        outString = outString[:-1]
         
     return outString
 
@@ -588,16 +179,13 @@ def getFileName(inputString):
 def getFrameNumber(inputString):
     """
     Extracts the frame number string from a path.
-    Example: '/path/to/my_render.-0045.exr' -&gt; '-0045'
     """
     base = os.path.basename(inputString)
     noExt = base.rsplit(".", 1)
     name_part = noExt[0]
     
-    # Walk backward right-to-left, checking characters that are numeric OR negative signs
     idx = len(name_part)
     while idx &gt; 0 and (name_part[idx-1].isdigit() or name_part[idx-1] == "-"):
-        # Prevent false negative matching (e.g. 'my-file-120.exr' should not match '-120' as negative)
         if name_part[idx-1] == "-" and (idx - 1 &gt; 0 and name_part[idx-2].isdigit()):
             break
         idx -= 1
@@ -608,7 +196,6 @@ def getFrameNumber(inputString):
 def getExtension(inputString):
     """
     Extracts the file extension of a path.
-    Example: 'image.0001.exr' -&gt; '.exr'
     """
     ext = inputString.rsplit(".", 1)
     return "." + ext[1] if len(ext) &gt; 1 else ""
@@ -616,96 +203,129 @@ def getExtension(inputString):
 
 def getFramePadding(inputFrame):
     """
-    Evaluates the literal string length of a frame to determine its padding width.
+    Evaluates only the absolute digit padding width.
+    Negative signs are ignored so that '-003' and '002' are grouped into 
+    the same padding bin (width of 3).
     """
     if not inputFrame:
         return 0
-        
-    # Negative frame padding calculation adjusted by global `negPad` modifier
-    if len(inputFrame) &gt; 1 and inputFrame.startswith("-") and inputFrame[1] == "0":
-        return len(inputFrame) - negPad
-        
-    # Standard positive frame padding (e.g., '0020' yields 4)
-    if len(inputFrame) &gt; 1 and inputFrame.startswith("0"):
-        return len(inputFrame)
-        
-    return len(inputFrame)
+    
+    # Strip leading minus sign to count absolute digits
+    clean_frame = inputFrame[1:] if inputFrame.startswith("-") else inputFrame
+    return len(clean_frame)
 
 
 # =====================================================================
 # MAIN EXECUTION
 # =====================================================================
 
-# Quick structural CLI validation
-if len(sys.argv) &gt; 3:
-    errorMessage()
+def main():
+    # Initialize the standard argument parser with customized descriptions
+    parser = argparse.ArgumentParser(
+        description="List numbered sequences in a directory using a compact, readable syntax.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
 
-# Check for help flags
-if len(sys.argv) &gt;= 2:
-    if sys.argv[1] in ["-h", "-help", "-H", "--help"]:
-        errorMessage()
-    # Check if the user specified the old legacy negative padding scheme
-    if sys.argv[1] == "-oldPad":
-        negPad = 1
+    # Define the directory argument as an optional positional argument
+    parser.add_argument(
+        "directory", 
+        nargs="?", 
+        default=".", 
+        help="The directory path to scan. Defaults to the current working directory."
+    )
 
-# Extract target path directory (defaulting to Current Working Directory if omitted)
-testPath = ""
-if len(sys.argv) &gt;= 2 and sys.argv[-1] != "-oldPad":
-    target = sys.argv[-1]
-    if os.path.exists(target):
-        testPath = target
-        # Crucial slash check: ensuring paths have trailing slashes prevents glob from fail-matching
-        if not testPath.endswith(os.sep):
-            testPath += os.sep
-    else:
-        errorMessage()
+    args = parser.parse_args()
 
-# Locate matching files using simple globbing
-fileList = glob.glob(testPath + "*.*")
+    # Validate directory path
+    testPath = args.directory
+    if not os.path.exists(testPath):
+        print(f"Error: Specified directory path does not exist: '{testPath}'", file=sys.stderr)
+        sys.exit(1)
+    if not os.path.isdir(testPath):
+        print(f"Error: Specified path is a file, not a directory: '{testPath}'", file=sys.stderr)
+        sys.exit(1)
 
-if len(fileList) &lt; 1:
-    print("\n\tNo valid files found.\n")
-    sys.exit(1)
+    # Ensure trailing folder slash
+    if not testPath.endswith(os.sep):
+        testPath += os.sep
 
-# A dictionary that automatically initializes list values for new keys.
-# This groups all files by their signature: (name_stem, padding_width, extension).
-sequences = defaultdict(list)
+    # Locate files reliably using os.listdir
+    try:
+        raw_files = os.listdir(testPath)
+    except OSError as e:
+        print(f"Error: Unable to read directory '{testPath}': {e}", file=sys.stderr)
+        sys.exit(1)
 
-for path in fileList:
-    frame_str = getFrameNumber(path)
-    # Ignore non-sequential files (files lacking structural sequence numbering)
-    if frame_str and frame_str != "NG":
-        stem = getFileName(path)
-        pad = getFramePadding(frame_str)
-        ext = getExtension(path)
-        frame_val = stringToInt(frame_str)
+    # Filter to files with an extension (equivalent to glob's *.*)
+    fileList = [os.path.join(testPath, f) for f in raw_files if "." in f and os.path.isfile(os.path.join(testPath, f))]
+
+    if len(fileList) &lt; 1:
+        print(f"Warning: No valid sequential files found in '{testPath}'", file=sys.stderr)
+        sys.exit(0)
+
+    # Group files by signature: (name_stem, absolute_padding_width, extension)
+    sequences = defaultdict(list)
+
+    for path in fileList:
+        frame_str = getFrameNumber(path)
+        if frame_str and frame_str != "NG":
+            stem = getFileName(path)
+            pad = getFramePadding(frame_str)
+            ext = getExtension(path)
+            frame_val = stringToInt(frame_str)
+            
+            key = (stem, pad, ext)
+            sequences[key].append(frame_val)
+
+    # Accumulate output
+    outputString = ""
+
+    for (stem, pad, ext), frames in sorted(sequences.items()):
+        frames.sort()
         
-        # The unique signature key that groups relative files together
-        key = (stem, pad, ext)
-        sequences[key].append(frame_val)
+        # Process ranges
+        formatted_frames = makeFrameList(frames, pad)
+        
+        # Clean, single-dot formatted line
+        line = f"{stem}.{formatted_frames}{ext}\n"
 
-# Accumulate the finalized string data to print out
-outputString = "\n"
+        # Check for missing files if the sequence has more than one frame
+        has_gaps = False
+        missing_report = ""
+        
+        if len(frames) &gt; 1:
+            min_frame = frames[0]
+            max_frame = frames[-1]
+            
+            # Use sets to find mathematical differences
+            expected_set = set(range(min_frame, max_frame + 1))
+            present_set = set(frames)
+            missing_set = expected_set - present_set
+            
+            if missing_set:
+                has_gaps = True
+                missing_list = sorted(list(missing_set))
+                missing_count = len(missing_list)
+                formatted_missing = makeMissingFrameList(missing_list, pad)
+                
+                # Format pluralization and construct the secondary info line
+                plural_suffix = "s" if missing_count &gt; 1 else ""
+                missing_report = f"    * missing {missing_count} file{plural_suffix}: {formatted_missing}\n"
 
-# Iterate through sorted sequences ensuring deterministic command line output
-for (stem, pad, ext), frames in sorted(sequences.items()):
-    # Sort frame numbers in ascending order so sequential gaps and runs can be analyzed
-    frames.sort()
-    
-    # Process the sorted list of frame values into a concise, grouped range list string
-    formatted_frames = makeFrameList(frames, pad)
-    
-    # Multi-file sequences get the sequence syntax '#' marker appended
-    if len(frames) &gt; 1:
-        outputString += f"\t{stem}{formatted_frames}#{ext}\n"
-    # Individual files do not receive range formatting markers
-    else:
-        outputString += f"\t{stem}{formatted_frames}{ext}\n"
+        # Output logic
+        if has_gaps:
+            # Color both the sequence name and its missing file report red
+            outputString += f"{COLOR_RED}{line}{missing_report}{COLOR_RESET}"
+        else:
+            outputString += line
 
-# Output the finished report to the terminal
-print(outputString)
+    # Output final report
+    print(outputString, end="")
+
+
+if __name__ == "__main__":
+    main()
 </pre>
-
 
 
 <p>
