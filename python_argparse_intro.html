@@ -23,547 +23,428 @@
 
 <div id="Argparse"><h1 id="Argparse" class="header"><a href="#Argparse">Argparse</a></h1></div>
 
-<table>
-<tr>
-<td>
-NOTE: THIS IS A BIZARRE ODYSSEY BECAUSE EVEN THOUGH THE ARGPARSE LOGIC IS SOUND, PYHON CANNOT CHANGE ENVIRONMENT VARIABLES WITHOUT AN OUTRAGEOUS SONG AND DANCE. THEREFORE, TO SALVAGE THIS PAGE, I HAVE INCLUDED A BASH SHELL EQUIVALENT.
-</td>
-</tr>
-</table>
-
-<div id="Argparse-Positional Arguments"><h2 id="Positional Arguments" class="header"><a href="#Argparse-Positional Arguments">Positional Arguments</a></h2></div>
+<div id="Argparse-A Developer's Guide to `argparse`"><h2 id="A Developer's Guide to `argparse`" class="header"><a href="#Argparse-A Developer's Guide to `argparse`">A Developer's Guide to <code>argparse</code></a></h2></div>
 
 <p>
-Below is one way to design your command using positional arguments with Python's <code>argparse</code> module. In this design, the user supplies arguments in a specific left-to-right order. If only the higher-level variable is provided, the lower ones are reset. When more arguments are provided, they fill in the lower levels. For example:
+<code>argparse</code> is Python’s standard library module for creating user-friendly command-line interfaces (CLIs). It automatically parses arguments from <code>sys.argv</code>, generates clean help and usage messages, and issues errors when users pass invalid arguments.
 </p>
+
+<div id="Argparse-A Developer's Guide to `argparse`-The Core Lifecycle of `argparse`"><h3 id="The Core Lifecycle of `argparse`" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-The Core Lifecycle of `argparse`">The Core Lifecycle of <code>argparse</code></a></h3></div>
+
+<p>
+Every command-line tool built with <code>argparse</code> follows the same structural pipeline:
+</p>
+
 <ul>
 <li>
-<code>your_command ShowName</code> → Sets Show; Sequence and Shot are reset.
+<span id="Argparse-A Developer's Guide to <code>argparse</code>-The Core Lifecycle of <code>argparse</code>-Initialize the Parser:"></span><strong id="Initialize the Parser:">Initialize the Parser:</strong> Create an instance of <code>ArgumentParser</code>.
 
 <li>
-<code>your_command ShowName SeqName</code> → Sets Show and Sequence; Shot is reset.
+<span id="Argparse-A Developer's Guide to <code>argparse</code>-The Core Lifecycle of <code>argparse</code>-Add Arguments:"></span><strong id="Add Arguments:">Add Arguments:</strong> Define the positional, optional, and flag arguments your script expects.
 
 <li>
-<code>your_command ShowName SeqName ShotName</code> → Sets all three environment variables.
+<span id="Argparse-A Developer's Guide to <code>argparse</code>-The Core Lifecycle of <code>argparse</code>-Parse Arguments:"></span><strong id="Parse Arguments:">Parse Arguments:</strong> Call <code>parse_args()</code> to convert CLI inputs into a clean Python object.
+
+<li>
+<span id="Argparse-A Developer's Guide to <code>argparse</code>-The Core Lifecycle of <code>argparse</code>-Execute:"></span><strong id="Execute:">Execute:</strong> Use the parsed variables in your script’s execution logic.
 
 </ul>
+ 
+<pre python>
+import argparse
+
+# 1. Initialize
+parser = argparse.ArgumentParser(description="A quick description of what your script does.")
+
+# 2. Add Arguments
+parser.add_argument("input_file", help="Path to the input file.")
+
+# 3. Parse
+args = parser.parse_args()
+
+# 4. Execute
+print(f"Processing: {args.input_file}")
+</pre>
+
+<div id="Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types"><h3 id="Adding Arguments: The Three Main Types" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types">Adding Arguments: The Three Main Types</a></h3></div>
+
 <p>
-Below is the sample code demonstrating this behavior:
+When configuring <code>parser.add_argument()</code>, your inputs will fall into three primary behavior patterns:
+</p>
+
+<div id="Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types-1. Positional Arguments (Required)"><h4 id="1. Positional Arguments (Required)" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types-1. Positional Arguments (Required)">1. Positional Arguments (Required)</a></h4></div>
+
+<p>
+These do not start with a hyphen. Their meaning is determined solely by the order in which they are typed in the terminal.
 </p>
 
 <pre python>
+parser.add_argument("source", help="The source directory")
+parser.add_argument("destination", help="The destination directory")
+</pre>
+
+<ul>
+<li>
+<span id="Argparse-A Developer's Guide to <code>argparse</code>-Adding Arguments: The Three Main Types-1. Positional Arguments (Required)-Terminal Usage:"></span><strong id="Terminal Usage:">Terminal Usage:</strong> <code>python script.py /path/to/src /path/to/dest</code>
+
+</ul>
+<div id="Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types-2. Optional Arguments (Named)"><h4 id="2. Optional Arguments (Named)" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types-2. Optional Arguments (Named)">2. Optional Arguments (Named)</a></h4></div>
+
+<p>
+These start with <code>-</code> (short-form) or <code>--</code> (long-form). They can be supplied in any order, and their values are explicitly assigned.
+</p>
+
+<pre python>
+parser.add_argument("-o", "--output", help="Output path (optional)")
+</pre>
+
+<ul>
+<li>
+<span id="Argparse-A Developer's Guide to <code>argparse</code>-Adding Arguments: The Three Main Types-2. Optional Arguments (Named)-Terminal Usage:"></span><strong id="Terminal Usage:">Terminal Usage:</strong> <code>python script.py --output /path/to/out</code>
+
+</ul>
+<div id="Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types-3. Flag / Boolean Arguments"><h4 id="3. Flag / Boolean Arguments" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Adding Arguments: The Three Main Types-3. Flag / Boolean Arguments">3. Flag / Boolean Arguments</a></h4></div>
+
+<p>
+These are optional arguments that do not take a value. Instead, their presence or absence acts as a True/False switch. You handle this using the <code>action</code> parameter.
+</p>
+
+<pre python>
+# Returns True if present, False if absent
+parser.add_argument("-r", "--recursive", action="store_true", help="Enable recursive search")
+</pre>
+
+<ul>
+<li>
+<span id="Argparse-A Developer's Guide to <code>argparse</code>-Adding Arguments: The Three Main Types-3. Flag / Boolean Arguments-Terminal Usage:"></span><strong id="Terminal Usage:">Terminal Usage:</strong> <code>python script.py --recursive</code>
+
+</ul>
+<div id="Argparse-A Developer's Guide to `argparse`-Essential Configuration Parameters"><h3 id="Essential Configuration Parameters" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Essential Configuration Parameters">Essential Configuration Parameters</a></h3></div>
+
+<p>
+These key parameters inside <code>add_argument()</code> allow you to dictate how inputs are validated, typed, and named:
+</p>
+
 <table>
+<thead>
+<tr>
+<th>
+Parameter
+</th>
+<th>
+Purpose
+</th>
+<th>
+Example
+</th>
+</tr>
+</thead>
+<tbody>
 <tr>
 <td>
-NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
+<code>type</code>
+</td>
+<td>
+Automatically converts inputs to a specific type (raises an error if invalid).
+</td>
+<td>
+<code>type=int</code>, <code>type=float</code>
 </td>
 </tr>
+<tr>
+<td>
+<code>default</code>
+</td>
+<td>
+The fallback value if an optional argument is omitted.
+</td>
+<td>
+<code>default="."</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>choices</code>
+</td>
+<td>
+Restricts the input to a pre-defined list of valid options.
+</td>
+<td>
+<code>choices=["fast", "slow"]</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>nargs</code>
+</td>
+<td>
+Specifies the number of command-line arguments that should be consumed.
+</td>
+<td>
+<code>nargs="?"</code> (zero or one), <code>nargs="*"</code> (zero or more)
+</td>
+</tr>
+<tr>
+<td>
+<code>required</code>
+</td>
+<td>
+Forces an optional (named) argument to be mandatory.
+</td>
+<td>
+<code>required=True</code>
+</td>
+</tr>
+</tbody>
 </table>
-import argparse
-import os
 
-def set_env_variables(show=None, sequence=None, shot=None):
-    """
-    Set hierarchical environment variables.
-    
-    If only a higher-level variable is provided, the ones below it get reset.
-    For example, if only `show` is provided, both SEQ and SHOT are removed.
-    """
-    if show:
-        os.environ["SHOW"] = show
-        # Reset lower levels if set
-        os.environ.pop("SEQ", None)
-        os.environ.pop("SHOT", None)
-    if sequence:
-        os.environ["SEQ"] = sequence
-        # Reset lower level if set
-        os.environ.pop("SHOT", None)
-    if shot:
-        os.environ["SHOT"] = shot
+<div id="Argparse-A Developer's Guide to `argparse`-Essential Configuration Parameters-Practical Example utilizing Parameters:"><h4 id="Practical Example utilizing Parameters:" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Essential Configuration Parameters-Practical Example utilizing Parameters:">Practical Example utilizing Parameters:</a></h4></div>
+
+<pre python>
+parser.add_argument(
+    "-m", "--mode", 
+    type=str, 
+    default="fast", 
+    choices=["fast", "slow", "turbo"],
+    help="Processing speed mode (default: %(default)s)"
+)
+
+</pre>
+
+<div id="Argparse-A Developer's Guide to `argparse`-Formatting Help &amp; Metadata"><h3 id="Formatting Help &amp; Metadata" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Formatting Help &amp; Metadata">Formatting Help &amp; Metadata</a></h3></div>
+
+<p>
+<code>argparse</code> automatically creates <code>-h</code> and <code>--help</code> flags for you. To control how this menu looks:
+</p>
+
+<div id="Argparse-A Developer's Guide to `argparse`-Formatting Help &amp; Metadata-Raw Text Formatting"><h4 id="Raw Text Formatting" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Formatting Help &amp; Metadata-Raw Text Formatting">Raw Text Formatting</a></h4></div>
+
+<p>
+By default, <code>argparse</code> squashes multi-line descriptions and removes line breaks. Use <code>RawTextHelpFormatter</code> if you want custom line-breaks, ascii-art, or detailed formatting to stay intact:
+</p>
+
+<pre python>
+parser = argparse.ArgumentParser(
+    description="Custom VFX sequence parser.\n\nUsage examples:\n  lseq /path/to/dir\n  lseq -v",
+    formatter_class=argparse.RawTextHelpFormatter
+)
+</pre>
+
+<div id="Argparse-A Developer's Guide to `argparse`-Formatting Help &amp; Metadata-Displaying Defaults in Help Text"><h4 id="Displaying Defaults in Help Text" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Formatting Help &amp; Metadata-Displaying Defaults in Help Text">Displaying Defaults in Help Text</a></h4></div>
+
+<p>
+If you want your help menu to dynamically display whatever your <code>default</code> variable is, use the string variable <code>%(default)s</code> in the argument's help parameter:
+</p>
+
+<pre python>
+parser.add_argument("-p", "--pad", type=int, default=4, help="Frame padding (default: %(default)s)")
+</pre>
+
+<div id="Argparse-A Developer's Guide to `argparse`-Quick Reference Recipe: Production Template"><h3 id="Quick Reference Recipe: Production Template" class="header"><a href="#Argparse-A Developer's Guide to `argparse`-Quick Reference Recipe: Production Template">Quick Reference Recipe: Production Template</a></h3></div>
+
+<p>
+This boilerplate covers most real-world pipeline CLI setups, including mutually exclusive groups (e.g., you can pass either <code>--verbose</code> or <code>--quiet</code>, but not both):
+</p>
+
+<pre python>
+#!/usr/bin/env python3
+import argparse
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Set hierarchical environment variables: Show, Sequence, and Shot.")
+        description="A professional, robust argparse template.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
 
-    # Define three positional arguments. They are optional (nargs="?"), so the user can provide 1, 2, or 3.
-    parser.add_argument("show", nargs="?", default=None,
-                        help="Show name (first hierarchical level)")
-    parser.add_argument("sequence", nargs="?", default=None,
-                        help="Sequence name (second level). If omitted, it will be reset.")
-    parser.add_argument("shot", nargs="?", default=None,
-                        help="Shot name (third level). If omitted, it will be reset.")
+    # 1. Positional argument
+    parser.add_argument("path", help="Path to process.")
 
+    # 2. Optional argument with constraints
+    parser.add_argument(
+        "-t", "--threads", 
+        type=int, 
+        default=4, 
+        help="Number of threads to utilize (default: %(default)s)"
+    )
+
+    # 3. Mutually exclusive group (Cannot pass both at the same time)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-v", "--verbose", action="store_true", help="Verbose output mode.")
+    group.add_argument("-q", "--quiet", action="store_true", help="Silence all output.")
+
+    # Parse inputs
     args = parser.parse_args()
 
-    set_env_variables(args.show, args.sequence, args.shot)
+    # Access parsed variables
+    print(f"Target path: {args.path}")
+    print(f"Threads: {args.threads}")
+    if args.verbose:
+        print("Verbose logging enabled.")
 
-    # Display the resulting environment variables
-    print("Environment variables set:")
-    print("SHOW:", os.environ.get("SHOW"))
-    print("SEQ:", os.environ.get("SEQ"))
-    print("SHOT:", os.environ.get("SHOT"))
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 </pre>
 
-<div id="Argparse-Positional Arguments-How It Works"><h3 id="How It Works" class="header"><a href="#Argparse-Positional Arguments-How It Works">How It Works</a></h3></div>
 
-<ul>
-<li>
-<span id="Argparse-Positional Arguments-How It Works-Argument Parsing with Positionals"></span><strong id="Argument Parsing with Positionals">Argument Parsing with Positionals</strong>: We defined three positional arguments using nargs="?". This makes them optional, and if the user omits any of them, the corresponding variable defaults to None.
-
-<li>
-<span id="Argparse-Positional Arguments-How It Works-Setting Hierarchical Variables"></span><strong id="Setting Hierarchical Variables">Setting Hierarchical Variables</strong>: The set_env_variables function sets the environment variables in order. When show is provided, it sets <code>SHOW</code> and removes any existing <code>SEQ</code> and <code>SHOT</code> values. Similarly, when sequence is provided, it resets <code>SHOT</code>.
-
-<li>
-<span id="Argparse-Positional Arguments-How It Works-Behavior and Reset Mechanism"></span><strong id="Behavior and Reset Mechanism">Behavior and Reset Mechanism</strong>: This ensures that if you only set the higher-level parameter (or change it later), the lower-level parameters are automatically cleared, maintaining the intended hierarchy.
-
-</ul>
-<p>
-This positional design provides a user-friendly, streamlined interface where the intended hierarchy is naturally enforced by ordering the arguments.
-</p>
-
-<div id="Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)"><h3 id="os.environ(&quot;SHOW&quot;, None)" class="header"><a href="#Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)">os.environ("SHOW", None)</a></h3></div>
+<div id="More"><h1 id="More" class="header"><a href="#More">More</a></h1></div>
 
 <p>
-The <code>os.environ.pop("SHOW", None)</code> line is used to remove an environment variable from the process environment if it exists.
+Here is an expanded section for your reference guide. It includes a complete, interactive code example showing exactly how to read parsed argument values and use them to drive different logical execution flows in a script.
 </p>
 
-<div id="Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Breaking It Down:"><h4 id="Breaking It Down:" class="header"><a href="#Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Breaking It Down:">Breaking It Down:</a></h4></div>
-
-<ul>
-<li>
-<code>os.environ</code> is a dictionary-like object that stores environment variables.
-
-<li>
-<code>.pop("SHOW", None)</code> tries to remove <code>"SHOW"</code> from <code>os.environ</code>.
-
-<li>
-The second argument (<code>None</code>) prevents errors. If <code>"SHOW"</code> doesn’t exist, it simply returns <code>None</code> instead of throwing a <code>KeyError</code>.
-
-</ul>
-<div id="Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Why We Use This?"><h4 id="Why We Use This?" class="header"><a href="#Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Why We Use This?">Why We Use This?</a></h4></div>
+<div id="More-Accessing and Routing Parsed Arguments"><h2 id="Accessing and Routing Parsed Arguments" class="header"><a href="#More-Accessing and Routing Parsed Arguments">Accessing and Routing Parsed Arguments</a></h2></div>
 
 <p>
-In the context of your hierarchical setup:
+Once <code>args = parser.parse_args()</code> is called, <code>argparse</code> stores all of your inputs inside a simple namespace object. You access these inputs as standard Python variables using dot notation (e.g., <code>args.variable_name</code>).
 </p>
 
-<ul>
-<li>
-If the user sets a higher-level variable (<code>SHOW</code>), lower levels (<code>SEQ</code>, <code>SHOT</code>) should reset.
+<div id="More-Accessing and Routing Parsed Arguments-The Implementation Blueprint"><h3 id="The Implementation Blueprint" class="header"><a href="#More-Accessing and Routing Parsed Arguments-The Implementation Blueprint">The Implementation Blueprint</a></h3></div>
 
-<li>
-<code>.pop()</code> is perfect because it removes the variable, ensuring that it's truly cleared rather than just set to an empty string.
-
-</ul>
-<div id="Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Without .pop(), We Could Do:"><h4 id="Without .pop(), We Could Do:" class="header"><a href="#Argparse-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Without .pop(), We Could Do:">Without .pop(), We Could Do:</a></h4></div>
+<p>
+Here is a practical, runnable script that demonstrates how to capture <span id="More-Accessing and Routing Parsed Arguments-The Implementation Blueprint-positional paths"></span><strong id="positional paths">positional paths</strong>, <span id="More-Accessing and Routing Parsed Arguments-The Implementation Blueprint-booleans"></span><strong id="booleans">booleans</strong>, <span id="More-Accessing and Routing Parsed Arguments-The Implementation Blueprint-optionals with choices"></span><strong id="optionals with choices">optionals with choices</strong>, and <span id="More-Accessing and Routing Parsed Arguments-The Implementation Blueprint-integers"></span><strong id="integers">integers</strong>, and then route them to run distinct blocks of code.
+</p>
 
 <pre python>
-<table>
-<tr>
-<td>
-NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
-</td>
-</tr>
-</table>
-os.environ["SHOW"] = None  # Sets the value to a string 'None' instead of removing it
-del os.environ["SHOW"]  # Would work, but causes an error if "SHOW" isn't set
-</pre>
-
-<p>
-Using <code>.pop()</code> ensures safe removal without breaking the script.
-</p>
-
-<div id="Argparse-Using Flagged Arguments"><h2 id="Using Flagged Arguments" class="header"><a href="#Argparse-Using Flagged Arguments">Using Flagged Arguments</a></h2></div>
-
-<pre python>
-<table>
-<tr>
-<td>
-NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
-</td>
-</tr>
-</table>
+#!/usr/bin/env python3
 import argparse
-import os
+import sys
 
-def set_env_variables(show=None, sequence=None, shot=None):
-    """Set environment variables based on hierarchy rules."""
-    if show:
-        os.environ["SHOW"] = show
-        os.environ["SEQ"] = None  # Reset lower hierarchy
-        os.environ["SHOT"] = None
-    
-    if sequence:
-        os.environ["SEQ"] = sequence
-        os.environ["SHOT"] = None  # Reset lower hierarchy
-
-    if shot:
-        os.environ["SHOT"] = shot
-    
-    print(f"SHOW: {os.environ.get('SHOW')}, SEQ: {os.environ.get('SEQ')}, SHOT: {os.environ.get('SHOT')}")
-
-parser = argparse.ArgumentParser(description="Set show hierarchy environment variables.")
-parser.add_argument("-s", "--show", help="Set show name")
-parser.add_argument("-sq", "--sequence", help="Set sequence name")
-parser.add_argument("-sh", "--shot", help="Set shot name")
-
-args = parser.parse_args()
-set_env_variables(args.show, args.sequence, args.shot)
-</pre>
-
-<div id="Argparse-Using Flagged Arguments-How This Works:"><h3 id="How This Works:" class="header"><a href="#Argparse-Using Flagged Arguments-How This Works:">How This Works:</a></h3></div>
-
-<ul>
-<li>
-Users call the script with flags (<code>-s</code>, <code>-sq</code>, <code>-sh</code>).
-
-<li>
-If only <code>SHOW</code> is set, lower levels (<code>SEQ</code>, <code>SHOT</code>) reset.
-
-<li>
-If <code>SEQ</code> is set, <code>SHOT</code> resets.
-
-<li>
-If <code>SHOT</code> is set, everything remains unchanged.
-
-<li>
-Environment variables are properly structured.
-
-</ul>
-<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments"><h2 id="Hybrid - Combination of Positional and Flagged Arguments" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments">Hybrid - Combination of Positional and Flagged Arguments</a></h2></div>
-
-<p>
-A hybrid strategy can offer both flexibility and structure, letting users provide essential values in order while using flags for optional additions or overrides.
-</p>
-
-<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-Approach:"><h3 id="Approach:" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-Approach:">Approach:</a></h3></div>
-
-<ul>
-<li>
-Use Positional Arguments for the main hierarchy:
-
-<ul>
-<li>
-<code>ShowName</code> → Required
-
-<li>
-<code>SequenceName</code> → Optional
-
-<li>
-<code>ShotName</code> → Optional
-
-</ul>
-<li>
-Use Flags for Overrides or Additional Options
-
-<ul>
-<li>
-<code>--override-seq SEQUENCE</code> → Explicitly override sequence name
-
-<li>
-<code>--override-shot SHOT</code> → Explicitly override shot name
-
-<li>
-<code>--reset</code> → Clears all hierarchy values
-
-</ul>
-</ul>
-<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-Implementation in Python (argparse)"><h3 id="Implementation in Python (argparse)" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-Implementation in Python (argparse)">Implementation in Python (argparse)</a></h3></div>
-
-<pre python>
-<table>
-<tr>
-<td>
-NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
-</td>
-</tr>
-</table>
-import argparse
-import os
-
-def set_env_variables(show, sequence=None, shot=None, override_seq=None, override_shot=None, reset=False):
-    """Set hierarchical environment variables with support for overrides and resets."""
-    
-    if reset:
-        os.environ.pop("SHOW", None)
-        os.environ.pop("SEQ", None)
-        os.environ.pop("SHOT", None)
-        print("All hierarchy variables have been reset.")
+def process_file(filepath, mode, compression_level, dry_run):
+    """
+    Simulates a file processing engine driven by command-line settings.
+    """
+    # 1. Handle a Boolean Flag (dry_run)
+    if dry_run:
+        print(f"[DRY-RUN]: Would have processed '{filepath}' in '{mode}' mode.")
         return
 
-    # Set the hierarchy from positional args first
-    os.environ["SHOW"] = show
-    os.environ["SEQ"] = sequence if sequence else None
-    os.environ["SHOT"] = shot if shot else None
+    print(f"Opening target: {filepath}")
+    
+    # 2. Handle Optionals with Choices (mode)
+    if mode == "analyze":
+        print(" -&gt; Performing structural analysis...")
+        # (Analysis logic goes here)
+    elif mode == "convert":
+        print(f" -&gt; Converting format using compression level {compression_level}...")
+        # (Conversion logic goes here)
+    elif mode == "verify":
+        print(" -&gt; Verifying file integrity...")
+        # (Verification logic goes here)
 
-    # Apply overrides if provided
-    if override_seq:
-        os.environ["SEQ"] = override_seq
-    if override_shot:
-        os.environ["SHOT"] = override_shot
-
-    print("Environment variables set:")
-    print(f"SHOW: {os.environ.get('SHOW')}")
-    print(f"SEQ: {os.environ.get('SEQ')}")
-    print(f"SHOT: {os.environ.get('SHOT')}")
+    print("Task completed successfully.")
 
 
-parser = argparse.ArgumentParser(description="Set hierarchical environment variables with mixed strategy.")
+def main():
+    parser = argparse.ArgumentParser(
+        description="Pipeline utility to analyze, convert, or verify assets.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
 
-# Positional arguments (hierarchy-based)
-parser.add_argument("show", help="Show name (required)")
-parser.add_argument("sequence", nargs="?", default=None, help="Sequence name (optional)")
-parser.add_argument("shot", nargs="?", default=None, help="Shot name (optional)")
+    # Required Positional: The target file to act upon
+    parser.add_argument(
+        "filepath", 
+        help="Path to the input file."
+    )
 
-# Optional flags
-parser.add_argument("--override-seq", help="Explicitly override sequence name")
-parser.add_argument("--override-shot", help="Explicitly override shot name")
-parser.add_argument("--reset", action="store_true", help="Reset all environment variables")
+    # Optional with Choices: Controls the core execution mode
+    parser.add_argument(
+        "-m", "--mode",
+        choices=["analyze", "convert", "verify"],
+        default="analyze",
+        help="The operation mode to execute (default: %(default)s)."
+    )
 
-args = parser.parse_args()
+    # Optional Integer: Numeric constraint (only relevant during convert)
+    parser.add_argument(
+        "-c", "--compression",
+        type=int,
+        default=5,
+        help="Compression level (1-10) for conversions (default: %(default)s)."
+    )
 
-# Set environment variables based on parsed arguments
-set_env_variables(args.show, args.sequence, args.shot, args.override_seq, args.override_shot, args.reset)
+    # Boolean Flag: Changes the execution profile
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what the command would do without modifying any files."
+    )
+
+    # Parse command line inputs
+    args = parser.parse_args()
+
+    # 3. Input Validation (Beyond basic type checks)
+    if args.compression &lt; 1 or args.compression &gt; 10:
+        print(f"Error: Compression level must be between 1 and 10 (got {args.compression}).", file=sys.stderr)
+        sys.exit(1)
+
+    # 4. Routing settings to your execution functions
+    process_file(
+        filepath=args.filepath,
+        mode=args.mode,
+        compression_level=args.compression,
+        dry_run=args.dry_run
+    )
+
+
+if __name__ == "__main__":
+    main()
+
 </pre>
 
-<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-How This Works"><h3 id="How This Works" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-How This Works">How This Works</a></h3></div>
+<div id="More-How It Behaves in the Terminal"><h2 id="How It Behaves in the Terminal" class="header"><a href="#More-How It Behaves in the Terminal">How It Behaves in the Terminal</a></h2></div>
 
 <p>
-🔹 Basic Usage (Positional Arguments)
+Here is how the argument router handles different inputs:
+</p>
+
+<div id="More-How It Behaves in the Terminal-1. Running with Default Settings"><h3 id="1. Running with Default Settings" class="header"><a href="#More-How It Behaves in the Terminal-1. Running with Default Settings">1. Running with Default Settings</a></h3></div>
+
+<p>
+If you only supply the mandatory positional argument, it defaults to <code>analyze</code> mode at a compression level of <code>5</code>:
 </p>
 
 <pre bash>
-your_command MyShow
-your_command MyShow MySequence
-your_command MyShow MySequence MyShot
+$ python script.py /jobs/shot_010.exr
+Opening target: /jobs/shot_010.exr
+ -&gt; Performing structural analysis...
+Task completed successfully.
+
 </pre>
-<ul>
-<li>
-Sets <code>SHOW</code>, <code>SEQ</code>, and <code>SHOT</code> in a structured hierarchy.
 
-<li>
-If only <code>SHOW</code> is provided, <code>SEQ</code> and <code>SHOT</code> reset to None.
+<div id="More-How It Behaves in the Terminal-2. Changing the Mode (Choices) and Level (Integer)"><h3 id="2. Changing the Mode (Choices) and Level (Integer)" class="header"><a href="#More-How It Behaves in the Terminal-2. Changing the Mode (Choices) and Level (Integer)">2. Changing the Mode (Choices) and Level (Integer)</a></h3></div>
 
-<li>
-If <code>SHOW</code> and <code>SEQ</code> are set, <code>SHOT</code> resets to None.
-
-</ul>
 <p>
-🔹 Using Flags for Overrides
+Explicitly passing <code>-m convert</code> routes the program down a different code path, utilizing the updated compression integer:
 </p>
 
 <pre bash>
-your_command MyShow --override-seq OverrideSequence
-your_command MyShow MySequence --override-shot OverrideShot
+$ python script.py /jobs/shot_010.exr -m convert -c 9
+Opening target: /jobs/shot_010.exr
+ -&gt; Converting format using compression level 9...
+Task completed successfully.
+
 </pre>
 
-<p>
-Overrides lower-level values without affecting others.
-</p>
+<div id="More-How It Behaves in the Terminal-3. Activating the Boolean Switch"><h3 id="3. Activating the Boolean Switch" class="header"><a href="#More-How It Behaves in the Terminal-3. Activating the Boolean Switch">3. Activating the Boolean Switch</a></h3></div>
 
 <p>
-🔹 Resetting All Hierarchy Variables
+Adding <code>--dry-run</code> intercepts the standard execution logic entirely:
 </p>
 
 <pre bash>
-your_command MyShow --reset
+$ python script.py /jobs/shot_010.exr -m verify --dry-run
+[DRY-RUN]: Would have processed '/jobs/shot_010.exr' in 'verify' mode.
+
 </pre>
-
 <p>
-Clears all hierarchy variables before exiting.
+<br>
+<hr>
 </p>
 
-<div id="Argparse-Hybrid - Combination of Positional and Flagged Arguments-Why This Hybrid Strategy?"><h3 id="Why This Hybrid Strategy?" class="header"><a href="#Argparse-Hybrid - Combination of Positional and Flagged Arguments-Why This Hybrid Strategy?">Why This Hybrid Strategy?</a></h3></div>
-
-<ul>
-<li>
-✅ Positional Arguments keep it structured for the hierarchy. 
-
-<li>
-✅ Flags provide additional flexibility for edge cases. 
-
-<li>
-✅ Explicit Reset Option allows users to clear everything when needed.
-<table>
-<tr>
-<td>
-NOTE: THIS DOESN'T CHANGE SHELL VARIABLES. WE NEED TO USE SHELL SCRIPTS TO WORK WITH THESE!
-</td>
-</tr>
-</table>
-
-</ul>
-<div id="Bash Equivalent of Your Python Script"><h1 id="Bash Equivalent of Your Python Script" class="header"><a href="#Bash Equivalent of Your Python Script">Bash Equivalent of Your Python Script</a></h1></div>
-
-<p>
-Take a look here for the Bash approach.
-</p>
-<ul>
-<li>
-<a href="shell_scripts_bash.html">Shell and Bash</a>
-
-</ul>
-<p>
-Here's how you can implement the same functionality in a Bash script:
-</p>
-
-<pre bash>
-#!/bin/bash
-
-# Function to set hierarchical environment variables
-set_env_variables() {
-    local show="$1"
-    local sequence="$2"
-    local shot="$3"
-
-    # Set the SHOW variable
-    export SHOW="$show"
-
-    # If SHOW is set, reset SEQ and SHOT
-    if [[ -n "$SHOW" ]]; then
-        export SEQ=""
-        export SHOT=""
-    fi
-
-    # If SEQ is set, reset SHOT
-    if [[ -n "$sequence" ]]; then
-        export SEQ="$sequence"
-        export SHOT=""
-    fi
-
-    # If SHOT is set, do not reset anything else
-    if [[ -n "$shot" ]]; then
-        export SHOT="$shot"
-    fi
-
-    # Print the environment variables
-    echo "Environment variables set:"
-    echo "SHOW: $SHOW"
-    echo "SEQ: $SEQ"
-    echo "SHOT: $SHOT"
-}
-
-# Accept up to three positional arguments
-set_env_variables "$1" "$2" "$3"
-</pre>
-
-<div id="Bash Equivalent of Your Python Script-How This Bash Script Works"><h3 id="How This Bash Script Works" class="header"><a href="#Bash Equivalent of Your Python Script-How This Bash Script Works">How This Bash Script Works</a></h3></div>
 
 <ul>
 <li>
-Accepts up to three positional arguments (SHOW, SEQ, SHOT).
-
-<li>
-If only SHOW is provided, it resets SEQ and SHOT.
-
-<li>
-If SEQ is provided, it sets SEQ and resets SHOT.
-
-<li>
-If SHOT is provided, it sets SHOT but does not reset other values.
-
-<li>
-Uses export so the variables persist in the shell.
-
-</ul>
-<div id="Bash Equivalent of Your Python Script-How This Bash Script Works-To Use It"><h4 id="To Use It" class="header"><a href="#Bash Equivalent of Your Python Script-How This Bash Script Works-To Use It">To Use It</a></h4></div>
-
-<p>
-Save the script as set_env.sh and run:
-</p>
-
-<pre bash>
-<table>
-<tr>
-<td>
-NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
-</td>
-</tr>
-</table>
-source set_env.sh "MyShow" "Seq01" "Shot005"
-</pre>
-
-<p>
-For with fewer arguments:
-</p>
-
-<pre bash>
-source set_env.sh "MyShow"
-source set_env.sh "MyShow" "Seq01"
-</pre>
-
-<p>
-Using source ensures the variables persist in your shell session.
-</p>
-
-<div id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions"><h3 id="Key Differences Between Python &amp; Bash Versions" class="header"><a href="#Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions">Key Differences Between Python &amp; Bash Versions</a></h3></div>
-
-<table>
-<tr>
-<td>
-<span id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions-Feature"></span><strong id="Feature">Feature</strong>
-</td>
-<td>
-<span id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions-Python Version"></span><strong id="Python Version">Python Version</strong>
-</td>
-<td>
-<span id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions-Bash Version"></span><strong id="Bash Version">Bash Version</strong>
-</td>
-</tr>
-<tr>
-<td>
-Argument Parsing
-</td>
-<td>
-<code>argparse</code> module
-</td>
-<td>
-Positional parameters (<code>\(1</code>, <code>\)2</code>, <code>$3</code>)
-</td>
-</tr>
-<tr>
-<td>
-Environment Setting
-</td>
-<td>
-<code>os.environ["VAR"] = value</code>
-</td>
-<td>
-<code>export VAR=value</code>
-</td>
-</tr>
-<tr>
-<td>
-Hierarchical Logic
-</td>
-<td>
-<code>if show: ...</code> Python-style
-</td>
-<td>
-<code>if [[ -n "$VAR" ]]; ...</code> Bash-style
-</td>
-</tr>
-<tr>
-<td>
-Reset Mechanism
-</td>
-<td>
-<code>os.environ.pop()</code>
-</td>
-<td>
-<code>export VAR=""</code>
-</td>
-</tr>
-</table>
-
-<p>
-There is more extensive here:
-</p>
-<ul>
-<li>
-<a href="shell_scripts_bash.html">Shell and Bash</a>
+<a href="python_argparse_old_trail.html">Legacy exercise with argparse</a>
 
 </ul>
 <p>

@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>python_argparse_old_trail</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+<div id="Argparse nonsense"><h1 id="Argparse nonsense" class="header"><a href="#Argparse nonsense">Argparse nonsense</a></h1></div>
+
+<table>
+<tr>
+<td>
+NOTE: THIS IS A BIZARRE ODYSSEY BECAUSE EVEN THOUGH THE ARGPARSE LOGIC IS SOUND, PYHON CANNOT CHANGE ENVIRONMENT VARIABLES WITHOUT AN OUTRAGEOUS SONG AND DANCE. THEREFORE, TO SALVAGE THIS PAGE, I HAVE INCLUDED A BASH SHELL EQUIVALENT.
+</td>
+</tr>
+</table>
+
+<div id="Argparse nonsense-Positional Arguments"><h2 id="Positional Arguments" class="header"><a href="#Argparse nonsense-Positional Arguments">Positional Arguments</a></h2></div>
+
+<p>
+Below is one way to design your command using positional arguments with Python's <code>argparse</code> module. In this design, the user supplies arguments in a specific left-to-right order. If only the higher-level variable is provided, the lower ones are reset. When more arguments are provided, they fill in the lower levels. For example:
+</p>
+<ul>
+<li>
+<code>your_command ShowName</code> → Sets Show; Sequence and Shot are reset.
+
+<li>
+<code>your_command ShowName SeqName</code> → Sets Show and Sequence; Shot is reset.
+
+<li>
+<code>your_command ShowName SeqName ShotName</code> → Sets all three environment variables.
+
+</ul>
+<p>
+Below is the sample code demonstrating this behavior:
+</p>
+
+<pre python>
+<table>
+<tr>
+<td>
+NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
+</td>
+</tr>
+</table>
+import argparse
+import os
+
+def set_env_variables(show=None, sequence=None, shot=None):
+    """
+    Set hierarchical environment variables.
+    
+    If only a higher-level variable is provided, the ones below it get reset.
+    For example, if only `show` is provided, both SEQ and SHOT are removed.
+    """
+    if show:
+        os.environ["SHOW"] = show
+        # Reset lower levels if set
+        os.environ.pop("SEQ", None)
+        os.environ.pop("SHOT", None)
+    if sequence:
+        os.environ["SEQ"] = sequence
+        # Reset lower level if set
+        os.environ.pop("SHOT", None)
+    if shot:
+        os.environ["SHOT"] = shot
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Set hierarchical environment variables: Show, Sequence, and Shot.")
+
+    # Define three positional arguments. They are optional (nargs="?"), so the user can provide 1, 2, or 3.
+    parser.add_argument("show", nargs="?", default=None,
+                        help="Show name (first hierarchical level)")
+    parser.add_argument("sequence", nargs="?", default=None,
+                        help="Sequence name (second level). If omitted, it will be reset.")
+    parser.add_argument("shot", nargs="?", default=None,
+                        help="Shot name (third level). If omitted, it will be reset.")
+
+    args = parser.parse_args()
+
+    set_env_variables(args.show, args.sequence, args.shot)
+
+    # Display the resulting environment variables
+    print("Environment variables set:")
+    print("SHOW:", os.environ.get("SHOW"))
+    print("SEQ:", os.environ.get("SEQ"))
+    print("SHOT:", os.environ.get("SHOT"))
+
+if __name__ == '__main__':
+    main()
+</pre>
+
+<div id="Argparse nonsense-Positional Arguments-How It Works"><h3 id="How It Works" class="header"><a href="#Argparse nonsense-Positional Arguments-How It Works">How It Works</a></h3></div>
+
+<ul>
+<li>
+<span id="Argparse nonsense-Positional Arguments-How It Works-Argument Parsing with Positionals"></span><strong id="Argument Parsing with Positionals">Argument Parsing with Positionals</strong>: We defined three positional arguments using nargs="?". This makes them optional, and if the user omits any of them, the corresponding variable defaults to None.
+
+<li>
+<span id="Argparse nonsense-Positional Arguments-How It Works-Setting Hierarchical Variables"></span><strong id="Setting Hierarchical Variables">Setting Hierarchical Variables</strong>: The set_env_variables function sets the environment variables in order. When show is provided, it sets <code>SHOW</code> and removes any existing <code>SEQ</code> and <code>SHOT</code> values. Similarly, when sequence is provided, it resets <code>SHOT</code>.
+
+<li>
+<span id="Argparse nonsense-Positional Arguments-How It Works-Behavior and Reset Mechanism"></span><strong id="Behavior and Reset Mechanism">Behavior and Reset Mechanism</strong>: This ensures that if you only set the higher-level parameter (or change it later), the lower-level parameters are automatically cleared, maintaining the intended hierarchy.
+
+</ul>
+<p>
+This positional design provides a user-friendly, streamlined interface where the intended hierarchy is naturally enforced by ordering the arguments.
+</p>
+
+<div id="Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)"><h3 id="os.environ(&quot;SHOW&quot;, None)" class="header"><a href="#Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)">os.environ("SHOW", None)</a></h3></div>
+
+<p>
+The <code>os.environ.pop("SHOW", None)</code> line is used to remove an environment variable from the process environment if it exists.
+</p>
+
+<div id="Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Breaking It Down:"><h4 id="Breaking It Down:" class="header"><a href="#Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Breaking It Down:">Breaking It Down:</a></h4></div>
+
+<ul>
+<li>
+<code>os.environ</code> is a dictionary-like object that stores environment variables.
+
+<li>
+<code>.pop("SHOW", None)</code> tries to remove <code>"SHOW"</code> from <code>os.environ</code>.
+
+<li>
+The second argument (<code>None</code>) prevents errors. If <code>"SHOW"</code> doesn’t exist, it simply returns <code>None</code> instead of throwing a <code>KeyError</code>.
+
+</ul>
+<div id="Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Why We Use This?"><h4 id="Why We Use This?" class="header"><a href="#Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Why We Use This?">Why We Use This?</a></h4></div>
+
+<p>
+In the context of your hierarchical setup:
+</p>
+
+<ul>
+<li>
+If the user sets a higher-level variable (<code>SHOW</code>), lower levels (<code>SEQ</code>, <code>SHOT</code>) should reset.
+
+<li>
+<code>.pop()</code> is perfect because it removes the variable, ensuring that it's truly cleared rather than just set to an empty string.
+
+</ul>
+<div id="Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Without .pop(), We Could Do:"><h4 id="Without .pop(), We Could Do:" class="header"><a href="#Argparse nonsense-Positional Arguments-os.environ(&quot;SHOW&quot;, None)-Without .pop(), We Could Do:">Without .pop(), We Could Do:</a></h4></div>
+
+<pre python>
+<table>
+<tr>
+<td>
+NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
+</td>
+</tr>
+</table>
+os.environ["SHOW"] = None  # Sets the value to a string 'None' instead of removing it
+del os.environ["SHOW"]  # Would work, but causes an error if "SHOW" isn't set
+</pre>
+
+<p>
+Using <code>.pop()</code> ensures safe removal without breaking the script.
+</p>
+
+<div id="Argparse nonsense-Using Flagged Arguments"><h2 id="Using Flagged Arguments" class="header"><a href="#Argparse nonsense-Using Flagged Arguments">Using Flagged Arguments</a></h2></div>
+
+<pre python>
+<table>
+<tr>
+<td>
+NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
+</td>
+</tr>
+</table>
+import argparse
+import os
+
+def set_env_variables(show=None, sequence=None, shot=None):
+    """Set environment variables based on hierarchy rules."""
+    if show:
+        os.environ["SHOW"] = show
+        os.environ["SEQ"] = None  # Reset lower hierarchy
+        os.environ["SHOT"] = None
+    
+    if sequence:
+        os.environ["SEQ"] = sequence
+        os.environ["SHOT"] = None  # Reset lower hierarchy
+
+    if shot:
+        os.environ["SHOT"] = shot
+    
+    print(f"SHOW: {os.environ.get('SHOW')}, SEQ: {os.environ.get('SEQ')}, SHOT: {os.environ.get('SHOT')}")
+
+parser = argparse.ArgumentParser(description="Set show hierarchy environment variables.")
+parser.add_argument("-s", "--show", help="Set show name")
+parser.add_argument("-sq", "--sequence", help="Set sequence name")
+parser.add_argument("-sh", "--shot", help="Set shot name")
+
+args = parser.parse_args()
+set_env_variables(args.show, args.sequence, args.shot)
+</pre>
+
+<div id="Argparse nonsense-Using Flagged Arguments-How This Works:"><h3 id="How This Works:" class="header"><a href="#Argparse nonsense-Using Flagged Arguments-How This Works:">How This Works:</a></h3></div>
+
+<ul>
+<li>
+Users call the script with flags (<code>-s</code>, <code>-sq</code>, <code>-sh</code>).
+
+<li>
+If only <code>SHOW</code> is set, lower levels (<code>SEQ</code>, <code>SHOT</code>) reset.
+
+<li>
+If <code>SEQ</code> is set, <code>SHOT</code> resets.
+
+<li>
+If <code>SHOT</code> is set, everything remains unchanged.
+
+<li>
+Environment variables are properly structured.
+
+</ul>
+<div id="Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments"><h2 id="Hybrid - Combination of Positional and Flagged Arguments" class="header"><a href="#Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments">Hybrid - Combination of Positional and Flagged Arguments</a></h2></div>
+
+<p>
+A hybrid strategy can offer both flexibility and structure, letting users provide essential values in order while using flags for optional additions or overrides.
+</p>
+
+<div id="Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-Approach:"><h3 id="Approach:" class="header"><a href="#Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-Approach:">Approach:</a></h3></div>
+
+<ul>
+<li>
+Use Positional Arguments for the main hierarchy:
+
+<ul>
+<li>
+<code>ShowName</code> → Required
+
+<li>
+<code>SequenceName</code> → Optional
+
+<li>
+<code>ShotName</code> → Optional
+
+</ul>
+<li>
+Use Flags for Overrides or Additional Options
+
+<ul>
+<li>
+<code>--override-seq SEQUENCE</code> → Explicitly override sequence name
+
+<li>
+<code>--override-shot SHOT</code> → Explicitly override shot name
+
+<li>
+<code>--reset</code> → Clears all hierarchy values
+
+</ul>
+</ul>
+<div id="Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-Implementation in Python (argparse)"><h3 id="Implementation in Python (argparse)" class="header"><a href="#Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-Implementation in Python (argparse)">Implementation in Python (argparse)</a></h3></div>
+
+<pre python>
+<table>
+<tr>
+<td>
+NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
+</td>
+</tr>
+</table>
+import argparse
+import os
+
+def set_env_variables(show, sequence=None, shot=None, override_seq=None, override_shot=None, reset=False):
+    """Set hierarchical environment variables with support for overrides and resets."""
+    
+    if reset:
+        os.environ.pop("SHOW", None)
+        os.environ.pop("SEQ", None)
+        os.environ.pop("SHOT", None)
+        print("All hierarchy variables have been reset.")
+        return
+
+    # Set the hierarchy from positional args first
+    os.environ["SHOW"] = show
+    os.environ["SEQ"] = sequence if sequence else None
+    os.environ["SHOT"] = shot if shot else None
+
+    # Apply overrides if provided
+    if override_seq:
+        os.environ["SEQ"] = override_seq
+    if override_shot:
+        os.environ["SHOT"] = override_shot
+
+    print("Environment variables set:")
+    print(f"SHOW: {os.environ.get('SHOW')}")
+    print(f"SEQ: {os.environ.get('SEQ')}")
+    print(f"SHOT: {os.environ.get('SHOT')}")
+
+
+parser = argparse.ArgumentParser(description="Set hierarchical environment variables with mixed strategy.")
+
+# Positional arguments (hierarchy-based)
+parser.add_argument("show", help="Show name (required)")
+parser.add_argument("sequence", nargs="?", default=None, help="Sequence name (optional)")
+parser.add_argument("shot", nargs="?", default=None, help="Shot name (optional)")
+
+# Optional flags
+parser.add_argument("--override-seq", help="Explicitly override sequence name")
+parser.add_argument("--override-shot", help="Explicitly override shot name")
+parser.add_argument("--reset", action="store_true", help="Reset all environment variables")
+
+args = parser.parse_args()
+
+# Set environment variables based on parsed arguments
+set_env_variables(args.show, args.sequence, args.shot, args.override_seq, args.override_shot, args.reset)
+</pre>
+
+<div id="Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-How This Works"><h3 id="How This Works" class="header"><a href="#Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-How This Works">How This Works</a></h3></div>
+
+<p>
+🔹 Basic Usage (Positional Arguments)
+</p>
+
+<pre bash>
+your_command MyShow
+your_command MyShow MySequence
+your_command MyShow MySequence MyShot
+</pre>
+<ul>
+<li>
+Sets <code>SHOW</code>, <code>SEQ</code>, and <code>SHOT</code> in a structured hierarchy.
+
+<li>
+If only <code>SHOW</code> is provided, <code>SEQ</code> and <code>SHOT</code> reset to None.
+
+<li>
+If <code>SHOW</code> and <code>SEQ</code> are set, <code>SHOT</code> resets to None.
+
+</ul>
+<p>
+🔹 Using Flags for Overrides
+</p>
+
+<pre bash>
+your_command MyShow --override-seq OverrideSequence
+your_command MyShow MySequence --override-shot OverrideShot
+</pre>
+
+<p>
+Overrides lower-level values without affecting others.
+</p>
+
+<p>
+🔹 Resetting All Hierarchy Variables
+</p>
+
+<pre bash>
+your_command MyShow --reset
+</pre>
+
+<p>
+Clears all hierarchy variables before exiting.
+</p>
+
+<div id="Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-Why This Hybrid Strategy?"><h3 id="Why This Hybrid Strategy?" class="header"><a href="#Argparse nonsense-Hybrid - Combination of Positional and Flagged Arguments-Why This Hybrid Strategy?">Why This Hybrid Strategy?</a></h3></div>
+
+<ul>
+<li>
+✅ Positional Arguments keep it structured for the hierarchy. 
+
+<li>
+✅ Flags provide additional flexibility for edge cases. 
+
+<li>
+✅ Explicit Reset Option allows users to clear everything when needed.
+<table>
+<tr>
+<td>
+NOTE: THIS DOESN'T CHANGE SHELL VARIABLES. WE NEED TO USE SHELL SCRIPTS TO WORK WITH THESE!
+</td>
+</tr>
+</table>
+
+</ul>
+<div id="Bash Equivalent of Your Python Script"><h1 id="Bash Equivalent of Your Python Script" class="header"><a href="#Bash Equivalent of Your Python Script">Bash Equivalent of Your Python Script</a></h1></div>
+
+<p>
+Take a look here for the Bash approach.
+</p>
+<ul>
+<li>
+<a href="shell_scripts_bash.html">Shell and Bash</a>
+
+</ul>
+<p>
+Here's how you can implement the same functionality in a Bash script:
+</p>
+
+<pre bash>
+#!/bin/bash
+
+# Function to set hierarchical environment variables
+set_env_variables() {
+    local show="$1"
+    local sequence="$2"
+    local shot="$3"
+
+    # Set the SHOW variable
+    export SHOW="$show"
+
+    # If SHOW is set, reset SEQ and SHOT
+    if [[ -n "$SHOW" ]]; then
+        export SEQ=""
+        export SHOT=""
+    fi
+
+    # If SEQ is set, reset SHOT
+    if [[ -n "$sequence" ]]; then
+        export SEQ="$sequence"
+        export SHOT=""
+    fi
+
+    # If SHOT is set, do not reset anything else
+    if [[ -n "$shot" ]]; then
+        export SHOT="$shot"
+    fi
+
+    # Print the environment variables
+    echo "Environment variables set:"
+    echo "SHOW: $SHOW"
+    echo "SEQ: $SEQ"
+    echo "SHOT: $SHOT"
+}
+
+# Accept up to three positional arguments
+set_env_variables "$1" "$2" "$3"
+</pre>
+
+<div id="Bash Equivalent of Your Python Script-How This Bash Script Works"><h3 id="How This Bash Script Works" class="header"><a href="#Bash Equivalent of Your Python Script-How This Bash Script Works">How This Bash Script Works</a></h3></div>
+
+<ul>
+<li>
+Accepts up to three positional arguments (SHOW, SEQ, SHOT).
+
+<li>
+If only SHOW is provided, it resets SEQ and SHOT.
+
+<li>
+If SEQ is provided, it sets SEQ and resets SHOT.
+
+<li>
+If SHOT is provided, it sets SHOT but does not reset other values.
+
+<li>
+Uses export so the variables persist in the shell.
+
+</ul>
+<div id="Bash Equivalent of Your Python Script-How This Bash Script Works-To Use It"><h4 id="To Use It" class="header"><a href="#Bash Equivalent of Your Python Script-How This Bash Script Works-To Use It">To Use It</a></h4></div>
+
+<p>
+Save the script as set_env.sh and run:
+</p>
+
+<pre bash>
+<table>
+<tr>
+<td>
+NOTE: TERRIBLE EXAMPLE - PYTHON CAN'T CHANGE THE ENVIRONMENT VARIABLES LIKE THIS.
+</td>
+</tr>
+</table>
+source set_env.sh "MyShow" "Seq01" "Shot005"
+</pre>
+
+<p>
+For with fewer arguments:
+</p>
+
+<pre bash>
+source set_env.sh "MyShow"
+source set_env.sh "MyShow" "Seq01"
+</pre>
+
+<p>
+Using source ensures the variables persist in your shell session.
+</p>
+
+<div id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions"><h3 id="Key Differences Between Python &amp; Bash Versions" class="header"><a href="#Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions">Key Differences Between Python &amp; Bash Versions</a></h3></div>
+
+<table>
+<tr>
+<td>
+<span id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions-Feature"></span><strong id="Feature">Feature</strong>
+</td>
+<td>
+<span id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions-Python Version"></span><strong id="Python Version">Python Version</strong>
+</td>
+<td>
+<span id="Bash Equivalent of Your Python Script-Key Differences Between Python &amp; Bash Versions-Bash Version"></span><strong id="Bash Version">Bash Version</strong>
+</td>
+</tr>
+<tr>
+<td>
+Argument Parsing
+</td>
+<td>
+<code>argparse</code> module
+</td>
+<td>
+Positional parameters (<code>\(1</code>, <code>\)2</code>, <code>$3</code>)
+</td>
+</tr>
+<tr>
+<td>
+Environment Setting
+</td>
+<td>
+<code>os.environ["VAR"] = value</code>
+</td>
+<td>
+<code>export VAR=value</code>
+</td>
+</tr>
+<tr>
+<td>
+Hierarchical Logic
+</td>
+<td>
+<code>if show: ...</code> Python-style
+</td>
+<td>
+<code>if [[ -n "$VAR" ]]; ...</code> Bash-style
+</td>
+</tr>
+<tr>
+<td>
+Reset Mechanism
+</td>
+<td>
+<code>os.environ.pop()</code>
+</td>
+<td>
+<code>export VAR=""</code>
+</td>
+</tr>
+</table>
+
+<p>
+There is more extensive here:
+</p>
+<ul>
+<li>
+<a href="shell_scripts_bash.html">Shell and Bash</a>
+
+</ul>
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
