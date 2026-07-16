@@ -41,17 +41,24 @@ lseq: Scans a directory and returns a compact summary of frame sequences
       and dynamically highlights missing frames in red.
 """
 
-__author__ = "Robert Holder"
-__copyright__ = "Copyright 2026"
+__author__ = "My Name"
+__copyright__ = "Copyright 2026, My Name"
 __license__ = "MIT"
-__version__ = "2.0.0"
-__maintainer__ = "Robert Holder"
+__version__ = "2.0.1"
+__maintainer__ = "My Name"
 __email__ = ""
 __status__ = "Production"
 
 # ANSI escape codes for coloring terminal text
 COLOR_RED = "\033[91m"
 COLOR_RESET = "\033[0m"
+
+# ---------------------------------------------------------------------
+# SAFETY VALVE: Prevents hanging on non-sequential numbers
+# ---------------------------------------------------------------------
+# No standard VFX sequence will have a gap larger than 100,000 frames.
+# This prevents O(N) range allocations from locking up the system.
+MAX_ALLOWED_GAP = 100000
 
 
 def format_single_frame(val, pad):
@@ -311,21 +318,26 @@ def main():
         if len(frames) &gt; 1:
             min_frame = frames[0]
             max_frame = frames[-1]
+            total_gap = max_frame - min_frame
             
-            # Use sets to find mathematical differences
-            expected_set = set(range(min_frame, max_frame + 1))
-            present_set = set(frames)
-            missing_set = expected_set - present_set
-            
-            if missing_set:
-                has_gaps = True
-                missing_list = sorted(list(missing_set))
-                missing_count = len(missing_list)
-                formatted_missing = makeMissingFrameList(missing_list, pad)
+            # -------------------------------------------------------------
+            # SAFETY CHECK: Skip analysis if sequence gap is unrealistic
+            # -------------------------------------------------------------
+            if total_gap &lt;= MAX_ALLOWED_GAP:
+                # Use sets to find mathematical differences
+                expected_set = set(range(min_frame, max_frame + 1))
+                present_set = set(frames)
+                missing_set = expected_set - present_set
                 
-                # Format pluralization and construct the secondary info line
-                plural_suffix = "s" if missing_count &gt; 1 else ""
-                missing_report = f"    * missing {missing_count} file{plural_suffix}: {formatted_missing}\n"
+                if missing_set:
+                    has_gaps = True
+                    missing_list = sorted(list(missing_set))
+                    missing_count = len(missing_list)
+                    formatted_missing = makeMissingFrameList(missing_list, pad)
+                    
+                    # Format pluralization and construct the secondary info line
+                    plural_suffix = "s" if missing_count &gt; 1 else ""
+                    missing_report = f"    * missing {missing_count} file{plural_suffix}: {formatted_missing}\n"
 
         # Output logic
         if has_gaps:
