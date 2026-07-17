@@ -811,6 +811,698 @@ Here is the line-by-line breakdown of how this code processes that sequence:
 <span id="Analyzing Results-Phase 5: Displaying the Final Result-What it does"></span><strong id="What it does">What it does</strong>: Once the loop has finished processing every sequence, it prints the entire accumulated report to the screen. Because our strings already end in newlines (<code>\n</code>), <code>end=""</code> prevents <code>print()</code> from adding an extra blank line at the very end.
 </p>
 
+<div id="getFrameNumber(inputString)"><h1 id="getFrameNumber(inputString)" class="header"><a href="#getFrameNumber(inputString)">getFrameNumber(inputString)</a></h1></div>
+
+<pre python>
+def getFrameNumber(inputString):
+    """
+    Extracts the frame number string from a path.
+    """
+    base = os.path.basename(inputString)
+    noExt = base.rsplit(".", 1)
+    name_part = noExt[0]
+    
+    idx = len(name_part)
+    while idx &gt; 0 and (name_part[idx-1].isdigit() or name_part[idx-1] == "-"):
+        if name_part[idx-1] == "-" and (idx - 1 &gt; 0 and name_part[idx-2].isdigit()):
+            break
+        idx -= 1
+        
+    return name_part[idx:]
+</pre>
+
+<p>
+This function has a very specific and critical job in VFX pipelines: it extracts the frame number from a file path while keeping negative signs intact (like <code>-003</code>), but making sure it doesn't accidentally grab a hyphen used as a word separator (like <code>shot-01</code>).
+</p>
+
+<p>
+Let’s trace how this function works line-by-line using a complex filename:
+<code>"/path/to/my-shot_v01.-0045.exr"</code> (Frame <code>-45</code>, with a hyphen in the shot name).
+</p>
+
+<div id="getFrameNumber(inputString)-Step 1: Strip down to the name part"><h3 id="Step 1: Strip down to the name part" class="header"><a href="#getFrameNumber(inputString)-Step 1: Strip down to the name part">Step 1: Strip down to the name part</a></h3></div>
+
+<pre python>
+    base = os.path.basename(inputString)
+</pre>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 1: Strip down to the name part-What it does"></span><strong id="What it does">What it does</strong>: Extracts just the file name from the full directory path.
+</p>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 1: Strip down to the name part-In our example"></span><strong id="In our example">In our example</strong>: <code>base</code> becomes <code>"my-shot_v01.-0045.exr"</code>.
+</p>
+
+<pre python>
+    noExt = base.rsplit(".", 1)
+    name_part = noExt[0]
+</pre>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 1: Strip down to the name part-What it does"></span><strong id="What it does">What it does</strong>: Splits the string starting from the right at the last dot (<code>.</code>) to separate the extension, and grabs the left side.
+</p>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 1: Strip down to the name part-In our example"></span><strong id="In our example">In our example</strong>:
+</p>
+<ul>
+<li>
+<code>noExt</code> is <code>["my-shot_v01.-0045", "exr"]</code>.
+
+<li>
+<code>name_part</code> becomes <code>"my-shot_v01.-0045"</code>.
+
+</ul>
+<div id="getFrameNumber(inputString)-Step 2: Set up a backward-scanning index"><h3 id="Step 2: Set up a backward-scanning index" class="header"><a href="#getFrameNumber(inputString)-Step 2: Set up a backward-scanning index">Step 2: Set up a backward-scanning index</a></h3></div>
+
+<pre python>
+    idx = len(name_part)
+</pre>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 2: Set up a backward-scanning index-What it does"></span><strong id="What it does">What it does</strong>: Sets an index pointer (<code>idx</code>) to the very end of the string. We are going to scan <span id="getFrameNumber(inputString)-Step 2: Set up a backward-scanning index-backwards"></span><strong id="backwards">backwards</strong> (from right to left) to find where the frame number begins.
+</p>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 2: Set up a backward-scanning index-In our example"></span><strong id="In our example">In our example</strong>: <code>len("my-shot_v01.-0045")</code> is <code>17</code>. So <code>idx = 17</code>.
+</p>
+
+<div id="getFrameNumber(inputString)-Step 3: Scan backward for digits and minus signs"><h3 id="Step 3: Scan backward for digits and minus signs" class="header"><a href="#getFrameNumber(inputString)-Step 3: Scan backward for digits and minus signs">Step 3: Scan backward for digits and minus signs</a></h3></div>
+
+<pre python>
+    while idx &gt; 0 and (name_part[idx-1].isdigit() or name_part[idx-1] == "-"):
+</pre>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 3: Scan backward for digits and minus signs-What it does"></span><strong id="What it does">What it does</strong>: This loop keeps moving backward (left) as long as the character it looks at is either a <span id="getFrameNumber(inputString)-Step 3: Scan backward for digits and minus signs-digit"></span><strong id="digit">digit</strong> (<code>0-9</code>) or a <span id="getFrameNumber(inputString)-Step 3: Scan backward for digits and minus signs-minus sign"></span><strong id="minus sign">minus sign</strong> (<code>-</code>).
+</p>
+
+<p>
+In our example:
+</p>
+<ul>
+<li>
+Character at index 16 is <code>"5"</code> (digit) → Keep going.
+
+<li>
+Character at index 15 is <code>"4"</code> (digit) → Keep going.
+
+<li>
+Character at index 14 is <code>"0"</code> (digit) → Keep going.
+
+<li>
+Character at index 13 is <code>"0"</code> (digit) → Keep going.
+
+<li>
+Character at index 12 is <code>"-"</code> (hyphen) → Keep going (but look at the special rule inside the loop next!).
+
+</ul>
+<div id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check"><h3 id="Step 4: The Negative Number Safety Check" class="header"><a href="#getFrameNumber(inputString)-Step 4: The Negative Number Safety Check">Step 4: The Negative Number Safety Check</a></h3></div>
+
+<p>
+This is the trickiest part of the loop. Inside the while loop, we find this safety check:
+</p>
+
+<pre python>
+        if name_part[idx-1] == "-" and (idx - 1 &gt; 0 and name_part[idx-2].isdigit()):
+            break
+</pre>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-What it does in English"></span><strong id="What it does in English">What it does in English</strong>: "If the character we just found is a hyphen (<code>"-"</code>), look at the character directly to its left. If that character is a number, STOP looping immediately."
+</p>
+
+<p>
+Why does this exist?
+</p>
+<ul>
+<li>
+If you have a file named <code>render-1-0045.exr</code>, and we scan backward:
+
+<li>
+We scan through <code>5</code>, <code>4</code>, <code>0</code>, <code>0</code>.
+
+<li>
+We reach the <code>-</code> before <code>0045</code>. This is a negative sign. The character to its left is <code>1</code>.
+
+<li>
+Since <code>1</code> is a digit, this rule triggers a <code>break</code> and stops scanning. This prevents the script from accidentally turning <code>-1-0045</code> into a single, giant, invalid number!
+
+</ul>
+<p>
+In our example (<code>"my-shot_v01.-0045"</code>):
+</p>
+<ul>
+<li>
+We reach the <code>-</code> at index 12.
+
+<li>
+The character to its left (index 11) is <code>.</code> (a dot, not a digit).
+
+<li>
+The check evaluates to <code>False</code>, so we do <span id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-not"></span><strong id="not">not</strong> break.
+
+</ul>
+  
+<pre python>
+        idx -= 1
+</pre>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-What it does"></span><strong id="What it does">What it does</strong>: Decrements our index to keep scanning left.
+</p>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-In our example"></span><strong id="In our example">In our example</strong>: We successfully pass the <code>-</code> character, and the index decrements to pointing at the dot <code>.</code>.
+</p>
+
+<p>
+On the next loop iteration, the character at index 11 is <code>.</code>. Since a dot is neither a digit nor a hyphen, the <code>while</code> loop cleanly terminates.
+</p>
+
+<div id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-1. Why we can't just break at any hyphen (-)"><h4 id="1. Why we can't just break at any hyphen (-)" class="header"><a href="#getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-1. Why we can't just break at any hyphen (-)">1. Why we can't just break at any hyphen (-)</a></h4></div>
+
+<p>
+In standard VFX pipeline naming conventions, a hyphen can mean two completely different things depending on where it sits:
+</p>
+<ul>
+<li>
+It can be a dash separator between the name and a version/token (e.g., <code>shot-name-v01-0001.exr</code>).
+
+<li>
+It can be a negative sign indicating a negative frame number (e.g., <code>shot-name-v01.-0001.exr</code>).
+
+</ul>
+<p>
+If the code simply did a <code>break</code> the moment it hit any hyphen while scanning backwards, it would break completely on negative frames.
+</p>
+
+<div id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-Look at my-shot_v01.-0045.exr"><h4 id="Look at my-shot_v01.-0045.exr" class="header"><a href="#getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-Look at my-shot_v01.-0045.exr">Look at my-shot_v01.-0045.exr</a></h4></div>
+
+<p>
+If we scan backward:
+</p>
+<ul>
+<li>
+We collect <code>5</code>, <code>4</code>, <code>0</code>, <code>0</code>.
+
+<li>
+We encounter the <code>-</code>.
+
+<li>
+If we just blindly <code>break</code> here, the function returns <code>"0045"</code>.
+
+<li>
+The negative sign is completely dropped! The script will misread frame <code>-45</code> as frame <code>45</code>.
+
+</ul>
+<p>
+By <em>not</em> breaking immediately, the loop decreases <code>idx</code> one more time, includes the <code>-</code> in the slice, and correctly extracts <code>"-0045"</code>.
+</p>
+
+<div id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-2. The Real Purpose of the isdigit() Look-Behind"><h4 id="2. The Real Purpose of the isdigit() Look-Behind" class="header"><a href="#getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-2. The Real Purpose of the isdigit() Look-Behind">2. The Real Purpose of the isdigit() Look-Behind</a></h4></div>
+
+<p>
+Now, look at the exact check that is confusing:
+</p>
+
+<pre python>
+if name_part[idx-1] == "-" and (idx - 1 &gt; 0 and name_part[idx-2].isdigit()):
+    break
+</pre>
+
+<p>
+This specifically handles files that use hyphens as <span id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-2. The Real Purpose of the isdigit() Look-Behind-separators right next to another number"></span><strong id="separators right next to another number">separators right next to another number</strong>,  like a version number or a shot number.
+</p>
+
+<div id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-The Example: render-1-0045.exr"><h4 id="The Example: render-1-0045.exr" class="header"><a href="#getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-The Example: render-1-0045.exr">The Example: render-1-0045.exr</a></h4></div>
+
+<ul>
+<li>
+What it means to a human: This is frame <code>0045</code> of a sequence named <code>render-1</code>.
+
+<li>
+What the backward loop does step-by-step:
+
+<ul>
+<li>
+It reads <code>5</code>, <code>4</code>, <code>0</code>, <code>0</code>. (<code>idx</code> moves left).
+
+<li>
+It hits the hyphen right before <code>0045</code>.
+
+<li>
+It looks to the left of that hyphen and sees <code>1</code> (which <code>.isdigit()</code> evaluates to <code>True</code>).
+
+<li>
+The check triggers a <code>break</code>.
+
+<li>
+The loop stops, and <code>name_part[idx:]</code> returns <code>0045</code>. (Correct!)
+
+</ul>
+</ul>
+<div id="getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-What would happen without that check?"><h4 id="What would happen without that check?" class="header"><a href="#getFrameNumber(inputString)-Step 4: The Negative Number Safety Check-What would happen without that check?">What would happen without that check?</a></h4></div>
+
+<p>
+If that check wasn't there, the loop would say: <em>"Oh, a hyphen! Let me check if it's part of a negative number."</em> It wouldn't break. It would keep scanning left.
+</p>
+<ul>
+<li>
+It swallows the <code>-</code>.
+
+<li>
+It sees <code>1</code>, which is a digit, so it swallows that too.
+
+<li>
+It hits the next <code>-</code> (before the <code>1</code>). To its left is <code>r</code> (not a digit), so it swallows that hyphen too.
+
+<li>
+The loop finally stops at the letters.
+
+</ul>
+<p>
+The function would return <code>"-1-0045"</code>. The script would then try to turn <code>"-1-0045"</code> into an integer, completely breaking your frame logic.
+</p>
+
+<div id="getFrameNumber(inputString)-Step 5: Slice and return the frame number"><h3 id="Step 5: Slice and return the frame number" class="header"><a href="#getFrameNumber(inputString)-Step 5: Slice and return the frame number">Step 5: Slice and return the frame number</a></h3></div>
+
+<pre python>
+    return name_part[idx:]
+</pre>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 5: Slice and return the frame number-What it does"></span><strong id="What it does">What it does</strong>: Slices the string from our final stopped index (idx) to the end of the string.
+</p>
+
+<p>
+<span id="getFrameNumber(inputString)-Step 5: Slice and return the frame number-In our example"></span><strong id="In our example">In our example</strong>: The loop stopped when idx reached 12 (the index of the hyphen -).
+</p>
+
+<p>
+<code>name_part[12:]</code> extracts everything from index 12 to the end: <code>"-0045"</code>.
+</p>
+
+<div id="getFrameNumber(inputString)-Step 5: Slice and return the frame number-Summary of what it returns:"><h4 id="Summary of what it returns:" class="header"><a href="#getFrameNumber(inputString)-Step 5: Slice and return the frame number-Summary of what it returns:">Summary of what it returns:</a></h4></div>
+
+<ul>
+<li>
+<code>shot_v01.0024.exr</code> → returns <code>"0024"</code>
+
+<li>
+<code>shot_v01.-0024.exr</code> → returns <code>"-0024"</code> (correctly identifies negative frames)
+
+<li>
+<code>my-shot-01-0024.exr</code> → returns <code>"0024"</code> (correctly ignores the hyphen in <code>my-shot-01</code>)
+
+<li>
+<code>notes.txt</code> → returns <code>""</code> (no digits at the end)
+
+</ul>
+<div id="getFileName(inputString)"><h1 id="getFileName(inputString)" class="header"><a href="#getFileName(inputString)">getFileName(inputString)</a></h1></div>
+
+<pre python>
+def getFileName(inputString):
+    """
+    Extracts the root name stem of the sequence, cleanly stripping any trailing
+    minus signs or separator dots.
+    """
+    base = os.path.basename(inputString)
+    noExt = base.rsplit(".", 1)
+    name_part = noExt[0]
+    
+    idx = len(name_part)
+    while idx &gt; 0 and name_part[idx-1].isdigit():
+        idx -= 1
+        
+    outString = name_part[:idx]
+    
+    # Strip the trailing minus sign if it was a negative frame
+    if outString.endswith("-"):
+        outString = outString[:-1]  
+        
+    # Strip the separator dot so we don't return "stem." as the stem name
+    if outString.endswith("."):
+        outString = outString[:-1]
+        
+    return outString
+</pre>
+
+<p>
+Its primary job is to extract the base name (or "stem") of a sequence by stripping away the file extension, the frame number (including negative signs), and any separator punctuation (like dots or dashes).
+</p>
+
+<p>
+To make this crystal clear, we will track the variables step-by-step using two different examples:
+</p>
+
+<ul>
+<li>
+A positive frame with a separator dot: <code>/path/to/my-shot_v01.0045.exr</code>
+
+<li>
+A negative frame with a separator dot: <code>/path/to/my-shot_v01.-0045.exr</code>
+
+</ul>
+<div id="getFileName(inputString)-Step 1: Strip the Directory and Extension"><h3 id="Step 1: Strip the Directory and Extension" class="header"><a href="#getFileName(inputString)-Step 1: Strip the Directory and Extension">Step 1: Strip the Directory and Extension</a></h3></div>
+
+<pre python>
+base = os.path.basename(inputString)
+noExt = base.rsplit(".", 1)
+name_part = noExt[0]
+</pre>
+
+<ul>
+<li>
+<code>os.path.basename</code> strips away any directory paths, leaving just the file name.
+
+<li>
+<code>rsplit(".", 1)</code> splits the string <em>once</em> starting from the right. This separates the file extension from everything else.
+
+<li>
+<code>name_part</code> captures the left half (index <code>0</code>) of that split.
+
+</ul>
+  
+<table>
+<thead>
+<tr>
+<th>
+Input Path
+</th>
+<th>
+base
+</th>
+<th>
+name_part
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+/path/to/my-shot_v01.0045.exr
+</td>
+<td>
+"my-shot_v01.0045.exr"
+</td>
+<td>
+"my-shot_v01.0045"
+</td>
+</tr>
+<tr>
+<td>
+/path/to/my-shot_v01.-0045.exr
+</td>
+<td>
+"my-shot_v01.-0045.exr"
+</td>
+<td>
+"my-shot_v01.-0045"
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="getFileName(inputString)-Step 1: Strip the Directory and Extension-Note: Path from pathlib can do this in one line:"><h4 id="Note: Path from pathlib can do this in one line:" class="header"><a href="#getFileName(inputString)-Step 1: Strip the Directory and Extension-Note: Path from pathlib can do this in one line:">Note: Path from pathlib can do this in one line:</a></h4></div>
+
+<pre python>
+from pathlib import Path
+ 
+# where inputString = "/path/to/my-shot_v01.004.exr"
+name_part = Path(inputString).stem
+</pre>
+
+<div id="getFileName(inputString)-Step 2: Strip the Numeric Digits (The while Loop)"><h3 id="Step 2: Strip the Numeric Digits (The while Loop)" class="header"><a href="#getFileName(inputString)-Step 2: Strip the Numeric Digits (The while Loop)">Step 2: Strip the Numeric Digits (The while Loop)</a></h3></div>
+
+<pre python>
+idx = len(name_part)
+while idx &gt; 0 and name_part[idx-1].isdigit():
+    idx -= 1
+</pre>
+
+<p>
+This loop starts at the very end of <code>name_part</code> and moves backward (<code>idx -= 1</code>) only as long as the characters are digits (<code>0-9</code>). It stops the moment it hits any non-digit character (like a dot or a hyphen).
+</p>
+<ul>
+<li>
+For <code>"my-shot_v01.0045"</code>:
+
+<ul>
+<li>
+It scans backward through <code>5</code>, <code>4</code>, <code>0</code>, <code>0</code>.
+
+<li>
+It hits <code>.</code>. Because <code>.</code> is not a digit, the loop stops.
+
+<li>
+Resulting <code>idx</code>: Points to the <code>.</code> right after <code>v01</code>.
+
+</ul>
+<li>
+For <code>"my-shot_v01.-0045"</code>:
+
+<ul>
+<li>
+It scans backward through <code>5</code>, <code>4</code>, <code>0</code>, <code>0</code>.
+
+<li>
+It hits <code>-</code>. Because <code>-</code> is not a digit, the loop stops.
+
+<li>
+Resulting <code>idx</code>: Points to the <code>-</code>.
+
+</ul>
+</ul>
+<div id="getFileName(inputString)-Step 3: Slice the String"><h3 id="Step 3: Slice the String" class="header"><a href="#getFileName(inputString)-Step 3: Slice the String">Step 3: Slice the String</a></h3></div>
+
+<pre python>
+outString = name_part[:idx]
+</pre>
+
+<p>
+We slice name_part from the beginning up to our stopped index idx. This successfully removes the raw digit portion of the frame number.
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+name_part
+</th>
+<th>
+Stopped at (idx points to)
+</th>
+<th>
+Sliced outString
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+"my-shot_v01.0045"
+</td>
+<td>
+<code>.</code>
+</td>
+<td>
+"my-shot_v01."
+</td>
+</tr>
+<tr>
+<td>
+"my-shot_v01.-0045"
+</td>
+<td>
+<code>-</code>
+</td>
+<td>
+"my-shot_v01.-"
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="getFileName(inputString)-Step 4: Clean up Negative Signs and Dots"><h3 id="Step 4: Clean up Negative Signs and Dots" class="header"><a href="#getFileName(inputString)-Step 4: Clean up Negative Signs and Dots">Step 4: Clean up Negative Signs and Dots</a></h3></div>
+
+<p>
+At this point, our base names still have leftover formatting characters at the very end. The final step cleans them up from right-to-left.
+</p>
+
+<div id="getFileName(inputString)-Step 4: Clean up Negative Signs and Dots-A. Strip the negative sign (if it exists):"><h4 id="A. Strip the negative sign (if it exists):" class="header"><a href="#getFileName(inputString)-Step 4: Clean up Negative Signs and Dots-A. Strip the negative sign (if it exists):">A. Strip the negative sign (if it exists):</a></h4></div>
+
+<pre python>
+if outString.endswith("-"):
+    outString = outString[:-1]  
+</pre>
+
+<ul>
+<li>
+<code>"my-shot_v01."</code> does not end in <code>-</code>. Nothing changes.
+
+<li>
+<code>"my-shot_v01.-"</code> ends in <code>-</code>. The code strips it.
+
+<ul>
+<li>
+New <code>outString</code>: <code>"my-shot_v01."</code>
+
+</ul>
+</ul>
+<div id="getFileName(inputString)-Step 4: Clean up Negative Signs and Dots-B. Strip the separator dot:"><h4 id="B. Strip the separator dot:" class="header"><a href="#getFileName(inputString)-Step 4: Clean up Negative Signs and Dots-B. Strip the separator dot:">B. Strip the separator dot:</a></h4></div>
+
+<pre python>
+if outString.endswith("."):
+    outString = outString[:-1]
+</pre>
+
+<p>
+Now, both examples have been reduced to <code>"my-shot_v01."</code>.
+</p>
+<ul>
+<li>
+The code detects the trailing dot and strips it.
+
+<li>
+Final <code>outString</code>: <code>"my-shot_v01"</code>
+
+</ul>
+<div id="getFileName(inputString)-Step 4: Clean up Negative Signs and Dots-Summary of the Output"><h4 id="Summary of the Output" class="header"><a href="#getFileName(inputString)-Step 4: Clean up Negative Signs and Dots-Summary of the Output">Summary of the Output</a></h4></div>
+
+<pre python>
+return outString
+</pre>
+
+<p>
+For both input files (<code>my-shot_v01.0045.exr</code> and <code>my-shot_v01.-0045.exr</code>), the function cleanly and dynamically returns the identical stem name:
+</p>
+
+<p>
+<code>"my-shot_v01"</code>
+</p>
+
+<div id="getFramePadding(inputFrame)"><h1 id="getFramePadding(inputFrame)" class="header"><a href="#getFramePadding(inputFrame)">getFramePadding(inputFrame)</a></h1></div>
+
+<pre python>
+def getFramePadding(inputFrame):
+    """
+    Evaluates only the absolute digit padding width.
+    Negative signs are ignored so that '-003' and '002' are grouped into 
+    the same padding bin (width of 3).
+    """
+    if not inputFrame:
+        return 0
+    
+    # Strip leading minus sign to count absolute digits
+    clean_frame = inputFrame[1:] if inputFrame.startswith("-") else inputFrame
+    return len(clean_frame)
+</pre>
+
+<p>
+The ultimate goal of this function is to look at a frame string—like <code>"0001"</code>, <code>"12"</code>, or <code>"-003"</code> - and figure out how many digits wide it is, entirely ignoring whether it’s a positive or negative frame.
+</p>
+
+<p>
+This is crucial for <code>lseq</code>, because if you have a sequence that transitions from negative frames to positive frames (e.g., <code>-002</code>, <code>-001</code>, <code>0000</code>, <code>0001</code>), they all need to be grouped into the exact same "padding bin" (a padding width of 4). If they aren't, the script will split them into separate, broken sequences.
+</p>
+
+<p>
+Here is how the code evaluates a string line-by-line:
+</p>
+
+<div id="getFramePadding(inputFrame)-1. The Safety Guard"><h3 id="1. The Safety Guard" class="header"><a href="#getFramePadding(inputFrame)-1. The Safety Guard">1. The Safety Guard</a></h3></div>
+
+<pre python>
+if not inputFrame:
+    return 0
+</pre>
+
+<p>
+<span id="getFramePadding(inputFrame)-1. The Safety Guard-What it does"></span><strong id="What it does">What it does</strong>: Checks if <code>inputFrame</code> is empty (like <code>""</code>) or <code>None</code>.
+</p>
+
+<p>
+<span id="getFramePadding(inputFrame)-1. The Safety Guard-Why it's there"></span><strong id="Why it's there">Why it's there</strong>: If a file somehow bypasses the parser without a valid frame number, this prevents the script from crashing when it tries to read the string's length, cleanly returning a padding of <code>0</code>.
+</p>
+
+<div id="getFramePadding(inputFrame)-2. Stripping the Negative Sign"><h3 id="2. Stripping the Negative Sign" class="header"><a href="#getFramePadding(inputFrame)-2. Stripping the Negative Sign">2. Stripping the Negative Sign</a></h3></div>
+
+<pre python>
+clean_frame = inputFrame[1:] if inputFrame.startswith("-") else inputFrame
+</pre>
+
+<p>
+This is a Python <span id="getFramePadding(inputFrame)-2. Stripping the Negative Sign-conditional expression"></span><strong id="conditional expression">conditional expression</strong> (a one-liner if-else statement). Let's see how it behaves under two different scenarios:
+</p>
+
+<div id="getFramePadding(inputFrame)-2. Stripping the Negative Sign-Scenario A: The frame is negative (inputFrame = &quot;-003&quot;)"><h4 id="Scenario A: The frame is negative (inputFrame = &quot;-003&quot;)" class="header"><a href="#getFramePadding(inputFrame)-2. Stripping the Negative Sign-Scenario A: The frame is negative (inputFrame = &quot;-003&quot;)">Scenario A: The frame is negative (inputFrame = "-003")</a></h4></div>
+
+<ul>
+<li>
+<code>inputFrame.startswith("-")</code> evaluates to <code>True</code>.
+
+<li>
+The code runs the first part: <code>inputFrame[1:]</code>.
+
+<li>
+In Python, string slicing <code>[1:]</code> means <em>"give me everything from index 1 to the very end of the string, skipping index 0."</em>
+
+<ul>
+<li>
+Index 0 is <code>"-"</code>
+
+<li>
+Index 1 is <code>"0"</code>
+
+<li>
+Index 2 is <code>"0"</code>
+
+<li>
+Index 3 is <code>"3"</code>
+
+</ul>
+<li>
+<code>clean_frame</code> becomes the string <code>"003"</code>. The minus sign is completely stripped.
+
+</ul>
+<div id="getFramePadding(inputFrame)-2. Stripping the Negative Sign-Scenario B: The frame is positive (inputFrame = &quot;0002&quot;)"><h4 id="Scenario B: The frame is positive (inputFrame = &quot;0002&quot;)" class="header"><a href="#getFramePadding(inputFrame)-2. Stripping the Negative Sign-Scenario B: The frame is positive (inputFrame = &quot;0002&quot;)">Scenario B: The frame is positive (inputFrame = "0002")</a></h4></div>
+
+<ul>
+<li>
+<code>inputFrame.startswith("-")</code> evaluates to <code>False</code>.
+
+<li>
+The code jumps to the else block: <code>else inputFrame</code>.
+
+<li>
+<code>clean_frame</code> simply becomes a direct copy of the original string: <code>"0002"</code>.
+
+</ul>
+<div id="getFramePadding(inputFrame)-3. Calculating the Width"><h3 id="3. Calculating the Width" class="header"><a href="#getFramePadding(inputFrame)-3. Calculating the Width">3. Calculating the Width</a></h3></div>
+
+<pre python>
+return len(clean_frame)
+</pre>
+
+<p>
+<span id="getFramePadding(inputFrame)-3. Calculating the Width-What it does"></span><strong id="What it does">What it does</strong>: Measures the total character length of the now-sanitized string and returns it as an integer.
+<span id="getFramePadding(inputFrame)-3. Calculating the Width-The Result"></span><strong id="The Result">The Result</strong>:
+</p>
+<ul>
+<li>
+<code>len("003")</code> returns <code>3</code>
+
+<li>
+<code>len("0002")</code> returns <code>4</code>
+
+</ul>
+<p>
+Because of this function, both <code>"-003"</code> and <code>"003"</code> yield a padding value of <code>3</code>, ensuring they are matched together perfectly under the same sequence key!
+</p>
+
+
 <div id="Defaultdict"><h1 id="Defaultdict" class="header"><a href="#Defaultdict">Defaultdict</a></h1></div>
 
 <p>
