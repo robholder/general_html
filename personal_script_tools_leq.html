@@ -355,6 +355,352 @@ if __name__ == "__main__":
 </pre>
 
 
+<div id="Breakdowns"><h1 id="Breakdowns" class="header"><a href="#Breakdowns">Breakdowns</a></h1></div>
+
+<p>
+This block:
+</p>
+
+<pre python>
+# Group files by signature: (name_stem, absolute_padding_width, extension)
+sequences = defaultdict(list)
+
+for path in fileList:
+    frame_str = getFrameNumber(path)
+    if frame_str and frame_str != "NG":
+        stem = getFileName(path)
+        pad = getFramePadding(frame_str)
+        ext = getExtension(path)
+        frame_val = stringToInt(frame_str)
+        
+        key = (stem, pad, ext)
+        sequences[key].append(frame_val)
+</pre>
+
+<p>
+Let’s break this down step-by-step. This block of code is the "brain" of the script: its job is to look at a list of raw filenames and organize them into organized sequence groups.
+</p>
+
+<p>
+To understand what is being built, let's trace this block using a real-world example.
+</p>
+
+<p>
+Imagine our <code>fileList</code> contains these three raw file paths:
+</p>
+
+<ul>
+<li>
+<code>/path/to/render.0001.exr</code>
+
+<li>
+<code>/path/to/render.0002.exr</code>
+
+<li>
+<code>/path/to/notes.txt</code> (not part of a sequence)
+
+</ul>
+<div id="Breakdowns-Step 1: Initialize the Container"><h3 id="Step 1: Initialize the Container" class="header"><a href="#Breakdowns-Step 1: Initialize the Container">Step 1: Initialize the Container</a></h3></div>
+
+<pre python>
+    sequences = defaultdict(list)
+</pre>
+
+<p>
+Because of <code>defaultdict(list)</code>, if we look up a sequence we haven't seen yet, Python will instantly create an empty list [] for it.
+</p>
+
+<ul>
+<li>
+Current state of <code>sequences: {}</code> (completely empty)
+
+</ul>
+<div id="Breakdowns-Step 2: Loop Through Each File"><h3 id="Step 2: Loop Through Each File" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File">Step 2: Loop Through Each File</a></h3></div>
+
+<p>
+The script starts looping through the files one by one.
+</p>
+
+<pre python>
+    for path in fileList:
+</pre>
+
+<p>
+Iteration 1: Processing /path/to/render.0001.exr
+</p>
+
+<div id="Breakdowns-Step 2: Loop Through Each File-Step 2a: Extract the frame number"><h4 id="Step 2a: Extract the frame number" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Step 2a: Extract the frame number">Step 2a: Extract the frame number</a></h4></div>
+  
+<pre bython>
+frame_str = getFrameNumber(path)
+</pre>
+
+<p>
+This calls the helper function <code>getFrameNumber()</code>. It strips away the path, name, and extension, leaving just the numbers at the end.
+</p>
+<ul>
+<li>
+<code>frame_str</code> becomes <code>"0001"</code>.
+
+</ul>
+<div id="Breakdowns-Step 2: Loop Through Each File-Step 2b: Is it a valid frame?"><h4 id="Step 2b: Is it a valid frame?" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Step 2b: Is it a valid frame?">Step 2b: Is it a valid frame?</a></h4></div>
+  
+<pre python>
+if frame_str and frame_str != "NG":
+</pre>
+
+<p>
+("NG" is a VFX industry term for "No Good" or bad frames). Since <code>"0001"</code> is valid, we proceed inside the <code>if</code> block.
+</p>
+
+<div id="Breakdowns-Step 2: Loop Through Each File-Step 2c: Extract the metadata"><h4 id="Step 2c: Extract the metadata" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Step 2c: Extract the metadata">Step 2c: Extract the metadata</a></h4></div>
+
+<p>
+Now, the script calls several helper functions to dissect the file path:
+</p>
+
+<pre python>
+stem = getFileName(path)          # Returns "render"
+pad = getFramePadding(frame_str)  # Returns 4 (because "0001" is 4 digits)
+ext = getExtension(path)          # Returns ".exr"
+frame_val = stringToInt(frame_str) # Converts "0001" to the integer 1
+</pre>
+
+<div id="Breakdowns-Step 2: Loop Through Each File-Step 2d: Build the &quot;Unique Key&quot;"><h4 id="Step 2d: Build the &quot;Unique Key&quot;" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Step 2d: Build the &quot;Unique Key&quot;">Step 2d: Build the "Unique Key"</a></h4></div>
+
+<p>
+This is the secret sauce of the script. To group sequences together, it creates a Python "tuple" (a fixed list) consisting of the (name, padding, extension):
+</p>
+
+<pre python>
+key = (stem, pad, ext)
+# key becomes: ("render", 4, ".exr")
+</pre>
+
+<div id="Breakdowns-Step 2: Loop Through Each File-Step 2e: Store the frame number"><h4 id="Step 2e: Store the frame number" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Step 2e: Store the frame number">Step 2e: Store the frame number</a></h4></div>
+
+<pre python>
+sequences[key].append(frame_val)
+</pre>
+
+<p>
+Python looks for <code>("render", 4, ".exr")</code> in our dictionary. It isn't there, so defaultdict automatically creates an empty list and appends our integer <code>1</code> to it.
+</p>
+
+<div id="Breakdowns-Step 2: Loop Through Each File-Current state of sequences:"><h4 id="Current state of sequences:" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Current state of sequences:">Current state of sequences:</a></h4></div>
+
+<pre python>
+{
+    ("render", 4, ".exr"): [1]
+}
+</pre>
+
+<div id="Breakdowns-Iteration 2: Processing /path/to/render.0002.exr"><h3 id="Iteration 2: Processing /path/to/render.0002.exr" class="header"><a href="#Breakdowns-Iteration 2: Processing /path/to/render.0002.exr">Iteration 2: Processing /path/to/render.0002.exr</a></h3></div>
+
+<p>
+The loop moves to the second file.
+</p>
+
+<ul>
+<li>
+<code>frame_str</code> becomes <code>"0002"</code>.
+
+<li>
+It is valid, so we dissect it:
+
+<ul>
+<li>
+<code>stem = "render"</code>
+
+<li>
+<code>pad = 4</code>
+
+<li>
+<code>ext = ".exr"</code>
+
+<li>
+<code>frame_val = 2</code>
+
+</ul>
+<li>
+The unique key is built: <code>key = ("render", 4, ".exr")</code>
+
+<li>
+<code>sequences[key].append(frame_val)</code> is called.
+
+<li>
+What happens here: The dictionary <em>already</em> has this key! Python grabs the existing list <code>[1]</code> and appends <code>2</code> to it.
+
+<li>
+Current state of <code>sequences</code>:
+
+</ul>
+  
+<pre python>
+{
+    ("render", 4, ".exr"): [1, 2]
+}
+</pre>
+
+<div id="Breakdowns-Iteration 3: Processing /path/to/notes.txt"><h3 id="Iteration 3: Processing /path/to/notes.txt" class="header"><a href="#Breakdowns-Iteration 3: Processing /path/to/notes.txt">Iteration 3: Processing /path/to/notes.txt</a></h3></div>
+
+<p>
+The loop moves to the final file.
+</p>
+<ul>
+<li>
+<code>frame_str = getFrameNumber(path)</code> is run.
+
+<li>
+Because <code>notes.txt</code> has no trailing numbers, <code>frame_str</code> returns <code>""</code> (an empty string).
+
+<li>
+The check <code>if frame_str:</code> fails.
+
+<li>
+What happens here: The script completely skips this file and does nothing.
+
+</ul>
+<div id="Breakdowns-The Final Result"><h2 id="The Final Result" class="header"><a href="#Breakdowns-The Final Result">The Final Result</a></h2></div>
+
+<p>
+Once the loop finishes, the <code>sequences</code> dictionary has completely organized your files. It now looks like this:
+</p>
+
+<pre python>
+{
+    ("render", 4, ".exr"): [1, 2]
+}
+</pre>
+
+<p>
+This data structure is perfect for the next stage of the script, because it has successfully grouped all related frames into a single list, safely separated by their name, padding, and file extension!
+</p>
+
+<div id="Defaultdict"><h1 id="Defaultdict" class="header"><a href="#Defaultdict">Defaultdict</a></h1></div>
+
+<p>
+In Python, <code>defaultdict</code> is a highly convenient subclass of the standard dictionary (<code>dict</code>) found in the built-in <code>collections</code> module.
+</p>
+
+<p>
+Its sole purpose is to <span id="Defaultdict-prevent"></span><strong id="prevent">prevent</strong> <code>KeyError</code> <span id="Defaultdict-exceptions"></span><strong id="exceptions">exceptions</strong> by automatically creating a default value whenever you try to access or modify a key that doesn't exist yet.
+</p>
+
+<div id="Defaultdict-The Problem with Standard Dictionaries"><h2 id="The Problem with Standard Dictionaries" class="header"><a href="#Defaultdict-The Problem with Standard Dictionaries">The Problem with Standard Dictionaries</a></h2></div>
+
+<p>
+With a standard Python dictionary, if you try to append something to a list inside a key that hasn't been created yet, Python will crash:
+</p>
+
+<pre python>
+# This will CRASH with a KeyError:
+sequences = {}
+key = ("render_layer", 4, ".exr")
+
+sequences[key].append(101)  # ❌ KeyError! The key doesn't exist yet.
+</pre>
+
+<p>
+To make this work with a standard dictionary, you have to manually check for the key every single time:
+</p>
+
+<pre python>
+# The manual way:
+if key not in sequences:
+    sequences[key] = []  # Initialize it first
+sequences[key].append(101)
+</pre>
+
+<div id="Defaultdict-The Problem with Standard Dictionaries-How defaultdict Solves This"><h4 id="How defaultdict Solves This" class="header"><a href="#Defaultdict-The Problem with Standard Dictionaries-How defaultdict Solves This">How defaultdict Solves This</a></h4></div>
+
+<p>
+When you initialize a <code>defaultdict</code>, you pass it a <span id="Defaultdict-The Problem with Standard Dictionaries-How defaultdict Solves This-&quot;default factory&quot;"></span><strong id="&quot;default factory&quot;">"default factory"</strong> - a callable object (like <code>list</code>, <code>int</code>, or <code>set</code>) that tells the dictionary what to put there if a key is missing.
+</p>
+
+<p>
+In a script:
+</p>
+
+<pre python>
+sequences = defaultdict(list)
+</pre>
+
+<p>
+By passing <code>list</code> as the factory, you are telling Python: <em>"If I ask for a key that isn't there, instantly create it and set its value to an empty list []."</em>
+</p>
+
+<p>
+This allows you to safely write this single line:
+</p>
+
+<pre python>
+sequences[key].append(frame_val)
+</pre>
+
+<p>
+What happens behind the scenes:
+</p>
+
+<ul>
+<li>
+First time encountering a sequence (e.g., <code>("shot_01", 4, ".exr")</code>):
+
+<ul>
+<li>
+<code>defaultdict</code> notices this key is missing.
+
+<li>
+It quietly runs <code>list()</code> to generate an empty list <code>[]</code>.
+
+<li>
+It inserts the key: <code>{("shot_01", 4, ".exr"): []}</code>.
+
+<li>
+It immediately appends your frame number (e.g., <code>101</code>) to that new list.
+
+</ul>
+<li>
+Second time encountering the same sequence:
+
+<li>
+<code>defaultdict</code> sees the key already exists.
+
+<li>
+It skips initialization and simply appends the next frame number (e.g., <code>102</code>) to the existing list.
+
+</ul>
+<div id="Defaultdict-The Problem with Standard Dictionaries-Other Common Uses for defaultdict"><h3 id="Other Common Uses for defaultdict" class="header"><a href="#Defaultdict-The Problem with Standard Dictionaries-Other Common Uses for defaultdict">Other Common Uses for defaultdict</a></h3></div>
+
+<p>
+You can use different factories depending on what you are trying to group or count:
+</p>
+<ul>
+<li>
+<code>defaultdict(int)</code>: Great for counting things. Missing keys start at <code>0</code>.
+
+</ul>
+  
+<pre python>
+counts = defaultdict(int)
+counts["apple"] += 1  # Automatically starts at 0, becomes 1
+</pre>
+
+<ul>
+<li>
+<code>defaultdict(set)</code>: Great for gathering unique, non-duplicate items. Missing keys start as <code>set()</code>.
+<pre python>
+unique_exts = defaultdict(set)
+unique_exts["render_passes"].add(".exr")
+</pre>
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
 <p>
 <a href="unix_tools_index.html">Unix Tools</a>
 </p>
