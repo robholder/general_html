@@ -41,11 +41,11 @@ lseq: Scans a directory and returns a compact summary of frame sequences
       and dynamically highlights missing frames in red.
 """
 
-__author__ = "My Name"
-__copyright__ = "Copyright 2026, My Name"
+__author__ = "Robert Holder"
+__copyright__ = "Copyright 2026, Robert Holder"
 __license__ = "MIT"
-__version__ = "2.0.1"
-__maintainer__ = "My Name"
+__version__ = "2.0.2"
+__maintainer__ = "Robert Holder"
 __email__ = ""
 __status__ = "Production"
 
@@ -282,7 +282,7 @@ def main():
     fileList = [os.path.join(testPath, f) for f in raw_files if "." in f and os.path.isfile(os.path.join(testPath, f))]
 
     if len(fileList) &lt; 1:
-        print(f"Warning: No valid sequential files found in '{testPath}'", file=sys.stderr)
+        print(f"Warning: No files found in '{testPath}'", file=sys.stderr)
         sys.exit(0)
 
     # Group files by signature: (name_stem, absolute_padding_width, extension)
@@ -298,6 +298,13 @@ def main():
             
             key = (stem, pad, ext)
             sequences[key].append(frame_val)
+
+    # ---&gt; NEW CHECK &lt;---
+    # 2.0.2: If files were found but none parsed as valid sequences (e.g., only .txt or .py files),
+    # warn the user rather than exiting silently.
+    if not sequences:
+        print(f"Warning: No valid sequential files found in '{testPath}'", file=sys.stderr)
+        sys.exit(0)
 
     # Accumulate output
     outputString = ""
@@ -410,9 +417,13 @@ Imagine our <code>fileList</code> contains these three raw file paths:
 Because of <code>defaultdict(list)</code>, if we look up a sequence we haven't seen yet, Python will instantly create an empty list [] for it.
 </p>
 
+<p>
+Current state of <code>sequences: {}</code> (completely empty)
+</p>
+
 <ul>
 <li>
-Current state of <code>sequences: {}</code> (completely empty)
+<a href="personal_script_tools_leq.html#Defaultdict">More on Defaultdict</a>
 
 </ul>
 <div id="Breakdowns-Step 2: Loop Through Each File"><h3 id="Step 2: Loop Through Each File" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File">Step 2: Loop Through Each File</a></h3></div>
@@ -443,6 +454,10 @@ This calls the helper function <code>getFrameNumber()</code>. It strips away the
 <code>frame_str</code> becomes <code>"0001"</code>.
 
 </ul>
+<p>
+_NOTE: If the string after the file stem 'dot' is not a number, the frame_str is empty._
+</p>
+
 <div id="Breakdowns-Step 2: Loop Through Each File-Step 2b: Is it a valid frame?"><h4 id="Step 2b: Is it a valid frame?" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Step 2b: Is it a valid frame?">Step 2b: Is it a valid frame?</a></h4></div>
   
 <pre python>
@@ -450,9 +465,14 @@ if frame_str and frame_str != "NG":
 </pre>
 
 <p>
-("NG" is a VFX industry term for "No Good" or bad frames). Since <code>"0001"</code> is valid, we proceed inside the <code>if</code> block.
+("NG" is a VFX industry term for "No Good" or bad frames. See more below.). Since <code>"0001"</code> is valid, we proceed inside the <code>if</code> block.
 </p>
 
+<ul>
+<li>
+<a href="personal_script_tools_leq.html#NG Explanation">NG Explanation</a>
+
+</ul>
 <div id="Breakdowns-Step 2: Loop Through Each File-Step 2c: Extract the metadata"><h4 id="Step 2c: Extract the metadata" class="header"><a href="#Breakdowns-Step 2: Loop Through Each File-Step 2c: Extract the metadata">Step 2c: Extract the metadata</a></h4></div>
 
 <p>
@@ -577,11 +597,229 @@ Once the loop finishes, the <code>sequences</code> dictionary has completely org
 This data structure is perfect for the next stage of the script, because it has successfully grouped all related frames into a single list, safely separated by their name, padding, and file extension!
 </p>
 
+<div id="Analyzing Results"><h1 id="Analyzing Results" class="header"><a href="#Analyzing Results">Analyzing Results</a></h1></div>
+
+<p>
+The next section takes the organized dictionary of sequences you built in the previous step and turns it into the formatted, color-coded text report you see in the terminal.
+</p>
+
+<p>
+To trace this line-by-line, let’s use a real-world example of what our sequences dictionary contains:
+</p>
+
+<pre python>
+# Our input data: "render" sequence has frames 1, 2, and 4 (frame 3 is missing!)
+sequences = {
+    ("render", 4, ".exr"): [4, 1, 2] 
+}
+</pre>
+
+<p>
+Here is the line-by-line breakdown of how this code processes that sequence:
+</p>
+
+<div id="Analyzing Results-Phase 1: Set Up and Sorting"><h2 id="Phase 1: Set Up and Sorting" class="header"><a href="#Analyzing Results-Phase 1: Set Up and Sorting">Phase 1: Set Up and Sorting</a></h2></div>
+
+<pre python>
+    # Accumulate output
+    outputString = ""
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 1: Set Up and Sorting-What it does"></span><strong id="What it does">What it does</strong>: Initializes an empty string. The script will build the entire final report line-by-line in this variable before printing it all at once at the very end.
+</p>
+
+<pre python>
+    for (stem, pad, ext), frames in sorted(sequences.items()):
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 1: Set Up and Sorting-What it does"></span><strong id="What it does">What it does</strong>: Loops through each grouped sequence in alphabetical order.
+</p>
+
+<p>
+<span id="Analyzing Results-Phase 1: Set Up and Sorting-In our example"></span><strong id="In our example">In our example</strong>: It unpacks the dictionary key <code>("render", 4, ".exr")</code> into the variables <code>stem="render"</code>, <code>pad=4</code>, <code>ext=".exr"</code>, and assigns the list <code>[4, 1, 2]</code> to the variable frames.
+</p>
+
+<pre python>
+        frames.sort()
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 1: Set Up and Sorting-What it does"></span><strong id="What it does">What it does</strong>: Sorts our list of frame numbers numerically.
+</p>
+
+<p>
+<span id="Analyzing Results-Phase 1: Set Up and Sorting-In our example"></span><strong id="In our example">In our example</strong>: <code>frames</code> becomes <code>[1, 2, 4]</code>. (Sorting is crucial because files can be read in a random order from the hard drive).
+</p>
+
+<div id="Analyzing Results-Phase 2: Formatting the Main Sequence Line"><h2 id="Phase 2: Formatting the Main Sequence Line" class="header"><a href="#Analyzing Results-Phase 2: Formatting the Main Sequence Line">Phase 2: Formatting the Main Sequence Line</a></h2></div>
+
+<pre python>
+        # Process ranges
+        formatted_frames = makeFrameList(frames, pad)
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 2: Formatting the Main Sequence Line-What it does"></span><strong id="What it does">What it does</strong>: Calls the helper function <code>makeFrameList()</code> to compress the list of frames into a readable range string (e.g., grouping consecutive numbers).
+</p>
+
+<p>
+<span id="Analyzing Results-Phase 2: Formatting the Main Sequence Line-In our example"></span><strong id="In our example">In our example</strong>: It converts <code>[1, 2, 4]</code> into the string <code>"0001-0002,0004"</code>. Note how it preserves the 4-digit padding!
+</p>
+
+<pre python>
+        # Clean, single-dot formatted line
+        line = f"{stem}.{formatted_frames}{ext}\n"
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 2: Formatting the Main Sequence Line-What it does"></span><strong id="What it does">What it does</strong>: Constructs the standard file representation line.
+</p>
+
+<p>
+<span id="Analyzing Results-Phase 2: Formatting the Main Sequence Line-In our example"></span><strong id="In our example">In our example</strong>: line becomes <code>"render.0001-0002,0004.exr\n"</code>.
+</p>
+
+<div id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)"><h2 id="Phase 3: Analyzing Missing Frames (The Gaps Check)" class="header"><a href="#Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)">Phase 3: Analyzing Missing Frames (The Gaps Check)</a></h2></div>
+
+<pre python>
+        # Check for missing files if the sequence has more than one frame
+        has_gaps = False
+        missing_report = ""
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: Initializes two variables. <code>has_gaps</code> acts as a toggle switch (set to <code>True</code> if files are missing), and <code>missing_report</code> will hold the red error text if needed.
+</p>
+
+<pre python>
+        if len(frames) &gt; 1:
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: It only looks for missing frames if there is more than one frame in the list. (You can't have a "gap" in a single-frame sequence).
+</p>
+
+<pre python>
+            min_frame = frames[0]
+            max_frame = frames[-1]
+            total_gap = max_frame - min_frame
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: Identifies the first frame, the last frame, and calculates the span between them.
+</p>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-In our example"></span><strong id="In our example">In our example</strong>: <code>min_frame = 1</code>, <code>max_frame = 4</code>. The <code>total_gap</code> is <code>3</code>.
+</p>
+
+<pre python>
+            # -------------------------------------------------------------
+            # SAFETY CHECK: Skip analysis if sequence gap is unrealistic
+            # -------------------------------------------------------------
+            if total_gap &lt;= MAX_ALLOWED_GAP:
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: A safety valve. If there is a massive gap (e.g., someone rendered frame <code>1</code> and frame <code>999,999</code>), calculating the missing frames would freeze the computer. This ensures we only proceed if the gap is reasonable (under 100,000 frames).
+</p>
+
+<pre python>
+                # Use sets to find mathematical differences
+                expected_set = set(range(min_frame, max_frame + 1))
+                present_set = set(frames)
+                missing_set = expected_set - present_set
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: Uses set mathematics to instantly find the missing frames.
+</p>
+<ul>
+<li>
+<code>expected_set</code> = <code>{1, 2, 3, 4}</code> (every number that <em>should</em> exist between 1 and 4).
+
+<li>
+<code>present_set</code> = <code>{1, 2, 4}</code> (the frames we actually have).
+
+<li>
+<code>missing_set</code> subtracts the second from the first, leaving exactly <code>{3}</code>.
+
+</ul>
+  
+<pre python>
+                if missing_set:
+                    has_gaps = True
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: Since we found a missing frame (<code>3</code>), it sets our <code>has_gaps</code> flag to <code>True</code>.
+</p>
+
+<pre python>
+                    missing_list = sorted(list(missing_set))
+                    missing_count = len(missing_list)
+                    formatted_missing = makeMissingFrameList(missing_list, pad)
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: Converts the set of missing frames back into a sorted list, counts them, and uses a helper function to format them into a string.
+</p>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-In our example"></span><strong id="In our example">In our example</strong>: <code>missing_count = 1</code>, <code>formatted_missing = "[0003]"</code>.
+</p>
+
+<pre python>
+                    # Format pluralization and construct the secondary info line
+                    plural_suffix = "s" if missing_count &gt; 1 else ""
+                    missing_report = f"    * missing {missing_count} file{plural_suffix}: {formatted_missing}\n"
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-What it does"></span><strong id="What it does">What it does</strong>: Handles grammar! If only 1 file is missing, it uses "file". If more, it adds an "s" ("files"). It then constructs the indented missing report line.
+</p>
+
+<p>
+<span id="Analyzing Results-Phase 3: Analyzing Missing Frames (The Gaps Check)-In our example"></span><strong id="In our example">In our example</strong>: <code>missing_report</code> becomes <code>"    * missing 1 file: [0003]\n"</code>.
+</p>
+
+<div id="Analyzing Results-Phase 4: Output and Coloring"><h2 id="Phase 4: Output and Coloring" class="header"><a href="#Analyzing Results-Phase 4: Output and Coloring">Phase 4: Output and Coloring</a></h2></div>
+
+<pre python>
+        # Output logic
+        if has_gaps:
+            # Color both the sequence name and its missing file report red
+            outputString += f"{COLOR_RED}{line}{missing_report}{COLOR_RESET}"
+        else:
+            outputString += line
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 4: Output and Coloring-What it does"></span><strong id="What it does">What it does</strong>: If there are gaps, it wraps both the file line and the missing report line inside ANSI color codes (<code>COLOR_RED</code> and <code>COLOR_RESET</code>) and appends them to our master output string. Otherwise, it just appends the clean white line.
+</p>
+
+<div id="Analyzing Results-Phase 5: Displaying the Final Result"><h2 id="Phase 5: Displaying the Final Result" class="header"><a href="#Analyzing Results-Phase 5: Displaying the Final Result">Phase 5: Displaying the Final Result</a></h2></div>
+
+<pre python>
+    # Output final report
+    print(outputString, end="")
+</pre>
+
+<p>
+<span id="Analyzing Results-Phase 5: Displaying the Final Result-What it does"></span><strong id="What it does">What it does</strong>: Once the loop has finished processing every sequence, it prints the entire accumulated report to the screen. Because our strings already end in newlines (<code>\n</code>), <code>end=""</code> prevents <code>print()</code> from adding an extra blank line at the very end.
+</p>
+
 <div id="Defaultdict"><h1 id="Defaultdict" class="header"><a href="#Defaultdict">Defaultdict</a></h1></div>
 
 <p>
-In Python, <code>defaultdict</code> is a highly convenient subclass of the standard dictionary (<code>dict</code>) found in the built-in <code>collections</code> module.
+In Python, <code>defaultdict</code> is a highly convenient subclass of the standard dictionary (<code>dict</code>) found in the built-in <code>collections</code> module:
 </p>
+
+<pre python>
+from collections import defaultdict
+</pre>
 
 <p>
 Its sole purpose is to <span id="Defaultdict-prevent"></span><strong id="prevent">prevent</strong> <code>KeyError</code> <span id="Defaultdict-exceptions"></span><strong id="exceptions">exceptions</strong> by automatically creating a default value whenever you try to access or modify a key that doesn't exist yet.
@@ -696,6 +934,49 @@ counts["apple"] += 1  # Automatically starts at 0, becomes 1
 unique_exts = defaultdict(set)
 unique_exts["render_passes"].add(".exr")
 </pre>
+
+<div id="NG Explanation"><h1 id="NG Explanation" class="header"><a href="#NG Explanation">NG Explanation</a></h1></div>
+
+<p>
+"NG" is not a Python feature or keyword. It is just a plain text string that the programmer who wrote this script chose to look out for.
+</p>
+
+<p>
+In Python, anything inside quotation marks like "NG" is just text. The operator <code>!=</code> means "is not equal to".
+</p>
+
+<p>
+So, this line of code:
+</p>
+
+<pre python>
+if frame_str and frame_str != "NG":
+</pre>
+
+<p>
+...translates to English as:
+</p>
+
+<p>
+<blockquote>
+"If we successfully found a frame number, and that frame number is not the exact text 'NG', then proceed."
+</blockquote>
+</p>
+
+<div id="NG Explanation-Why is &quot;NG&quot; there? (The VFX Context)"><h3 id="Why is &quot;NG&quot; there? (The VFX Context)" class="header"><a href="#NG Explanation-Why is &quot;NG&quot; there? (The VFX Context)">Why is "NG" there? (The VFX Context)</a></h3></div>
+
+<p>
+In the Visual Effects (VFX) and animation industries, "NG" sometimes stands for "No Good".
+</p>
+
+<p>
+When artists render out thousands of frames of an animation, sometimes a specific frame glitches or fails. Instead of deleting it and leaving a gap, or if they want to flag a bad render to their team, they might rename that file or frame to include "NG" (for example, <code>character_render.NG.exr</code>).
+</p>
+
+<p>
+This script add <code>frame_str != "NG"</code> as a safety check. It ensures that if the script encounters a file marked as "No Good", it will ignore it and won't try to turn the letters "NG" into a mathematical frame number (which would cause the script to crash).
+</p>
+
 
 <p>
 <br>
