@@ -1513,7 +1513,246 @@ return len(clean_frame)
 Because of this function, both <code>"-003"</code> and <code>"003"</code> yield a padding value of <code>3</code>, ensuring they are matched together perfectly under the same sequence key!
 </p>
 
+<div id="getExtension(inputString)"><h1 id="getExtension(inputString)" class="header"><a href="#getExtension(inputString)">getExtension(inputString)</a></h1></div>
 
+<p>
+Let’s break down <code>getExtension(inputString)</code> line-by-line, focusing heavily on what that <code>rsplit(".", 1)</code> is doing.
+</p>
+
+<p>
+The goal of this function is to reliably extract a file's extension (like <code>.exr</code> or <code>.mp4</code>) from a full file path, even if the filename contains multiple dots (e.g., <code>shot_010.0001.exr</code>).
+</p>
+
+<div id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)"><h2 id="The Secret of rsplit(&quot;.&quot;, 1)" class="header"><a href="#getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)">The Secret of rsplit(".", 1)</a></h2></div>
+
+<p>
+Python’s standard <code>.split()</code> splits a string from the <span id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-left"></span><strong id="left">left</strong> side. However, <code>.rsplit()</code> splits a string from the <span id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-right"></span><strong id="right">right</strong> side.
+</p>
+
+<p>
+The two arguments mean:
+</p>
+
+<ul>
+<li>
+<code>"."</code>: The delimiter to split on (a dot).
+
+<li>
+<code>1</code>: The <span id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-maximum number of splits"></span><strong id="maximum number of splits">maximum number of splits</strong> allowed to occur.
+
+</ul>
+<p>
+By telling Python to look from the right and only split once, you guarantee that you isolate the very last element after the final dot—which is always the file extension.
+</p>
+
+<div id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-Let's trace an example:"><h3 id="Let's trace an example:" class="header"><a href="#getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-Let's trace an example:">Let's trace an example:</a></h3></div>
+
+<p>
+If <code>inputString</code> is <code>/path/to/render.0001.exr</code>:
+</p>
+<ul>
+<li>
+Without the <code>1</code> limit (<code>rsplit(".")</code>): Python would split on every dot, resulting in: <code>['/path/to/render', '0001', 'exr']</code>.
+
+<li>
+With the <code>1</code> limit (<code>rsplit(".", 1)</code>): Python scans from the right, finds the first dot (the one right before <code>exr</code>), performs exactly one split, and stops. It returns a list with exactly two elements:
+
+</ul>
+  
+<pre python>
+['/path/to/render.0001', 'exr']
+#       ext[0]          ext[1]
+</pre>
+
+<p>
+Line-by-Line Breakdown of the Function
+</p>
+
+<div id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-1. The Split"><h3 id="1. The Split" class="header"><a href="#getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-1. The Split">1. The Split</a></h3></div>
+
+<pre python>
+ext = inputString.rsplit(".", 1)
+</pre>
+
+<ul>
+<li>
+<span id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-1. The Split-What it does"></span><strong id="What it does">What it does</strong>: As shown above, it splits the string once from the right at the final dot. The variable <code>ext</code> now holds a list.
+
+<li>
+If a dot was found, <code>ext</code> will have 2 items: <code>[everything_before, extension]</code>.
+
+<li>
+If no dot was found (e.g., a folder named <code>Downloads</code>), no split happens, and <code>ext</code> will have <span id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-1. The Split-1"></span><strong id="1">1</strong> item: <code>['Downloads']</code>.
+
+</ul>
+<div id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-2. The Conditional Return"><h3 id="2. The Conditional Return" class="header"><a href="#getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-2. The Conditional Return">2. The Conditional Return</a></h3></div>
+
+<pre python>
+return "." + ext[1] if len(ext) &gt; 1 else ""
+</pre>
+
+<p>
+This is a clean Python conditional one-liner. It checks the size of our <code>ext</code> list:
+</p>
+<ul>
+<li>
+Scenario A: A dot <em>was</em> found <code>(len(ext) &gt; 1)</code>
+
+<ul>
+<li>
+If <code>len(ext)</code> is 2, it means an extension exists at index <code>1</code> (<code>ext[1] is "exr"</code>). The function prepends a dot back onto it (<code>"." + "exr"</code>) and returns <code>".exr"</code>.
+
+</ul>
+<li>
+Scenario B: No dot was found (<code>else</code>)
+
+<li>
+If <code>len(ext)</code> is <span id="getExtension(inputString)-The Secret of rsplit(&quot;.&quot;, 1)-2. The Conditional Return-1"></span><strong id="1">1</strong>, it means there is no extension in the path. The function falls back to the <code>else</code> statement and returns an empty string <code>""</code>.
+
+</ul>
+<div id="stringToInt(inputString)"><h1 id="stringToInt(inputString)" class="header"><a href="#stringToInt(inputString)">stringToInt(inputString)</a></h1></div>
+
+<p>
+Let's take a deep dive into <code>stringToInt(inputString)</code>.
+</p>
+
+<p>
+The core job of this function is to turn a frame string (like <code>"0042"</code> or <code>"-0012"</code>) into an actual mathematical integer (<code>42</code> or <code>-12</code>).
+</p>
+
+<p>
+The tricky part of coding this natively in Python is that Python's built-in string checker, <code>.isdigit()</code>, only returns <code>True</code> if a string contains <em>pure numbers</em>. If a string has a minus sign in it (like <code>"-0012"</code>), <code>.isdigit()</code> returns <code>False</code>. This function gets around that limitation by isolating the minus sign, validating the remaining digits, and manually re-applying the negative sign using multiplication.
+</p>
+
+<p>
+Here is the step-by-step breakdown:
+</p>
+
+<div id="stringToInt(inputString)-1. The Empty Check"><h3 id="1. The Empty Check" class="header"><a href="#stringToInt(inputString)-1. The Empty Check">1. The Empty Check</a></h3></div>
+
+<pre python>
+if not inputString:
+    return 0
+</pre>
+
+<ul>
+<li>
+What it does: If the incoming string is empty (<code>""</code>) or <code>None</code>, it immediately short-circuits the function and returns <code>0</code>. This keeps the script from throwing errors later on.
+
+</ul>
+<div id="stringToInt(inputString)-2. Setting Up the &quot;Tweak&quot; and Sign Detection"><h3 id="2. Setting Up the &quot;Tweak&quot; and Sign Detection" class="header"><a href="#stringToInt(inputString)-2. Setting Up the &quot;Tweak&quot; and Sign Detection">2. Setting Up the "Tweak" and Sign Detection</a></h3></div>
+
+<pre python>
+tweakVal = inputString
+if inputString.startswith("-"):
+    multVal = -1
+    tweakVal = inputString[1:]
+else:
+    multVal = 1
+</pre>
+
+<p>
+This is where the magic happens for negative numbers. It sets up two variables: <code>tweakVal</code> (a temporary string we can safely check for digits) and <code>multVal</code> (a mathematical multiplier).
+</p>
+<ul>
+<li>
+If the string is negative (e.g., <code>"-0012"</code>):
+
+<ul>
+<li>
+It detects the starting <code>"-"</code>.
+
+<li>
+It sets <code>multVal = -1</code>.
+
+<li>
+It sets <code>tweakVal = inputString[1:]</code>, which strips off the minus sign. If the input was <code>"-0012"</code>, <code>tweakVal</code> becomes <code>"0012"</code>.
+
+</ul>
+<li>
+If the string is positive (e.g., <code>"0042"</code>):
+
+<ul>
+<li>
+It skips to the <code>else</code> block.
+
+<li>
+It sets <code>multVal = 1</code>.
+
+<li>
+<code>tweakVal</code> remains unchanged as <code>"0042"</code>.
+
+</ul>
+</ul>
+<div id="stringToInt(inputString)-3. Validation and Conversion"><h3 id="3. Validation and Conversion" class="header"><a href="#stringToInt(inputString)-3. Validation and Conversion">3. Validation and Conversion</a></h3></div>
+
+<pre python>
+if not tweakVal.isdigit():
+    print(f"Error: {tweakVal} is a non-numeric frame value.", file=sys.stderr)
+    return 0
+else:
+    return int(tweakVal) * multVal
+</pre>
+
+<p>
+Now that the minus sign has been temporarily stripped away, <code>tweakVal</code> is a clean string of numbers.
+</p>
+<ul>
+<li>
+The if block (Error Handling):
+
+<ul>
+<li>
+If <code>tweakVal</code> still contains non-numeric characters (like <code>"00a2"</code> or <code>"NG"</code>), <code>.isdigit()</code> fails. The function prints an error message to the system's error stream (<code>sys.stderr</code>) and returns <code>0</code>.
+
+</ul>
+<li>
+The else block (The Conversion):
+
+<ul>
+<li>
+If <code>tweakVal</code> is purely numbers, it runs:
+
+<ul>
+<li>
+<code>int(tweakVal)</code>: Converts the cleaned string to a positive integer. Python automatically discards leading zeros here (e.g., <code>"0012"</code> becomes <code>12</code>).
+
+<li>
+<code>multVal</code>: Multiplies that integer by our saved multiplier (<code>1</code> or <code>-1</code>).
+
+</ul>
+</ul>
+</ul>
+<div id="stringToInt(inputString)-3. Validation and Conversion-Let's Trace Two Quick Examples"><h4 id="Let's Trace Two Quick Examples" class="header"><a href="#stringToInt(inputString)-3. Validation and Conversion-Let's Trace Two Quick Examples">Let's Trace Two Quick Examples</a></h4></div>
+
+<p>
+Example A: <code>inputString = "-0012"</code>
+</p>
+<ul>
+<li>
+<code>startswith("-")</code> is True → <code>multVal = -1</code> and <code>tweakVal = "0012"</code>.
+
+<li>
+<code>"0012".isdigit()</code> is True → jumps to the <code>else</code> block.
+
+<li>
+Math: <code>int("0012") * -1 → 12 * -1</code> → Returns <code>-12</code>.
+
+</ul>
+<p>
+Example B: <code>inputString = "0042"</code>
+</p>
+<ul>
+<li>
+<code>startswith("-")</code> is False → <code>multVal = 1</code> and <code>tweakVal = "0042"</code>.
+
+<li>
+<code>"0042".isdigit()</code> is True → jumps to the <code>else</code> block.
+
+<li>
+Math: <code>int("0042") * 1</code> → <code>42</code>
+
+</ul>
 <div id="Defaultdict"><h1 id="Defaultdict" class="header"><a href="#Defaultdict">Defaultdict</a></h1></div>
 
 <p>
