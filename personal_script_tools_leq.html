@@ -1893,20 +1893,153 @@ Reset: Set <code>start = 105</code> and <code>prev = 105</code> to begin trackin
 
 </ul>
 </ul>
-<div id="makeFrameList(inputList, pad)-Trace Example-Handling the Final Segment"><h4 id="Handling the Final Segment" class="header"><a href="#makeFrameList(inputList, pad)-Trace Example-Handling the Final Segment">Handling the Final Segment</a></h4></div>
+<div id="makeFrameList(inputList, pad)-Slower Read Through"><h3 id="Slower Read Through" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through">Slower Read Through</a></h3></div>
+
+<p>
+Let’s slow this down and look at what the code is doing mechanically behind the scenes.
+</p>
+
+<p>
+The main goal of this loop is to act like a human scanning a list of numbers, looking for contiguous runs (where each number is exactly 1 higher than the last) so it can compress them into a bracketed range like <code>[0101-0103]</code>.
+</p>
+
+<p>
+To track these runs, the script uses two pointer variables that remember what happened in the past:
+</p>
+<ul>
+<li>
+<code>start</code>: The number where our current run began.
+
+<li>
+<code>prev</code>: The most recent number we looked at that was successfully part of the run.
+
+</ul>
+<div id="makeFrameList(inputList, pad)-Slower Read Through-The Setup before the Loop"><h4 id="The Setup before the Loop" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through-The Setup before the Loop">The Setup before the Loop</a></h4></div>
+
+<p>
+We are handed the sorted list <code>[101, 102, 103, 105]</code>.
+</p>
+
+<p>
+Before entering the loop, the code looks at the very first item (index <code>0</code>), which is <code>101</code>:
+</p>
+
+<ul>
+<li>
+<code>start = 101</code>
+
+<li>
+<code>prev = 101</code>
+
+</ul>
+<p>
+Now the loop begins, intentionally skipping index 0 and iterating through the remaining items: <code>[102, 103, 105]</code>.
+</p>
+
+<div id="makeFrameList(inputList, pad)-Slower Read Through-Step-by-Step Loop Execution"><h4 id="Step-by-Step Loop Execution" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through-Step-by-Step Loop Execution">Step-by-Step Loop Execution</a></h4></div>
+
+<p>
+Iteration 1: <code>val = 102</code>
+</p>
+<ul>
+<li>
+The Code Asks: Is the current value (<code>102</code>) exactly one step ahead of the previous value (<code>prev + 1</code>, which is <code>101 + 1 = 102</code>)?
+
+<li>
+The Answer: Yes! They are consecutive.
+
+<li>
+The Action: The run is still intact. We update <code>prev = 102</code>. (Notice <code>start</code> stays at <code>101</code>, because that's still where this run began).
+
+</ul>
+<p>
+Iteration 2: <code>val = 103</code>
+</p>
+<ul>
+<li>
+The Code Asks: Is <code>103 == prev + 1</code> (where <code>prev</code> is now <code>102</code>)? Is <code>103 == 102 + 1</code>?
+
+<li>
+The Answer: Yes! Still consecutive.
+
+<li>
+The Action: The run continues. We update <code>prev = 103</code> (<code>start</code> is still <code>101</code>).
+
+</ul>
+<p>
+Iteration 3: <code>val = 105</code>
+</p>
+<ul>
+<li>
+The Code Asks: Is <code>105 == prev + 1</code> (where <code>prev</code> is <code>103</code>)? Is <code>105 == 103 + 1</code>?
+
+<li>
+The Answer: No! <code>104</code> is missing. The consecutive chain is completely broken.
+
+<li>
+The Action: Because the chain broke, we have to "lock in" and save the run we just finished tracking (<code>101</code> through <code>103</code>) before we start tracking a new one.
+
+</ul>
+<div id="makeFrameList(inputList, pad)-Slower Read Through-Processing the Broken Chain (else block)"><h4 id="Processing the Broken Chain (else block)" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through-Processing the Broken Chain (else block)">Processing the Broken Chain (else block)</a></h4></div>
+
+<p>
+Once the chain breaks at <code>105</code>, the code runs its inner check to figure out <em>how</em> to save the finished run:
+</p>
+
+<pre python>
+if start == prev:
+</pre>
+
+<ul>
+<li>
+Why does it check this? If <code>start</code> and <code>prev</code> are the same number, it means the run only lasted for a single, isolated frame (e.g., if we had just a lonely frame <code>101</code> followed by a gap). In that case, it wouldn't make sense to write <code>[0101-0101]</code>, it should just write <code>0101</code>.
+
+<li>
+Our current situation: <code>start</code> is <code>101</code> and <code>prev</code> is <code>103</code>. They are not equal.
+
+<li>
+The Result: The <code>else</code> section triggers. This tells the script: <em>"We successfully tracked a multi-frame range starting at 101 and ending at 103."</em>
+
+<li>
+Saving the Range: It formats these two numbers and pushes <code>"[0101-0103]"</code> into the <code>segments</code> list.
+
+</ul>
+<div id="makeFrameList(inputList, pad)-Slower Read Through-The Reset"><h4 id="The Reset" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through-The Reset">The Reset</a></h4></div>
+
+<p>
+Now that the old run is safely recorded, the script needs to start fresh and begin tracking a brand new run, using the current number (<code>105</code>) as the foundation.
+</p>
+
+<pre python>
+start = val  # start becomes 105
+prev = val   # prev becomes 105
+</pre>
+
+<p>
+Now, <code>105</code> is officially marked as the <code>start</code>
+</p>
+
+<div id="makeFrameList(inputList, pad)-Slower Read Through-Jump to format_single_frame:"><h4 id="Jump to format_single_frame:" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through-Jump to format_single_frame:">Jump to format_single_frame:</a></h4></div>
+
+<ul>
+<li>
+<a href="personal_script_tools_leq.html#format_single_frame(val, pad)">format_single_frame(val, pad)</a>
+
+</ul>
+<div id="makeFrameList(inputList, pad)-Slower Read Through-Handling the Final Segment"><h4 id="Handling the Final Segment" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through-Handling the Final Segment">Handling the Final Segment</a></h4></div>
 
 <p>
 The loop ends, but the number <code>105</code> hasn't been added yet! The code outside the loop cleans this up:
 </p>
 <ul>
 <li>
-Does <code>start == prev? (105 == 105)</code>. <span id="makeFrameList(inputList, pad)-Trace Example-Handling the Final Segment-Yes"></span><strong id="Yes">Yes</strong>. It's a single isolated frame.
+Does <code>start == prev? (105 == 105)</code>. <span id="makeFrameList(inputList, pad)-Slower Read Through-Handling the Final Segment-Yes"></span><strong id="Yes">Yes</strong>. It's a single isolated frame.
 
 <li>
 Action: <code>segments.append("0105")</code>
 
 </ul>
-<div id="makeFrameList(inputList, pad)-Trace Example-The Return Statement"><h4 id="The Return Statement" class="header"><a href="#makeFrameList(inputList, pad)-Trace Example-The Return Statement">The Return Statement</a></h4></div>
+<div id="makeFrameList(inputList, pad)-Slower Read Through-The Return Statement"><h4 id="The Return Statement" class="header"><a href="#makeFrameList(inputList, pad)-Slower Read Through-The Return Statement">The Return Statement</a></h4></div>
 
 <pre python>
 return ",".join(segments)
@@ -1949,6 +2082,183 @@ This evaluates to the final string layout:
 <pre text>
 my-shot.[0101-0103],0105.exr\n
 </pre>
+
+<div id="format_single_frame(val, pad)"><h1 id="format_single_frame(val, pad)" class="header"><a href="#format_single_frame(val, pad)">format_single_frame(val, pad)</a></h1></div>
+
+<pre python>
+def format_single_frame(val, pad):
+    """
+    Formats a single frame number, preserving its absolute padding and wrapping
+    negative numbers in parentheses.
+    """
+    if val &lt; 0:
+        # Wrap negative numbers in parentheses, e.g., (-003)
+        padded_digits = str(abs(val)).zfill(pad)
+        return f"(-{padded_digits})"
+    else:
+        # Standard positive padding, e.g., 002
+        return str(val).zfill(pad)
+</pre>
+
+<p>
+The <code>format_single_frame(val, pad)</code> function is a utility helper used throughout the script (by both <code>makeFrameList</code> and <code>makeMissingFrameList</code>). Its job is to turn a raw integer frame number into a string that matches standard VFX padding conventions, while handling negative frame numbers elegantly.
+</p>
+
+<p>
+Here is the line-by-line breakdown of how it works:
+</p>
+
+<div id="format_single_frame(val, pad)-1. The Conditional Branch (if/else)"><h3 id="1. The Conditional Branch (if/else)" class="header"><a href="#format_single_frame(val, pad)-1. The Conditional Branch (if/else)">1. The Conditional Branch (if/else)</a></h3></div>
+
+<p>
+{{python
+if val &lt; 0:
+}}}
+</p>
+
+<p>
+The function splits its logic right away based on whether the frame number is negative or positive/zero.
+</p>
+
+<p>
+VFX sequences occasionally use negative frames (e.g., for pre-roll or head trims). However, text formatting tools like Python's <code>.zfill()</code> handle negative signs poorly if you want strict digit padding. This branch ensures negative numbers are formatted predictably.
+</p>
+
+<div id="format_single_frame(val, pad)-2. The Negative Frame Logic"><h3 id="2. The Negative Frame Logic" class="header"><a href="#format_single_frame(val, pad)-2. The Negative Frame Logic">2. The Negative Frame Logic</a></h3></div>
+
+<pre python>
+padded_digits = str(abs(val)).zfill(pad)
+return f"(-{padded_digits})"
+</pre>
+
+<p>
+If we pass <code>val = -3</code> and <code>pad = 4</code> to this function:
+</p>
+<ul>
+<li>
+<code>abs(val)</code>: Takes the absolute value of the number, stripping the minus sign (<code>-3</code> becomes <code>3</code>).
+
+<li>
+<code>str(...)</code>: Converts the integer <code>3</code> into the string <code>"3"</code>.
+
+<li>
+<code>.zfill(pad)</code>: Pads the string with leading zeros until it matches the <code>pad</code> width. <code>"3".zfill(4)</code> results in <code>"0003"</code>.
+
+<li>
+<code>f"(-{padded_digits})"</code>: Wraps the padded string back up with a negative sign and puts it inside parentheses.
+
+</ul>
+<p>
+Result for <code>-3</code> (pad 4): <code>"(-0003)"</code>
+</p>
+
+<div id="format_single_frame(val, pad)-2. The Negative Frame Logic-Why the parentheses?"><h4 id="Why the parentheses?" class="header"><a href="#format_single_frame(val, pad)-2. The Negative Frame Logic-Why the parentheses?">Why the parentheses?</a></h4></div>
+
+<p>
+Without the parentheses, a negative range inside brackets might look like [-0003--0001], which is highly confusing to read. Wrapping them makes it crystal clear: [(-0003)-(-0001)].
+</p>
+
+<div id="format_single_frame(val, pad)-3. The Positive Frame Logic"><h3 id="3. The Positive Frame Logic" class="header"><a href="#format_single_frame(val, pad)-3. The Positive Frame Logic">3. The Positive Frame Logic</a></h3></div>
+
+<pre python>
+else:
+    return str(val).zfill(pad)
+</pre>
+
+<p>
+If the frame number is 0 or positive, the code bypasses the complex wrapping logic completely.
+</p>
+
+<p>
+If we pass <code>val = 45</code> and <code>pad = 4</code>:
+</p>
+
+<ul>
+<li>
+<code>str(val)</code>: Converts the integer <code>45</code> into the string <code>"45"</code>.
+
+<li>
+<code>.zfill(pad)</code>: Pads it with leading zeros until it is 4 characters wide.
+
+</ul>
+<p>
+Result for 45 (pad 4): "0045"
+</p>
+
+<div id="format_single_frame(val, pad)-3. The Positive Frame Logic-Summary Table of Examples"><h4 id="Summary Table of Examples" class="header"><a href="#format_single_frame(val, pad)-3. The Positive Frame Logic-Summary Table of Examples">Summary Table of Examples</a></h4></div>
+
+<table>
+<tr>
+<td>
+Input Value (val)
+</td>
+<td>
+Padding Width (pad)
+</td>
+<td>
+Execution Path
+</td>
+<td>
+Output String
+</td>
+</tr>
+<tr>
+<td>
+1
+</td>
+<td>
+4
+</td>
+<td>
+else block
+</td>
+<td>
+"0001"
+</td>
+</tr>
+<tr>
+<td>
+1024
+</td>
+<td>
+4
+</td>
+<td>
+else block
+</td>
+<td>
+"1024"
+</td>
+</tr>
+<tr>
+<td>
+-5
+</td>
+<td>
+3
+</td>
+<td>
+if block
+</td>
+<td>
+"(-005)"
+</td>
+</tr>
+<tr>
+<td>
+0
+</td>
+<td>
+2
+</td>
+<td>
+else block
+</td>
+<td>
+"00"
+</td>
+</tr>
+</table>
 
 <div id="The Main Function (After the Function calls)"><h1 id="The Main Function (After the Function calls)" class="header"><a href="#The Main Function (After the Function calls)">The Main Function (After the Function calls)</a></h1></div>
 
@@ -2032,7 +2342,7 @@ Tuple Unpacking: In each iteration of the loop, Python splits the key directly i
    
 <pre text>
 ("my-shot", 4, ".exr"), [102, 101, 103, 105]
-    |   |   |                  I 
+    I       I     I             I 
 (  stem    pad   ext ), [   frames list    ]
 </pre>
 
