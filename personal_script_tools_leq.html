@@ -1784,6 +1784,99 @@ Example B: <code>inputString = "0042"</code>
 Math: <code>int("0042") * 1</code> → <code>42</code>
 
 </ul>
+<div id="The Main Function (After the Function calls)"><h1 id="The Main Function (After the Function calls)" class="header"><a href="#The Main Function (After the Function calls)">The Main Function (After the Function calls)</a></h1></div>
+
+<div id="The Main Function (After the Function calls)-Step 1: The Empty Check Guard"><h3 id="Step 1: The Empty Check Guard" class="header"><a href="#The Main Function (After the Function calls)-Step 1: The Empty Check Guard">Step 1: The Empty Check Guard</a></h3></div>
+
+<pre python>
+if not sequences:
+    print(f"Warning: No valid sequential files found in '{testPath}'", file=sys.stderr)
+    sys.exit(0)
+</pre>
+
+<p>
+Earlier in <code>main()</code>, the script looks for files with extensions. However, if a directory only contains files without frame numbers (like <code>README.txt</code> or <code>script.py</code>), the sequences dictionary will be empty. This block detects that, prints a helpful warning to the standard error stream, and gracefully exits.
+</p>
+
+<div id="The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting"><h3 id="Step 2: Iteration and Initial Formatting" class="header"><a href="#The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting">Step 2: Iteration and Initial Formatting</a></h3></div>
+
+<pre python>
+for (stem, pad, ext), frames in sorted(sequences.items()):
+    frames.sort()
+    formatted_frames = makeFrameList(frames, pad)
+    line = f"{stem}.{formatted_frames}{ext}\n"
+</pre>
+
+<ul>
+<li>
+Sorting the Sequences: <code>sorted(sequences.items())</code> ensures that your sequences are processed alphabetically by their signature: <code>(stem, pad, ext)</code>.
+
+<li>
+Sorting the Frames: The list of integer frames is sorted from lowest to highest so they can be grouped chronologically.
+
+<li>
+Creating the Base Line: It calls <code>makeFrameList</code> to compress a list like <code>[1, 2, 3, 5]</code> into <code>"[0001-0003],0005"</code>. This creates a standard line text for the file sequence.
+
+</ul>
+<div id="The Main Function (After the Function calls)-Step 3: Missing File Analysis &amp; The Safety Valve"><h3 id="Step 3: Missing File Analysis &amp; The Safety Valve" class="header"><a href="#The Main Function (After the Function calls)-Step 3: Missing File Analysis &amp; The Safety Valve">Step 3: Missing File Analysis &amp; The Safety Valve</a></h3></div>
+
+<p>
+If a sequence contains only 1 frame, it's impossible to have a "gap." If it has more than one, the script calculates <code>total_gap = max_frame - min_frame</code>.
+</p>
+
+<pre python>
+if total_gap &lt;= MAX_ALLOWED_GAP:
+    expected_set = set(range(min_frame, max_frame + 1))
+    present_set = set(frames)
+    missing_set = expected_set - present_set
+</pre>
+
+<p>
+The Safety Check: If someone accidentally names two files <code>render.0001.exr</code> and <code>render.9999999.exr</code>, trying to generate a list of 10 million numbers will freeze or crash Python due to memory exhaustion. If the gap is larger than 100000, the script bypasses analysis.
+</p>
+<ul>
+<li>
+Set Subtraction: Using Python sets makes finding missing frames incredibly fast and clean. It generates a <code>set</code> of every number that <em>should</em> exist between the minimum and maximum frame, and subtracts the <code>set</code> of frames actually present in the folder.
+
+</ul>
+<div id="The Main Function (After the Function calls)-Step 4: Formatting the Missing Frame Report"><h3 id="Step 4: Formatting the Missing Frame Report" class="header"><a href="#The Main Function (After the Function calls)-Step 4: Formatting the Missing Frame Report">Step 4: Formatting the Missing Frame Report</a></h3></div>
+
+<pre python>
+if missing_set:
+    has_gaps = True
+    missing_list = sorted(list(missing_set))
+    missing_count = len(missing_list)
+    formatted_missing = makeMissingFrameList(missing_list, pad)
+    
+    plural_suffix = "s" if missing_count &gt; 1 else ""
+    missing_report = f"    * missing {missing_count} file{plural_suffix}: {formatted_missing}\n"
+</pre>
+
+<p>
+If <code>missing_set</code> contains anything, a flag (<code>has_gaps</code>) is set to <code>True</code>. The missing frame integers are sorted, formatted via <code>makeMissingFrameList</code> (which wraps all missing blocks in square brackets), and structured into an indented text block (<code>missing_report</code>). It also checks the count to dynamically handle pluralization (e.g., <code>file</code> vs <code>files</code>).
+</p>
+
+<div id="The Main Function (After the Function calls)-Step 5: Color Coding &amp; Output Aggregation"><h3 id="Step 5: Color Coding &amp; Output Aggregation" class="header"><a href="#The Main Function (After the Function calls)-Step 5: Color Coding &amp; Output Aggregation">Step 5: Color Coding &amp; Output Aggregation</a></h3></div>
+
+<pre python>
+if has_gaps:
+    outputString += f"{COLOR_RED}{line}{missing_report}{COLOR_RESET}"
+else:
+    outputString += line
+</pre>
+
+<ul>
+<li>
+If the sequence has missing frames, the text block is wrapped in ANSI escape codes (<code>COLOR_RED</code> and <code>COLOR_RESET</code>), turning the entire sequence printout red in the terminal to immediately alert the user.
+
+<li>
+If it is healthy, it is appended normally with no color modification.
+
+</ul>
+<p>
+Finally, after looping through every sequence in the directory, <code>print(outputString, end="")</code> sends the complete summary to the terminal window at once.
+</p>
+
 <div id="Defaultdict"><h1 id="Defaultdict" class="header"><a href="#Defaultdict">Defaultdict</a></h1></div>
 
 <p>
