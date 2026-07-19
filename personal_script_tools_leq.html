@@ -1784,6 +1784,172 @@ Example B: <code>inputString = "0042"</code>
 Math: <code>int("0042") * 1</code> → <code>42</code>
 
 </ul>
+<div id="makeFrameList(inputList, pad)"><h1 id="makeFrameList(inputList, pad)" class="header"><a href="#makeFrameList(inputList, pad)">makeFrameList(inputList, pad)</a></h1></div>
+
+<pre python>
+def makeFrameList(inputList, pad):
+    """
+    Takes a sorted list of integer frame numbers and aggregates them into a
+    compact string, grouping consecutive runs inside square brackets.
+    """
+    if not inputList:
+        return ""
+    if len(inputList) == 1:
+        return format_single_frame(inputList[0], pad)
+
+    segments = []
+    start = inputList[0]
+    prev = inputList[0]
+
+    for val in inputList[1:]:
+        if val == prev + 1:
+            prev = val
+        else:
+            if start == prev:
+                segments.append(format_single_frame(start, pad))
+            else:
+                segments.append(f"[{format_single_frame(start, pad)}-{format_single_frame(prev, pad)}]")
+            start = val
+            prev = val
+
+    # Handle final segment
+    if start == prev:
+        segments.append(format_single_frame(start, pad))
+    else:
+        segments.append(f"[{format_single_frame(start, pad)}-{format_single_frame(prev, pad)}]")
+
+    return ",".join(segments)
+</pre>
+
+<p>
+This function uses a <span id="makeFrameList(inputList, pad)-single-pass grouping algorithm"></span><strong id="single-pass grouping algorithm">single-pass grouping algorithm</strong> (often called a "two-pointer" or "clipping" approach) to find contiguous runs of numbers.
+</p>
+
+<div id="makeFrameList(inputList, pad)-Trace Example"><h3 id="Trace Example" class="header"><a href="#makeFrameList(inputList, pad)-Trace Example">Trace Example</a></h3></div>
+
+<p>
+Let's trace this function using the sorted list <code>[101, 102, 103, 105]</code> with a padding (<code>pad</code>) of 4.
+</p>
+
+<div id="makeFrameList(inputList, pad)-Trace Example-Initial Setup"><h4 id="Initial Setup" class="header"><a href="#makeFrameList(inputList, pad)-Trace Example-Initial Setup">Initial Setup</a></h4></div>
+
+<ul>
+<li>
+<code>segments = []</code> (An empty list where we will deposit our final string segments).
+
+<li>
+<code>start = 101</code> (Tracks where the current continuous block began).
+
+<li>
+<code>prev = 101</code> (Tracks the last number we successfully verified as sequential).
+
+</ul>
+<div id="makeFrameList(inputList, pad)-Trace Example-The Loop (for val in inputList[1:])"><h4 id="The Loop (for val in inputList[1:])" class="header"><a href="#makeFrameList(inputList, pad)-Trace Example-The Loop (for val in inputList[1:])">The Loop (for val in inputList[1:])</a></h4></div>
+
+<p>
+We start iterating from index 1 (the number <code>102</code>):
+</p>
+<ul>
+<li>
+<code>val = 102</code>:
+
+<ul>
+<li>
+Is <code>102 == 101 + 1</code>? <span id="makeFrameList(inputList, pad)-Trace Example-The Loop (for val in inputList[1:])-Yes"></span><strong id="Yes">Yes</strong>.
+
+<li>
+Update <code>prev = 102</code>. (Our run is alive).
+
+</ul>
+<li>
+<code>val = 103</code>:
+
+<ul>
+<li>
+Is <code>103 == 102 + 1</code>? <span id="makeFrameList(inputList, pad)-Trace Example-The Loop (for val in inputList[1:])-Yes"></span><strong id="Yes">Yes</strong>.
+
+<li>
+Update <code>prev = 103</code>. (Our run is still alive).
+
+</ul>
+<li>
+<code>val = 105</code>:
+
+<ul>
+<li>
+Is <code>105 == 103 + 1</code>? <span id="makeFrameList(inputList, pad)-Trace Example-The Loop (for val in inputList[1:])-No"></span><strong id="No">No</strong>! The sequence broke. We must commit the old block to <code>segments</code>.
+
+<li>
+The Inner Check (<code>if start == prev</code>): Does <code>101 == 103</code>? <span id="makeFrameList(inputList, pad)-Trace Example-The Loop (for val in inputList[1:])-No"></span><strong id="No">No</strong>. This means we have a multi-frame range.
+
+<li>
+Action: Format the range using <code>format_single_frame</code> and append it to our list.
+
+<li>
+<code>segments.append("[0101-0103]")</code>
+
+<li>
+Reset: Set <code>start = 105</code> and <code>prev = 105</code> to begin tracking the next potential sequence block.
+
+</ul>
+</ul>
+<div id="makeFrameList(inputList, pad)-Trace Example-Handling the Final Segment"><h4 id="Handling the Final Segment" class="header"><a href="#makeFrameList(inputList, pad)-Trace Example-Handling the Final Segment">Handling the Final Segment</a></h4></div>
+
+<p>
+The loop ends, but the number <code>105</code> hasn't been added yet! The code outside the loop cleans this up:
+</p>
+<ul>
+<li>
+Does <code>start == prev? (105 == 105)</code>. <span id="makeFrameList(inputList, pad)-Trace Example-Handling the Final Segment-Yes"></span><strong id="Yes">Yes</strong>. It's a single isolated frame.
+
+<li>
+Action: <code>segments.append("0105")</code>
+
+</ul>
+<div id="makeFrameList(inputList, pad)-Trace Example-The Return Statement"><h4 id="The Return Statement" class="header"><a href="#makeFrameList(inputList, pad)-Trace Example-The Return Statement">The Return Statement</a></h4></div>
+
+<pre python>
+return ",".join(segments)
+</pre>
+
+<p>
+<code>segments</code> now looks like: <code>["[0101-0103]", "0105"]</code>.
+</p>
+
+<p>
+The <code>.join()</code> method glues them together with a comma, returning the string:
+</p>
+
+<p>
+<code>"[0101-0103],0105"</code>
+</p>
+
+<div id="makeFrameList(inputList, pad)-Creating the String Line"><h3 id="Creating the String Line" class="header"><a href="#makeFrameList(inputList, pad)-Creating the String Line">Creating the String Line</a></h3></div>
+
+<p>
+Back in the <code>main()</code> loop, the function finishes by taking that string and plugging it into an f-string:
+</p>
+
+<pre python>
+line = f"{stem}.{formatted_frames}{ext}\n"
+</pre>
+
+<p>
+Substituting our variables:
+</p>
+
+<pre python>
+line = f"my-shot.{'[0101-0103],0105'}.exr\n"
+</pre>
+
+<p>
+This evaluates to the final string layout:
+</p>
+
+<pre text>
+my-shot.[0101-0103],0105.exr\n
+</pre>
+
 <div id="The Main Function (After the Function calls)"><h1 id="The Main Function (After the Function calls)" class="header"><a href="#The Main Function (After the Function calls)">The Main Function (After the Function calls)</a></h1></div>
 
 <div id="The Main Function (After the Function calls)-Step 1: The Empty Check Guard"><h3 id="Step 1: The Empty Check Guard" class="header"><a href="#The Main Function (After the Function calls)-Step 1: The Empty Check Guard">Step 1: The Empty Check Guard</a></h3></div>
@@ -1818,6 +1984,58 @@ Sorting the Frames: The list of integer frames is sorted from lowest to highest 
 Creating the Base Line: It calls <code>makeFrameList</code> to compress a list like <code>[1, 2, 3, 5]</code> into <code>"[0001-0003],0005"</code>. This creates a standard line text for the file sequence.
 
 </ul>
+  
+<div id="The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Jump to Function Breakdown"><h4 id="Jump to Function Breakdown" class="header"><a href="#The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Jump to Function Breakdown">Jump to Function Breakdown</a></h4></div>
+
+<ul>
+<li>
+<a href="personal_script_tools_leq.html#makeFrameList(inputList, pad)">makeFrameList(inputList, pad)</a>
+
+</ul>
+<div id="The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Expanding the Loop Mechanics"><h4 id="Expanding the Loop Mechanics" class="header"><a href="#The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Expanding the Loop Mechanics">Expanding the Loop Mechanics</a></h4></div>
+
+<p>
+The dictionary <code>sequences</code> stores data where the <span id="The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Expanding the Loop Mechanics-Key"></span><strong id="Key">Key</strong> is a tuple containing the file signature, and the <span id="The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Expanding the Loop Mechanics-Value"></span><strong id="Value">Value</strong> is a list of integers representing the frame numbers found:
+</p>
+<ul>
+<li>
+Key: <code>("my-shot", 4, ".exr")</code>
+
+<li>
+Value: <code>[102, 101, 103, 105]</code>
+
+</ul>
+<p>
+When Python executes this line:
+</p>
+
+<pre python>
+for (stem, pad, ext), frames in sorted(sequences.items()):
+</pre>
+
+<div id="The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Unpacking and Sorting"><h4 id="Unpacking and Sorting" class="header"><a href="#The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Unpacking and Sorting">Unpacking and Sorting</a></h4></div>
+
+<ul>
+<li>
+<code>.items()</code>: Converts the dictionary into a list of tuples: <code>[((stem, pad, ext), [frames]), ...]</code>.
+
+<li>
+<code>sorted(...)</code>: Sorts these items alphabetically by the tuple keys. It first sorts by <code>stem</code>. If stems match, it sorts by <code>pad</code>. If pads match, it sorts by <code>ext</code>. This ensures the terminal output is perfectly organized.
+
+<li>
+Tuple Unpacking: In each iteration of the loop, Python splits the key directly into three separate variables (<code>stem</code>, <code>pad</code>, <code>ext</code>) and assigns the value list to <code>frames</code>.
+
+</ul>
+<div id="The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Sorting the Frames"><h4 id="Sorting the Frames" class="header"><a href="#The Main Function (After the Function calls)-Step 2: Iteration and Initial Formatting-Sorting the Frames">Sorting the Frames</a></h4></div>
+
+<pre python>
+frames.sort()
+</pre>
+
+<p>
+Files are read by the operating system in arbitrary order. If <code>frames</code> is <code>[102, 101, 103, 105]</code>, <code>.sort()</code> rearranges them in-place to <code>[101, 102, 103, 105]</code>. This chronological order is mandatory for the tracking logic inside <code>makeFrameList</code>.
+</p>
+
 <div id="The Main Function (After the Function calls)-Step 3: Missing File Analysis &amp; The Safety Valve"><h3 id="Step 3: Missing File Analysis &amp; The Safety Valve" class="header"><a href="#The Main Function (After the Function calls)-Step 3: Missing File Analysis &amp; The Safety Valve">Step 3: Missing File Analysis &amp; The Safety Valve</a></h3></div>
 
 <p>
