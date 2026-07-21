@@ -634,6 +634,37 @@ This updated version is 'better' as it checks the location (the dotfiles repo):
 <span id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Why this is better:-Clean Exit"></span><strong id="Clean Exit">Clean Exit</strong>: If any single rebase or merge fails, the script uses return 1 to halt immediately, leaving you exactly where the error occurred so you can fix it. 
 
 </ul>
+<div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Git Alias - UPDATED UPDATED VERSION - Another Improvement"><h4 id="Git Alias - UPDATED UPDATED VERSION - Another Improvement" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Git Alias - UPDATED UPDATED VERSION - Another Improvement">Git Alias - UPDATED UPDATED VERSION - Another Improvement</a></h4></div>
+
+<p>
+This is a hybrid of the last version and the example below (for function illustration).
+</p>
+
+<pre ini>
+[alias]
+    sync-dots = "!f() { \
+        DIR=\"$HOME/dotfiles\"; \
+        MAIN='main'; \
+        MACHINES=('macbook-m3' 'macmini' 'macbook-intel'); \
+        if [ ! -d \"$DIR\" ]; then echo \"Folder $DIR not found\"; return 1; fi; \
+        REPO=$(basename \"$(git -C \"$DIR\" rev-parse --show-toplevel 2&gt;/dev/null)\"); \
+        if [ \"$REPO\" != 'dotfiles' ]; then echo 'Not a dotfiles repo'; return 1; fi; \
+        START=$(git -C \"$DIR\" branch --show-current); \
+        if ! git -C \"$DIR\" diff-index --quiet HEAD --; then echo 'ERROR: Uncommitted changes found. Commit or stash first.'; return 1; fi; \
+        echo \"Syncing dotfiles from $DIR...\"; \
+        git -C \"$DIR\" checkout $MAIN &amp;&amp; git -C \"$DIR\" pull origin $MAIN || { echo 'Failed to pull main'; return 1; }; \
+        if [ \"$START\" != \"$MAIN\" ]; then \
+            git -C \"$DIR\" merge \"$START\" &amp;&amp; git -C \"$DIR\" push origin $MAIN || { echo 'Failed to merge current branch into main'; return 1; }; \
+        fi; \
+        for br in \"${MACHINES[@]}\"; do \
+            echo \"Updating $br...\"; \
+            git -C \"$DIR\" checkout $br &amp;&amp; git -C \"$DIR\" rebase $MAIN &amp;&amp; git -C \"$DIR\" push --force-with-lease || { echo \"Rebase failed on $br\"; return 1; }; \
+        done; \
+        git -C \"$DIR\" checkout $START; \
+        echo '--- Dotfiles Sync Complete ---'; \
+    }; f"
+</pre>
+
 <div id="Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Pro-Tip: Add a Git Alias"><h4 id="Pro-Tip: Add a Git Alias" class="header"><a href="#Git - Dotfiles Workflow Exploration-Automate-Dotfile Sync Script-Pro-Tip: Add a Git Alias">Pro-Tip: Add a Git Alias</a></h4></div>
 
 <p>
@@ -647,6 +678,14 @@ To add a multi-line script as a Git alias, you wrap the entire script in a shell
 </p>
 
 <div id="Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 1: The &quot;Function Wrap&quot; (Direct in .gitconfig)"><h3 id="Method 1: The &quot;Function Wrap&quot; (Direct in .gitconfig)" class="header"><a href="#Git - Dotfiles Workflow Exploration-Git Alias Addition-Method 1: The &quot;Function Wrap&quot; (Direct in .gitconfig)">Method 1: The "Function Wrap" (Direct in .gitconfig)</a></h3></div>
+
+<table>
+<tr>
+<td>
+Use the alias scripts shown above - they can be run from anywhere. The following example runs only on the pwd/repo.
+</td>
+</tr>
+</table>
 
 <p>
 Open your ~/.gitconfig file (e.g., git config --global --edit) and add the following under the [alias] section: 
