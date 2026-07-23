@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_dot-zshrc_settings</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_terminals_starship.html">Starship</a>
+</p>
+
+
+<div id="Starship - zshrc Settings"><h1 id="Starship - zshrc Settings" class="header"><a href="#Starship - zshrc Settings">Starship - zshrc Settings</a></h1></div>
+
+<p>
+This is a snapshot of what I have in my .zshrc file. This takes into account NerdFonts also:
+</p>
+
+<pre bash>
+#--------------------------------- Add Paths ----------------------------------#
+
+# Option 1: Explicit add Path
+#export PATH="$HOME/.local/bin:$PATH
+
+# Option 2: Test before adding Path
+[[ -d "$HOME/.local/bin" ]] &amp;&amp; export PATH="$HOME/.local/bin:$PATH"
+
+#---------------------------- Check for Nerd Fonts ----------------------------#
+# --- Nerd Font Diagnostic ---
+# Tests for the 'nf-fa-folder' icon (f115)
+# If the terminal doesn't recognize it, it usually renders it as a 1-character '?' 
+# Nerd Fonts render this as a 2-character wide glyph in most modern terminals.
+check_nerd_font() {
+  # We use a character from the Nerd Font 'Private Use Area' (e.g., \ue0b0 - Powerline Arrow)
+  # Instead of measuring width, we check if the terminal handles it as a multi-byte UTF-8 char
+  # while ensuring it doesn't fall back to a 1-byte placeholder.
+  local test_char=$(printf "\ue0b0")
+  
+  # If the shell is Zsh, we can use the (%V) expansion to see how the terminal sees it.
+  # If it shows as &lt;e0b0&gt; or \uE0B0, it's not being rendered.
+  if [[ "${(%):-%V}" == *"$test_char"* ]]; then
+     return 1
+  fi
+
+  # Secondary check: If the icon and a space together are still measured as '1' 
+  # by certain terminal logic, it's likely a non-rendered glyph.
+  if [[ ${#test_char} -lt 1 ]]; then
+    return 1
+  fi
+
+  return 0
+}
+
+if ! check_nerd_font; then
+  echo -e "\n\033[0;33m⚠️  Starship Warning: Nerd Font not detected!\033[0m"
+  echo -e "Icons may look like [?] or blocks. To fix this, run:"
+  echo -e "\033[0;34mbrew install --cask font-jetbrains-mono-nerd-font\033[0m"
+  echo -e "Then, set your Terminal font to 'JetBrainsMono Nerd Font'.\n"
+fi
+#------------------------------------ END -------------------------------------#
+
+
+#-------------------------------- Add Starship --------------------------------#
+
+# # Set config from default of ~/.config to ~/.config/starship/
+export STARSHIP_CONFIG=~/.config/starship/starship.toml
+
+if [ -n "$TMUX" ]; then
+  ## Inside Tmux, load this starship config:
+  export STARSHIP_CONFIG=~/.config/starship/starship_tmux.toml
+  ## Factory Settings prompt:
+  #export STARSHIP_CONFIG=/dev/null
+else
+  # NOT in Tmux
+  export STARSHIP_CONFIG=~/.config/starship/starship.toml
+fi
+#
+# Prevent starship interfering with vi mode
+if [[ "${widgets[zle-keymap-select]#user:}" == "starship_zle-keymap-select" || \
+      "${widgets[zle-keymap-select]#user:}" == "starship_zle-keymap-select-wrapped" ]]; then
+    zle -N zle-keymap-select "";
+fi
+
+# # Start Starship
+eval "$(starship init zsh)"
+
+# Restrict Starship to only print fatal errors by setting its logging level to error. 
+# (Effectively silences [WARN] errors.)
+export STARSHIP_LOG=error
+
+</pre>
+
+<div id="Suppressing [WARN] Messages"><h1 id="Suppressing [WARN] Messages" class="header"><a href="#Suppressing [WARN] Messages">Suppressing [WARN] Messages</a></h1></div>
+
+<div id="Suppressing [WARN] Messages-Ai Insight"><h3 id="Ai Insight" class="header"><a href="#Suppressing [WARN] Messages-Ai Insight">Ai Insight</a></h3></div>
+
+<p>
+QUESTION
+I get this now and again in Starship environment:
+</p>
+
+<pre bash>
+[WARN] - (starship::context): Scanning current directory timed out.
+[WARN] - (starship::context): You can set scan_timeout in your config to a higher value to allow longer-running scans to keep executing.
+</pre>
+
+<p>
+...how can I suppress these (largely) useless errors?
+</p>
+
+<div id="Suppressing [WARN] Messages-ANSWER"><h2 id="ANSWER" class="header"><a href="#Suppressing [WARN] Messages-ANSWER">ANSWER</a></h2></div>
+
+<p>
+To permanently suppress those warnings, you have two main options: silence warning logs completely via an environment variable, or increase/disable the scan timeout in your Starship configuration.
+</p>
+
+<div id="Suppressing [WARN] Messages-ANSWER-Option 1: Silence Warning Logs Globally (Recommended)"><h3 id="Option 1: Silence Warning Logs Globally (Recommended)" class="header"><a href="#Suppressing [WARN] Messages-ANSWER-Option 1: Silence Warning Logs Globally (Recommended)">Option 1: Silence Warning Logs Globally (Recommended)</a></h3></div>
+
+<p>
+By default, Starship prints <code>[WARN]</code> messages directly to your standard error when operations run a bit long. You can restrict Starship to only print fatal errors by setting its logging level to <code>error</code>.
+</p>
+
+<p>
+Add this line to your shell configuration file (<code>~/.zshrc</code> or <code>~/.bashrc</code>):
+</p>
+
+<pre bash>
+export STARSHIP_LOG=error
+</pre>
+
+<p>
+(Then reload your shell with source <code>~/.zshrc</code> or open a new terminal window).
+</p>
+
+<div id="Suppressing [WARN] Messages-ANSWER-Option 2: Raise or Disable scan_timeout"><h3 id="Option 2: Raise or Disable scan_timeout" class="header"><a href="#Suppressing [WARN] Messages-ANSWER-Option 2: Raise or Disable scan_timeout">Option 2: Raise or Disable scan_timeout</a></h3></div>
+
+<p>
+If you'd rather fix the underlying cause (Starship taking more than its default 30ms limit to scan directories with many files or over network/slow drives), you can adjust the threshold in your <code>starship.toml</code> configuration file.
+</p>
+
+<ul>
+<li>
+Open <code>~/.config/starship.toml</code> (create it if it doesn't exist).  
+
+<li>
+Add one of the following lines at the very top of the file (outside any <code>[module]</code> sections):
+<pre ini>
+# Option A: Give it more time (e.g., 500ms instead of 30ms)
+scan_timeout = 500
+
+# Option B: Disable the scan timeout completely
+scan_timeout = 0
+</pre>
+
+</ul>
+<p>
+<a href="unix_tools_terminals_starship.html">Starship</a>
+</p>
+
+<p>
+<a href="unix_tools_terminals_and_emulators.html">Terminals &amp; Emulators</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
