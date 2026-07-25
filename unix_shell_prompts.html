@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_shell_prompts</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<div id="Bash Prompts"><h1 id="Bash Prompts" class="header"><a href="#Bash Prompts">Bash Prompts</a></h1></div>
+
+<div id="Bash Prompts-Ironing Out Issues in Prompt Scripts"><h2 id="Ironing Out Issues in Prompt Scripts" class="header"><a href="#Bash Prompts-Ironing Out Issues in Prompt Scripts">Ironing Out Issues in Prompt Scripts</a></h2></div>
+
+<p>
+Before building a prompt, it helps to understand what went wrong in the original snippet and how to fix it:
+</p>
+<ul>
+<li>
+<span id="Bash Prompts-Ironing Out Issues in Prompt Scripts-Non-Printing Character Escaping"></span><strong id="Non-Printing Character Escaping">Non-Printing Character Escaping</strong> (<code>\[</code> and <code>\]</code>): Bash needs to know which characters take up visual space on the screen and which are purely formatting (like colors). Without wrapping color and style codes in <code>\[</code> and <code>\]</code>, Bash miscalculates line lengths, leading to broken wrapping when text hits the edge of your terminal window.
+
+<li>
+<span id="Bash Prompts-Ironing Out Issues in Prompt Scripts-Variable Scope &amp; Evaluation Timing"></span><strong id="Variable Scope &amp; Evaluation Timing">Variable Scope &amp; Evaluation Timing</strong>: If you evaluate a dynamic variable or command substitution once when <code>.bashrc</code> loads (using double quotes <code>"</code>), it will never update. Dynamic variables like current time, working directory, or environment states must either use escaped backslashes (so Bash runs them on every prompt redraw) or single quotes <code>'</code>.
+
+<li>
+<span id="Bash Prompts-Ironing Out Issues in Prompt Scripts-Undefined Variables"></span><strong id="Undefined Variables">Undefined Variables</strong>: Your original script referenced <code>rh_sgr0</code>, but you defined it as <code>rh_reset=$(tput sgr0)</code>. This caused an empty evaluation break.
+
+<li>
+<span id="Bash Prompts-Ironing Out Issues in Prompt Scripts-ANSI Formatting Resets"></span><strong id="ANSI Formatting Resets">ANSI Formatting Resets</strong>: Starting an ANSI escape code (like italics <code>\e[3m)</code> requires a corresponding reset code (<code>\e[23m</code>), or the styling will bleed into subsequent text elements.
+
+</ul>
+<div id="Bash Prompts-The Cleaned &amp; Optimized Reference Script"><h2 id="The Cleaned &amp; Optimized Reference Script" class="header"><a href="#Bash Prompts-The Cleaned &amp; Optimized Reference Script">The Cleaned &amp; Optimized Reference Script</a></h2></div>
+
+<p>
+Here is the fully ironed-out, robust version of your prompt script. Drop this into your <code>~/.bashrc</code> or <code>~/.bash_profile</code>.
+</p>
+
+<pre bash>
+###############################################
+#  Custom Command Prompt Configuration
+###############################################
+
+# 1. Color and Style Variables 
+# Using a custom prefix 'rh_' to prevent system/studio clashes.
+rh_gray=$(tput setaf 8)
+rh_lightgray=$(tput setaf 7)
+rh_darkgray=$(tput setaf 245)
+rh_lightblue=$(tput setaf 153)
+rh_pink=$(tput setaf 183)
+rh_teal=$(tput setaf 23)
+rh_red=$(tput setaf 160)
+rh_orange=$(tput setaf 166)
+rh_paleorange=$(tput setaf 172)
+rh_yellow=$(tput setaf 228)
+rh_green=$(tput setaf 71)
+rh_white=$(tput setaf 15)
+
+rh_bold=$(tput bold)
+rh_reset=$(tput sgr0)
+
+# 2. Dynamic Environment Checks
+# Safely handle production environment variables
+prod="${PRODUCTION:-No GIG}"
+
+# 3. Constructing PS1
+# - Double quotes allow bash expansion for static variables and tput commands.
+# - \[\b\] wrappers protect bash from miscalculating character lengths.
+# - Single quotes or escaped variables are used for real-time dynamic evaluation.
+
+PS1=""
+
+# Line 1: Bold spacing and Timestamp
+PS1+="\[${rh_bold}\]\n"
+PS1+="\[${rh_pink}\]\D{%y%m%d_%H%M:%S}"
+
+# Conditional Production Tag (only displays if $PRODUCTION is active)
+# Deferred evaluation via single quotes keeps it dynamic
+PS1+='${PRODUCTION:+ \[${rh_green}\][$PRODUCTION]}'
+
+# Line 2: User @ Host in Working Directory
+PS1+="\n"
+PS1+="\[${rh_lightblue}\]\e[3m\u"             # Username (Italicized)
+PS1+="\[${rh_lightgray}\]@"
+PS1+="\[${rh_paleorange}\]\h\e[23m"          # Host (End Italics)
+PS1+="\[${rh_lightblue}\] in "
+PS1+="\[${rh_darkgray}\]\w"                  # Working directory
+
+# Line 3: Prompt Symbol
+PS1+="\n"
+PS1+="\[${rh_white}\]\$ \[${rh_reset}\]"
+
+export PS1
+</pre>
+
+<div id="Bash Prompts-Anatomy of a Custom Prompt"><h2 id="Anatomy of a Custom Prompt" class="header"><a href="#Bash Prompts-Anatomy of a Custom Prompt">Anatomy of a Custom Prompt</a></h2></div>
+
+<div id="Bash Prompts-Anatomy of a Custom Prompt-Color &amp; Styling Engine (tput)"><h3 id="Color &amp; Styling Engine (tput)" class="header"><a href="#Bash Prompts-Anatomy of a Custom Prompt-Color &amp; Styling Engine (tput)">Color &amp; Styling Engine (tput)</a></h3></div>
+
+<p>
+Using <code>tput</code> is superior to hardcoding raw ANSI escape codes because it queries the terminal's termcap database, ensuring compatibility across different terminal emulators.
+</p>
+
+<ul>
+<li>
+Colors (Foreground)*: <code>tput setaf &lt;number&gt;</code> (0–255 color palette)
+
+<li>
+Modifiers*: <code>tput bold</code>, <code>tput dim</code>, <code>tput sgr0</code> (resets all attributes).
+
+<li>
+<span id="Bash Prompts-Anatomy of a Custom Prompt-Color &amp; Styling Engine (tput)-Inline Styles"></span><strong id="Inline Styles">Inline Styles</strong>: Standard escape sequences like <code>\e[3m</code> (italics) and <code>\e[23m</code> (stop italics) work well when wrapped correctly.
+
+</ul>
+<p>
+Essential Bash Escape Sequences
+</p>
+
+<p>
+When building your string, Bash recognizes specific backslash-escaped characters natively:
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Sequence
+</th>
+<th>
+Meaning
+</th>
+<th>
+Example
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+\u
+</td>
+<td>
+Current username
+</td>
+<td>
+john_doe
+</td>
+</tr>
+<tr>
+<td>
+\h
+</td>
+<td>
+Hostname (short version)
+</td>
+<td>
+devbox
+</td>
+</tr>
+<tr>
+<td>
+\w
+</td>
+<td>
+Current working directory (full path)
+</td>
+<td>
+/home/user/projects
+</td>
+</tr>
+<tr>
+<td>
+\W
+</td>
+<td>
+Basename of current working directory
+</td>
+<td>
+projects
+</td>
+</tr>
+<tr>
+<td>
+\$
+</td>
+<td>
+Privilege indicator (＄for user, # for root)
+</td>
+<td>
+＄
+</td>
+</tr>
+<tr>
+<td>
+\n
+</td>
+<td>
+Newline character
+</td>
+<td>
+Creates multi-line layout
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Bash Prompts-Design Best Practices"><h2 id="Design Best Practices" class="header"><a href="#Bash Prompts-Design Best Practices">Design Best Practices</a></h2></div>
+
+<ul>
+<li>
+<span id="Bash Prompts-Design Best Practices-Always Wrap Non-Printing Characters"></span><strong id="Always Wrap Non-Printing Characters">Always Wrap Non-Printing Characters</strong>: Enclose every single color assignment, <code>tput</code> command, and style modifier inside <code>\[ ... \]</code>. If you omit this, your command history arrows (<code>Up</code>/<code>Down</code>) will glitch out visually when text wraps.
+
+<li>
+<span id="Bash Prompts-Design Best Practices-Use Multi-Line Layouts"></span><strong id="Use Multi-Line Layouts">Use Multi-Line Layouts</strong>: Cramming everything onto a single line makes navigation difficult when working with long commands or deep directory paths. Using <code>\n</code> to break information (Context -&gt; Location -&gt; Input) keeps things clean.
+
+<li>
+<span id="Bash Prompts-Design Best Practices-Graceful Fallbacks for Variables"></span><strong id="Graceful Fallbacks for Variables">Graceful Fallbacks for Variables</strong>: Use parameter expansion like <code>"${PRODUCTION:-No GIG}"</code> to supply safe default states when custom environment variables aren't set.
+
+</ul>
+<div id="Bash Prompts-Design Best Practices-Setting color variables:"><h4 id="Setting color variables:" class="header"><a href="#Bash Prompts-Design Best Practices-Setting color variables:">Setting color variables:</a></h4></div>
+
+<pre bash>
+rh_pink=$(tput setaf 183);
+</pre>
+
+<div id="Bash Prompts-Design Best Practices-Color Swatches"><h4 id="Color Swatches" class="header"><a href="#Bash Prompts-Design Best Practices-Color Swatches">Color Swatches</a></h4></div>
+
+<p>
+Quick view of available colors:
+</p>
+
+<pre bash>
+for i in {0..255}; do printf "\x1b[38;5;${i}mcolour%-5s\x1b[0m" "${i}"; if [ $(( ($i + 1) % 8 )) -eq 0 ]; then echo; fi; done
+</pre>
+
+<div id="Bash Prompts-Design Best Practices-Show available colors in a block style:"><h4 id="Show available colors in a block style:" class="header"><a href="#Bash Prompts-Design Best Practices-Show available colors in a block style:">Show available colors in a block style:</a></h4></div>
+
+<pre bash>
+for i in {0..255}; do
+    printf "\e[48;5;%dm  %3d  \e[0m" "$i" "$i"
+    if [ $(( ($i + 1) % 6 )) -eq 0 ]; then
+        echo
+    fi
+done
+</pre>
+
+<p>
+If you make variables based on these, show them like this:
+</p>
+
+<pre bash>
+echo -e "${rh_pink}■ rh_pink (183) ${rh_teal}■ rh_teal (23) ${rh_orange}■ rh_orange (166)${rh_reset}"
+</pre>
+
+
+
+<div id="Bash Prompts-Terminal Background Color"><h2 id="Terminal Background Color" class="header"><a href="#Bash Prompts-Terminal Background Color">Terminal Background Color</a></h2></div>
+
+<p>
+You can configure the terminal background color using a bash config file like <code>.bashrc</code>.
+</p>
+
+<p>
+Just like setting foreground colors with <code>tput setaf</code>, you can set background colors using <code>tput setab</code> (set background ANSI/color).  
+</p>
+
+<div id="Bash Prompts-Terminal Background Color-How to Implement It"><h3 id="How to Implement It" class="header"><a href="#Bash Prompts-Terminal Background Color-How to Implement It">How to Implement It</a></h3></div>
+
+<p>
+You can add background color variables alongside your text colors, wrapping them in <code>\[ ... \]</code> when used inside <code>PS1</code>.
+</p>
+
+<pre bash>
+# Set a dark blue background variable
+rh_bg_darkblue=$(tput setab 18)
+rh_reset=$(tput sgr0)
+
+# Apply it inside your prompt layout
+PS1="\[${rh_bg_darkblue}\]\[${rh_white}\] Working on a background color \[${rh_reset}\]\n\$ "
+</pre>
+
+<div id="Bash Prompts-Terminal Background Color-How to Implement It-Important Nuances to Keep in Mind:"><h4 id="Important Nuances to Keep in Mind:" class="header"><a href="#Bash Prompts-Terminal Background Color-How to Implement It-Important Nuances to Keep in Mind:">Important Nuances to Keep in Mind:</a></h4></div>
+
+<p>
+The "Full Window" Trap: Changing the background color inside PS1 only colors the exact cells/spaces that text occupies, rather than painting the entire background window of your terminal emulator.
+</p>
+
+<p>
+The "Bleed" Issue: If your script changes the background color, any text you type or commands you run afterward might inherit that background color unless you explicitly append $(tput sgr0) (or a reset sequence) at the end of your prompt line.
+</p>
+
+<ul>
+<li>
+<a href="https://www.youtube.com/watch?v=ilRVbYvKPEM">ExternalLink - YouTube - Bash Prompt Customization</a>
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
