@@ -295,16 +295,118 @@ PS1="\[${rh_bg_darkblue}\]\[${rh_white}\] Working on a background color \[${rh_r
 <div id="Bash Prompts-Terminal Background Color-How to Implement It-Important Nuances to Keep in Mind:"><h4 id="Important Nuances to Keep in Mind:" class="header"><a href="#Bash Prompts-Terminal Background Color-How to Implement It-Important Nuances to Keep in Mind:">Important Nuances to Keep in Mind:</a></h4></div>
 
 <p>
-The "Full Window" Trap: Changing the background color inside PS1 only colors the exact cells/spaces that text occupies, rather than painting the entire background window of your terminal emulator.
+The "Full Window" Trap: Changing the background color inside <code>PS1</code> only colors the exact cells/spaces that text occupies, rather than painting the entire background window of your terminal emulator.
 </p>
 
 <p>
-The "Bleed" Issue: If your script changes the background color, any text you type or commands you run afterward might inherit that background color unless you explicitly append $(tput sgr0) (or a reset sequence) at the end of your prompt line.
+The "Bleed" Issue: If your script changes the background color, any text you type or commands you run afterward might inherit that background color unless you explicitly append <code>＄(tput sgr0)</code> (or a reset sequence) at the end of your prompt line.
 </p>
 
 <ul>
 <li>
 <a href="https://www.youtube.com/watch?v=ilRVbYvKPEM">ExternalLink - YouTube - Bash Prompt Customization</a>
+
+</ul>
+<div id="Changing Color of Terminal Background"><h1 id="Changing Color of Terminal Background" class="header"><a href="#Changing Color of Terminal Background">Changing Color of Terminal Background</a></h1></div>
+
+<p>
+You can set a background color, but there is an important distinction to make:
+</p>
+<ul>
+<li>
+<span id="Changing Color of Terminal Background-Background of the prompt text only"></span><strong id="Background of the prompt text only">Background of the prompt text only</strong>: This colors the background strictly behind the characters/lines your prompt occupies.
+
+<li>
+<span id="Changing Color of Terminal Background-Background of the whole terminal window"></span><strong id="Background of the whole terminal window">Background of the whole terminal window</strong>: True background coloring of the entire window canvas requires emitting an escape sequence that persists across the terminal buffer.
+
+</ul>
+<p>
+Because you want it tied dynamically to your <code>＄PRODUCTION</code> variable, handling this inside your <code>PS1</code> string or via a dynamic evaluation step works cleanly.
+</p>
+
+<p>
+Here is how you can update your configuration to include background colors using <code>tput setab</code> (set background) and conditionally shift the styling based on whether you are in production.
+</p>
+
+<div id="Changing Color of Terminal Background-Enhanced Configuration with Conditional Backgrounds"><h4 id="Enhanced Configuration with Conditional Backgrounds" class="header"><a href="#Changing Color of Terminal Background-Enhanced Configuration with Conditional Backgrounds">Enhanced Configuration with Conditional Backgrounds</a></h4></div>
+
+<pre bash>
+###############################################
+#  Custom Command Prompt Configuration
+###############################################
+
+# 1. Color and Style Variables 
+rh_gray=$(tput setaf 8)
+rh_lightgray=$(tput setaf 7)
+rh_darkgray=$(tput setaf 245)
+rh_lightblue=$(tput setaf 153)
+rh_pink=$(tput setaf 183)
+rh_teal=$(tput setaf 23)
+rh_red=$(tput setaf 160)
+rh_orange=$(tput setaf 166)
+rh_paleorange=$(tput setaf 172)
+rh_yellow=$(tput setaf 228)
+rh_green=$(tput setaf 71)
+rh_white=$(tput setaf 15)
+
+# Background color definitions using tput setab
+rh_bg_default=$(tput setab 0)    # Default/Black background
+rh_bg_prod=$(tput setab 52)      # Dark red/maroon background for production safety warning
+rh_bg_staging=$(tput setab 23)   # Dark teal background for staging/other environments
+
+rh_bold=$(tput bold)
+rh_reset=$(tput sgr0)
+
+# 2. Dynamic Environment Checks
+prod="${PRODUCTION:-No GIG}"
+
+# 3. Constructing PS1
+PS1=""
+
+# Dynamic background switcher logic evaluated live per prompt draw:
+# If $PRODUCTION is active, apply a warning background; otherwise, use default.
+PS1+='$(
+    if [ -n "$PRODUCTION" ] &amp;&amp; [ "$PRODUCTION" != "No GIG" ]; then
+        printf "%s" "${rh_bg_prod}"
+    else
+        printf "%s" "${rh_bg_default}"
+    fi
+)'
+
+# Line 1: Bold spacing and Timestamp
+PS1+="\[${rh_bold}\]\n"
+PS1+="\[${rh_pink}\]\D{%y%m%d_%H%M:%S}"
+
+# Conditional Production Tag (only displays if $PRODUCTION is active)
+PS1+='${PRODUCTION:+ \[${rh_green}\][$PRODUCTION]}'
+
+# Line 2: User @ Host in Working Directory
+PS1+="\n"
+PS1+="\[${rh_lightblue}\]\e[3m\u"         # Username (Italicized)
+PS1+="\[${rh_lightgray}\]@"
+PS1+="\[${rh_paleorange}\]\h\e[23m"          # Host (End Italics)
+PS1+="\[${rh_lightblue}\] in "
+PS1+="\[${rh_darkgray}\]\w"                  # Working directory
+
+# Line 3: Prompt Symbol (Ensure rh_reset clears both foreground and background back to normal)
+PS1+="\n"
+PS1+="\[${rh_white}\]\$ \[${rh_reset}\]"
+
+export PS1
+</pre>
+
+<p>
+Key Adjustments Made:
+</p>
+<ul>
+<li>
+<code>tput setab</code>: This is the background counterpart to <code>tput setaf</code>. For instance, <code>tput setab 52</code> triggers a deep red hue ideal for warning banners, and <code>tput setab 23</code> sets a subtle dark teal.
+
+<li>
+<span id="Changing Color of Terminal Background-Enhanced Configuration with Conditional Backgrounds-Command Substitution in PS1"></span><strong id="Command Substitution in PS1">Command Substitution in PS1</strong>: By wrapping logic inside a dynamic command block <code>＄(...)</code> evaluated at prompt-draw time, it checks your <code>＄PRODUCTION</code> variable on the fly.
+
+<li>
+<span id="Changing Color of Terminal Background-Enhanced Configuration with Conditional Backgrounds-Global Cleanup (rh_reset)"></span><strong id="Global Cleanup (rh_reset)">Global Cleanup (rh_reset)</strong>: Ending the prompt with <code>\[＄{rh_reset}\]</code> ensures that any text you type out into the shell inherits the proper reset state instead of smearing the background color across your whole terminal buffer as you type commands.
 
 </ul>
 <p>
