@@ -48,6 +48,157 @@
 <code>tmux new -s &lt;name&gt;</code>
 
 </ul>
+<div id="Functions &amp; Aliases"><h1 id="Functions &amp; Aliases" class="header"><a href="#Functions &amp; Aliases">Functions &amp; Aliases</a></h1></div>
+
+<div id="Functions &amp; Aliases-Navigate to seqData (Houdini directory)"><h3 id="Navigate to seqData (Houdini directory)" class="header"><a href="#Functions &amp; Aliases-Navigate to seqData (Houdini directory)">Navigate to seqData (Houdini directory)</a></h3></div>
+
+<p>
+The Houdini file directory structure is a bit esoteric, so this is a wrapper to go to the correct location with the correct environment, and to jump into the user's directory at the base of the tree structure.
+</p>
+
+<p>
+In:
+</p>
+
+<pre bash>
+/disney/shows/OHIOTR/work/Sequences/seq/&lt;seq&gt;/seqData/lighting/
+</pre>
+
+<pre text>
+&lt;username&gt;
+├── 037.00_037.10_037.20 &lt;-packet of shot named directory
+│  └── houdini
+│     ├── .task_modules_info.json
+│     ├── backup
+│     ├── lighting_v0001.hip
+│     ├── lighting_v0002.hip
+│     ├── lighting_v0003.hip
+│     ├── quipscenes/
+│     └── rvit_&lt;username&gt;/
+├── miscData/
+└── texture/
+   └── 037.00_037.10_037.20/
+      ├── ies/
+      ├── latlong/
+      └── lightMaps/
+</pre>
+
+<pre bash>
+nh() {
+    if [ -z "$1" ]; then
+        echo "Usage: setenv &lt;seq_number&gt;"
+        return 1
+    fi
+
+    # 1. Run the utility and hide its output
+    #n "$1" seqData lighting &gt; /dev/null 2&gt;&amp;1
+    # Allow error messages, but suppress 'ls'
+    n "$1" seqData lighting &gt; /dev/null
+
+    # 2. Define the base target directory using the current username
+    local base_dir="$USER"
+    
+    # Check if the base directory exists before proceeding
+    if [ ! -d "$base_dir" ]; then
+        echo "Error: Directory $base_dir does not exist."
+        return 1
+    fi
+
+    # 3. Find the first directory starting with a digit
+    local target=""
+    for d in "$base_dir"/[0-9]*; do
+        if [ -d "$d" ]; then
+            target="$d"
+            break
+        fi
+    done
+
+    # 4. Determine final path including the 'houdini' subdirectory
+    if [ -n "$target" ]; then
+        final_dir="$target/houdini"
+    else
+        echo "Warning: No directory starting with a digit found in $base_dir. Falling back to base."
+        final_dir="$base_dir"
+    fi
+
+    # 5. 'cd' into the final destination (creates or enters 'houdini' if appropriate)
+    cd "$final_dir" || return
+
+    # 6. Run your 'ls' command in the final directory
+    ls -la
+}
+</pre>
+
+<div id="Functions &amp; Aliases-run_houdini Wrapper"><h3 id="run_houdini Wrapper" class="header"><a href="#Functions &amp; Aliases-run_houdini Wrapper">run_houdini Wrapper</a></h3></div>
+
+<p>
+<code>run_houdini</code> wrapper: <code>rhl</code> (run_houdini latest):
+</p>
+
+<pre bash>
+rhl() {
+    # ---------------------------------------------------------------------------
+    # 1. SHELL COMPATIBILITY &amp; SAFETY (Zsh specific handling)
+    # ---------------------------------------------------------------------------
+    # By default, Zsh will throw a fatal "no matches found" error and abort the 
+    # function entirely if a wildcard pattern (like *.hip) matches nothing.
+    # 'setopt localoptions nullglob' tells Zsh: "If the glob pattern doesn't match 
+    # any files, just evaluate it to an empty list instead of crashing."
+    # 'localoptions' ensures this setting only applies inside this function.
+    # Bash ignores this line safely without any issues.
+    setopt localoptions nullglob
+    
+    # ---------------------------------------------------------------------------
+    # 2. FILE GATHERING (The Glob Array)
+    # ---------------------------------------------------------------------------
+    # Here we create a local array variable named 'files'.
+    # 'lighting_v*.hip' is a wildcard pattern (glob):
+    #   - 'lighting_v' is the fixed prefix text.
+    #   - '*' is a wildcard matching any characters (like version numbers).
+    #   - '.hip' is the fixed file extension.
+    # The shell automatically expands this pattern into a list of all matching 
+    # files in the current directory and stores them in alphabetical/version order.
+    local files=(lighting_v*.hip)
+    
+    # ---------------------------------------------------------------------------
+    # 3. EMPTY CHECK (Error Handling)
+    # ---------------------------------------------------------------------------
+    # '${#files[@]}' is a syntax that checks the length (number of items) in the array.
+    # '-eq 0' means "equals zero". If no files matched our pattern, the array is empty.
+    # If it is empty, we print a friendly error message and exit the function 
+    # early using 'return 1' (which indicates failure).
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "Error: No matching files found in this directory."
+        return 1
+    fi
+    
+    # ---------------------------------------------------------------------------
+    # 4. SELECTING THE LATEST VERSION
+    # ---------------------------------------------------------------------------
+    # Because zero-padded version numbers (e.g., v0001, v0002, v0010) sort correctly 
+    # in standard alphabetical order, the "latest" (highest) version will always 
+    # end up as the very last item in our sorted array.
+    # '${files[-1]}' is a shell feature that fetches the last element of an array 
+    # (using a negative index counting backward from the end).
+    local latest="${files[-1]}"
+    
+    # ---------------------------------------------------------------------------
+    # 5. EXECUTION &amp; BACKGROUNDING
+    # ---------------------------------------------------------------------------
+    # Print a helpful message to the terminal so you know what file is being targeted.
+    echo "Opening latest version in background: $latest"
+    
+    # run_houdini: Your actual command/app launcher.
+    # '"$latest"'     : Passes the filename as an argument (quoted to handle spaces safely).
+    # '&gt; /dev/null'   : Redirects standard output (normal app logs) to the system black hole 
+    #                   so it doesn't clutter your terminal screen.
+    # '&amp;'             : Sends the application process to the background, immediately freeing 
+    #                   up your prompt so you can keep typing terminal commands.
+    run_houdini "$latest" &gt; /dev/null &amp;
+}
+</pre>
+
+
 <p>
 <a href="disney_shows_ohio.html">Ohio</a>
 </p>
