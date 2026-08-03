@@ -180,9 +180,8 @@ if [[ "$PRODUCTION" = "OHIO" || "$PRODUCTION" = "OHIOTR" ]]; then
 
         # Check if the array contains at least one file before proceeding
         if (( ${#files[@]} &gt; 0 )); then
-            # Generate a random index using Zsh's RANDOM plus the process ID ($$) for uniqueness, 
-            # then use modulo (%) and 1-based indexing to pick a random file from the array
-            rand_idx=$(( (RANDOM + $$) % ${#files[@]} + 1 ))
+            # Generate a random index safely compatible with both Bash (0-indexed) and Zsh (MOD adjusted)
+            rand_idx=$(( (RANDOM + $$) % ${#files[@]} ))
             random_file="${files[rand_idx]}"
             
             # Clean the file path string by stripping any hidden carriage return characters (\r)
@@ -190,36 +189,48 @@ if [[ "$PRODUCTION" = "OHIO" || "$PRODUCTION" = "OHIOTR" ]]; then
 
             # Verify that the randomly selected path points to a valid, readable file
             if [[ -f "$random_file" ]]; then
-                # Initialize an empty local array to hold the lines of the file
-                local -a lines=()
+                # Initialize an empty array to hold the lines of the file (removed 'local' to prevent top-level execution errors)
+                lines=()
                 
                 # Read the file line-by-line safely, preserving empty lines
                 while IFS= read -r line || [[ -n "$line" ]]; do
                     lines+=("$line")
                 done &lt; "$random_file"
 
-                # Loop through each line of the ASCII art and print it with a slight delay for an animation effect
+                # Loop through each line of the ASCII art, force an absolute horizontal offset (column 25), 
+                # and print with a slight delay for an animation effect
                 for line in "${lines[@]}"; do
-                    printf "%b\n" "$line"
+                    printf "\033[25G%b\n" "$line"
                     sleep 0.04
                 done
 
                 # Pause briefly so the user can look at the fully rendered art
-                sleep 1.5
+                sleep 0.8
 
+                # Measure current terminal window height (rows) dynamically
+                term_rows=$(tput lines 2&gt;/dev/null || echo 24)
+                
                 # Calculate the exact height (number of lines) of the ASCII art
                 banner_height=${#lines[@]}
                 
-                # Scroll the terminal window upward dynamically (plus extra clearance rows) 
+                # Scroll enough to clear both the art height AND the full terminal window height 
+                total_scroll=$(( banner_height + term_rows ))
+
+                # Scroll the terminal window upward dynamically 
                 # to push the banner cleanly into the scrollback history buffer
-                for ((i=1; i&lt;=banner_height+15; i++)); do
+                for ((i=1; i&lt;=total_scroll; i++)); do
                     printf "\033[1S"
-                    sleep 0.02
+                    sleep 0.01
                 done
+
+                # Snap the cursor back to the top-left corner (Row 1, Column 1) 
+                # so your fresh prompt renders right at the top of the window
+                printf "\033[H"
             fi
         fi
     fi
 fi
+
 </pre>
 
 <p>
@@ -231,6 +242,275 @@ subfolder/
 ├── hexed_undergronds.txt
 ├── hexed_uprise.txt
 └── hexed_vintage.txt
+</pre>
+
+<div id="Scrolling Intro Banner-Preview"><h2 id="Preview" class="header"><a href="#Scrolling Intro Banner-Preview">Preview</a></h2></div>
+
+<pre bash>
+# Preview ASCII art file directly with escape sequence evaluation
+preview_art() {
+    local target_file="$1"
+    
+    if [[ -f "$target_file" ]]; then
+        echo "=== PREVIEW: $target_file ==="
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            # %b expands backslash escape sequences (like colors and formatting)
+            printf "%b\n" "$line"
+        done &lt; "$target_file"
+        echo "=============================="
+    else
+        echo "Error: File '$target_file' not found."
+    fi
+}
+
+# Usage example:
+# preview_art "$HOME/.ascii_art_dir/your_art_file.txt"
+
+</pre>
+
+<div id="Scrolling Intro Banner-QUESTION"><h2 id="QUESTION" class="header"><a href="#Scrolling Intro Banner-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I have this great set up for the rolling banners now, but is there a way to package it into a function to be triggered by various actions or changes too?
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER"><h2 id="ANSWER" class="header"><a href="#Scrolling Intro Banner-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, you can easily wrap this script into a reusable Bash/Zsh function. Packaging it allows you to invoke it on demand, bind it to key combinations, or trigger it based on specific environment changes or actions.
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER-The Wrapped Function"><h3 id="The Wrapped Function" class="header"><a href="#Scrolling Intro Banner-ANSWER-The Wrapped Function">The Wrapped Function</a></h3></div>
+
+<p>
+Here is your code refactored into a clean function called show_ascii_banner. It includes local declarations to ensure variables don't leak into your broader shell session.
+</p>
+
+<pre bash>
+show_ascii_banner() {
+    # Check if the environment variable equals a specific value (e.g., "my_theme")
+    if [[ "$PRODUCTION" = "OHIO" || "$PRODUCTION" = "OHIOTR" ]]; then
+        # Define the directory where the ASCII art text files are stored
+        local banner_dir="$HOME/.ascii_art_dir"
+        
+        # Check if the specified directory actually exists on the filesystem
+        if [[ -d "$banner_dir" ]]; then
+            # Gather all .txt files in the directory into an array
+            local files=("$banner_dir"/*.txt)
+
+            # Check if the array contains at least one file before proceeding
+            if (( ${#files[@]} &gt; 0 )); then
+                # Generate a random index safely compatible with both Bash (0-indexed) and Zsh (MOD adjusted)
+                local rand_idx=$(( (RANDOM + $$) % ${#files[@]} ))
+                local random_file="${files[rand_idx]}"
+                
+                # Clean the file path string by stripping any hidden carriage return characters (\r)
+                random_file=$(printf '%s' "$random_file" | tr -d '\r')
+
+                # Verify that the randomly selected path points to a valid, readable file
+                if [[ -f "$random_file" ]]; then
+                    # Initialize an empty array to hold the lines of the file
+                    local lines=()
+                    
+                    # Read the file line-by-line safely, preserving empty lines
+                    while IFS= read -r line || [[ -n "$line" ]]; do
+                        lines+=("$line")
+                    done &lt; "$random_file"
+
+                    # Loop through each line of the ASCII art, force an absolute horizontal offset (column 25), 
+                    # and print with a slight delay for an animation effect
+                    for line in "${lines[@]}"; do
+                        printf "\033[25G%b\n" "$line"
+                        sleep 0.04
+                    done
+
+                    # Pause briefly so the user can look at the fully rendered art
+                    sleep 0.8
+
+                    # Measure current terminal window height (rows) dynamically
+                    local term_rows=$(tput lines 2&gt;/dev/null || echo 24)
+                    
+                    # Calculate the exact height (number of lines) of the ASCII art
+                    local banner_height=${#lines[@]}
+                    
+                    # Scroll enough to clear both the art height AND the full terminal window height 
+                    local total_scroll=$(( banner_height + term_rows ))
+
+                    # Scroll the terminal window upward dynamically 
+                    # to push the banner cleanly into the scrollback history buffer
+                    for ((i=1; i&lt;=total_scroll; i++)); do
+                        printf "\033[1S"
+                        sleep 0.01
+                    done
+
+                    # Snap the cursor back to the top-left corner (Row 1, Column 1) 
+                    # so your fresh prompt renders right at the top of the window
+                    printf "\033[H"
+                fi
+            fi
+        fi
+    fi
+}
+</pre>
+
+<div id="Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes"><h3 id="How to Trigger It Using Actions and Changes" class="header"><a href="#Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes">How to Trigger It Using Actions and Changes</a></h3></div>
+
+<p>
+Once you place this function inside your shell configuration file (like ~/.bashrc or ~/.zshrc), you can trigger it in several dynamic ways:
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes-Trigger on Shell Startup"><h4 id="Trigger on Shell Startup" class="header"><a href="#Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes-Trigger on Shell Startup">Trigger on Shell Startup</a></h4></div>
+
+<p>
+Simply add a call to the function at the very bottom of your .bashrc or .zshrc:
+</p>
+
+<pre bash>
+show_ascii_banner
+</pre>
+
+<div id="Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes-Trigger on Directory Change (cd)"><h4 id="Trigger on Directory Change (cd)" class="header"><a href="#Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes-Trigger on Directory Change (cd)">Trigger on Directory Change (cd)</a></h4></div>
+
+<p>
+You can hook the function into your shell's directory-change routines so a banner rolls whenever you jump to specific project folders:
+</p>
+
+<pre bash>
+# For Bash (using PROMPT_COMMAND) or Zsh (using chpwd hook)
+cd() {
+    builtin cd "$@" || return
+    # Optional: trigger only if inside a specific project path
+    if [[ "$PWD" == *"/my-special-project"* ]]; then
+        show_ascii_banner
+    fi
+}
+</pre>
+
+<div id="Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes-Trigger via Keybinding"><h4 id="Trigger via Keybinding" class="header"><a href="#Scrolling Intro Banner-ANSWER-How to Trigger It Using Actions and Changes-Trigger via Keybinding">Trigger via Keybinding</a></h4></div>
+
+<p>
+You can bind the function to a specific hotkey combination (e.g., Ctrl + B) so you can summon a rolling banner whenever you want:
+</p>
+
+<p>
+In Bash:
+</p>
+
+<pre bash>
+bind '"\C-b": "show_ascii_banner\n"'
+</pre>
+
+<p>
+In Zsh:
+</p>
+
+<pre bash>
+zle -N show_ascii_banner
+bindkey '^B' show_ascii_banner
+</pre>
+
+<div id="Scrolling Intro Banner-QUESTION"><h2 id="QUESTION" class="header"><a href="#Scrolling Intro Banner-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I guess I don't really need the conditional at the top of the main function, as that could be built into the trigger(s). What do you think?
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER"><h2 id="ANSWER" class="header"><a href="#Scrolling Intro Banner-ANSWER">ANSWER</a></h2></div>
+
+<p>
+That is a fantastic observation. Removing the conditional (if <a href=" &quot;OHIOTR&quot; = &quot;OHIO&quot;... .html">"$PRODUCTION" = "OHIO"...</a>) from the core function makes the code much cleaner, highly modular, and strictly single-responsibility.
+</p>
+
+<p>
+By stripping it out, your function becomes a pure rendering engine (show_ascii_banner), leaving the decision of when and where it should fire entirely up to your triggers.
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER-The Streamlined Function"><h3 id="The Streamlined Function" class="header"><a href="#Scrolling Intro Banner-ANSWER-The Streamlined Function">The Streamlined Function</a></h3></div>
+
+<pre bash>
+show_ascii_banner() {
+    # Define the directory where the ASCII art text files are stored
+    local banner_dir="$HOME/.ascii_art_dir"
+    
+    # Check if the specified directory actually exists on the filesystem
+    if [[ -d "$banner_dir" ]]; then
+        # Gather all .txt files in the directory into an array
+        local files=("$banner_dir"/*.txt)
+
+        # Check if the array contains at least one file before proceeding
+        if (( ${#files[@]} &gt; 0 )); then
+            # Generate a random index safely compatible with both Bash (0-indexed) and Zsh (MOD adjusted)
+            local rand_idx=$(( (RANDOM + $$) % ${#files[@]} ))
+            local random_file="${files[rand_idx]}"
+            
+            # Clean the file path string by stripping any hidden carriage return characters (\r)
+            random_file=$(printf '%s' "$random_file" | tr -d '\r')
+
+            # Verify that the randomly selected path points to a valid, readable file
+            if [[ -f "$random_file" ]]; then
+                # Initialize an empty array to hold the lines of the file
+                local lines=()
+                
+                # Read the file line-by-line safely, preserving empty lines
+                while IFS= read -r line || [[ -n "$line" ]]; do
+                    lines+=("$line")
+                done &lt; "$random_file"
+
+                # Loop through each line of the ASCII art, force an absolute horizontal offset (column 25), 
+                # and print with a slight delay for an animation effect
+                for line in "${lines[@]}"; do
+                    printf "\033[25G%b\n" "$line"
+                    sleep 0.04
+                done
+
+                # Pause briefly so the user can look at the fully rendered art
+                sleep 0.8
+
+                # Measure current terminal window height (rows) dynamically
+                local term_rows=$(tput lines 2&gt;/dev/null || echo 24)
+                
+                # Calculate the exact height (number of lines) of the ASCII art
+                local banner_height=${#lines[@]}
+                
+                # Scroll enough to clear both the art height AND the full terminal window height 
+                local total_scroll=$(( banner_height + term_rows ))
+
+                # Scroll the terminal window upward dynamically 
+                # to push the banner cleanly into the scrollback history buffer
+                for ((i=1; i&lt;=total_scroll; i++)); do
+                    printf "\033[1S"
+                    sleep 0.01
+                done
+
+                # Snap the cursor back to the top-left corner (Row 1, Column 1) 
+                # so your fresh prompt renders right at the top of the window
+                printf "\033[H"
+            fi
+        fi
+    fi
+}
+</pre>
+
+<div id="Scrolling Intro Banner-ANSWER-Managing the Logic in Your Triggers"><h3 id="Managing the Logic in Your Triggers" class="header"><a href="#Scrolling Intro Banner-ANSWER-Managing the Logic in Your Triggers">Managing the Logic in Your Triggers</a></h3></div>
+
+<p>
+Now, you handle your production checks or environment variables directly inside the wrappers or trigger points:
+</p>
+
+<p>
+Example: Conditional Wrapper Trigger
+</p>
+
+<pre bash>
+# A wrapper trigger that checks your environment first
+trigger_banner() {
+    if [[ "$PRODUCTION" = "OHIO" || "$PRODUCTION" = "OHIOTR" ]]; then
+        show_ascii_banner
+    fi
+}
+
+# Now use 'trigger_banner' in your startup scripts or keybindings instead
+trigger_banner
 </pre>
 
 
