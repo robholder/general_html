@@ -288,6 +288,14 @@ I have this great set up for the rolling banners now, but is there a way to pack
 
 <div id="Scrolling Intro Banner-ANSWER"><h2 id="ANSWER" class="header"><a href="#Scrolling Intro Banner-ANSWER">ANSWER</a></h2></div>
 
+<table>
+<tr>
+<td>
+UNTESTED FROM HERE DOWN
+</td>
+</tr>
+</table>
+
 <p>
 Yes, you can easily wrap this script into a reusable Bash/Zsh function. Packaging it allows you to invoke it on demand, bind it to key combinations, or trigger it based on specific environment changes or actions.
 </p>
@@ -525,7 +533,126 @@ trigger_banner() {
 trigger_banner
 </pre>
 
+<div id="Scrolling Intro Banner-QUESTION"><h2 id="QUESTION" class="header"><a href="#Scrolling Intro Banner-QUESTION">QUESTION</a></h2></div>
+<p>
+Will this trigger constantly?
+</p>
 
+<div id="Scrolling Intro Banner-ANSWER"><h2 id="ANSWER" class="header"><a href="#Scrolling Intro Banner-ANSWER">ANSWER</a></h2></div>
+
+<p>
+This specific trigger function will not repeat on every single command you type, provided you place it correctly inside your shell startup files (like <code>.zshrc</code>) rather than hooking it into a per-command execution loop (like <code>precmd</code> or <code>PROMPT_COMMAND</code>).  
+</p>
+
+<p>
+If you just put the trigger call at the bottom of your <code>.zshrc</code> file like this:
+</p>
+
+<pre bash>
+# At the very bottom of .zshrc
+trigger_banner
+</pre>
+
+<p>
+It will only execute once, right when that shell instance initializes (i.e., when you first open the terminal or type <code>zsh</code> to spawn a new shell). Once you are sitting at the prompt, typing random commands (<code>ls</code>, <code>git status</code>, etc.) will not re-trigger it.
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly"><h3 id="Handling Your Goals Explicitly" class="header"><a href="#Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly">Handling Your Goals Explicitly</a></h3></div>
+
+<p>
+If you want to fine-tune when it fires—such as ensuring it only happens when entering <code>zsh</code> or tracking state changes—you can adapt the trigger logic.
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly-Scenario A: Only run when freshly launching/entering zsh"><h4 id="Scenario A: Only run when freshly launching/entering zsh" class="header"><a href="#Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly-Scenario A: Only run when freshly launching/entering zsh">Scenario A: Only run when freshly launching/entering zsh</a></h4></div>
+
+<p>
+If you want to ensure it fires when entering <code>zsh</code>, putting it in .zshrc naturally achieves this because .zshrc is read every time an interactive zsh process starts.
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly-Scenario B: Prevent repeating if you nest shells or source .zshrc again"><h4 id="Scenario B: Prevent repeating if you nest shells or source .zshrc again" class="header"><a href="#Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly-Scenario B: Prevent repeating if you nest shells or source .zshrc again">Scenario B: Prevent repeating if you nest shells or source .zshrc again</a></h4></div>
+
+<p>
+If you manually type source <code>~/.zshrc</code> later in the same session, a basic environment check would run the banner again. If you want to guarantee it only runs once per session even if .zshrc is re-sourced, use a tracker variable:
+</p>
+
+<pre bash>
+trigger_banner() {
+    # Check if the banner was already shown in this specific shell process
+    if [[ "$PRODUCTION" == "OHIO" || "$PRODUCTION" == "OHIOTR" ]] &amp;&amp; [[ -z "$_BANNER_SHOWN" ]]; then
+        show_ascii_banner
+        export _BANNER_SHOWN="true"
+    fi
+}
+</pre>
+
+<div id="Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly-trigger_banner"><h4 id="trigger_banner" class="header"><a href="#Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly-trigger_banner">trigger_banner</a></h4></div>
+
+<ul>
+<li>
+<span id="Scrolling Intro Banner-ANSWER-Handling Your Goals Explicitly-trigger_banner-How it works"></span><strong id="How it works">How it works</strong>: The first time the shell starts, it sees <code>PRODUCTION</code> is set and <code>_BANNER_SHOWN</code> is empty. It shows the banner and locks <code>_BANNER_SHOWN="true"</code>. If you source your config again or run sub-commands, _BANNER_SHOWN stops it from repeating.
+
+</ul>
+<div id="Scrolling Intro Banner-QUESTION"><h2 id="QUESTION" class="header"><a href="#Scrolling Intro Banner-QUESTION">QUESTION</a></h2></div>
+<p>
+Would this trigger if the env var PRODUCTION was changed during a session? (I hope it does.)
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER"><h2 id="ANSWER" class="header"><a href="#Scrolling Intro Banner-ANSWER">ANSWER</a></h2></div>
+
+<p>
+No, it won't trigger if you change <code>PRODUCTION</code> mid-session under the previous setup.
+</p>
+
+<p>
+Because that version only calls <code>trigger_banner</code> once when the shell first starts up, changing the environment variable later via <code>export PRODUCTION="OHIO"</code> while sitting at the prompt will do nothing.
+</p>
+
+<div id="Scrolling Intro Banner-ANSWER-How to make it trigger when changed mid-session"><h3 id="How to make it trigger when changed mid-session" class="header"><a href="#Scrolling Intro Banner-ANSWER-How to make it trigger when changed mid-session">How to make it trigger when changed mid-session</a></h3></div>
+
+<p>
+If you want it to detect changes <em>while</em> you are working (and fire immediately when you export or modify that variable), you need to hook the check into Zsh's <code>precmd</code> (which runs before every prompt is drawn).
+</p>
+
+<p>
+To prevent it from repeating on every <em>single</em> command after it's set, we can track the last state it fired for:
+</p>
+
+<pre bash>
+# Keep track of what state we last showed the banner for
+_LAST_SHOWN_PRODUCTION=""
+
+check_production_banner() {
+    if [[ "$PRODUCTION" == "OHIO" || "$PRODUCTION" == "OHIOTR" ]]; then
+        # If it matches, but we haven't shown it for THIS value yet, show it now!
+        if [[ "$_LAST_SHOWN_PRODUCTION" != "$PRODUCTION" ]]; then
+            show_ascii_banner
+            _LAST_SHOWN_PRODUCTION="$PRODUCTION"
+        fi
+    else
+        # If PRODUCTION changes away from OHIO/OHIOTR, reset the tracker 
+        # so it can fire again if you switch back later.
+        _LAST_SHOWN_PRODUCTION=""
+    fi
+}
+
+# Register it as a Zsh precmd hook
+autoload -U add-zsh-hook
+add-zsh-hook precmd check_production_banner
+</pre>
+
+<div id="Scrolling Intro Banner-ANSWER-How this behaves:"><h3 id="How this behaves:" class="header"><a href="#Scrolling Intro Banner-ANSWER-How this behaves:">How this behaves:</a></h3></div>
+
+<ul>
+<li>
+<span id="Scrolling Intro Banner-ANSWER-How this behaves:-Fresh start"></span><strong id="Fresh start">Fresh start</strong>: If you open a terminal where <code>PRODUCTION="OHIO"</code> is already set, it fires instantly.
+
+<li>
+<span id="Scrolling Intro Banner-ANSWER-How this behaves:-Mid-session change"></span><strong id="Mid-session change">Mid-session change</strong>: If you open a normal terminal and later type <code>export PRODUCTION="OHIO"</code>, the very next time you press Enter (at the prompt), it will catch the change and trigger the banner.
+
+<li>
+<span id="Scrolling Intro Banner-ANSWER-How this behaves:-No spam"></span><strong id="No spam">No spam</strong>: It won't repeat the banner every time you type <code>ls</code> or <code>git status</code>, because <code>_LAST_SHOWN_PRODUCTION</code> remembers it already displayed it for that value.
+
+</ul>
 <p>
 <br>
 <hr>
