@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_starship_conditionals</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_terminals_starship.html">Starship</a>
+</p>
+
+<div id="Starship - Conditionals"><h1 id="Starship - Conditionals" class="header"><a href="#Starship - Conditionals">Starship - Conditionals</a></h1></div>
+
+<p>
+Starship supports conditional formatting for prompts through conditional format strings enclosed in parentheses <code>(...)</code>, which hide content if all internal variables are empty.
+</p>
+
+<div id="Starship - Conditionals-Conditional Features"><h2 id="Conditional Features" class="header"><a href="#Starship - Conditionals-Conditional Features">Conditional Features</a></h2></div>
+
+<ul>
+<li>
+<span id="Starship - Conditionals-Conditional Features-Visibility Control"></span><strong id="Visibility Control">Visibility Control</strong>: Any text and variables wrapped in parentheses will only render if at least one variable inside the group evaluates to a non-empty value. For example, <code>(@\(region)</code> displays <code>@</code> and the region name only if the \)region variable exists; otherwise, it outputs nothing.
+
+<li>
+<span id="Starship - Conditionals-Conditional Features-Module-Level Triggers"></span><strong id="Module-Level Triggers">Module-Level Triggers</strong>: Individual modules automatically turn on or off contextually depending on environmental indicators (like detecting local Git repositories, configuration files, or active cloud contexts).
+
+<li>
+<span id="Starship - Conditionals-Conditional Features-Custom Module Conditions"></span><strong id="Custom Module Conditions">Custom Module Conditions</strong>: Custom modules can use the <code>when</code> configuration option with a custom command or environment check to determine whether they should run.
+
+</ul>
+<div id="Starship - Conditionals-QUESTION"><h2 id="QUESTION" class="header"><a href="#Starship - Conditionals-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Can you have conditionals based on the value of an env var?
+</p>
+
+<div id="Starship - Conditionals-ANSWER"><h2 id="ANSWER" class="header"><a href="#Starship - Conditionals-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, you can, but not directly within Starship's core layout engine, as <code>starship.toml</code> does not support native <code>if/else</code> logic statements. Instead, you can achieve this cleanly using two official methods: Custom Modules with shell commands or Conditional Format Strings based on variable existence.
+</p>
+
+<div id="Starship - Conditionals-ANSWER-Method 1: Custom Modules with when Conditions (Recommended)"><h3 id="Method 1: Custom Modules with when Conditions (Recommended)" class="header"><a href="#Starship - Conditionals-ANSWER-Method 1: Custom Modules with when Conditions (Recommended)">Method 1: Custom Modules with when Conditions (Recommended)</a></h3></div>
+
+<p>
+You can create a custom module that runs a shell evaluation command inside the <code>when</code> parameter. If the shell command returns an exit code of <code>0</code> (true), the module triggers; if it fails, the module remains completely hidden.
+</p>
+
+<p>
+Add this to your starship.toml:
+</p>
+
+<pre toml>
+# 1. Register your custom module in the main layout
+format = """
+$directory\
+$custom.env_check\
+$character
+"""
+
+# 2. Define the conditional logic
+[custom.env_check]
+# Executes a shell command to check the exact value of your environment variable
+when = 'test "$MY_ENV_VAR" = "production"' 
+command = 'echo "⚠️ PROD"'
+style = "bold red"
+format = "[$output]($style) "
+</pre>
+
+<div id="Starship - Conditionals-ANSWER-Method 2: Conditional Format Strings (Existence Only)"><h3 id="Method 2: Conditional Format Strings (Existence Only)" class="header"><a href="#Starship - Conditionals-ANSWER-Method 2: Conditional Format Strings (Existence Only)">Method 2: Conditional Format Strings (Existence Only)</a></h3></div>
+
+<p>
+If you only need to check whether an environment variable exists and is not empty (regardless of its specific value), you can use Starship's native environment variable module paired with a conditional format string.
+</p>
+
+<pre toml>
+# Main layout using conditional syntax (parentheses)
+format = """
+$directory\
+(${env_var.STAGE} )\
+$character
+"""
+
+# Define the variable to watch
+[env_var.STAGE]
+variable = "STAGE"
+style = "bold yellow"
+</pre>
+
+<ul>
+<li>
+<span id="Starship - Conditionals-ANSWER-Method 2: Conditional Format Strings (Existence Only)-How it works"></span><strong id="How it works">How it works</strong>: The <code>(${env_var.STAGE} )</code> block will evaluate to absolutely nothing if <code>＄STAGE</code> is empty or unset. If <code>＄STAGE</code> is set to "dev", it will cleanly render <code>dev </code> in your prompt.
+
+</ul>
+<div id="Starship - Conditionals-QUESTION"><h2 id="QUESTION" class="header"><a href="#Starship - Conditionals-QUESTION">QUESTION</a></h2></div>
+
+<p>
+I need to show a variable in the prompt only IF another variable is NOT a certain value. Is that possible?
+</p>
+
+<div id="Starship - Conditionals-ANSWER"><h2 id="ANSWER" class="header"><a href="#Starship - Conditionals-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, this is completely possible by routing the logic through a Starship custom module. Because Starship's layout strings do not have native unequal/negation syntax (<code>!=</code>), you use the shell's logic inside the module's <code>when</code> condition to control it.
+</p>
+
+<div id="Starship - Conditionals-ANSWER-Implementation"><h3 id="Implementation" class="header"><a href="#Starship - Conditionals-ANSWER-Implementation">Implementation</a></h3></div>
+
+<p>
+Below is a setup that displays the environment variable <code>＄TARGET_APP</code> only if the variable <code>＄ENV_TYPE</code> is NOT equal to <code>"production"</code>.Add this configuration to your <code>starship.toml</code> file:
+</p>
+
+
+<pre toml>
+# 1. Place your custom module variable into your layout format
+format = """
+$directory\
+$custom.conditional_display\
+$character
+"""
+
+# 2. Define the negative logic inside the custom block
+[custom.conditional_display]
+# The 'when' command must return an exit code of 0 for the module to display.
+# In shell scripting, [ ! "$VAR" = "value" ] means "if NOT equal".
+when = '[ ! "$ENV_TYPE" = "production" ]'
+
+# If the check passes, fetch and echo the variable you want to show
+command = 'echo "$TARGET_APP"'
+
+style = "bold cyan"
+format = "via [$output]($style) "
+</pre>
+
+<div id="Starship - Conditionals-ANSWER-How It Handles Edges"><h3 id="How It Handles Edges" class="header"><a href="#Starship - Conditionals-ANSWER-How It Handles Edges">How It Handles Edges</a></h3></div>
+
+<ul>
+<li>
+If <code>＄ENV_TYPE</code> is <code>"production"</code>: The <code>when</code> condition fails (exits with code 1). The entire module is skipped, completely hiding the text and variable.
+
+<li>
+If <code>＄ENV_TYPE</code> is anything else (e.g., <code>"staging"</code>, <code>"development"</code>): The condition passes. Starship executes the <code>command</code> block, outputs the value of <code>＄TARGET_APP</code>, and formats it cleanly.
+
+<li>
+If <code>＄TARGET_APP</code> is empty: Even if the condition passes, <code>echo</code> yields nothing, preventing empty brackets or broken styles from muddying the prompt.
+
+</ul>
+<div id="Starship - Conditionals-QUESTION"><h2 id="QUESTION" class="header"><a href="#Starship - Conditionals-QUESTION">QUESTION</a></h2></div>
+
+<p>
+This is working for me. Is it possible to do an 'else' (for a different string for the 'not' situation)?
+</p>
+
+<div id="Starship - Conditionals-ANSWER"><h2 id="ANSWER" class="header"><a href="#Starship - Conditionals-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, you can achieve an "else" behavior, but because a single Starship custom module cannot split into multiple layout branches, you must use two complementary custom modules that act as opposing conditional toggles.
+</p>
+
+<div id="Starship - Conditionals-ANSWER-The &quot;If / Else&quot; Dual Module Strategy"><h3 id="The &quot;If / Else&quot; Dual Module Strategy" class="header"><a href="#Starship - Conditionals-ANSWER-The &quot;If / Else&quot; Dual Module Strategy">The "If / Else" Dual Module Strategy</a></h3></div>
+
+<p>
+To render String A when your condition is met, and String B when it is not, create two separate custom modules with inverted <code>when</code> logic and place them side-by-side in your layout.
+</p>
+
+<p>
+Here is how to show <code>＄TARGET_APP</code> when <code>＄ENV_TYPE</code> is NOT <code>"production"</code> (the "If" block), and show a generic warning string when it <span id="Starship - Conditionals-ANSWER-The &quot;If / Else&quot; Dual Module Strategy-IS"></span><strong id="IS">IS</strong> <code>"production"</code> (the "Else" block):
+</p>
+
+<pre toml>
+# 1. Place both modules side-by-side. 
+# Only one will ever satisfy its 'when' condition at any given moment.
+format = """
+$directory\
+$custom.if_not_prod\
+$custom.else_is_prod\
+$character
+"""
+
+# --- THE "IF" BLOCK ---
+# Displays only when $ENV_TYPE is NOT "production"
+[custom.if_not_prod]
+when = '[ ! "$ENV_TYPE" = "production" ]'
+command = 'echo "$TARGET_APP"'
+style = "bold cyan"
+format = "via [$output]($style) "
+
+# --- THE "ELSE" BLOCK ---
+# Displays only when $ENV_TYPE IS "production"
+[custom.else_is_prod]
+when = '[ "$ENV_TYPE" = "production" ]'
+command = 'echo "🔒 PROD-LOCKED"'
+style = "bold red"
+format = "[$output]($style) "
+</pre>
+
+<div id="Starship - Conditionals-ANSWER-Why This Works Efficiently"><h3 id="Why This Works Efficiently" class="header"><a href="#Starship - Conditionals-ANSWER-Why This Works Efficiently">Why This Works Efficiently</a></h3></div>
+
+<ul>
+<li>
+<span id="Starship - Conditionals-ANSWER-Why This Works Efficiently-Mutual Exclusion"></span><strong id="Mutual Exclusion">Mutual Exclusion</strong>: Because the shell evaluation for <code>when</code> in <code>else_is_prod</code> is the exact mathematical inverse of <code>if_not_prod</code>, Starship will never render both simultaneously.
+
+<li>
+<span id="Starship - Conditionals-ANSWER-Why This Works Efficiently-No Layout Gaps"></span><strong id="No Layout Gaps">No Layout Gaps</strong>: Starship completely strips out modules that fail their <code>when</code> command, meaning the inactive module won't leave behind any accidental spaces or broken padding.
+
+</ul>
+<div id="Starship - Conditionals-QUESION"><h2 id="QUESION" class="header"><a href="#Starship - Conditionals-QUESION">QUESION</a></h2></div>
+
+<p>
+How can I have the else block be 'nil'? (taking no space and showing nothing?)
+</p>
+
+<div id="Starship - Conditionals-ANSWER"><h2 id="ANSWER" class="header"><a href="#Starship - Conditionals-ANSWER">ANSWER</a></h2></div>
+
+<p>
+To make the Else block completely <code>nil</code> (taking up zero space and showing absolutely nothing), you simply remove the <code>else_is_prod</code> module from your format configuration, or leave its <code>command</code> completely empty.
+</p>
+
+<p>
+Starship naturally behaves this way: if a custom module fails its <code>when</code> condition or outputs an empty string, it yields <code>nil</code> space and leaves no trace in your prompt.
+</p>
+
+<div id="Starship - Conditionals-ANSWER-Option A: Remove the Else Module Completely (Simplest)"><h3 id="Option A: Remove the Else Module Completely (Simplest)" class="header"><a href="#Starship - Conditionals-ANSWER-Option A: Remove the Else Module Completely (Simplest)">Option A: Remove the Else Module Completely (Simplest)</a></h3></div>
+
+<p>
+If your "Else" case is truly meant to be blank, you do not need a second module at all. The <code>if_not_prod</code> module you already built will automatically disappear and collapse into nothing when <code>＄ENV_TYPE</code> is <code>"production"</code>.
+</p>
+
+<pre toml>
+# The prompt will automatically collapse to zero space when the condition fails
+format = """
+$directory\
+$custom.if_not_prod\
+$character
+"""
+
+[custom.if_not_prod]
+when = '[ ! "$ENV_TYPE" = "production" ]'
+command = 'echo "$TARGET_APP"'
+style = "bold cyan"
+format = "via [$output]($style) "
+</pre>
+
+<div id="Starship - Conditionals-ANSWER-Option B: The Blank Return Strategy"><h3 id="Option B: The Blank Return Strategy" class="header"><a href="#Starship - Conditionals-ANSWER-Option B: The Blank Return Strategy">Option B: The Blank Return Strategy</a></h3></div>
+
+<p>
+If you are building a complex chain where you must explicitly define the module, ensure the <code>command</code> outputs nothing. Starship ignores modules that return an empty string.
+</p>
+
+<pre toml>
+[custom.else_is_prod]
+when = '[ "$ENV_TYPE" = "production" ]'
+command = '' # Outputting nothing ensures it renders as a true 'nil' layout element
+</pre>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="unix_tools_terminals_starship.html">Starship</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -151,6 +151,89 @@ if [ "$PRODUCTION" = "OHIOTR" ]; then
 fi
 </pre>
 
+<div id="Scrolling Intro Banner"><h1 id="Scrolling Intro Banner" class="header"><a href="#Scrolling Intro Banner">Scrolling Intro Banner</a></h1></div>
+
+<p>
+This approach loads banners from a subfolder, where each <code>txt</code> file holds a banner in colored ascii.
+</p>
+
+<p>
+It slowly builds the banner line by line (deliberately), then pauses and scrolls the screen to lift the live prompt, clearing the banner off the screen of the terminal.
+</p>
+
+<p>
+This block lives in the bashrc or zshrc (or sourced from there).
+</p>
+
+<pre>
+#---------------------------- Colored 'Hexed' text ----------------------------#
+#
+# Check if the environment variable equals a specific value (e.g., "my_theme")
+if [[ "$PRODUCTION" = "OHIO" || "$PRODUCTION" = "OHIOTR" ]]; then
+    # Define the directory where the ASCII art text files are stored
+    banner_dir="$HOME/.ascii_art_dir"
+    
+    # Check if the specified directory actually exists on the filesystem
+    if [[ -d "$banner_dir" ]]; then
+        # Gather all .txt files in the directory into an array
+        files=("$banner_dir"/*.txt)
+
+        # Check if the array contains at least one file before proceeding
+        if (( ${#files[@]} &gt; 0 )); then
+            # Generate a random index using Zsh's RANDOM plus the process ID ($$) for uniqueness, 
+            # then use modulo (%) and 1-based indexing to pick a random file from the array
+            rand_idx=$(( (RANDOM + $$) % ${#files[@]} + 1 ))
+            random_file="${files[rand_idx]}"
+            
+            # Clean the file path string by stripping any hidden carriage return characters (\r)
+            random_file=$(printf '%s' "$random_file" | tr -d '\r')
+
+            # Verify that the randomly selected path points to a valid, readable file
+            if [[ -f "$random_file" ]]; then
+                # Initialize an empty local array to hold the lines of the file
+                local -a lines=()
+                
+                # Read the file line-by-line safely, preserving empty lines
+                while IFS= read -r line || [[ -n "$line" ]]; do
+                    lines+=("$line")
+                done &lt; "$random_file"
+
+                # Loop through each line of the ASCII art and print it with a slight delay for an animation effect
+                for line in "${lines[@]}"; do
+                    printf "%b\n" "$line"
+                    sleep 0.04
+                done
+
+                # Pause briefly so the user can look at the fully rendered art
+                sleep 1.5
+
+                # Calculate the exact height (number of lines) of the ASCII art
+                banner_height=${#lines[@]}
+                
+                # Scroll the terminal window upward dynamically (plus extra clearance rows) 
+                # to push the banner cleanly into the scrollback history buffer
+                for ((i=1; i&lt;=banner_height+15; i++)); do
+                    printf "\033[1S"
+                    sleep 0.02
+                done
+            fi
+        fi
+    fi
+fi
+</pre>
+
+<p>
+The actual banners are placed in a reference subfolder somewhere (sort out the paths in the main block):
+</p>
+
+<pre text>
+subfolder/
+├── hexed_undergronds.txt
+├── hexed_uprise.txt
+└── hexed_vintage.txt
+</pre>
+
+
 <p>
 <br>
 <hr>
