@@ -342,6 +342,7 @@ Because of this, sending them via tmux send-keys should work seamlessly right ou
 </p>
 
 <div id="Tmux - Bash Templates-After some 'Follow-on' Commands"><h2 id="After some 'Follow-on' Commands" class="header"><a href="#Tmux - Bash Templates-After some 'Follow-on' Commands">After some 'Follow-on' Commands</a></h2></div>
+
 <pre bash>
 #!/bin/bash
 
@@ -391,46 +392,129 @@ tmux attach-session -t "$SESSION_NAME"
 <pre bash>
 #!/bin/bash
 
-if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: $0 &lt;sequence-number&gt; &lt;shot-number&gt;"
-    echo "Example: $0 100 37"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
+    echo "Usage: $0 &lt;hou|nuke&gt; &lt;sequence-number&gt; &lt;shot-number&gt;"
+    echo "Example: $0 hou 100 37"
     exit 1
 fi
 
 SEQ="$1"
 SHOT="$2"
-SESSION_NAME="${SEQ}_${SHOT}"
+# Extract only the first character and convert to lowercase just in case
+FLAVOR="${3:0:1}"
+FLAVOR="${FLAVOR,,}"
 
-# 1. Create a new detached session with the first window 'houdini'
-tmux new-session -d -s "$SESSION_NAME" -n "houdini"
-# Split window into two panes
-tmux split-window -v -t "$SESSION_NAME:houdini"
-# Invoke your custom command/function in Pane 0 &amp; 1
-tmux send-keys -t "$SESSION_NAME:houdini.0" "nh $SEQ $SHOT; clear" C-m
-tmux send-keys -t "$SESSION_NAME:houdini.1" "nh $SEQ $SHOT" C-m
+# Define your custom session name variables
+SESSION_NAME_HOU="${SEQ}_${SHOT}_houdini"
+SESSION_NAME_NUKE="${SEQ}_${SHOT}_nuke"
 
-# 2. Create the second window ('nuke')
-tmux new-window -t "$SESSION_NAME" -n "nuke"
-# Split window into two panes
-tmux split-window -v -t "$SESSION_NAME:nuke"
-# Invoke commands in the second window for Pain 0 &amp; 1
-tmux send-keys -t "$SESSION_NAME:nuke.0" "clear; ncomp $SEQ $SHOT; clear" C-m
-tmux send-keys -t "$SESSION_NAME:nuke.1" "ncomp $SEQ $SHOT" C-m
+if [ "$FLAVOR" = "h" ]; then
+    SESSION_NAME="$SESSION_NAME_HOU"
+    
+    # --- HOUDINI WORKFLOW ---
+    tmux new-session -d -s "$SESSION_NAME" -n "houdini"
+    tmux split-window -v -t "$SESSION_NAME:houdini"
+    
+    tmux send-keys -t "$SESSION_NAME:houdini.0" "nh $SEQ $SHOT; clear" C-m
+    tmux send-keys -t "$SESSION_NAME:houdini.1" "nh $SEQ $SHOT" C-m
 
-# 3. Create the second window ('pics')
-tmux new-window -t "$SESSION_NAME" -n "pics"
-# Split window into two panes
-tmux split-window -v -t "$SESSION_NAME:pics"
+    tmux new-window -t "$SESSION_NAME" -n "pics"
+    tmux split-window -v -t "$SESSION_NAME:pics"
 
-# Invoke commands in the third window's panes, but allow for an alternative command/function if fails
-tmux send-keys -t "$SESSION_NAME:pics.0" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ls" C-m
-tmux send-keys -t "$SESSION_NAME:pics.1" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ltr" C-m
+    tmux send-keys -t "$SESSION_NAME:pics.0" "clear; ncomp $SEQ $SHOT; clear" C-m
+    tmux send-keys -t "$SESSION_NAME:pics.1" "ncomp $SEQ $SHOT" C-m
 
-# 4. Finalize view and attach
-tmux select-window -t "$SESSION_NAME:houdini"
-tmux select-pane -t "$SESSION_NAME:houdini.0"
+    # tmux new-window -t "$SESSION_NAME" -n "pics"
+    # tmux split-window -v -t "$SESSION_NAME:pics"
+    # tmux send-keys -t "$SESSION_NAME:pics.0" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ls" C-m
+    # tmux send-keys -t "$SESSION_NAME:pics.1" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ltr" C-m
+
+    tmux select-window -t "$SESSION_NAME:houdini"
+    tmux select-pane -t "$SESSION_NAME:houdini.0"
+
+elif [ "$FLAVOR" = "n" ]; then
+    SESSION_NAME="$SESSION_NAME_NUKE"
+    
+    # --- NUKE WORKFLOW ---
+    tmux new-session -d -s "$SESSION_NAME" -n "nuke"
+    tmux split-window -v -t "$SESSION_NAME:nuke"
+    
+    tmux send-keys -t "$SESSION_NAME:nuke.0" "clear; ncomp $SEQ $SHOT; clear" C-m
+    tmux send-keys -t "$SESSION_NAME:nuke.1" "ncomp $SEQ $SHOT" C-m
+
+    tmux new-window -t "$SESSION_NAME" -n "pics"
+    tmux split-window -v -t "$SESSION_NAME:pics"
+
+    tmux send-keys -t "$SESSION_NAME:pics.0" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ls" C-m
+    tmux send-keys -t "$SESSION_NAME:pics.1" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ltr" C-m
+
+    tmux select-window -t "$SESSION_NAME:nuke"
+    tmux select-pane -t "$SESSION_NAME:nuke.0"
+
+else
+    echo "Error: Unknown flavor '$FLAVOR'. Use 'hou' or 'nuke'."
+    exit 1
+fi
+
 tmux attach-session -t "$SESSION_NAME"
 </pre>
+
+<div id="Allowing for just first letter for Flavor"><h1 id="Allowing for just first letter for Flavor" class="header"><a href="#Allowing for just first letter for Flavor">Allowing for just first letter for Flavor</a></h1></div>
+
+<pre bash>
+# Extract only the first character and convert to lowercase just in case
+FLAVOR="${3:0:1}"
+FLAVOR="${FLAVOR,,}"
+</pre>
+
+<p>
+Those two lines use built-in Bash features to safely clean and normalize whatever the user types for the flavor argument so that variations like <code>H</code>, <code>Hou</code>, or <code>Houdini</code> all map correctly.
+</p>
+
+<p>
+Here is a breakdown of how each line works:
+</p>
+
+<div id="Allowing for just first letter for Flavor-Extracting the first character: FLAVOR=&quot;${3:0:1}&quot;"><h3 id="Extracting the first character: FLAVOR=&quot;${3:0:1}&quot;" class="header"><a href="#Allowing for just first letter for Flavor-Extracting the first character: FLAVOR=&quot;${3:0:1}&quot;">Extracting the first character: FLAVOR="${3:0:1}"</a></h3></div>
+
+<p>
+This uses Bash parameter expansion to slice a substring out of the third positional argument (<code>＄3</code>).
+</p>
+<ul>
+<li>
+<code>3</code>: Refers to the third argument passed to the script (e.g., houdini).
+
+<li>
+<code>:0</code>: Tells Bash to start slicing at index 0 (the very beginning of the string).
+
+<li>
+<code>:1</code>: Tells Bash to take a length of 1 character.
+
+</ul>
+<p>
+So, whether the user types <code>hou</code>, <code>Houdini</code>, <code>h</code>, or even something like <code>heavy</code>, this line grabs just the <code>h</code> (or <code>H</code>).
+</p>
+
+<div id="Allowing for just first letter for Flavor-Converting to lowercase: FLAVOR&quot;${FLAVOR,,}&quot;"><h3 id="Converting to lowercase: FLAVOR&quot;${FLAVOR,,}&quot;" class="header"><a href="#Allowing for just first letter for Flavor-Converting to lowercase: FLAVOR&quot;${FLAVOR,,}&quot;">Converting to lowercase: FLAVOR"${FLAVOR,,}"</a></h3></div>
+
+<p>
+This uses Bash case-modification operator to ensure the letter is strictly lowercase.
+</p>
+
+<ul>
+<li>
+<code>,,</code>: This specific operator tells Bash to convert all characters in the variable to lowercase. (If it were uppercase like <code>^^</code>, it would convert everything to uppercase).
+
+</ul>
+<p>
+So, if a user accidentally types an uppercase letter like <code>H</code> or <code>N</code>, this line instantly turns it into <code>h</code> or <code>n</code>.
+</p>
+
+<div id="Allowing for just first letter for Flavor-Why do both?"><h3 id="Why do both?" class="header"><a href="#Allowing for just first letter for Flavor-Why do both?">Why do both?</a></h3></div>
+
+<p>
+By combining them, your script becomes completely foolproof. No matter if the user enters <code>h</code>, <code>hou</code>, <code>HOUDINI</code>, or <code>NuKe</code>, the script reliably reduces it down to a clean lowercase <code>h</code> or <code>n</code>, making your if/elif statements evaluate successfully every time.
+</p>
 
 <p>
 <br>
