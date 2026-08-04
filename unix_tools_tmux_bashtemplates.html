@@ -83,6 +83,351 @@ Make it executable: <code>chmod +x tmux-template.sh</code>
 Run it with your variable: <code>./tmux-template.sh "01-05"</code>
 
 </ul>
+<div id="Tmux - Bash Templates-QUESTION"><h2 id="QUESTION" class="header"><a href="#Tmux - Bash Templates-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Before I try the bash approach, is this compatible with both Bash and Zsh?
+</p>
+
+<div id="Tmux - Bash Templates-ANSWER"><h2 id="ANSWER" class="header"><a href="#Tmux - Bash Templates-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, this is fully compatible with both Bash and Zsh.
+</p>
+
+<p>
+Since the script itself is executed by the system shell specified in the shebang line (<code>#!/bin/bash</code>), it doesn't matter whether your interactive terminal uses Bash or Zsh—the script will run the exact same way.
+</p>
+
+<div id="Tmux - Bash Templates-ANSWER-A Quick Tip for Zsh Users"><h3 id="A Quick Tip for Zsh Users" class="header"><a href="#Tmux - Bash Templates-ANSWER-A Quick Tip for Zsh Users">A Quick Tip for Zsh Users</a></h3></div>
+
+<p>
+If your session names or directory structures include special characters or if you decide to pass arguments with slashes (like <code>01/05</code>), Zsh handles pattern matching and expansion slightly differently than Bash.
+</p>
+
+<p>
+To ensure your script plays nicely when you run it from a Zsh terminal, just make sure you wrap your arguments in quotes when calling the script:
+</p>
+
+<pre bash>
+./tmux-template.sh "01/05"
+</pre>
+
+<div id="Tmux - Bash Templates-QUESTION"><h2 id="QUESTION" class="header"><a href="#Tmux - Bash Templates-QUESTION">QUESTION</a></h2></div>
+
+<p>
+Is it possible to run commands in the windows/panes during the setup script?
+</p>
+
+<p>
+I'd like to give a sequence number and a shot number and have the session be created, the windows named as planned (which should be generic apart form the session name), then call on utiities to navigate and set the env for each window based on the two numbers given as args with running the Tmux setup script.
+</p>
+
+<p>
+For example:
+</p>
+
+<pre bash>
+Tmux-template.sh 100 37
+</pre>
+
+<p>
+(Note: usually the args would be numbers, but they could be strings.)
+</p>
+
+<div id="Tmux - Bash Templates-ANSWER"><h2 id="ANSWER" class="header"><a href="#Tmux - Bash Templates-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, absolutely! You can easily accept multiple arguments (like a sequence number and shot number) and pass automated commands down into specific windows and panes upon creation using tmux send-keys.  
+</p>
+
+<p>
+Here is how you can update your <code>tmux-template.sh</code> script to handle two arguments (e.g., sequence and shot) and execute setup commands or environment variables inside each pane automatically:
+</p>
+
+<div id="Tmux - Bash Templates-ANSWER-The Enhanced Setup Script (tmux-template.sh)"><h3 id="The Enhanced Setup Script (tmux-template.sh)" class="header"><a href="#Tmux - Bash Templates-ANSWER-The Enhanced Setup Script (tmux-template.sh)">The Enhanced Setup Script (tmux-template.sh)</a></h3></div>
+
+<p>
+{{[bash
+#!/bin/bash
+</p>
+
+<ul>
+<li>
+Ensure both sequence and shot numbers are provided
+
+</ul>
+<p>
+if [ -z "\(1" ] || [ -z "\)2" ]; then
+</p>
+<pre><code>echo "Usage: $0 <sequence-number> <shot-number>"
+echo "Example: $0 100 37"
+exit 1
+</code></pre>
+<p>
+fi
+</p>
+
+<p>
+SEQ="$1"
+SHOT="$2"
+SESSION_NAME="\({SEQ}_\){SHOT}" # Creates session name like "100_37"
+</p>
+
+<ul>
+<li>
+Define your directory structure template using the variables
+
+<li>
+Adjust this path pattern to match how your directories are actually laid out
+
+</ul>
+<p>
+PROJECT_DIR="/path/to/your/shows/seq_\(SEQ/shot_\)SHOT"
+</p>
+
+<ul>
+<li>
+-----------------------------------------------------------------
+
+<li>
+1. Create session and first window ('Shots' with 2 panes)
+
+<li>
+-----------------------------------------------------------------
+
+</ul>
+<p>
+tmux new-session -d -s "$SESSION_NAME" -n "Shots"
+</p>
+
+<ul>
+<li>
+Split the 'Shots' window vertically into two panes (Pane 0 top, Pane 1 bottom)
+
+</ul>
+<p>
+tmux split-window -v -t "$SESSION_NAME:Shots"
+</p>
+
+<ul>
+<li>
+Configure Pane 0 (e.g., Main work pane: nav to directory &amp; set environment)
+
+</ul>
+<p>
+tmux send-keys -t "\(SESSION_NAME:Shots.0" "cd \)PROJECT_DIR" C-m
+tmux send-keys -t "\(SESSION_NAME:Shots.0" "echo 'Loaded Sequence \)SEQ, Shot $SHOT'" C-m
+</p>
+<ul>
+<li>
+Add your custom environment command here, e.g.:
+
+<li>
+tmux send-keys -t "\(SESSION_NAME:Shots.0" "my_custom_env_tool --seq \)SEQ --shot $SHOT" C-m
+
+<li>
+Configure Pane 1 (e.g., Secondary pane, like logs or playback tools)
+
+</ul>
+<p>
+tmux send-keys -t "\(SESSION_NAME:Shots.1" "cd \)PROJECT_DIR" C-m
+tmux send-keys -t "$SESSION_NAME:Shots.1" "echo 'Utility / Logs Pane'" C-m
+</p>
+
+
+<ul>
+<li>
+-----------------------------------------------------------------
+
+<li>
+2. Create the second window ('Utility' with a single pane)
+
+<li>
+-----------------------------------------------------------------
+
+</ul>
+<p>
+tmux new-window -t "$SESSION_NAME" -n "Utility"
+</p>
+
+<ul>
+<li>
+Configure the Utility window pane
+
+</ul>
+<p>
+tmux send-keys -t "\(SESSION_NAME:Utility.0" "cd \)PROJECT_DIR" C-m
+tmux send-keys -t "$SESSION_NAME:Utility.0" "htop" C-m # Example: auto-launching a utility
+</p>
+
+
+<ul>
+<li>
+-----------------------------------------------------------------
+
+<li>
+3. Finalize
+
+<li>
+-----------------------------------------------------------------
+
+<li>
+Select the first window and primary pane before attaching
+
+</ul>
+<p>
+tmux select-window -t "$SESSION_NAME:Shots"
+tmux select-pane -t "$SESSION_NAME:Shots.0"
+</p>
+
+<ul>
+<li>
+Attach to the session
+
+</ul>
+<p>
+tmux attach-session -t "$SESSION_NAME"
+}}}
+</p>
+
+<div id="Tmux - Bash Templates-ANSWER-How to use it:"><h3 id="How to use it:" class="header"><a href="#Tmux - Bash Templates-ANSWER-How to use it:">How to use it:</a></h3></div>
+
+<ul>
+<li>
+Save the code into a file called <code>tmux-template.sh</code>.
+
+<li>
+Give it execution permissions:
+
+</ul>
+  
+<pre bash>
+chmod +x tmux-template.sh
+</pre>
+
+<p>
+Run it using your custom numbers:
+</p>
+
+<pre bash>
+./tmux-template.sh 100 37
+</pre>
+
+<div id="Tmux - Bash Templates-ANSWER-What happens under the hood:"><h3 id="What happens under the hood:" class="header"><a href="#Tmux - Bash Templates-ANSWER-What happens under the hood:">What happens under the hood:</a></h3></div>
+
+<ul>
+<li>
+<code>C-m</code>: This stands for "Control-M", which is the equivalent of pressing <code>Enter</code> in Tmux. It tells the pane to execute whatever string was just sent to it.
+
+<li>
+Target Specifiers (<code>$SESSION_NAME:Shots.0</code>): Tmux reads these identifiers precisely to mean <code>Session</code> -&gt; <code>Window Name</code> -&gt; <code>Pane Index</code> (<code>0</code> for top/left, <code>1</code> for bottom/right), allowing you to control completely different tasks in different areas simultaneously.  
+
+</ul>
+<div id="Tmux - Bash Templates-QUESTION"><h2 id="QUESTION" class="header"><a href="#Tmux - Bash Templates-QUESTION">QUESTION</a></h2></div>
+
+<p>
+If I had a function/alias that takes these same two args, could this set up script run them in designated panes? Example would be to run this to set up the location and env vars in a pane:
+</p>
+
+<pre bash>
+nh 100 37
+</pre>
+
+<div id="Tmux - Bash Templates-ANSWER"><h2 id="ANSWER" class="header"><a href="#Tmux - Bash Templates-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, absolutely. Since <code>nh</code> behaves like a standard command line utility accepting arguments, you can pass it directly via tmux send-keys into any pane you want.
+</p>
+
+<p>
+Assuming <code>nh</code> is a registered function, alias, or executable script available in your shell environment, your script can type it out and hit enter automatically.
+</p>
+
+<div id="Tmux - Bash Templates-ANSWER-Updated Setup Script (tmux-template.sh)"><h4 id="Updated Setup Script (tmux-template.sh)" class="header"><a href="#Tmux - Bash Templates-ANSWER-Updated Setup Script (tmux-template.sh)">Updated Setup Script (tmux-template.sh)</a></h4></div>
+
+<pre bash>
+#!/bin/bash
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $0 &lt;sequence-number&gt; &lt;shot-number&gt;"
+    echo "Example: $0 100 37"
+    exit 1
+fi
+
+SEQ="$1"
+SHOT="$2"
+SESSION_NAME="${SEQ}_${SHOT}"
+
+# 1. Create a new detached session with the first window 'Shots'
+tmux new-session -d -s "$SESSION_NAME" -n "Shots"
+
+# Split window into two panes
+tmux split-window -v -t "$SESSION_NAME:Shots"
+
+# -----------------------------------------------------------------
+# Invoke your custom command/function in Pane 0
+# -----------------------------------------------------------------
+tmux send-keys -t "$SESSION_NAME:Shots.0" "nh $SEQ $SHOT" C-m
+
+# -----------------------------------------------------------------
+# If Pane 1 needs something else (or even the same command):
+# -----------------------------------------------------------------
+# tmux send-keys -t "$SESSION_NAME:Shots.1" "some_other_tool $SEQ $SHOT" C-m
+
+
+# 2. Create the second window ('Utility')
+tmux new-window -t "$SESSION_NAME" -n "Utility"
+
+# Invoke utility commands in the second window if needed
+tmux send-keys -t "$SESSION_NAME:Utility.0" "htop" C-m
+
+
+# 3. Finalize view and attach
+tmux select-window -t "$SESSION_NAME:Shots"
+tmux select-pane -t "$SESSION_NAME:Shots.0"
+tmux attach-session -t "$SESSION_NAME"
+</pre>
+
+<div id="Tmux - Bash Templates-ANSWER-Important Caveat for Aliases &amp; Functions:"><h3 id="Important Caveat for Aliases &amp; Functions:" class="header"><a href="#Tmux - Bash Templates-ANSWER-Important Caveat for Aliases &amp; Functions:">Important Caveat for Aliases &amp; Functions:</a></h3></div>
+
+<p>
+If <code>nh</code> is defined as a Bash/Zsh alias or a shell function (rather than an independent executable script stored in your <code>＄PATH</code>), newly spawned Tmux panes might not recognize it initially. Shells spawned inside Tmux default to non-interactive or fresh environments where local aliases aren't always auto-imported.
+</p>
+
+<p>
+To ensure <code>nh</code> is always found:
+</p>
+<ul>
+<li>
+Best approach: Turn <code>nh</code> into a small standalone script (e.g., an executable file named <code>nh</code> placed somewhere in your system or local <code>~/bin path</code>).
+
+<li>
+Alternative approach: If it must remain a shell function/alias, make sure it's defined inside your <code>~/.bashrc</code> or <code>~/.zshrc</code>, and your Tmux template sources it first:
+
+</ul>
+  
+<pre bash>
+tmux send-keys -t "$SESSION_NAME:Shots.0" "source ~/.bashrc &amp;&amp; nh $SEQ $SHOT" C-m
+</pre>
+
+<div id="Tmux - Bash Templates-QUESTION"><h2 id="QUESTION" class="header"><a href="#Tmux - Bash Templates-QUESTION">QUESTION</a></h2></div>
+
+<p>
+If these function/aliases work currently in my Tmux sessions, is that an indication that they might work with this setup script?
+</p>
+
+<div id="Tmux - Bash Templates-ANSWER"><h2 id="ANSWER" class="header"><a href="#Tmux - Bash Templates-ANSWER">ANSWER</a></h2></div>
+
+<p>
+Yes, exactly. If those functions and aliases are already available and working inside your existing manual Tmux sessions, it is a strong indication that your shell configuration (<code>.bashrc</code> or <code>.zshrc</code>) is already loading them correctly inside Tmux.
+</p>
+
+<p>
+Because of this, sending them via tmux send-keys should work seamlessly right out of the box without any extra configuration.
+</p>
+
+
 <p>
 <br>
 <hr>
