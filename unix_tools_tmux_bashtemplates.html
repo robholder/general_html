@@ -341,6 +341,96 @@ Yes, exactly. If those functions and aliases are already available and working i
 Because of this, sending them via tmux send-keys should work seamlessly right out of the box without any extra configuration.
 </p>
 
+<div id="Tmux - Bash Templates-After some 'Follow-on' Commands"><h2 id="After some 'Follow-on' Commands" class="header"><a href="#Tmux - Bash Templates-After some 'Follow-on' Commands">After some 'Follow-on' Commands</a></h2></div>
+<pre bash>
+#!/bin/bash
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $0 &lt;sequence-number&gt; &lt;shot-number&gt;"
+    echo "Example: $0 100 37"
+    exit 1
+fi
+
+SEQ="$1"
+SHOT="$2"
+SESSION_NAME="${SEQ}_${SHOT}"
+
+# 1. Create a new detached session with the first window 'houdini'
+tmux new-session -d -s "$SESSION_NAME" -n "houdini"
+# Split window into two panes
+tmux split-window -v -t "$SESSION_NAME:houdini"
+# Invoke your custom command/function in Pane 0 &amp; 1
+tmux send-keys -t "$SESSION_NAME:houdini.0" "nh $SEQ $SHOT; clear" C-m
+tmux send-keys -t "$SESSION_NAME:houdini.1" "nh $SEQ $SHOT" C-m
+
+# 2. Create the second window ('nuke')
+tmux new-window -t "$SESSION_NAME" -n "nuke"
+# Split window into two panes
+tmux split-window -v -t "$SESSION_NAME:nuke"
+# Invoke commands in the second window for Pain 0 &amp; 1
+tmux send-keys -t "$SESSION_NAME:nuke.0" "clear; ncomp $SEQ $SHOT; clear" C-m
+tmux send-keys -t "$SESSION_NAME:nuke.1" "ncomp $SEQ $SHOT" C-m
+
+# 3. Create the second window ('pics')
+tmux new-window -t "$SESSION_NAME" -n "pics"
+# Split window into two panes
+tmux split-window -v -t "$SESSION_NAME:pics"
+
+# Invoke commands in the third window's panes, but allow for an alternative command/function if fails
+tmux send-keys -t "$SESSION_NAME:pics.0" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ls" C-m
+tmux send-keys -t "$SESSION_NAME:pics.1" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ltr" C-m
+
+# 4. Finalize view and attach
+tmux select-window -t "$SESSION_NAME:houdini"
+tmux select-pane -t "$SESSION_NAME:houdini.0"
+tmux attach-session -t "$SESSION_NAME"
+</pre>
+
+<div id="Separating into Two 'Flavors' (Houdini &amp; Nuke)"><h1 id="Separating into Two 'Flavors' (Houdini &amp; Nuke)" class="header"><a href="#Separating into Two 'Flavors' (Houdini &amp; Nuke)">Separating into Two 'Flavors' (Houdini &amp; Nuke)</a></h1></div>
+
+<pre bash>
+#!/bin/bash
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $0 &lt;sequence-number&gt; &lt;shot-number&gt;"
+    echo "Example: $0 100 37"
+    exit 1
+fi
+
+SEQ="$1"
+SHOT="$2"
+SESSION_NAME="${SEQ}_${SHOT}"
+
+# 1. Create a new detached session with the first window 'houdini'
+tmux new-session -d -s "$SESSION_NAME" -n "houdini"
+# Split window into two panes
+tmux split-window -v -t "$SESSION_NAME:houdini"
+# Invoke your custom command/function in Pane 0 &amp; 1
+tmux send-keys -t "$SESSION_NAME:houdini.0" "nh $SEQ $SHOT; clear" C-m
+tmux send-keys -t "$SESSION_NAME:houdini.1" "nh $SEQ $SHOT" C-m
+
+# 2. Create the second window ('nuke')
+tmux new-window -t "$SESSION_NAME" -n "nuke"
+# Split window into two panes
+tmux split-window -v -t "$SESSION_NAME:nuke"
+# Invoke commands in the second window for Pain 0 &amp; 1
+tmux send-keys -t "$SESSION_NAME:nuke.0" "clear; ncomp $SEQ $SHOT; clear" C-m
+tmux send-keys -t "$SESSION_NAME:nuke.1" "ncomp $SEQ $SHOT" C-m
+
+# 3. Create the second window ('pics')
+tmux new-window -t "$SESSION_NAME" -n "pics"
+# Split window into two panes
+tmux split-window -v -t "$SESSION_NAME:pics"
+
+# Invoke commands in the third window's panes, but allow for an alternative command/function if fails
+tmux send-keys -t "$SESSION_NAME:pics.0" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ls" C-m
+tmux send-keys -t "$SESSION_NAME:pics.1" "clear; if npics $SEQ $SHOT; then :; else ncomp $SEQ $SHOT; fi; ltr" C-m
+
+# 4. Finalize view and attach
+tmux select-window -t "$SESSION_NAME:houdini"
+tmux select-pane -t "$SESSION_NAME:houdini.0"
+tmux attach-session -t "$SESSION_NAME"
+</pre>
 
 <p>
 <br>
