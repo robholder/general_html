@@ -516,6 +516,144 @@ So, if a user accidentally types an uppercase letter like <code>H</code> or <cod
 By combining them, your script becomes completely foolproof. No matter if the user enters <code>h</code>, <code>hou</code>, <code>HOUDINI</code>, or <code>NuKe</code>, the script reliably reduces it down to a clean lowercase <code>h</code> or <code>n</code>, making your if/elif statements evaluate successfully every time.
 </p>
 
+<div id="Clashing Session Names"><h1 id="Clashing Session Names" class="header"><a href="#Clashing Session Names">Clashing Session Names</a></h1></div>
+
+<p>
+If the script tries to create a session name that already exists (for example, you already have <code>100_37_houdini</code> running and you run the script for it again), Tmux will abort the creation and throw an error, causing your script to fail right out of the gate.
+</p>
+
+<p>
+Specifically, Tmux prints an error message to your terminal like:
+</p>
+
+<pre bash>
+duplicate session: 100_37_houdini
+</pre>
+
+<p>
+Because the script errors out at the tmux new-session line, it won't run any of the window/pane creation logic, and it won't execute your final tmux attach-session command.
+</p>
+
+<div id="Clashing Session Names-How to handle this (The Smart Fix)"><h2 id="How to handle this (The Smart Fix)" class="header"><a href="#Clashing Session Names-How to handle this (The Smart Fix)">How to handle this (The Smart Fix)</a></h2></div>
+
+<p>
+Depending on what you actually want to happen when a session already exists, you have two options:
+</p>
+
+<div id="Clashing Session Names-How to handle this (The Smart Fix)-Option 1: Just jump straight into the existing session (Most common)"><h3 id="Option 1: Just jump straight into the existing session (Most common)" class="header"><a href="#Clashing Session Names-How to handle this (The Smart Fix)-Option 1: Just jump straight into the existing session (Most common)">Option 1: Just jump straight into the existing session (Most common)</a></h3></div>
+
+<p>
+If a session for that shot is already open, you probably don't want to recreate it from scratch—you just want to attach to the one that's already running.
+</p>
+
+<p>
+You can update the session creation line in your script to use Tmux’s <code>-A</code> (<code>attach</code>) flag. If the session already exists, <code>-A</code> tells Tmux to skip creating a new one and just attach to it; if it doesn't exist, it creates it normally:
+</p>
+
+<pre bash>
+# Instead of: tmux new-session -d -s "$SESSION_NAME" ...
+# Use -Ad (Attach + Detached initialization, which safely handles existing sessions):
+tmux new-session -Ad -s "$SESSION_NAME" -n "houdini"
+</pre>
+
+<p>
+(Combined with <code>-d</code>, it ensures the session initializes safely in the background if it's new, and then your final tmux attach-session at the bottom of the script will drop you right into it).
+</p>
+
+<div id="Clashing Session Names-How to handle this (The Smart Fix)-Option 2: Throw a clean warning message"><h3 id="Option 2: Throw a clean warning message" class="header"><a href="#Clashing Session Names-How to handle this (The Smart Fix)-Option 2: Throw a clean warning message">Option 2: Throw a clean warning message</a></h3></div>
+
+<p>
+If you want your script to explicitly warn you instead of crashing ungracefully, you can check if the session exists using tmux has-session before running your block:
+</p>
+
+<pre bash>
+if tmux has-session -t "$SESSION_NAME" 2&gt;/dev/null; then
+    echo "Session '$SESSION_NAME' already exists! Attaching..."
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+fi
+</pre>
+
+<div id="Avoid Mirroring the Same Tmux Session"><h1 id="Avoid Mirroring the Same Tmux Session" class="header"><a href="#Avoid Mirroring the Same Tmux Session">Avoid Mirroring the Same Tmux Session</a></h1></div>
+
+<p>
+The unfortunate thing is this re-attaches to an existing Tmux session if it is already attached and creates a 'mirror' in the current Terminal.
+</p>
+
+<p>
+If you are running the script from a brand new OS terminal window, which launches a brand new Tmux client attached to the existing session, it results in two separate terminal windows mirroring the exact same thing.
+</p>
+
+<p>
+Here is the underlying technical reality: Tmux only knows about text terminals (<code>TTYs</code>), it has no idea what graphical OS window or desktop workspace your terminal emulator lives in. Because of this, a shell script running inside a terminal cannot natively command your operating system (Linux/macOS) to "find the GUI window on workspace 2 and bring it to the front."
+</p>
+
+<p>
+However, depending on what you want to happen, you have two great ways to handle this:
+</p>
+
+<div id="Avoid Mirroring the Same Tmux Session-Option 1: &quot;Steal&quot; the session into your current terminal (-d)"><h3 id="Option 1: &quot;Steal&quot; the session into your current terminal (-d)" class="header"><a href="#Avoid Mirroring the Same Tmux Session-Option 1: &quot;Steal&quot; the session into your current terminal (-d)">Option 1: "Steal" the session into your current terminal (-d)</a></h3></div>
+
+<p>
+If you want to stop spawning a second terminal view and instead pull the session directly into your current window (while automatically disconnecting it from the old one), you can add the -d (detach) flag to your attach command:
+</p>
+
+<pre bash>
+# This detaches the session from any other terminal and brings it here
+tmux attach-session -d -t "$SESSION_NAME"
+</pre>
+
+<p>
+What happens: The old terminal window will disconnect/exit, and the session will be safely transferred to your current terminal window.
+</p>
+
+<div id="Avoid Mirroring the Same Tmux Session-Option 2: Detect if it's running and block duplicates"><h3 id="Option 2: Detect if it's running and block duplicates" class="header"><a href="#Avoid Mirroring the Same Tmux Session-Option 2: Detect if it's running and block duplicates">Option 2: Detect if it's running and block duplicates</a></h3></div>
+
+<p>
+If you want the script to realize "Hey, this session is already open somewhere" and prevent you from accidentally spawning a messy duplicate view, you can check if the session already has an active client using tmux list-clients:
+</p>
+
+<pre bash>
+# Check if the session is already actively attached to a client
+if tmux list-clients -t "$SESSION_NAME" 2&gt;/dev/null | grep -q .; then
+    echo "Session '$SESSION_NAME' is already open in another window!"
+    echo "Please switch to that window or use 'tmux attach -d -t $SESSION_NAME' to steal it."
+    exit 1
+fi
+</pre>
+
+<div id="Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?"><h2 id="Danger in Stealing a Session?" class="header"><a href="#Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?">Danger in Stealing a Session?</a></h2></div>
+
+<p>
+Stealing a session will not harm a background processes.
+</p>
+
+<div id="Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?-The Technical Reality of tmux attach -d"><h3 id="The Technical Reality of tmux attach -d" class="header"><a href="#Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?-The Technical Reality of tmux attach -d">The Technical Reality of tmux attach -d</a></h3></div>
+
+<p>
+When you use the <code>-d</code> flag to "steal" or re-attach a session, Tmux only disconnects the client view (the terminal UI window). It does not touch, restart, or kill any processes running inside the panes. The Tmux server keeps everything alive in the background. If you had a render or a long script running, it would keep right on going without interruption.
+</p>
+
+<div id="Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?-The Technical Reality of tmux attach -d-Why the Warning Approach is Still Better"><h4 id="Why the Warning Approach is Still Better" class="header"><a href="#Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?-The Technical Reality of tmux attach -d-Why the Warning Approach is Still Better">Why the Warning Approach is Still Better</a></h4></div>
+
+<p>
+Even though your background processes are safe from the <code>-d</code> flag, your workflow peace-of-mind is not!
+</p>
+
+<p>
+Getting suddenly yanked out of a session because someone (or a stray script) attached to it from another terminal window can be deeply disruptive—especially if you're actively typing or looking at something on another monitor. Choosing the warning route is definitely the safer choice for a clean, predictable pipeline.
+</p>
+
+<div id="Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?-The Technical Reality of tmux attach -d-Adding the Warning to Your Script"><h4 id="Adding the Warning to Your Script" class="header"><a href="#Avoid Mirroring the Same Tmux Session-Danger in Stealing a Session?-The Technical Reality of tmux attach -d-Adding the Warning to Your Script">Adding the Warning to Your Script</a></h4></div>
+
+<p>
+You can implement this safely right after your session name logic is determined. If the session is already active elsewhere, it will stop, print a clear warning, and exit without touching anything (as described above).
+</p>
+
+<p>
+This keeps your workspace organized, protects your active views from accidental overlap, and ensures your script behaves predictably every time you run it.
+</p>
+
 <p>
 <br>
 <hr>
