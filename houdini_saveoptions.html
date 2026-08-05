@@ -56,9 +56,138 @@ The "Make Numbered Backup" option in SideFX Houdini creates an incremental backu
 <span id="Houdini Save/Backup Options-Key Settings &amp; Location-Difference"></span><strong id="Difference">Difference</strong>: This applies to your regular manual saves or auto-saves depending on how you configure your global preferences.
 
 </ul>
+<div id="Houdini's Save and Autosave Strategy"><h1 id="Houdini's Save and Autosave Strategy" class="header"><a href="#Houdini's Save and Autosave Strategy">Houdini's Save and Autosave Strategy</a></h1></div>
+
 <p>
-If you want, I can share how to change the maximum number of backup files kept on your disk or how to set up an auto-save default script.
+By default, Houdini handles and names auto-saves slightly differently than your manual saves. [1] 
 </p>
+
+<p>
+If you use the default interface preferences, manual saves get labeled with a <code>_bak</code> suffix, while background auto-saves get stamped with an <code>_auto</code> suffix. However, if you are using highly customized directory patterns (as described in this page), your auto-saves will actually bypass your file-specific subfolders unless you configure a separate matching variable.
+</p>
+
+<div id="Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below"><h3 id="How Auto-Saves Interact with Configurations Described Below" class="header"><a href="#Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below">How Auto-Saves Interact with Configurations Described Below</a></h3></div>
+
+<ul>
+<li>
+<span id="Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-The Same Directory"></span><strong id="The Same Directory">The Same Directory</strong>: By default, auto-saves use the exact same directory target variable that you defined in <code>HOUDINI_BACKUP_DIR</code>. They will successfully place themselves into your monthly <code>backup_XYZ_2026_08</code> folder.
+
+<li>
+<span id="Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-The Broken Naming Loop"></span><strong id="The Broken Naming Loop">The Broken Naming Loop</strong>: However, auto-saves completely ignore the <code>HOUDINI_BACKUP_FILENAME</code> rules you just set up. This means auto-saves will skip your customized <code>＄BASENAME/</code> subfolder structure. Instead, they will be dropped loosely into the main monthly folder, cluttering the layout.
+
+</ul>
+<div id="Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-The Fix: Mirroring the Settings for Auto-Saves"><h4 id="The Fix: Mirroring the Settings for Auto-Saves" class="header"><a href="#Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-The Fix: Mirroring the Settings for Auto-Saves">The Fix: Mirroring the Settings for Auto-Saves</a></h4></div>
+
+<p>
+To force your background auto-saves to mirror your manual behavior precisely—subfolders and all—you need to configure the companion environment variable: <code>HOUDINI_AUTOSAVE_FILENAME</code>.
+</p>
+
+<p>
+Open your houdini.env file and update your variables block to include this matching definition: [2] 
+</p>
+
+<pre ini>
+# ---------------------------------------------
+# DYNAMIC PER-FILE BACKUP PIPELINE
+# ---------------------------------------------
+# 1. Direct the folder target path for both manual and auto-saves
+HOUDINI_BACKUP_DIR = "$HIP/backup_XYZ_\$Y_\$M"
+
+# 2. Control manual save templates (e.g., pyro_v01_bak1.hip)
+HOUDINI_BACKUP_FILENAME = "\$BASENAME/\$BASENAME_bak\$N.hip"
+
+# 3. Control auto-save templates (e.g., pyro_v01_auto1.hip)
+HOUDINI_AUTOSAVE_FILENAME = "\$BASENAME/\$BASENAME_auto\$N.hip"
+
+# 4. Restrict history clutter per file
+HOUDINI_MAX_BACKUP_FILES = 10
+</pre>
+
+<div id="Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-Why This Is highly Optimized"><h4 id="Why This Is highly Optimized" class="header"><a href="#Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-Why This Is highly Optimized">Why This Is highly Optimized</a></h4></div>
+
+<p>
+By keeping the structures split:
+</p>
+<ul>
+<li>
+<span id="Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-Why This Is highly Optimized-Clear Context"></span><strong id="Clear Context">Clear Context</strong>: You can instantly tell if a file was a deliberate manual checkpoint (<code>_bak1</code>) or a background timer snap (<code>_auto1</code>) just by looking at the filename.
+
+<li>
+<span id="Houdini's Save and Autosave Strategy-How Auto-Saves Interact with Configurations Described Below-Why This Is highly Optimized-Clean Organization"></span><strong id="Clean Organization">Clean Organization</strong>: Both manual files and auto-save files will stream smoothly into the exact same <code>＄BASENAME</code> file-specific subfolder. Your main directories will remain completely clean and organized.
+
+</ul>
+<p>
+Now that your variables are mirrored, let me know if you would like to know how Houdini’s automatic "Crash Saves" differ from these configurations when the application unexpectedly closes down! [7] 
+</p>
+
+<div id="Houdini's Crash Saves"><h1 id="Houdini's Crash Saves" class="header"><a href="#Houdini's Crash Saves">Houdini's Crash Saves</a></h1></div>
+
+<p>
+Houdini’s automatic Crash Saves operate on a completely different subsystem than manual backups or timed auto-saves. They are designed as a last-resort recovery mechanism when the application encounters a fatal error, memory overflow, or segmentation fault. [1, 2, 3] 
+</p>
+
+<div id="Houdini's Crash Saves-The Triggering Event"><h3 id="The Triggering Event" class="header"><a href="#Houdini's Crash Saves-The Triggering Event">The Triggering Event</a></h3></div>
+
+<ul>
+<li>
+<span id="Houdini's Crash Saves-The Triggering Event-Backups &amp; Auto-Saves"></span><strong id="Backups &amp; Auto-Saves">Backups &amp; Auto-Saves</strong>: These run smoothly while Houdini is stable. They cleanly serialize your node configurations into files.
+
+<li>
+<span id="Houdini's Crash Saves-The Triggering Event-Crash Saves"></span><strong id="Crash Saves">Crash Saves</strong>: These trigger exclusively when the core program is actively dying. When Houdini detects a fatal failure, it intercepts the operating system's kill command, pauses its own shutdown for a split second, and attempts to scrape your active RAM into an emergency file before the process terminates.
+
+</ul>
+<div id="Houdini's Crash Saves-Complete Separation of Directories"><h3 id="Complete Separation of Directories" class="header"><a href="#Houdini's Crash Saves-Complete Separation of Directories">Complete Separation of Directories</a></h3></div>
+
+<p>
+Crash files intentionally bypass your project’s <code>＄HIP</code> space, date directories, and custom folders. If your network drive or project folder loses connection (a frequent cause of crashes), Houdini needs a local directory to dump the recovery data.
+</p>
+<ul>
+<li>
+The Path: Crash saves are written to your local operating system's standard temporary directory token (<code>＄TEMP</code> or <code>＄TMP</code>).
+
+<ul>
+<li>
+Windows default: <code>C:\Users\&lt;YourUsername&gt;\AppData\Local\Temp\</code>
+
+<li>
+Linux/Mac default: <code>/tmp/houdini_temp/</code>
+
+</ul>
+</ul>
+<div id="Houdini's Crash Saves-Naming Format Differences"><h3 id="Naming Format Differences" class="header"><a href="#Houdini's Crash Saves-Naming Format Differences">Naming Format Differences</a></h3></div>
+
+<p>
+Crash files disregard your naming rules entirely. Because the asset environment variable strings may be corrupted during a crash, Houdini uses a hardcoded naming convention:
+</p>
+
+<pre bash>
+crash.&lt;YourFileName&gt;_base.&lt;ProcessID&gt;.hip
+</pre>
+
+<ul>
+<li>
+Example: <code>crash.pyro_simulation_v01_base.14824.hip</code>
+
+<li>
+The numeric string at the end is a randomized Operating System Process ID. This prevents a new crash from accidentally overwriting an older recovery asset.
+
+</ul>
+<div id="Houdini's Crash Saves-No File Volume Restrictions"><h3 id="No File Volume Restrictions" class="header"><a href="#Houdini's Crash Saves-No File Volume Restrictions">No File Volume Restrictions</a></h3></div>
+
+<p>
+Your custom <code>HOUDINI_MAX_BACKUP_FILES = 10</code> rule does not apply to crash recoveries. Houdini will never automatically delete older crash files to clean up space. They accumulate over time in your local temporary folder until your operating system runs a disk cleanup or you delete them manually.
+</p>
+
+<div id="Houdini's Crash Saves-How to Access a Crash Save"><h3 id="How to Access a Crash Save" class="header"><a href="#Houdini's Crash Saves-How to Access a Crash Save">How to Access a Crash Save</a></h3></div>
+
+<p>
+Modern versions of the software feature a native recovery hook. If you restart Houdini immediately after an abnormal termination, a popup dialog box will appear asking to restore your last session.
+</p>
+
+<p>
+Alternatively, you can browse to the recovery files directly via File &gt; Open Crash File or Open Crash Folder.
+</p>
+
 
 <div id="Editing Env Settings"><h1 id="Editing Env Settings" class="header"><a href="#Editing Env Settings">Editing Env Settings</a></h1></div>
 
@@ -154,10 +283,6 @@ HOUDINI_MAX_BACKUP_FILES = 10
 Save your text file and restart Houdini to apply the changes to your project pipeline.
 </p>
 
-<p>
-<em>If you want, I can show you how to expand this variable so it also automatically appends the current calendar year or date into the folder name layout structure.</em>
-</p>
-
 <div id="Editing Env Settings-Include Date On Backup Folder"><h2 id="Include Date On Backup Folder" class="header"><a href="#Editing Env Settings-Include Date On Backup Folder">Include Date On Backup Folder</a></h2></div>
 
 <p>
@@ -233,7 +358,11 @@ HOUDINI_MAX_BACKUP_FILES = 10
 </pre>
 
 <p>
-Once saved, restart your software interface. Whenever you hit <code>&lt;Ctrl&gt; + S</code>, Houdini will check the current calendar day, construct the exact folder name dynamically, verify that the total file count does not exceed 10, and save your historical scene data seamlessly.
+Once saved, restart your software interface.
+</p>
+
+<p>
+Whenever you hit <code>&lt;Ctrl&gt; + S</code>, Houdini will check the current calendar day, construct the exact folder name dynamically, verify that the total file count does not exceed 10, and save your historical scene data seamlessly.
 </p>
 
 
