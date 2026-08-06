@@ -399,6 +399,139 @@ Houdini will now look into your local scene $HIP/backup directory and automatica
 If you edit the <code>HOUDINI_BACKUP_DIR</code> and assign an alternative path, you must use an existing path. Houdini will not create this directory if it doesn't exist
 </p>
 
+<div id="Packages"><h1 id="Packages" class="header"><a href="#Packages">Packages</a></h1></div>
+
+<p>
+'Packages' are the more modern ways to set preferences in Houdini.
+</p>
+
+<p>
+To migrate an <code>houdini.env</code> settings to the modern Houdini Packages system, you need to format them into a structured JSON file. Because packages do not process standard <code>houdini.env</code> string assignments, variables are handled via an explicit env array.Here is how to create and place the package file.
+</p>
+
+<div id="Packages-Step 1: Create the Package JSON File"><h4 id="Step 1: Create the Package JSON File" class="header"><a href="#Packages-Step 1: Create the Package JSON File">Step 1: Create the Package JSON File</a></h4></div>
+
+<p>
+Create a new text file named <code>backup_settings.json</code> and paste the following configuration inside it:
+</p>
+
+<pre json>
+{
+    "env": [
+        {
+            "HOUDINI_BACKUP_DIR": "backup_$USER"
+        },
+        {
+            "HOUDINI_MAX_BACKUP_FILES": "20"
+        }
+    ]
+}
+</pre>
+
+<ul>
+<li>
+Formatting Rule: Every value in the package system must be wrapped in quotation marks as a string literal (even integers like "20") to comply with valid JSON syntax.
+
+<li>
+Variable Resolution: Houdini natively parses standard system variables like $USER inside package string blocks.
+
+</ul>
+<div id="Packages-Step 2: Place the File in the Packages Directory"><h4 id="Step 2: Place the File in the Packages Directory" class="header"><a href="#Packages-Step 2: Place the File in the Packages Directory">Step 2: Place the File in the Packages Directory</a></h4></div>
+
+<p>
+Houdini looks for a specific directory layout on startup. You must place your new <code>.json file</code> inside the packages subdirectory of your Houdini user preferences directory.
+</p>
+
+<p>
+Move the file to the exact path below based on your Operating System:
+</p>
+
+<ul>
+<li>
+Linux: <code>~/houdini20.5/packages/backup_settings.json</code>
+
+<li>
+macOS: <code>~/Library/Preferences/houdini/20.5/packages/backup_settings.json</code>
+
+<li>
+Windows: <code>C:\Users\&lt;username&gt;\Documents\houdini20.5\packages\backup_settings.json</code>
+
+</ul>
+<p>
+(Note: If the packages folder does not exist inside your version directory yet, simply create a new folder named packages and drop the file inside.)
+</p>
+
+<p>
+Once the file is placed, you can safely remove or comment out those lines from your old <code>houdini.env</code> file. Houdini will parse this JSON file automatically the next time it boots up.
+</p>
+
+<div id="Packages-Conditionally Change Paths"><h2 id="Conditionally Change Paths" class="header"><a href="#Packages-Conditionally Change Paths">Conditionally Change Paths</a></h2></div>
+
+<p>
+Using Package Expressions is incredibly robust because Houdini evaluates them directly at the C++ core level during startup. It does not rely on sketchy shell wrappers or fragile script hacks. If a condition evaluates to false, Houdini completely ignores that path variant before it even boots the user interface.
+</p>
+
+<p>
+Here is a bulletproof, production-grade package configuration that introduces project-based or operating system-based conditionals natively.
+</p>
+
+<div id="Packages-Conditionally Change Paths-Robust Package Implementation"><h3 id="Robust Package Implementation" class="header"><a href="#Packages-Conditionally Change Paths-Robust Package Implementation">Robust Package Implementation</a></h3></div>
+
+<p>
+Create or overwrite your <code>backup_settings.json</code> file with this layout:
+</p>
+
+<pre json>
+{
+    "env": [
+        {
+            "HOUDINI_MAX_BACKUP_FILES": "20"
+        },
+        {
+            "HOUDINI_BACKUP_DIR": [
+                {
+                    " $JOB != '' ": "$JOB/backup_$USER"
+                },
+                {
+                    " $JOB == '' and houdini_os == 'windows' ": "D:/Global_Backups/backup_$USER"
+                },
+                {
+                    " $JOB == '' and houdini_os != 'windows' ": "$HOME/backups/backup_$USER"
+                }
+            ]
+        }
+    ]
+}
+</pre>
+
+<div id="Packages-Conditionally Change Paths-Why This Setup is Fail-Safe"><h3 id="Why This Setup is Fail-Safe" class="header"><a href="#Packages-Conditionally Change Paths-Why This Setup is Fail-Safe">Why This Setup is Fail-Safe</a></h3></div>
+
+<ul>
+<li>
+The <code>＄JOB</code> Fallback: Houdini packages read environment variables chronologically. If your studio launcher sets a <code>＄JOB</code> variable (the standard pipeline practice for defining project directories), Houdini immediately routes your backups straight into that project folder.
+
+<li>
+Strict Evaluation Syntax: Notice the trailing and leading spaces inside the quotes for variables (<code>" ＄JOB != '' "</code>). This explicit syntax ensures the token parser cleanly splits variables from strings without triggering syntax errors.
+
+<li>
+No Broken Links: If you launch a local file outside your network pipeline and <code>＄JOB</code> is empty (<code>''</code>), the logic falls back to OS-specific failsafe paths depending on whether you are working on a Windows workstation or a Linux/macOS machine.
+
+</ul>
+<div id="Packages-Conditionally Change Paths-Verification Tool"><h3 id="Verification Tool" class="header"><a href="#Packages-Conditionally Change Paths-Verification Tool">Verification Tool</a></h3></div>
+
+<p>
+To verify that Houdini is interpreting your conditional expressions perfectly, open your terminal before launching and set the package debugger flag:
+</p>
+
+<pre ini>
+export HOUDINI_PACKAGE_VERBOSE=1
+houdini
+</pre>
+
+<p>
+This forces Houdini to dump a live compilation log straight into your terminal stream, letting you watch exactly which path option won the expression contest.
+</p>
+
 <div id="AutoSave 'On' With Wrappers"><h1 id="AutoSave 'On' With Wrappers" class="header"><a href="#AutoSave 'On' With Wrappers">AutoSave 'On' With Wrappers</a></h1></div>
 
 <p>
