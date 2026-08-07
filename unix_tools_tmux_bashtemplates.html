@@ -392,10 +392,23 @@ tmux attach-session -t "$SESSION_NAME"
 <pre bash>
 #!/bin/bash
 
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
-    echo "Usage: $0 &lt;hou|nuke&gt; &lt;sequence-number&gt; &lt;shot-number&gt;"
-    echo "Example: $0 hou 100 37"
+# Define an explicit, accurate usage message block
+show_usage() {
+    echo "=================================================================="
+    echo "❌ ERROR: Invalid or Missing Arguments"
+    echo "=================================================================="
+    echo "Usage:   $(basename "$0") &lt;sequence&gt; &lt;shot&gt; &lt;flavor&gt;"
+    echo "Flavors: 'hou' (Houdini) or 'nuke' (Nuke)"
+    echo "------------------------------------------------------------------"
+    echo "Example: $(basename "$0") 100 37 hou"
+    echo "Example: $(basename "$0") 120 04 nuke"
+    echo "=================================================================="
     exit 1
+}
+
+# Enforce strict argument checks
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
+    show_usage
 fi
 
 SEQ="$1"
@@ -410,9 +423,20 @@ SESSION_NAME_NUKE="${SEQ}_${SHOT}_nuke"
 
 if [ "$FLAVOR" = "h" ]; then
     SESSION_NAME="$SESSION_NAME_HOU"
-    
+
+   # Check if the session is already actively attached to a client
+    if tmux list-clients -t "$SESSION_NAME" 2&gt;/dev/null | grep -q .; then
+        echo "Session '$SESSION_NAME' is already open in another window!"
+        echo "Please switch to that window or use 'tmux attach -d -t $SESSION_NAME' to steal it."
+        exit 1
+    fi 
+
     # --- HOUDINI WORKFLOW ---
-    tmux new-session -d -s "$SESSION_NAME" -n "houdini"
+    #tmux new-session -d -s "$SESSION_NAME" -n "houdini"
+    # Instead of: tmux new-session -d -s "$SESSION_NAME" ...
+    # Use -Ad (Attach + Detached initialization, which safely handles existing sessions):
+    tmux new-session -Ad -s "$SESSION_NAME" -n "houdini"
+
     tmux split-window -v -t "$SESSION_NAME:houdini"
     
     tmux send-keys -t "$SESSION_NAME:houdini.0" "nh $SEQ $SHOT; clear" C-m
@@ -435,8 +459,18 @@ if [ "$FLAVOR" = "h" ]; then
 elif [ "$FLAVOR" = "n" ]; then
     SESSION_NAME="$SESSION_NAME_NUKE"
     
+   # Check if the session is already actively attached to a client
+    if tmux list-clients -t "$SESSION_NAME" 2&gt;/dev/null | grep -q .; then
+        echo "Session '$SESSION_NAME' is already open in another window!"
+        echo "Please switch to that window or use 'tmux attach -d -t $SESSION_NAME' to steal it."
+        exit 1
+    fi 
+
     # --- NUKE WORKFLOW ---
-    tmux new-session -d -s "$SESSION_NAME" -n "nuke"
+    #tmux new-session -d -s "$SESSION_NAME" -n "nuke"
+    # Instead of: tmux new-session -d -s "$SESSION_NAME" ...
+    # Use -Ad (Attach + Detached initialization, which safely handles existing sessions):
+    tmux new-session -Ad -s "$SESSION_NAME" -n "nuke"
     tmux split-window -v -t "$SESSION_NAME:nuke"
     
     tmux send-keys -t "$SESSION_NAME:nuke.0" "clear; ncomp $SEQ $SHOT; clear" C-m
@@ -452,7 +486,7 @@ elif [ "$FLAVOR" = "n" ]; then
     tmux select-pane -t "$SESSION_NAME:nuke.0"
 
 else
-    echo "Error: Unknown flavor '$FLAVOR'. Use 'hou' or 'nuke'."
+    echo "Error: Unknown flavor '$3'. Use 'hou' or 'nuke'."
     exit 1
 fi
 
