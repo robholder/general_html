@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_shell_taming_titlebars</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<div id="Terminal Titles (and Tmux)"><h1 id="Terminal Titles (and Tmux)" class="header"><a href="#Terminal Titles (and Tmux)">Terminal Titles (and Tmux)</a></h1></div>
+
+<div id="Terminal Titles (and Tmux)-Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides"><h2 id="Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides" class="header"><a href="#Terminal Titles (and Tmux)-Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides">Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides</a></h2></div>
+
+<p>
+When working in complex pipeline environments (like VFX or animation studios), terminal window titles are often hijacked by automated startup scripts, studio pipeline wrappers, and terminal multiplexers like Tmux.
+</p>
+
+<p>
+This reference article breaks down the technical hurdles we encountered, why they happened, and how we built a clean, robust, and unified solution across your <code>tmux.conf</code>, automated launch scripts, and personal shell configurations.
+</p>
+
+<div id="Terminal Titles (and Tmux)-Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides-The Core Problem: Who Controls the Title Bar?"><h3 id="The Core Problem: Who Controls the Title Bar?" class="header"><a href="#Terminal Titles (and Tmux)-Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides-The Core Problem: Who Controls the Title Bar?">The Core Problem: Who Controls the Title Bar?</a></h3></div>
+
+<p>
+In a standard local terminal, changing the title bar is simple: your shell's prompt mechanism (<code>PROMPT_COMMAND</code> in Bash or <code>precmd</code> in Zsh) prints a specific ANSI escape sequence (e.g., <code>\033]0;Your Title\a</code>), which your terminal emulator interprets and displays.
+</p>
+
+<p>
+When you introduce Tmux, three major roadblocks appear:
+</p>
+
+<ul>
+<li>
+<span id="Terminal Titles (and Tmux)-Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides-The Core Problem: Who Controls the Title Bar?-The Multiplexer Barrier"></span><strong id="The Multiplexer Barrier">The Multiplexer Barrier</strong>: Tmux intercepts all escape sequences generated inside its panes. By default, it doesn't automatically pass them up to your real, outer terminal window.
+
+<li>
+<span id="Terminal Titles (and Tmux)-Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides-The Core Problem: Who Controls the Title Bar?-Aggressive Auto-Renaming"></span><strong id="Aggressive Auto-Renaming">Aggressive Auto-Renaming</strong>: Tmux natively tries to rename windows based on the active command (e.g., running <code>houdini</code> or <code>python</code> changes the title), wiping out custom formats.
+
+<li>
+<span id="Terminal Titles (and Tmux)-Mastering Terminal Titles and Tmux: A Guide to Conquering Multiplexer Overrides-The Core Problem: Who Controls the Title Bar?-Studio Pipeline Interference"></span><strong id="Studio Pipeline Interference">Studio Pipeline Interference</strong>: Studio tools (e.g., <code>n &lt;seq&gt; &lt;shot&gt;</code>) often have built-in escape sequences designed to print rigid, verbose status messages into the title bar, which clash with your personal workflow.
+
+</ul>
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution"><h2 id="The 3-Part Solution" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution">The 3-Part Solution</a></h2></div>
+
+<p>
+To make manual shells, manual Tmux sessions, and automated script-launched Tmux sessions all behave harmoniously, we divided the solution into three distinct layers.
+</p>
+
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution-Part 1: Tmux Configuration (~/.tmux.conf)"><h3 id="Part 1: Tmux Configuration (~/.tmux.conf)" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution-Part 1: Tmux Configuration (~/.tmux.conf)">Part 1: Tmux Configuration (~/.tmux.conf)</a></h3></div>
+
+<p>
+<em>The Goal</em>: Force Tmux to act as a clean pipe instead of an obstacle.
+</p>
+
+<p>
+We added a dedicated block to configure how Tmux handles window titles and renaming:
+</p>
+
+<pre ini>
+#-------------------------------- titlebar fix --------------------------------#
+# Allow programs running inside tmux panes to modify the title
+set -g allow-set-title on
+
+# Allow programs inside tmux to set the real outer terminal title
+set -g set-titles on
+set -g set-titles-string "#T"
+
+# Lock down automatic renaming so titles don't get overwritten
+set -g allow-rename off
+set-window-option -g automatic-rename off
+#-------------------------------- titlebar fix - END --------------------------#
+</pre>
+
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution-Part 1: Tmux Configuration (~/.tmux.conf)-Why this works:"><h4 id="Why this works:" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution-Part 1: Tmux Configuration (~/.tmux.conf)-Why this works:">Why this works:</a></h4></div>
+
+<ul>
+<li>
+<code>set -g set-titles on</code> tells Tmux to bridge internal pane titles to the outer application window.
+
+<li>
+<code>set -g set-titles-string "#T"</code> forces Tmux to pass the pane's title (<code>#T</code>) verbatim, preventing Tmux from injecting its own session names or wrappers (which was causing those unexpected (<code>prod)...in work</code> strings).
+
+<li>
+Disabling automatic renaming (<code>allow-rename off</code>) ensures that background tasks can't dynamically scramble your titles.
+
+</ul>
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution-Part 2: The Shell Title Script (~/.window_title.sh)"><h3 id="Part 2: The Shell Title Script (~/.window_title.sh)" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution-Part 2: The Shell Title Script (~/.window_title.sh)">Part 2: The Shell Title Script (~/.window_title.sh)</a></h3></div>
+
+<p>
+<em>The Goal</em>: Handle regular terminals and manual Tmux sessions dynamically.
+</p>
+
+<p>
+Instead of jamming everything into a massive <code>.bashrc</code>, we isolated the title-setting logic into its own sourced file with a smart guard clause:
+</p>
+
+<pre bash>
+# Guard clause: Skip this block if launched by our automated tmux script
+if [ -n "$TMUX_SCRIPT_LAUNCHED" ]; then
+    return 0
+fi
+
+set_window_title() {
+    local title="${PRODUCTION:-No Gig} - ${NAV_SEQ:-No Seq}/${NAV_SHOT:-No Shot}"
+    echo -ne "\033]0;${title}\a"
+}
+
+# Hook into Bash/Zsh prompt commands
+if [ -n "$ZSH_VERSION" ]; then
+    precmd_functions+=(set_window_title)
+elif [ -n "$BASH_VERSION" ]; then
+    if [[ "$PROMPT_COMMAND" ]]; then
+        export PROMPT_COMMAND="$PROMPT_COMMAND;set_window_title"
+    else
+        export PROMPT_COMMAND="set_window_title"
+    fi
+fi
+</pre>
+
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution-Part 2: The Shell Title Script (~/.window_title.sh)-Why this works:"><h4 id="Why this works:" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution-Part 2: The Shell Title Script (~/.window_title.sh)-Why this works:">Why this works:</a></h4></div>
+
+<ul>
+<li>
+In regular terminal windows and <em>manual</em> Tmux sessions, this code executes on every prompt refresh, pushing your <code>\(PRODUCTION</code>, <code>\)NAV_SEQ</code>, and <code>$NAV_SHOT</code> variables straight to the title bar.
+
+<li>
+The Guard Clause: By checking for <code>[ -n "$TMUX_SCRIPT_LAUNCHED" ]</code>, we tell regular shells to run this block, but instruct automated script sessions to bypass it. This prevents the continuous prompt loop from fighting with your startup scripts.
+
+</ul>
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution-Part 3: The Automated Launcher Script"><h3 id="Part 3: The Automated Launcher Script" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution-Part 3: The Automated Launcher Script">Part 3: The Automated Launcher Script</a></h3></div>
+
+<p>
+<em>The Goal</em>: Take control of script-spun sessions and override studio tools.
+</p>
+
+<p>
+When your custom Bash script creates an automated Tmux session for Houdini or Nuke, it sets up splits, runs pipeline tools (e.g., <code>n &lt;seq&gt; &lt;shot&gt;</code>), and passes down environment flags:
+</p>
+
+<pre bash>
+# Define your target custom title string
+CUSTOM_TITLE="${PRODUCTION:-No Gig} - ${SEQ}/${SHOT}"
+
+# Spin up the session while passing down our custom bypass flag
+TMUX_SCRIPT_LAUNCHED=1 tmux new-session -Ad -s "$SESSION_NAME" -n "houdini"
+
+tmux split-window -v -t "$SESSION_NAME:houdini"
+
+# Run the studio tool, then immediately execute an echo escape sequence to win the title race
+tmux send-keys -t "$SESSION_NAME:houdini.0" "nh $SEQ $SHOT; echo -ne '\033]0;${CUSTOM_TITLE}\a'; clear" C-m
+tmux send-keys -t "$SESSION_NAME:houdini.1" "nh $SEQ $SHOT; echo -ne '\033]0;${CUSTOM_TITLE}\a'" C-m
+</pre>
+
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution-Part 3: The Automated Launcher Script-Why this works:"><h4 id="Why this works:" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution-Part 3: The Automated Launcher Script-Why this works:">Why this works:</a></h4></div>
+
+<ul>
+<li>
+<code>TMUX_SCRIPT_LAUNCHED=1</code> sets an environment variable specifically inherited by shells spawned inside this script-created session, successfully triggering the guard clause in Part 2.
+
+<li>
+Because the shell prompt's title updater is disabled via the guard clause, the studio's pipeline tools (<code>n &lt;seq&gt; &lt;shot&gt;</code>) attempt to set their default verbose titles.
+
+<li>
+By chaining <code>echo -ne '\033]0;${CUSTOM_TITLE}\a'</code> immediately after the pipeline tools initialize, our script forcefully overrides them, ensuring your clean <code>PROD - seq/shot</code> format takes control of the title bar.
+
+</ul>
+<div id="Terminal Titles (and Tmux)-The 3-Part Solution-Summary of the Data Flow"><h3 id="Summary of the Data Flow" class="header"><a href="#Terminal Titles (and Tmux)-The 3-Part Solution-Summary of the Data Flow">Summary of the Data Flow</a></h3></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Environment
+</th>
+<th>
+What handles the title?
+</th>
+<th>
+Why?
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Regular Terminal
+</td>
+<td>
+Shell Prompt (<code>PROMPT_COMMAND</code> / <code>precmd</code>)
+</td>
+<td>
+Runs freely to display local environment variables.
+</td>
+</tr>
+<tr>
+<td>
+Manual Tmux Session
+</td>
+<td>
+Shell Prompt + Tmux (<code>set-titles on</code>)
+</td>
+<td>
+Escapes the pane, passes through Tmux verbatim, and hits the outer window.
+</td>
+</tr>
+<tr>
+<td>
+Automated Tmux Script
+</td>
+<td>
+Explicit script injection (<code>send-keys</code>)
+</td>
+<td>
+Bypasses the shell prompt loop entirely, runs <code>n &lt;seq&gt; &lt;shot&gt;</code>, and forces your custom title string last.
+</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+<br>
+<hr>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
