@@ -197,140 +197,120 @@ Maintaining a uniform developer environment across restrictive corporate network
 </p>
 
 <p>
-This reference guide covers how to set up a fully synchronized visual environment where switching your Starship theme or environment profile instantly updates your terminal emulator's background canvas color to match—while gracefully navigating terminal multiplexer limitations.
+This reference guide covers how to set up a fully synchronized visual environment where switching your Starship theme or environment profile instantly updates your terminal emulator's background canvas color to match - while gracefully navigating terminal multiplexer limitations.
 </p>
 
+<div id="Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-Why This System?"><h3 id="Why This System?" class="header"><a href="#Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-Why This System?">Why This System?</a></h3></div>
+
 <p>
-Why This System?
 Standardizing prompt configurations using Starship handles text layout nicely, but it leaves the outer terminal window's background color completely untouched. Relying on default terminal background colors across heterogeneous systems results in stark contrasts: a bright white corporate terminal window clashes with a dark production-themed prompt, or vice versa.
 </p>
 
 <p>
-To solve this consistently without root access or specialized terminal emulators, we leverage OSC (Operating System Command) escape sequences—specifically OSC 11. OSC 11 commands communicate directly with the underlying terminal emulator window to paint its background canvas dynamically using precise hex codes.
+To solve this consistently without root access or specialized terminal emulators, we leverage <span id="Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-Why This System?-OSC (Operating System Command) escape sequences"></span><strong id="OSC (Operating System Command) escape sequences">OSC (Operating System Command) escape sequences</strong> - specifically <span id="Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-Why This System?-OSC 11"></span><strong id="OSC 11">OSC 11</strong>. OSC 11 commands communicate directly with the underlying terminal emulator window to paint its background canvas dynamically using precise hex codes.
 </p>
 
-<p>
-The Tmux Caveat and Solution
-The Caveat
-By default, Tmux acts as a barrier between your shell and the outer terminal emulator. When you execute an OSC sequence (like changing background colors) from inside a Tmux session, Tmux intercepts and swallows the escape sequence to protect the window state, preventing the background color change from reaching your physical window.
-</p>
+<div id="Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-The Tmux Caveat and Solution"><h3 id="The Tmux Caveat and Solution" class="header"><a href="#Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-The Tmux Caveat and Solution">The Tmux Caveat and Solution</a></h3></div>
+
+<div id="Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-The Tmux Caveat and Solution-The Caveat"><h4 id="The Caveat" class="header"><a href="#Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-The Tmux Caveat and Solution-The Caveat">The Caveat</a></h4></div>
 
 <p>
-The Solution
-To fix this, enable escape sequence passthrough in your centralized Tmux configuration file (~/.tmux.conf):
+By default, <span id="Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-The Tmux Caveat and Solution-The Caveat-Tmux"></span><strong id="Tmux">Tmux</strong> acts as a barrier between your shell and the outer terminal emulator. When you execute an OSC sequence (like changing background colors) from inside a Tmux session, Tmux intercepts and swallows the escape sequence to protect the window state, preventing the background color change from reaching your physical window.
 </p>
 
-<p>
-Code snippet
-</p>
-<ul>
-<li>
-Allow OSC escape sequences to pass through Tmux to the outer terminal
+<div id="Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-The Tmux Caveat and Solution-The Solution"><h4 id="The Solution" class="header"><a href="#Terminal Background Colors-Synchronizing Terminal Backgrounds and Starship Themes-The Tmux Caveat and Solution-The Solution">The Solution</a></h4></div>
 
-</ul>
 <p>
+To fix this, enable escape sequence passthrough in your centralized Tmux configuration file (<code>~/.tmux.conf</code>):
+</p>
+
+<pre ini>
+# Allow OSC escape sequences to pass through Tmux to the outer terminal
 set -g allow-passthrough on
-(Note: Requires Tmux version 3.2 or newer, where allow-passthrough was officially introduced).
-</p>
+</pre>
 
 <p>
-Complete Implementation Guide
+<em>(Note: Requires Tmux version 3.2 or newer, where allow-passthrough was officially introduced).</em>
+</p>
+
+<div id="Terminal Background Colors-Complete Implementation Guide"><h2 id="Complete Implementation Guide" class="header"><a href="#Terminal Background Colors-Complete Implementation Guide">Complete Implementation Guide</a></h2></div>
+
+<p>
 Follow these steps to integrate this complete system into your dotfiles.
 </p>
 
-<p>
-Step 1: Update Your Tmux Configuration
-Add the passthrough rule to your version-controlled .tmux.conf file:
-</p>
+<div id="Terminal Background Colors-Complete Implementation Guide-Step 1: Update Your Tmux Configuration"><h3 id="Step 1: Update Your Tmux Configuration" class="header"><a href="#Terminal Background Colors-Complete Implementation Guide-Step 1: Update Your Tmux Configuration">Step 1: Update Your Tmux Configuration</a></h3></div>
 
 <p>
-Code snippet
+Add the passthrough rule to your version-controlled <code>.tmux.conf</code> file:
 </p>
-<ul>
-<li>
-~/.tmux.conf
 
-</ul>
-<p>
+<pre ini>
+# ~/.tmux.conf
 set -g allow-passthrough on
-Step 2: Implement the Theme/Environment Switching Logic
-Building on your original environment logic, you can combine Starship configurations and dynamic OSC 11 background updates into clean shell functions. Add these to your shared shell initialization file (sourced by both .bashrc and .zshrc):
-</p>
+</pre>
+
+<div id="Terminal Background Colors-Complete Implementation Guide-Step 2: Implement the Theme/Environment Switching Logic"><h3 id="Step 2: Implement the Theme/Environment Switching Logic" class="header"><a href="#Terminal Background Colors-Complete Implementation Guide-Step 2: Implement the Theme/Environment Switching Logic">Step 2: Implement the Theme/Environment Switching Logic</a></h3></div>
 
 <p>
-Bash
+Building on your original environment logic, you can combine Starship configurations and dynamic OSC 11 background updates into clean shell functions. Add these to your shared shell initialization file (sourced by both <code>.bashrc</code> and <code>.zshrc</code>):
 </p>
-<ul>
-<li>
-~/.config/shell/themes.sh
 
-<li>
-Function to apply themes or environment profiles dynamically
+<pre bash>
+# ~/.config/shell/themes.sh
 
-</ul>
-<p>
+# Function to apply themes or environment profiles dynamically
 apply_theme() {
-</p>
-<pre><code>local profile="$1"
-</code></pre>
-<pre><code>case "$profile" in
-WISHTR)
-export STARSHIP_CONFIG="$HOME/.config/starship/production.toml"
-printf '%b' '\e]11;#3e3b47\a' # Slate/Purple tint for Production Troubleshooting
-;;
-WISH)
-export STARSHIP_CONFIG="$HOME/.config/starship/corporate.toml"
-printf '%b' '\e]11;#242936\a' # Deep charcoal for Production
-;;
-'No GIG')
-export STARSHIP_CONFIG="$HOME/.config/starship/minimal.toml"
-printf '%b' '\e]11;#000000\a' # True black fallback
-;;
-*)
-export STARSHIP_CONFIG="$HOME/.config/starship/dev.toml"
-printf '%b' '\e]11;#406065\a' # Default Muted Teal/Blue for Dev
-;;
-esac
-</code></pre>
-<p>
+    local profile="$1"
+
+    case "$profile" in
+        WISHTR)
+            export STARSHIP_CONFIG="$HOME/.config/starship/production.toml"
+            printf '%b' '\e]11;#3e3b47\a' # Slate/Purple tint for Production Troubleshooting
+            ;;
+        WISH)
+            export STARSHIP_CONFIG="$HOME/.config/starship/corporate.toml"
+            printf '%b' '\e]11;#242936\a' # Deep charcoal for Production
+            ;;
+        'No GIG')
+            export STARSHIP_CONFIG="$HOME/.config/starship/minimal.toml"
+            printf '%b' '\e]11;#000000\a' # True black fallback
+            ;;
+        *)
+            export STARSHIP_CONFIG="$HOME/.config/starship/dev.toml"
+            printf '%b' '\e]11;#406065\a' # Default Muted Teal/Blue for Dev
+            ;;
+    esac
 }
-</p>
 
-<ul>
-<li>
-Aliases for quick manual switching
-
-</ul>
-<p>
+# Aliases for quick manual switching
 alias th-wish-tr="apply_theme WISHTR"
 alias th-wish="apply_theme WISH"
 alias th-nogig="apply_theme 'No GIG'"
 alias th-dev="apply_theme DEV"
-Step 3: Automate on Shell Startup (Optional)
-If you want your shell to automatically evaluate your environment variable ($prod) upon opening a new terminal window or tab, add an auto-evaluation check at the bottom of your ~/.bashrc and ~/.zshrc:
-</p>
+</pre>
+
+<div id="Terminal Background Colors-Complete Implementation Guide-Step 3: Automate on Shell Startup (Optional)"><h3 id="Step 3: Automate on Shell Startup (Optional)" class="header"><a href="#Terminal Background Colors-Complete Implementation Guide-Step 3: Automate on Shell Startup (Optional)">Step 3: Automate on Shell Startup (Optional)</a></h3></div>
 
 <p>
-Bash
+If you want your shell to automatically evaluate your environment variable (<code>＄prod</code>) upon opening a new terminal window or tab, add an auto-evaluation check at the bottom of your <code>~/.bashrc</code> and <code>~/.zshrc</code>:
 </p>
-<ul>
-<li>
-Automatically trigger the color/theme block if $prod is already defined in your environment
 
-</ul>
-<p>
+<pre bash>
+# Automatically trigger the color/theme block if $prod is already defined in your environment
 if [ -n "$prod" ]; then
-</p>
-<pre><code>apply_theme "$prod"
-</code></pre>
-<p>
+    apply_theme "$prod"
 fi
-Step 4: Sync via Dotfiles
-Because these configurations reside entirely in standard plain-text files (.tmux.conf, .bashrc, .zshrc, and your starship TOML configs), they integrate directly into dotfile managers like GNU Stow or chezmoi.
+</pre>
+
+<div id="Terminal Background Colors-Complete Implementation Guide-Step 4: Sync via Dotfiles"><h3 id="Step 4: Sync via Dotfiles" class="header"><a href="#Terminal Background Colors-Complete Implementation Guide-Step 4: Sync via Dotfiles">Step 4: Sync via Dotfiles</a></h3></div>
+
+<p>
+Because these configurations reside entirely in standard plain-text files (<code>.tmux.conf</code>, <code>.bashrc</code>, <code>.zshrc</code>, and your starship TOML configs), they integrate directly into dotfile managers like GNU Stow or chezmoi.
 </p>
 
 <p>
-When moving between your personal Mac and your corporate RHEL Linux machine, pulling your latest dotfiles syncs the entire ecosystem. Whether manually via aliases or automatically via your $prod environment variable, your prompts and terminal window canvas will shift cohesively together.
+When moving between your personal Mac and your corporate RHEL Linux machine, pulling your latest dotfiles syncs the entire ecosystem. Whether manually via aliases or automatically via your <code>＄prod</code> environment variable, your prompts and terminal window canvas will shift cohesively together.
 </p>
 
 <p>
