@@ -547,11 +547,8 @@ randbg() {
 
 <pre bash>
 randombg() {
-    # --- CONFIGURATION (Adjust these to your liking) ---
-    local max_brightness=0.35  # 0.0 to 1.0 (Keep it low for dark terminal backgrounds)
-    local max_saturation=1.0   # 0.0 to 1.0 (Lower = more muted/pastel/grayish)
-    # ---------------------------------------------------
-
+    local max_brightness=0.35
+    local max_saturation=0.5
     local hexcolor=""
     
     while true; do
@@ -559,7 +556,6 @@ randombg() {
         local g=$((RANDOM % 256))
         local b=$((RANDOM % 256))
 
-        # Safely capture awk output without any risk of leakage
         local valid=$(awk -v r="$r" -v g="$g" -v b="$b" \
                           -v max_b="$max_brightness" \
                           -v max_s="$max_saturation" 'BEGIN {
@@ -577,52 +573,121 @@ randombg() {
         fi
     done
     
-    printf '%b' "\e]11;#${hexcolor}\a"
+    if [ -n "$TMUX" ]; then
+        # Prevent running inside Vim/editors
+        local current_cmd=$(tmux display-message -p '#{pane_current_command}')
+        case "$current_cmd" in
+            vim|nvim|vi|nano|less|more)
+                echo "Skipping background change: active application ($current_cmd) detected."
+                return
+                ;;
+        esac
+
+        # Push true 24-bit RGB sequence explicitly to this pane's TTY via tmux passthrough
+        printf '%b' "\033Ptmux;\033\033]11;#${hexcolor}\007\033\\" &gt; "$(tmux display-message -p '#{pane_tty}')"
+    else
+        printf '%b' "\033]11;#${hexcolor}\007"
+    fi
+    
     echo "Terminal background changed to: #${hexcolor}"
 }
-
-alias rbg='randombg'
 </pre>
 
 <div id="Randomizer-Reset Alias"><h2 id="Reset Alias" class="header"><a href="#Randomizer-Reset Alias">Reset Alias</a></h2></div>
 
-<p>
-Reset doesn't work with Tmux panes.
-</p>
-
-<p>
-I'm using this to reset, but it doesn't really work with Tmux. I turns the background the wrong color.
-</p>
-
-<pre bash>
-alias resetbg='printf "\033Ptmux;\033\033]11;#2c2f36\007\033\\"'
-</pre>
-
-<p>
-or:
-</p>
-
-<pre bash>
-alias resetbg='printf "\033]11;#2c2f36\007"'
-</pre>
-
-<p>
-This doesn't work either in Tmux, but maybe it can be used as a basis for exploration:
-</p>
-
 <pre bash>
 resetbg() {
     if [ -n "$TMUX" ]; then
-        # 1. Clear Tmux's internal pane style override
-        tmux select-pane -P 'default' 2&gt;/dev/null
-        # 2. Force-send the real background color escape code through tmux to the host terminal
-        printf '\033Ptmux;\033\033]11;#2c2f36\007\033\\'
+        tmux select-pane -t "$TMUX_PANE" -P 'default' 2&gt;/dev/null
+        printf '%b' "\033Ptmux;\033\033]11;#2c2f36\007\033\\" &gt; "$(tmux display-message -p '#{pane_tty}')"
     else
-        # Outside tmux: standard direct escape sequence
-        printf '\033]11;#2c2f36\007'
+        # Reset back to your default background hex (#2c2f36)
+        printf '%b' "\033]11;#2c2f36\007"
     fi
 }
 </pre>
+
+<div id="Randomizer-Reset Alias-Same with comments"><h3 id="Same with comments" class="header"><a href="#Randomizer-Reset Alias-Same with comments">Same with comments</a></h3></div>
+
+<pre bash>
+randombg() {
+    # Define constraints to keep the generated background dark and muted (low light/saturation)
+    local max_brightness=0.35
+    local max_saturation=0.5
+    local hexcolor=""
+    
+    # Loop continuously until we generate a color that matches our brightness/saturation criteria
+    while true; do
+        # Generate random values between 0 and 255 for Red, Green, and Blue channels
+        local r=$((RANDOM % 256))
+        local g=$((RANDOM % 256))
+        local b=$((RANDOM % 256))
+
+        # Pass the RGB values into an Awk script to calculate color HSV/Brightness metrics
+        local valid=$(awk -v r="$r" -v g="$g" -v b="$b" \
+                          -v max_b="$max_brightness" \
+                          -v max_s="$max_saturation" 'BEGIN {
+            # Step 1: Normalize RGB values from 0-255 down to a 0.0-1.0 scale
+            nr = r / 255.0; ng = g / 255.0; nb = b / 255.0;
+            
+            # Step 2: Find the maximum and minimum values among the R, G, and B channels
+            mmax = nr; if (ng &gt; mmax) mmax = ng; if (nb &gt; mmax) mmax = nb;
+            mmin = nr; if (ng &lt; mmin) mmin = ng; if (nb &lt; mmin) mmin = nb;
+            
+            # Step 3: Value (Brightness) is represented by the highest color component
+            val = mmax;
+            
+            # Step 4: Calculate Saturation (distance between max and min values)
+            sat = (mmax == 0) ? 0 : (mmax - mmin) / mmax;
+            
+            # Step 5: Check if the color is within our dark/muted limits. Print 1 if valid, 0 if not.
+            if (val &lt;= max_b &amp;&amp; sat &lt;= max_s) print 1; else print 0;
+        }' 2&gt;/dev/null)
+
+        # If Awk returned 1 (valid color), convert RGB to a Hex string and exit the loop
+        if [ "$valid" -eq 1 ]; then
+            hexcolor=$(printf '%02x%02x%02x' "$r" "$g" "$b")
+            break
+        fi
+    done
+    
+    # Check if we are currently running inside a Tmux session
+    if [ -n "$TMUX" ]; then
+        # Check what command/application is currently running in the active tmux pane
+        local current_cmd=$(tmux display-message -p '#{pane_current_command}')
+        case "$current_cmd" in
+            # Protect text editors and pagers from background painting corruption
+            vim|nvim|vi|nano|less|more)
+                echo "Skipping background change: active application ($current_cmd) detected."
+                return
+                ;;
+        esac
+
+        # Wrap the standard OSC 11 escape sequence in a Tmux DCS passthrough (\033Ptmux; ... \033\) 
+        # and pipe it straight into this specific pane's TTY device file
+        printf '%b' "\033Ptmux;\033\033]11;#${hexcolor}\007\033\\" &gt; "$(tmux display-message -p '#{pane_tty}')"
+    else
+        # If not in tmux, send the standard OSC 11 escape sequence directly to the terminal emulator
+        printf '%b' "\033]11;#${hexcolor}\007"
+    fi
+    
+    echo "Terminal background changed to: #${hexcolor}"
+}
+
+resetbg() {
+    if [ -n "$TMUX" ]; then
+        # Clear any local tmux pane style overrides
+        tmux select-pane -t "$TMUX_PANE" -P 'default' 2&gt;/dev/null
+        # Send the passthrough escape sequence to restore the default base background (#2c2f36) to the TTY
+        printf '%b' "\033Ptmux;\033\033]11;#2c2f36\007\033\\" &gt; "$(tmux display-message -p '#{pane_tty}')"
+    else
+        # Outside tmux, send the standard escape sequence to reset back to your default hex (#2c2f36)
+        printf '%b' "\033]11;#2c2f36\007"
+    fi
+}
+</pre>
+
+
 
 <p>
 <br>
