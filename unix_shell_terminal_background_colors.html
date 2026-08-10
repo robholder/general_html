@@ -528,6 +528,80 @@ if [ -z "$prod" ]; then
 fi
 </pre>
 
+<div id="Randomizer-A True Randomizer (Random Color)"><h2 id="A True Randomizer (Random Color)" class="header"><a href="#Randomizer-A True Randomizer (Random Color)">A True Randomizer (Random Color)</a></h2></div>
+
+<pre bash>
+randbg() {
+    # Generate a random 6-digit hex color code
+    local hexcolor=$(printf '%06x' $(( RANDOM * 32768 + RANDOM )))
+    
+    # Apply it using your preferred format
+    printf '%b' "\e]11;#${hexcolor}\a"
+    
+    # Optional: print the generated color code to the screen
+    echo "Terminal background changed to: #${hexcolor}"
+}
+</pre>
+
+<div id="Randomizer-Randomizer with Saturation and Value limits"><h2 id="Randomizer with Saturation and Value limits" class="header"><a href="#Randomizer-Randomizer with Saturation and Value limits">Randomizer with Saturation and Value limits</a></h2></div>
+
+<pre>
+randombg() {
+    # --- CONFIGURATION (Adjust these to your liking) ---
+    local max_brightness=0.35  # 0.0 to 1.0 (Keep it low for dark terminal backgrounds)
+    local max_saturation=1.0   # 0.0 to 1.0 (Lower = more muted/pastel/grayish)
+    # ---------------------------------------------------
+
+    local hexcolor=""
+    
+    while true; do
+        local r=$((RANDOM % 256))
+        local g=$((RANDOM % 256))
+        local b=$((RANDOM % 256))
+
+        # Safely capture awk output without any risk of leakage
+        local valid=$(awk -v r="$r" -v g="$g" -v b="$b" \
+                          -v max_b="$max_brightness" \
+                          -v max_s="$max_saturation" 'BEGIN {
+            nr = r / 255.0; ng = g / 255.0; nb = b / 255.0;
+            mmax = nr; if (ng &gt; mmax) mmax = ng; if (nb &gt; mmax) mmax = nb;
+            mmin = nr; if (ng &lt; mmin) mmin = ng; if (nb &lt; mmin) mmin = nb;
+            val = mmax;
+            sat = (mmax == 0) ? 0 : (mmax - mmin) / mmax;
+            if (val &lt;= max_b &amp;&amp; sat &lt;= max_s) print 1; else print 0;
+        }' 2&gt;/dev/null)
+
+        if [ "$valid" -eq 1 ]; then
+            hexcolor=$(printf '%02x%02x%02x' "$r" "$g" "$b")
+            break
+        fi
+    done
+    
+    printf '%b' "\e]11;#${hexcolor}\a"
+    echo "Terminal background changed to: #${hexcolor}"
+}
+
+alias rbg='randombg'
+</pre>
+
+<div id="Randomizer-Reset Alias"><h2 id="Reset Alias" class="header"><a href="#Randomizer-Reset Alias">Reset Alias</a></h2></div>
+<p>
+I'm using this to reset, but it doesn't really work with Tmux. I turns the background the wrong color.
+</p>
+
+<pre bash>
+alias resetbg='printf "\033Ptmux;\033\033]11;#2c2f36\007\033\\"'
+</pre>
+
+<p>
+or:
+</p>
+
+<pre bash>
+alias resetbg='printf "\033]11;#2c2f36\007"'
+</pre>
+
+
 <p>
 <br>
 <hr>
