@@ -298,6 +298,58 @@ set_custom_bg() {
 set_custom_bg "#3e3b47"
 </pre>
 
+<p>
+Even though Zsh will execute the <code>printf</code> command successfully, Tmux will intercept and swallow the OSC escape sequence to protect the internal pane state, preventing the background color command from reaching your outer terminal window.
+</p>
+
+<p>
+To make that exact function work seamlessly inside Zsh and Tmux, you need to apply the Tmux passthrough rule and ensure your <code>printf</code> syntax is wrapped so Tmux knows to forward it.
+</p>
+
+<div id="Terminal Background Colors-Understanding and Customizing OSC 11 Terminal Coloring-How to Make It Work in Zsh + Tmux"><h3 id="How to Make It Work in Zsh + Tmux" class="header"><a href="#Terminal Background Colors-Understanding and Customizing OSC 11 Terminal Coloring-How to Make It Work in Zsh + Tmux">How to Make It Work in Zsh + Tmux</a></h3></div>
+
+<div id="Terminal Background Colors-Understanding and Customizing OSC 11 Terminal Coloring-How to Make It Work in Zsh + Tmux-Step 1: Ensure Tmux Passthrough is Enabled"><h4 id="Step 1: Ensure Tmux Passthrough is Enabled" class="header"><a href="#Terminal Background Colors-Understanding and Customizing OSC 11 Terminal Coloring-How to Make It Work in Zsh + Tmux-Step 1: Ensure Tmux Passthrough is Enabled">Step 1: Ensure Tmux Passthrough is Enabled</a></h4></div>
+
+<p>
+Add this line to your <code>~/.tmux.conf</code> (if you haven't already) and reload your tmux config (<code>tmux source ~/.tmux.conf</code>):
+</p>
+
+<pre ini>
+set -g allow-passthrough on
+</pre>
+
+<div id="Terminal Background Colors-Understanding and Customizing OSC 11 Terminal Coloring-How to Make It Work in Zsh + Tmux-Step 2: Update Your Function for Tmux Compatibility"><h4 id="Step 2: Update Your Function for Tmux Compatibility" class="header"><a href="#Terminal Background Colors-Understanding and Customizing OSC 11 Terminal Coloring-How to Make It Work in Zsh + Tmux-Step 2: Update Your Function for Tmux Compatibility">Step 2: Update Your Function for Tmux Compatibility</a></h4></div>
+
+<p>
+When running inside Tmux, standard OSC escape sequences sometimes need to be wrapped in a Tmux escape wrapper (<code>\ePtmux;\e...\e\\</code>) so Tmux explicitly passes them through to the host terminal emulator.
+</p>
+
+<p>
+Here is how you can write your Zsh function to automatically handle this. If you are inside Tmux, it wraps the sequence; if you are in a regular Zsh window, it sends it normally:
+</p>
+
+<pre bash>
+set_custom_bg() {
+    local hex_code="$1"
+    
+    # Check if we are currently running inside a Tmux session
+    if [[ -n "$TMUX" ]]; then
+        # Wrap the OSC 11 sequence in a Tmux passthrough escape sequence
+        printf '%b' "\ePtmux;\e\e]11;${hex_code}\a\e\\"
+    else
+        # Standard direct OSC 11 sequence for raw Zsh terminals
+        printf '%b' "\e]11;${hex_code}\a"
+    fi
+}
+
+# Usage:
+set_custom_bg "#3e3b47"
+</pre>
+
+<p>
+With <code>set -g allow-passthrough on</code> in your <code>.tmux.conf</code> and this wrapper logic in your Zsh configuration, your background color function will now work identically whether you are in a raw Zsh terminal, a pure Bash corporate window, or nested inside a Tmux session.
+</p>
+
 <div id="Synchronizing Terminal Backgrounds and Starship Themes"><h1 id="Synchronizing Terminal Backgrounds and Starship Themes" class="header"><a href="#Synchronizing Terminal Backgrounds and Starship Themes">Synchronizing Terminal Backgrounds and Starship Themes</a></h1></div>
 
 <p>
