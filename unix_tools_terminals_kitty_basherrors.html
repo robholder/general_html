@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_terminals_kitty_basherrors</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_terminals_kitty_index.html">Kitty</a>
+</p>
+
+<div id="Bash Errors (on Redhat)"><h2 id="Bash Errors (on Redhat)" class="header"><a href="#Bash Errors (on Redhat)">Bash Errors (on Redhat)</a></h2></div>
+
+<p>
+I was getting these errors in Kitty. The error appeared every time the shell opened, and with a command or <code>&lt;Enter&gt;</code>.
+</p>
+
+<pre text>
+bash: PROMPT_COMMAND: line 1: syntax error near unexpected token `:'
+bash: PROMPT_COMMAND: line 1: `history -a; history -a; ;set_window_title;set_window_title' 
+</pre>
+
+<p>
+After trials and errors, it was coming from the Redhat environment, and not any extra sourced files or aliases of my own.
+</p>
+
+<p>
+This was the solution that seemed to work (although I haven't field tested fully to see if it breaks any other functionality):
+</p>
+<pre ini>
+#shell_integration no-rc
+env PROMPT_COMMAND=history -a
+</pre>
+
+<p>
+As a precaution, I added these guard blocks to my <code>dot-disney_titlebar</code> and any other config files that seemed to call on <code>PROMPT_COMMAND</code>:
+</p>
+
+<pre bash>
+if [ -n "$ZSH_VERSION" ]; then
+    precmd_functions+=(set_window_title)
+elif [ -n "$BASH_VERSION" ]; then
+    # Safely append set_window_title only if it isn't already present
+    if [[ ";$PROMPT_COMMAND;" != *";set_window_title;"* ]]; then
+        if [[ -n "$PROMPT_COMMAND" ]]; then
+            export PROMPT_COMMAND="$PROMPT_COMMAND; set_window_title"
+        else
+            export PROMPT_COMMAND="set_window_title"
+        fi
+    fi
+fi
+</pre>
+
+<p>
+The old version I had <a href="was.html">was</a> this:
+</p>
+
+<pre bash>
+if [ -n "$ZSH_VERSION" ]; then
+    precmd_functions+=(set_window_title)
+elif [ -n "$BASH_VERSION" ]; then
+    if [[ "$PROMPT_COMMAND" ]]; then
+        export PROMPT_COMMAND="$PROMPT_COMMAND;set_window_title"
+    else
+        export PROMPT_COMMAND="set_window_title"
+    fi
+fi
+</pre>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="unix_tools_terminals_kitty_index.html">Kitty</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+ 
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
