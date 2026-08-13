@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_shell_universal_shell_themes</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+You can extend theme-switching workflow to other terminals like WezTerm, macOS Terminal.app, and Linux Virtual Consoles / Standard Terminals (like GNOME Terminal, Konsole, or generic xterm-compatible Linux terminals).
+</p>
+
+<p>
+The trick is using Terminal Escape Sequences or CLI configuration triggers that each application supports natively.
+</p>
+
+<div id="WezTerm"><h3 id="WezTerm" class="header"><a href="#WezTerm">WezTerm</a></h3></div>
+
+<p>
+WezTerm handles themes via its Lua configuration file (<code>~/.config/wezterm/wezterm.lua</code>). It doesn't use a live hot-reload file like Kitty's <code>current-theme.conf</code> out of the box, but you can achieve dynamic switching by having your script rewrite a small state file or Lua module that WezTerm reads.
+</p>
+
+<div id="WezTerm-In your wezterm.lua:"><h4 id="In your wezterm.lua:" class="header"><a href="#WezTerm-In your wezterm.lua:">In your wezterm.lua:</a></h4></div>
+
+<p>
+Read a dynamic theme file written by your shell script:
+</p>
+
+<pre lua>
+local wezterm = require 'wezterm'
+local config = {}
+
+-- Try to read a theme override written by your switch_theme function
+local f = io.open(os.getenv("HOME") .."/.config/wezterm/active-theme.txt", "r")
+if f then
+    config.color_scheme = f:read("*all"):gsub("%s+", "")
+    f:close()
+else
+    config.color_scheme = 'Catppuccin Frappe' -- default fallback
+end
+
+return config
+</pre>
+
+<div id="WezTerm-Add WezTerm handling to your `switch_theme function`"><h4 id="Add WezTerm handling to your `switch_theme function`" class="header"><a href="#WezTerm-Add WezTerm handling to your `switch_theme function`">Add WezTerm handling to your <code>switch_theme function</code></a></h4></div>
+
+<p>
+Map your themes to WezTerm’s built-in scheme names (WezTerm natively includes "Catppuccin Frappe", "Nord", etc.) and write to that tracking file:
+</p>
+
+<pre bash>
+# Inside your switch_theme function:
+if command -v wezterm &amp;&gt;/dev/null &amp;&amp; [[ -n "$wezterm_scheme" ]]; then
+    echo "$wezterm_scheme" &gt; "$HOME/.config/wezterm/active-theme.txt"
+    # WezTerm automatically watches and hot-reloads config changes!
+fi
+</pre>
+
+<div id="Standard Linux Terminals (GNOME Terminal, Konsole, Xterm, etc.)"><h3 id="Standard Linux Terminals (GNOME Terminal, Konsole, Xterm, etc.)" class="header"><a href="#Standard Linux Terminals (GNOME Terminal, Konsole, Xterm, etc.)">Standard Linux Terminals (GNOME Terminal, Konsole, Xterm, etc.)</a></h3></div>
+
+<p>
+Standard Linux terminal emulators can change their background and text colors dynamically without restarting using ANSI OSC (Operating System Command) escape sequences.
+</p>
+
+<p>
+You can push color changes directly to the current terminal window standard output stream. This works universally on almost any standard Linux terminal.
+</p>
+
+<p>
+To change the background color via script:
+</p>
+  
+<pre bash>
+# Format: \e]11;#RRGGBB\a
+echo -ne "\e]11;#2e3440\a" # Sets background to Nord dark
+</pre>
+
+<p>
+To change the foreground (text) color via script:
+</p>
+
+<pre bash>
+# Format: \e]10;#RRGGBB\a
+echo -ne "\e]10;#d8dee9\a" # Sets text color
+</pre>
+
+<div id="macOS Terminal.app"><h3 id="macOS Terminal.app" class="header"><a href="#macOS Terminal.app">macOS Terminal.app</a></h3></div>
+
+<p>
+Apple's built-in Terminal app doesn't natively parse standard ANSI background escape sequences reliably across all profiles. Instead, it relies on AppleScript.
+</p>
+
+<p>
+You can execute AppleScript directly inline from your Zsh function using <code>osascript -e</code> to change the active window's profile or RGB background color:
+</p>
+
+<pre bash>
+if [[ "$OSTYPE" == "darwin"* ]] &amp;&amp; command -v osascript &amp;&gt;/dev/null; then
+    # Option A: Switch to a predefined macOS Terminal Profile name
+    osascript -e "tell application \"Terminal\" to set current settings of window 1 to settings set \"$macos_profile_name\""
+    
+    # Option B: Or send explicit RGB background values (values from 0 to 65535)
+    # osascript -e "tell application \"Terminal\" to set background color of window 1 to {12288, 14336, 17408}"
+fi
+</pre>
+
+<div id="Unified Multi-Terminal Function Example"><h1 id="Unified Multi-Terminal Function Example" class="header"><a href="#Unified Multi-Terminal Function Example">Unified Multi-Terminal Function Example</a></h1></div>
+
+<p>
+Here is how you can expand your switch_theme function to handle Kitty, WezTerm, Linux ANSI sequences, and macOS Terminal all at once:
+</p>
+
+<pre>
+switch_theme() {
+    local theme_name="$1"
+    
+    # Define your themes: 
+    # "short_name : eza_file : kitty_file : wezterm_scheme : macos_profile : bg_hex"
+    local -A themes=(
+        [catppuccin]="theme-catppuccin.yml:Catppuccin-Frappe.conf:Catppuccin Frappe:Pro:#303446"
+        [nord]="theme-nord.yml:Nord.conf:Nord:Basic:#2e3440"
+        [adapta]="theme-adapta.yml:Adapta_Nokto_Maia.conf:Adapta:Ocean:#222d32"
+    )
+
+    if [[ -z "${themes[$theme_name]}" ]]; then
+        echo "Unknown theme: '$theme_name'"
+        echo "Available themes: ${(k)themes[*]}"
+        return 1
+    fi
+
+    IFS=':' read -r eza_file kitty_file wezterm_scheme macos_profile bg_hex &lt;&lt;&lt; "${themes[$theme_name]}"
+
+    # 1. Update eza theme
+    local eza_target="$HOME/.config/eza/$eza_file"
+    if [[ -f "$eza_target" ]]; then
+        cp "$eza_target" "$HOME/.config/eza/theme.yml"
+        echo "Updated eza theme to: $theme_name"
+    fi
+
+    # 2. Apply to Kitty (if active)
+    if command -v kitty &amp;&gt;/dev/null &amp;&amp; [[ "$TERM" == "xterm-kitty" ]]; then
+        local kitty_target="$HOME/.config/eza/$kitty_file"
+        [[ ! -f "$kitty_target" ]] &amp;&amp; kitty_target="$HOME/.config/kitty/$kitty_file"
+        if [[ -f "$kitty_target" ]]; then
+            rm -f "$HOME/.config/kitty/current-theme.conf"
+            cp "$kitty_target" "$HOME/.config/kitty/current-theme.conf"
+            kill -SIGUSR1 $(pgrep -u $USER -x kitty) &amp;&gt;/dev/null
+        fi
+    fi
+
+    # 3. Apply to WezTerm (if active)
+    if [[ "$TERM_PROGRAM" == "WezTerm" ]]; then
+        echo "$wezterm_scheme" &gt; "$HOME/.config/wezterm/active-theme.txt"
+    fi
+
+    # 4. Apply to macOS Terminal.app (if on Mac)
+    if [[ "$OSTYPE" == "darwin*" ]] &amp;&amp; command -v osascript &amp;&gt;/dev/null; then
+        osascript -e "tell application \"Terminal\" to set current settings of window 1 to settings set \"$macos_profile\"" 2&gt;/dev/null
+    fi
+
+    # 5. Fallback generic Linux Terminal ANSI background change
+    if [[ -n "$bg_hex" ]] &amp;&amp; [[ "$TERM" != "xterm-kitty" ]] &amp;&amp; [[ "$TERM_PROGRAM" != "WezTerm" ]]; then
+        echo -ne "\e]11;${bg_hex}\a"
+    fi
+
+    echo "Successfully applied theme: $theme_name"
+}
+</pre>
+
+<div id="Preparing Config files for each Platform/Terminal"><h1 id="Preparing Config files for each Platform/Terminal" class="header"><a href="#Preparing Config files for each Platform/Terminal">Preparing Config files for each Platform/Terminal</a></h1></div>
+
+<p>
+Because every terminal app handles themes via its own proprietary configuration format, a unified shell script acts as a "router" telling each app what theme name, profile, or color code to load.
+</p>
+
+<p>
+The varieties of settings map out across your environment as follows:
+</p>
+
+<div id="Preparing Config files for each Platform/Terminal-eza (Syntax &amp; UI Metadata)"><h3 id="eza (Syntax &amp; UI Metadata)" class="header"><a href="#Preparing Config files for each Platform/Terminal-eza (Syntax &amp; UI Metadata)">eza (Syntax &amp; UI Metadata)</a></h3></div>
+
+<ul>
+<li>
+What it is: The YAML file (theme-catppuccin.yml, theme-nord.yml, etc.) located in your ~/.config/eza/ directory.
+
+<li>
+How it works: It dictates the color map specifically for eza's file listings (e.g., directory colors, symlinks, file size text, permissions output).
+
+<li>
+For other themes: You download or write the respective .yml mapping file from the eza-community/eza-themes repository and place it in your eza configuration folder.
+
+</ul>
+<div id="Preparing Config files for each Platform/Terminal-Kitty (Terminal-Specific Native Config)"><h3 id="Kitty (Terminal-Specific Native Config)" class="header"><a href="#Preparing Config files for each Platform/Terminal-Kitty (Terminal-Specific Native Config)">Kitty (Terminal-Specific Native Config)</a></h3></div>
+
+<ul>
+<li>
+What it is: The .conf file (Catppuccin-Frappe.conf, Nord.conf) containing raw terminal palette hex codes.
+
+<li>
+How it works: Kitty dynamically reads current-theme.conf inside its config folder to paint the background, text, and ANSI 16-color blocks.
+
+<li>
+For other themes: You extract or download the raw .conf file tailored for Kitty (most theme creators provide a .conf alongside their theme repository) and reference it in your script mapping.
+
+</ul>
+<div id="Preparing Config files for each Platform/Terminal-WezTerm (Lua-Driven Terminal)"><h3 id="WezTerm (Lua-Driven Terminal)" class="header"><a href="#Preparing Config files for each Platform/Terminal-WezTerm (Lua-Driven Terminal)">WezTerm (Lua-Driven Terminal)</a></h3></div>
+
+<ul>
+<li>
+What it is: WezTerm built-in color scheme string identifier (e.g., "Catppuccin Frappe", "Nord").  
+
+<li>
+Diego Vicente
+
+<li>
+How it works: WezTerm natively includes over 700+ popular color schemes built directly into its engine. You do not need to hunt down files for it. You just need to look up WezTerm's exact name string for that theme.  
+
+</ul>
+<div id="Preparing Config files for each Platform/Terminal-WezTerm"><h3 id="WezTerm" class="header"><a href="#Preparing Config files for each Platform/Terminal-WezTerm">WezTerm</a></h3></div>
+
+<p>
+For other themes: Check WezTerm's online color scheme gallery or write a quick loop to see if it's built-in, then plug the exact string name (like "GruvboxDark") into your script mapping.
+</p>
+
+<div id="Preparing Config files for each Platform/Terminal-macOS Terminal.app (Apple Ecosystem Profile)"><h3 id="macOS Terminal.app (Apple Ecosystem Profile)" class="header"><a href="#Preparing Config files for each Platform/Terminal-macOS Terminal.app (Apple Ecosystem Profile)">macOS Terminal.app (Apple Ecosystem Profile)</a></h3></div>
+
+<ul>
+<li>
+What it is: A saved profile name inside Apple's native Terminal application preferences (e.g., "Pro", "Basic", "Ocean").
+
+<li>
+How it works: macOS Terminal doesn't easily let scripts change every single RGB color on the fly via plain text files. Instead, it relies on pre-configured Profiles that you save manually via Terminal &gt; Settings &gt; Profiles.
+
+<li>
+For other themes: You manually create a profile inside the Terminal app GUI, customize its colors to match your theme, name the profile (e.g., "Nord-Mac"), and then put that exact profile name string into your script variable.
+
+</ul>
+<div id="Preparing Config files for each Platform/Terminal-bg_hex (Generic Linux ANSI Fallback)"><h3 id="bg_hex (Generic Linux ANSI Fallback)" class="header"><a href="#Preparing Config files for each Platform/Terminal-bg_hex (Generic Linux ANSI Fallback)">bg_hex (Generic Linux ANSI Fallback)</a></h3></div>
+
+<ul>
+<li>
+What it is: A raw hexadecimal background color code (e.g., #2e3440).
+
+<li>
+How it works: If you are on a standard Linux terminal emulator (like GNOME Terminal or Konsole) that isn't Kitty or WezTerm, the script bypasses profile files and fires a raw ANSI escape sequence (\e]11;#HEX\a) straight into the shell stream to force the background color to change instantly.
+
+<li>
+For other themes: You just look up the core background hex code of that theme and supply it as a string.
+
+</ul>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
