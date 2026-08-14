@@ -44,22 +44,44 @@ WezTerm handles themes via its Lua configuration file (<code>~/.config/wezterm/w
 <div id="Universal Shell/Terminal Color Themes-WezTerm-In your wezterm.lua:"><h4 id="In your wezterm.lua:" class="header"><a href="#Universal Shell/Terminal Color Themes-WezTerm-In your wezterm.lua:">In your wezterm.lua:</a></h4></div>
 
 <p>
-Read a dynamic theme file written by your shell script:
+This is probably already at the top of your lua config:
 </p>
 
 <pre lua>
 local wezterm = require 'wezterm'
 local config = {}
+</pre>
 
--- Try to read a theme override written by your switch_theme function
-local f = io.open(os.getenv("HOME") .."/.config/wezterm/active-theme.txt", "r")
+<p>
+This is the new bit:
+</p>
+
+<p>
+Read a dynamic theme file written by your shell script:
+</p>
+
+<pre lua>
+------------------- Enable Universal Switch-Theme function -------------------
+
+local active_theme_file = os.getenv("HOME") .."/.config/wezterm/active_theme.lua"
+wezterm.add_to_config_reload_watch_list(active_theme_file)
+
+config.color_scheme = 'Catppuccin Frappe' -- default fallback
+
+local f = loadfile(active_theme_file)
 if f then
-    config.color_scheme = f:read("*all"):gsub("%s+", "")
-    f:close()
-else
-    config.color_scheme = 'Catppuccin Frappe' -- default fallback
+    local ok, res = pcall(f)
+    if ok and type(res) == "string" then
+        config.color_scheme = res
+    end
 end
+</pre>
 
+<p>
+...and this must appear at the end of the lua config (and it's probably already there!):
+</p>
+
+<pre lua>
 return config
 </pre>
 
@@ -70,10 +92,14 @@ Map your themes to WezTerm’s built-in scheme names (WezTerm natively includes 
 </p>
 
 <pre bash>
-# Inside your switch_theme function:
-if command -v wezterm &amp;&gt;/dev/null &amp;&amp; [[ -n "$wezterm_scheme" ]]; then
-    echo "$wezterm_scheme" &gt; "$HOME/.config/wezterm/active-theme.txt"
-    # WezTerm automatically watches and hot-reloads config changes!
+# 3. Apply to WezTerm (if active)
+if [[ "$TERM_PROGRAM" == "WezTerm" ]]; then
+    # Write out a direct Lua chunk so WezTerm can load it seamlessly
+    echo "return \"$wezterm_scheme\"" &gt; "$HOME/.config/wezterm/active_theme.lua"
+    
+    if command -v wezterm &amp;&gt;/dev/null; then
+        wezterm cli reload-config &amp;&gt;/dev/null
+    fi
 fi
 </pre>
 
@@ -131,18 +157,49 @@ fi
 Here is how you can expand your switch_theme function to handle Kitty, WezTerm, Linux ANSI sequences, and macOS Terminal all at once:
 </p>
 
+<p>
+(Still in development; especially the color schemes):
+</p>
+
 <pre bash>
+# Function to switch themes across Kitty and eza seamlessly
 switch_theme() {
     local theme_name="$1"
     
     # Define your themes: 
     # "short_name : eza_file : kitty_file : wezterm_scheme : macos_profile : bg_hex"
-    local -A themes=(
-        [catppuccin]="theme-catppuccin.yml:Catppuccin-Frappe.conf:Catppuccin Frappe:Pro:#303446"
-        [nord]="theme-nord.yml:Nord.conf:Nord:Basic:#2e3440"
-        [adapta]="theme-adapta.yml:Adapta_Nokto_Maia.conf:Adapta:Ocean:#222d32"
-    )
+    # local -A themes=(
+    #     [catppuccin]="theme-catppuccin.yml:Catppuccin-Frappe.conf:Catppuccin Frappe:Pro:#303446"
+    #     [nord]="theme-nord.yml:Nord.conf:Nord:Basic:#2e3440"
+    #     [adapta]="theme-adapta.yml:Adapta_Nokto_Maia.conf:Adapta:Ocean:#222d32"
+    # )
 
+    # Define your themes: "short_name : eza_file : kitty_file"
+local -A themes=(
+        [black]="black.yml:Black_Metal.conf:Black Metal"
+        [catppuccin]="catppuccin-frappe.yml:Catppuccin-Frappe.conf:Catppuccin Frappe:Pro:#303446"
+        [latte]="catppuccin-latte.yml:Catppuccin-Latte.conf:Catppuccin Latte:Latte:#909090"
+        [macchiato]="catppuccin-macchiato.yml:Catppuccin-Macchiato.conf:Catppuccin Macchiato"
+        [mocha]="catppuccin-mocha.yml:Catppuccin-Mocha.conf:Catppuccin Mocha"
+        [default]="default.yml:Default.conf:Default"
+        [dracula]="dracula.yml:Dracula.conf:Dracula"
+        [gruvbox]="gruvbox-dark.yml:Gruvbox_Dark.conf:Gruvbox Dark"
+        [gruvboxlight]="gruvbox-light.yml:Gruvbox_Light.conf:Gruvbox Light"
+        [kanagawadragon]="kanagawa-dragon.yml:Kanagawa_dragon.conf:Kanagawa Dragon"
+        [kd]="kanagawa-dragon.yml:Kanagawa_dragon.conf:Kanagawa Dragon"
+        [kanagawalight]="kanagawa-lotus.yml:Kanagawa_light.conf:Kanagawa Lotus"
+        [kl]="kanagawa-lotus.yml:Kanagawa_light.conf:Kanagawa Lotus"
+        [rosedawn]="rose-pine-dawn.yml:Rose_Pine_Dawn.conf:Dawnfox"
+        [rd]="rose-pine-dawn.yml:Rose_Pine_Dawn.conf:Dawnfox"
+        [roasemoon]="rose-pine-moon.yml:Rose_Pine_Moon.conf:Rose Pine Moon"
+        [rm]="rose-pine-moon.yml:Rose_Pine_Moon.conf:Rose Pine Moon"
+        [rose]="rose-pine.yml:Rose_Pine.conf:Rose Pine"
+        [solorized]="solarized-dark.yml:Solorized_Dark.conf:Solarized Dark"
+        [sol]="solarized-dark.yml:Solorized_Dark.conf:Solarized Dark"
+        [adapta]="theme-adapta.yml:Adapta_Nokto_Maia.conf:Adapta:Ocean:#222d32"
+        [nord]="theme-nord.yml:Nord.conf:Nord (Gogh):Basic:#2e3440"
+        [tokyo]="tokyonight.yml:Tokyo_Night.conf:Tokyo Night"
+    )
     if [[ -z "${themes[$theme_name]}" ]]; then
         echo "Unknown theme: '$theme_name'"
         echo "Available themes: ${(k)themes[*]}"
@@ -171,7 +228,12 @@ switch_theme() {
 
     # 3. Apply to WezTerm (if active)
     if [[ "$TERM_PROGRAM" == "WezTerm" ]]; then
-        echo "$wezterm_scheme" &gt; "$HOME/.config/wezterm/active-theme.txt"
+        # Write out a direct Lua chunk so WezTerm can load it seamlessly
+        echo "return \"$wezterm_scheme\"" &gt; "$HOME/.config/wezterm/active_theme.lua"
+        
+        if command -v wezterm &amp;&gt;/dev/null; then
+            wezterm cli reload-config &amp;&gt;/dev/null
+        fi
     fi
 
     # 4. Apply to macOS Terminal.app (if on Mac)
@@ -186,8 +248,6 @@ switch_theme() {
 
     echo "Successfully applied theme: $theme_name"
 }
-
-# Add an alias shortcut if desired:
 alias swth='switch_theme'
 </pre>
 
