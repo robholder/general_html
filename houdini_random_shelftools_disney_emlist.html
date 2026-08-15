@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>houdini_random_shelftools_disney_emlist</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Houdini.html">Houdini</a>
+</p>
+
+<div id="Disney - Shelf Tool - EmList"><h1 id="Disney - Shelf Tool - EmList" class="header"><a href="#Disney - Shelf Tool - EmList">Disney - Shelf Tool - EmList</a></h1></div>
+
+<p>
+Print to a window and the Python Console a list of lights/shaders grouped under each Emission number present.
+</p>
+
+<pre python>
+import hou
+
+def find_all_emissions():
+    # Dictionary to hold emission numbers as keys and lists of matching node paths as values
+    emission_dict = {}
+
+    # Loop through the range 1 to 50 (inclusive)
+    for emNum in range(1, 51):
+        matching_lights = []
+
+        # Loop through all nodes in the scene recursively
+        for node in hou.node("/").allSubChildren():
+            parm = node.parm("emissionCategory")
+            if parm is not None:
+                try:
+                    if int(parm.eval()) == emNum:
+                        matching_lights.append(node)
+                except (ValueError, TypeError):
+                    continue
+
+        # If we found any matching nodes for this emission number, sort and store them
+        if matching_lights:
+            sorted_paths = [light.path() for light in sorted(matching_lights, key=lambda x: x.path())]
+            emission_dict[emNum] = sorted_paths
+
+    # Check if we found anything across the entire range 1-50
+    if not emission_dict:
+        hou.ui.displayMessage(
+            "No matching items found for emission categories 1 through 50.", 
+            severity=hou.severityType.Message,
+            title="Emission Search Results"
+        )
+        return
+
+    # Build the formatted report lines
+    report_lines = []
+    
+    for emNum, paths in sorted(emission_dict.items()):
+        report_lines.append(f"\n#  emission {emNum}:")
+        for path in paths:
+            report_lines.append(path)  # Or add indentation if preferred: f"    {path}"
+
+    # Join everything into a single multi-line string
+    message_text = "\n".join(report_lines)
+
+    # 1. Print to the Python Console (making sure it flushes/writes)
+    print("\n" + message_text + "\n")
+
+    # Total count of items found for the popup summary
+    total_found = sum(len(paths) for paths in emission_dict.values())
+
+    # 2. Display the copyable popup dialog box with the details expanded
+    hou.ui.displayMessage(
+        f"Found {total_found} item(s) across {len(emission_dict)} emission category/categories (1-50).",
+        severity=hou.severityType.Message,
+        title="Emission Search Results",
+        details=message_text,
+        details_expanded=True  # Automatically opens the copyable text drawer
+    )
+
+# Run the function
+find_all_emissions()
+</pre>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Houdini.html">Houdini</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

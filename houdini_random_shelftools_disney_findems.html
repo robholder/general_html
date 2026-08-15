@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>houdini_random_shelftools_disney_findems</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Houdini.html">Houdini</a>
+</p>
+
+<div id="Disney - Shelf Tool - EmList"><h1 id="Disney - Shelf Tool - EmList" class="header"><a href="#Disney - Shelf Tool - EmList">Disney - Shelf Tool - EmList</a></h1></div>
+
+<p>
+Asks user to enter integer, and the tool lists the lights/shaders assigned to that emission number.
+</p>
+
+<p>
+Lists to a Window and to the Python Console.
+</p>
+
+<pre python>
+import hou
+
+def get_integer_input():
+    while True:
+        button_pressed, user_input = hou.ui.readInput(
+            "Enter a number:", 
+            title="Integer Input Tool", 
+            buttons=("OK", "Cancel"), 
+            default_choice=0, 
+            close_choice=1
+        )
+        if button_pressed != 0:
+            return None
+        try:
+            return int(user_input.strip())
+        except ValueError:
+            hou.ui.displayMessage(
+                "Invalid input! Please enter a valid integer.", 
+                severity=hou.severityType.Error
+            )
+
+def findEms():
+    emNum = get_integer_input()
+    if emNum is None:
+        return
+
+    matching_lights = []
+    for node in hou.node("/").allSubChildren():
+        parm = node.parm("emissionCategory")
+        if parm is not None and parm.eval() == emNum:
+            matching_lights.append(node)
+
+    if not matching_lights:
+        hou.ui.displayMessage(
+            f"No matching lights found for emission value {emNum}.", 
+            severity=hou.severityType.Message,
+            title="Search Results"
+        )
+        return
+
+    # Build the list of paths
+    results = [f"Emission {emNum}: {light.path()}" for light in sorted(matching_lights, key=lambda x: x.path())]
+    message_text = "\n".join(results)
+    print(f"\n--- Search Results for Emission {emNum} ({len(matching_lights)} found) ---")
+    for light in sorted(matching_lights, key=lambda x: x.path()):
+        print(f"Emission {emNum}: {light.path()}")
+    print("--------------------------------------------------")
+    
+    # Display popup with selectable details expanded
+    hou.ui.displayMessage(
+        f"Found {len(matching_lights)} matching light(s) for Emission {emNum}.",
+        severity=hou.severityType.Message,
+        title="Search Results",
+        details=message_text,
+        details_expanded=True  # Automatically reveals the copyable box
+    )
+
+findEms()
+</pre>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Houdini.html">Houdini</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
