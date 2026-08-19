@@ -21,6 +21,126 @@
 <a href="Houdini.html">Houdini</a>
 </p>
 
+<div id="AI Breakdown"><h1 id="AI Breakdown" class="header"><a href="#AI Breakdown">AI Breakdown</a></h1></div>
+
+<div id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference"><h2 id="Houdini Backup &amp; Auto-Save: Complete Setup Reference" class="header"><a href="#AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference">Houdini Backup &amp; Auto-Save: Complete Setup Reference</a></h2></div>
+
+<p>
+This reference guide covers how to configure, structure, and automate Houdini’s backup and auto-save systems so they persist across sessions and point to the correct directories.
+</p>
+
+<div id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Overview of the Architecture"><h3 id="Overview of the Architecture" class="header"><a href="#AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Overview of the Architecture">Overview of the Architecture</a></h3></div>
+
+<p>
+Houdini splits auto-save and backup management into three distinct layers:
+</p>
+<ul>
+<li>
+The Engine Trigger (<code>123.cmd</code>): Houdini turns off auto-save by default on every new launch. A startup script is required to kick off the background saving thread.
+
+<li>
+The Environment Variables (<code>packages/</code>): Modern configuration uses JSON package files to define where backup files are stored and how many versions are kept.
+
+<li>
+The Timing Rules (Preferences UI): General settings like save frequency and idle limits are managed via Houdini’s user preferences.
+
+</ul>
+<div id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 1: Setting Up the Storage Configuration (Packages)"><h3 id="Part 1: Setting Up the Storage Configuration (Packages)" class="header"><a href="#AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 1: Setting Up the Storage Configuration (Packages)">Part 1: Setting Up the Storage Configuration (Packages)</a></h3></div>
+
+<p>
+Instead of relying on default paths, you can define your backup behavior globally using Houdini's package system.
+</p>
+<ul>
+<li>
+Navigate to your user Houdini preferences directory (e.g., <code>C:/Users/&lt;username&gt;/Documents/houdiniXX.X/</code> or <code>~/.config/houdiniXX.X/</code> on Linux/Mac).
+
+<li>
+Ensure there is a folder named <code>packages</code> (create it if it doesn't exist).
+
+<li>
+Inside <code>packages</code>, create a file named <code>backup_settings.json</code> with the following structure:
+<pre json>
+{
+    "env": [
+        {
+            "HOUDINI_BACKUP_DIR": "backup_$USER"
+        },
+        {
+            "HOUDINI_MAX_BACKUP_FILES": "50"
+        }
+    ]
+}
+</pre>
+
+<li>
+<code>HOUDINI_BACKUP_DIR</code>: Specifies the directory where backups are dumped. (Using <code>backup_$USER</code> or an absolute path ensures it stays organized). Without setting this, Houdini defaults to <code>backup</code>.
+
+<li>
+<code>HOUDINI_MAX_BACKUP_FILES</code>: Sets the retention limit so your backup directory doesn't bloat infinitely over time.
+
+</ul>
+<div id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 2: Activating the Auto-Save Engine (123.cmd)"><h3 id="Part 2: Activating the Auto-Save Engine (123.cmd)" class="header"><a href="#AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 2: Activating the Auto-Save Engine (123.cmd)">Part 2: Activating the Auto-Save Engine (123.cmd)</a></h3></div>
+
+<p>
+Because Houdini intentionally disables auto-save upon every fresh session launch, you must use a startup script to turn the loop on automatically.
+</p>
+<ul>
+<li>
+In your user Houdini preferences directory (<code>houdiniXX.X/</code>), ensure there is a folder named <code>scripts</code> (create it if it doesn't exist).
+
+<li>
+Inside <code>scripts</code>, create a plain text file named <code>123.cmd</code>.
+
+</ul>
+<p>
+8 Add the following HScript command to the file and save it:
+</p>
+
+<pre ini>
+autosave on
+</pre>
+
+<p>
+When Houdini boots up, it automatically executes <code>123.cmd</code>, initializing the background timer using your package configuration.
+</p>
+
+<div id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 3: Timing and Frequency (Preferences UI)"><h3 id="Part 3: Timing and Frequency (Preferences UI)" class="header"><a href="#AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 3: Timing and Frequency (Preferences UI)">Part 3: Timing and Frequency (Preferences UI)</a></h3></div>
+
+<p>
+With the engine running and paths defined, use Houdini's native settings window to control how often it saves:
+</p>
+<ul>
+<li>
+Open Houdini and go to <span id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 3: Timing and Frequency (Preferences UI)-Edit &gt; Preferences &gt; General"></span><strong id="Edit &gt; Preferences &gt; General">Edit &gt; Preferences &gt; General</strong> (or search for Save Options).
+
+<li>
+Locate the <span id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Part 3: Timing and Frequency (Preferences UI)-Save Options"></span><strong id="Save Options">Save Options</strong> section:
+
+<ul>
+<li>
+Auto-Save Time Interval: Set your desired frequency (e.g., every 1 minute).
+
+<li>
+Prompt Before Auto-Saving / Notifications: Configure whether you want a subtle HUD notification when a backup occurs.
+
+</ul>
+<li>
+Click Accept to save your preferences.
+
+</ul>
+<div id="AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Crucial Checklist &amp; Gotchas"><h3 id="Crucial Checklist &amp; Gotchas" class="header"><a href="#AI Breakdown-Houdini Backup &amp; Auto-Save: Complete Setup Reference-Crucial Checklist &amp; Gotchas">Crucial Checklist &amp; Gotchas</a></h3></div>
+
+<ul>
+<li>
+Saved Files Only: Houdini cannot auto-save an "untitled" (<code>.hip</code>) project. You must perform an initial manual save to disk so the application has a physical file path target.
+
+<li>
+Active Interactions: The auto-save timer respects user activity. If you are actively interacting with the viewport or nodes, Houdini may slightly defer the save action until a natural lull occurs to prevent UI stuttering.
+
+<li>
+Troubleshooting: If auto-saves stop working after an update, check that your <code>123.cmd</code> file is still in the correct <code>scripts/</code> directory and that <code>autosave</code> on is successfully executing in the textport.
+
+</ul>
 <div id="Houdini Save/Backup Options"><h1 id="Houdini Save/Backup Options" class="header"><a href="#Houdini Save/Backup Options">Houdini Save/Backup Options</a></h1></div>
 
 <p>
