@@ -528,8 +528,119 @@ First minute of every hour
 </tbody>
 </table>
 
+<div id="Project - Cron Report to Slack"><h1 id="Project - Cron Report to Slack" class="header"><a href="#Project - Cron Report to Slack">Project - Cron Report to Slack</a></h1></div>
 
+<p>
+Here is the step-by-step process to delete the files, count how many were removed, and send a notification to Slack using a webhook and <code>curl</code>.
+</p>
 
+<div id="Project - Cron Report to Slack-Step 1: Get a Slack Webhook URL"><h3 id="Step 1: Get a Slack Webhook URL" class="header"><a href="#Project - Cron Report to Slack-Step 1: Get a Slack Webhook URL">Step 1: Get a Slack Webhook URL</a></h3></div>
+
+<p>
+To post messages to Slack via <code>curl</code>, you need an <span id="Project - Cron Report to Slack-Step 1: Get a Slack Webhook URL-Incoming Webhook URL"></span><strong id="Incoming Webhook URL">Incoming Webhook URL</strong>.
+</p>
+
+<ul>
+<li>
+Go to your Slack workspace settings (or ask your Slack administrator) to create a custom app or enable <span id="Project - Cron Report to Slack-Step 1: Get a Slack Webhook URL-Incoming Webhooks"></span><strong id="Incoming Webhooks">Incoming Webhooks</strong> for a specific channel (e.g., <code>#alerts</code> or <code>#pipeline-logs</code>).
+
+<li>
+Once enabled, Slack will provide you with a unique Webhook URL that looks something like this:
+
+<ul>
+<li>
+<code>[https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX](https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX)</code>
+
+</ul>
+<li>
+Keep this URL handy; you’ll paste it into your script.
+
+</ul>
+<div id="Project - Cron Report to Slack-Step 2: Create a Bash Script"><h3 id="Step 2: Create a Bash Script" class="header"><a href="#Project - Cron Report to Slack-Step 2: Create a Bash Script">Step 2: Create a Bash Script</a></h3></div>
+
+<p>
+Create a new file anywhere safe in your user directory (for example, inside a <code>scripts</code> folder in your home directory), name it <code>cleanup_backup.sh</code>, and open it in your text editor:
+</p>
+
+<pre bash>
+vim ~/cleanup_backup.sh
+</pre>
+
+<p>
+Paste the following script into it (remember to swap out the placeholder webhook URL with your actual Slack URL):
+</p>
+
+<pre bash>
+#!/bin/bash
+
+# Configuration
+TARGET_DIR="/disney/shows/OHIO/work/Sequences/seq/265.0/seqData/lighting/rholder/PacketE/houdini/backup_rholder"
+WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+# 1. Count how many files match the criteria before deleting
+FILE_COUNT=$(find "$TARGET_DIR" -type f -mtime +1 | wc -l)
+
+# 2. Only proceed if there are actually files to delete
+if [ "$FILE_COUNT" -gt 0 ]; then
+    # Delete the files
+    find "$TARGET_DIR" -type f -mtime +1 -delete
+
+    # 3. Format the message for Slack
+    MESSAGE="🧹 *Backup Cleanup Report*\nDeleted *\$FILE_COUNT* old file(s) from \`$TARGET_DIR\`."
+
+    # 4. Send the payload via curl
+    curl -X POST -H 'Content-type: application/json' \
+         --data "{\"text\": \"$MESSAGE\"}" \
+         "$WEBHOOK_URL"
+fi
+</pre>
+
+<p>
+Save and close the file (<code>Ctrl+O</code>, <code>Enter</code>, then <code>Ctrl+X</code> in nano).
+</p>
+
+<div id="Project - Cron Report to Slack-Step 3: Make the Script Executable"><h3 id="Step 3: Make the Script Executable" class="header"><a href="#Project - Cron Report to Slack-Step 3: Make the Script Executable">Step 3: Make the Script Executable</a></h3></div>
+
+<p>
+Before cron can run your script, you need to give it execution permissions in the terminal:
+</p>
+
+<pre bash>
+chmod +x ~/cleanup_backup.sh
+</pre>
+
+<p>
+(Optional: You can test the script right now by running <code>~/cleanup_backup.sh</code> in your terminal to see if it successfully cleans files and pings Slack!)
+</p>
+
+<div id="Project - Cron Report to Slack-Step 4: Update Your Crontab"><h3 id="Step 4: Update Your Crontab" class="header"><a href="#Project - Cron Report to Slack-Step 4: Update Your Crontab">Step 4: Update Your Crontab</a></h3></div>
+
+<p>
+Now, open your crontab (<code>crontab -e</code>) and replace your old line with a simple call to your new script:
+</p>
+
+<pre bash>
+# Run the backup cleanup script Mon-Sat at 3:00 AM
+0 3 * * 1-6 /home/yourusername/cleanup_backup.sh
+</pre>
+
+<p>
+(Make sure to replace <code>/home/yourusername/</code> with your actual home directory path, which you can find by typing <code>echo $HOME</code> in your terminal).
+</p>
+
+<div id="Project - Cron Report to Slack-Why this approach is great:"><h3 id="Why this approach is great:" class="header"><a href="#Project - Cron Report to Slack-Why this approach is great:">Why this approach is great:</a></h3></div>
+
+<ul>
+<li>
+<span id="Project - Cron Report to Slack-Why this approach is great:-Clean &amp; Maintainable:"></span><strong id="Clean &amp; Maintainable:">Clean &amp; Maintainable:</strong> Your crontab stays simple and readable.
+
+<li>
+<span id="Project - Cron Report to Slack-Why this approach is great:-Smart Conditions:"></span><strong id="Smart Conditions:">Smart Conditions:</strong> The <code>if [ "$FILE_COUNT" -gt 0 ]</code> check ensures that Slack isn't spammed with notifications on days when there are no files to delete.
+
+<li>
+<span id="Project - Cron Report to Slack-Why this approach is great:-Extensible:"></span><strong id="Extensible:">Extensible:</strong> If you later decide you want to log these events to a local text file or add error handling, you can easily add it right into your <code>.sh</code> script!
+
+</ul>
 <p>
 <br>
 <hr>
