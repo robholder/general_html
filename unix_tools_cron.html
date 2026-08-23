@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_cron</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Cron"><h1 id="Cron" class="header"><a href="#Cron">Cron</a></h1></div>
+
+<p>
+Combining <code>cron</code> with the <code>find</code> command is the standard, most reliable way to automatically clean up old backups without having to write a custom script.
+</p>
+
+<p>
+Here is how you can set it up.
+</p>
+
+<div id="Cron-1. The Core Command"><h3 id="1. The Core Command" class="header"><a href="#Cron-1. The Core Command">1. The Core Command</a></h3></div>
+
+<p>
+The <code>find</code> utility is built into almost all Unix/Linux systems and is perfect for this. To find and delete files older than a certain number of days, you can use:
+</p>
+
+<pre bash>
+find /path/to/backup -type f -mtime +30 -delete
+</pre>
+
+<div id="Cron-1. The Core Command-Breakdown of the flags:"><h4 id="Breakdown of the flags:" class="header"><a href="#Cron-1. The Core Command-Breakdown of the flags:">Breakdown of the flags:</a></h4></div>
+
+<ul>
+<li>
+<code>/path/to/backup</code>: The target directory you want to clean.
+
+<li>
+<code>-type f</code>: Target files only (leaves directories alone).
+
+<li>
+<code>-mtime +30</code>: Matches files modified more than 30 days ago. (Change <code>30</code> to whatever number of days you prefer).
+
+<li>
+<code>-delete</code>: Removes the matched files safely. *(Tip: Test your command first by replacing <code>-delete</code> with <code>-print</code> to see a list of files it's about to delete!)*
+
+</ul>
+<div id="Cron-2. Setting Up the Crontab Job"><h3 id="2. Setting Up the Crontab Job" class="header"><a href="#Cron-2. Setting Up the Crontab Job">2. Setting Up the Crontab Job</a></h3></div>
+
+<p>
+To make this run automatically on a schedule, you will add it to your user's <code>crontab</code>.
+</p>
+
+<ol>
+<li>
+Open your terminal and open the cron editor:
+<pre bash>
+crontab -e
+</pre>
+
+<li>
+Add a line defining when you want it to run and the command. For example, to run this cleanup <span id="Cron-2. Setting Up the Crontab Job-every day at 2:00 AM"></span><strong id="every day at 2:00 AM">every day at 2:00 AM</strong>, add this line:
+
+</ol>
+<p>
+}}}cron
+0 2 * * * find /path/to/your/backup -type f -mtime +30 -delete &gt;/dev/null 2&gt;&amp;1
+}}}
+</p>
+
+<p>
+*(Note: <code>&gt;/dev/null 2&gt;&amp;1</code> at the end silences cron from emailing you output every time it runs, unless an error occurs).*
+</p>
+
+<div id="Cron-⚠️ A Crucial Cron Tip"><h3 id="⚠️ A Crucial Cron Tip" class="header"><a href="#Cron-⚠️ A Crucial Cron Tip">⚠️ A Crucial Cron Tip</a></h3></div>
+
+<p>
+Cron runs in a minimal environment, meaning it often doesn't load your standard shell profile or custom path variables. Always use <span id="Cron-⚠️ A Crucial Cron Tip-absolute paths"></span><strong id="absolute paths">absolute paths</strong> (like <code>/usr/bin/find</code> instead of just <code>find</code>, and <code>/home/username/backups</code> instead of <code>~/backups</code>). You can find your exact path to <code>find</code> by running <code>which find</code> in your terminal.
+</p>
+
+<div id="Cron-What E-Mailing does it do?"><h2 id="What E-Mailing does it do?" class="header"><a href="#Cron-What E-Mailing does it do?">What E-Mailing does it do?</a></h2></div>
+
+<p>
+By default, cron does <span id="Cron-What E-Mailing does it do?-local system mailing"></span><strong id="local system mailing">local system mailing</strong>. It does not automatically send emails to external addresses (like Gmail or Outlook) unless your operating system has a mail server (like Postfix) explicitly configured and hooked up to an external account.
+</p>
+
+<p>
+Instead, here is how cron's email mechanism actually works:
+</p>
+
+<ol>
+<li>
+<span id="Cron-What E-Mailing does it do?-Local System Inbox:"></span><strong id="Local System Inbox:">Local System Inbox:</strong> Whenever a cron job produces text output (either standard print statements or error messages), cron tries to mail that output to the local user account that ran the job (e.g., your username).
+
+<li>
+<span id="Cron-What E-Mailing does it do?-Where it goes:"></span><strong id="Where it goes:">Where it goes:</strong> It drops the message into a local mailbox file on your machine, typically located at <code>/var/mail/your-username</code> or <code>/var/spool/mail/your-username</code>.
+
+<li>
+<span id="Cron-What E-Mailing does it do?-Most of the time, people ignore it:"></span><strong id="Most of the time, people ignore it:">Most of the time, people ignore it:</strong> On a standard personal computer or cloud server where no mail transfer agent is installed, these emails just sit silently in that local file, or cron throws them away if it can't find a local mailer.
+
+</ol>
+<div id="Cron-What E-Mailing does it do?-How to manage cron's output:"><h3 id="How to manage cron's output:" class="header"><a href="#Cron-What E-Mailing does it do?-How to manage cron's output:">How to manage cron's output:</a></h3></div>
+
+<ul>
+<li>
+<span id="Cron-What E-Mailing does it do?-How to manage cron's output:-To completely shut off emails and output:"></span><strong id="To completely shut off emails and output:">To completely shut off emails and output:</strong> This is what most people prefer for routine cleanup tasks like deleting old backups. You redirect everything to the void (<code>/dev/null</code>) directly in your crontab line:
+<pre cron>
+0 2 * * * find /path/to/backup -type f -mtime +30 -delete &gt;/dev/null 2&gt;&amp;1
+</pre>
+
+<li>
+<span id="Cron-What E-Mailing does it do?-How to manage cron's output:-To catch errors only:"></span><strong id="To catch errors only:">To catch errors only:</strong> If you <span id="Cron-What E-Mailing does it do?-How to manage cron's output:-do"></span><strong id="do">do</strong> want to know if something goes wrong, you can let it output errors, or write a tiny script that only prints or notifies you if a command fails.
+
+</ul>
+<p>
+Unless you explicitly configure a tool like <code>postfix</code> or <code>msmtp</code> with an external SMTP relay, your cron jobs won't spam your personal email address.
+</p>
+
+<div id="Cron-What E-Mailing does it do?-1. Using Minutes Instead of Days"><h3 id="1. Using Minutes Instead of Days" class="header"><a href="#Cron-What E-Mailing does it do?-1. Using Minutes Instead of Days">1. Using Minutes Instead of Days</a></h3></div>
+
+<p>
+Yes, you can easily use minutes instead of days by swapping <code>-mtime</code> for *<code>-mmin</code>*.
+</p>
+
+<p>
+For example, to delete files older than <span id="Cron-What E-Mailing does it do?-1. Using Minutes Instead of Days-60 minutes"></span><strong id="60 minutes">60 minutes</strong>, you would use:
+</p>
+
+<pre bash>
+find /path/to/backup -type f -mmin +60 -delete
+</pre>
+
+<ul>
+<li>
+*<code>+60</code>*: Older than 60 minutes
+
+<li>
+*<code>-60</code>*: Newer than (modified within) the last 60 minutes
+
+</ul>
+<div id="Cron-What E-Mailing does it do?-2. What Happens if the Target Directory is Deleted or Moved?"><h3 id="2. What Happens if the Target Directory is Deleted or Moved?" class="header"><a href="#Cron-What E-Mailing does it do?-2. What Happens if the Target Directory is Deleted or Moved?">2. What Happens if the Target Directory is Deleted or Moved?</a></h3></div>
+
+<p>
+If the directory specified in your <code>find</code> command stops existing (e.g., it was deleted or renamed), <span id="Cron-What E-Mailing does it do?-2. What Happens if the Target Directory is Deleted or Moved?-the command will fail gracefully and throw an error message"></span><strong id="the command will fail gracefully and throw an error message">the command will fail gracefully and throw an error message</strong>, but it won't break your system.
+</p>
+
+<ul>
+<li>
+<span id="Cron-What E-Mailing does it do?-2. What Happens if the Target Directory is Deleted or Moved?-In the Terminal:"></span><strong id="In the Terminal:">In the Terminal:</strong> It will print an error like:
+
+</ul>
+<p>
+<code>find: ‘/path/to/backup’: No such file or directory</code> and exit with a non-zero status code.
+</p>
+<ul>
+<li>
+<span id="Cron-What E-Mailing does it do?-2. What Happens if the Target Directory is Deleted or Moved?-In a Cron Job:"></span><strong id="In a Cron Job:">In a Cron Job:</strong> Because cron executes this silently (if you appended <code>&gt;/dev/null 2&gt;&amp;1</code>), it will fail quietly in the background without affecting anything else. The next time the cron job runs after you recreate or restore the folder, it will magically start working again.
+
+</ul>
+<p>
+<span id="Cron-What E-Mailing does it do?-2. What Happens if the Target Directory is Deleted or Moved?-Pro-Tip to make it bulletproof:"></span><strong id="Pro-Tip to make it bulletproof:">Pro-Tip to make it bulletproof:</strong> If you want to prevent error messages or script crashes when a directory might not exist yet, you can wrap the command in a conditional check:
+</p>
+
+<pre bash>
+[ -d "/path/to/backup" ] &amp;&amp; find /path/to/backup -type f -mmin +60 -delete
+</pre>
+
+<p>
+This safely checks if the directory exists (<code>-d</code>) <span id="Cron-What E-Mailing does it do?-2. What Happens if the Target Directory is Deleted or Moved?-before"></span><strong id="before">before</strong> attempting to run the <code>find</code> command.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
