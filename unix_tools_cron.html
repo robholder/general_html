@@ -372,6 +372,164 @@ If you restrict <span id="Cron-What If The Calendar Day And Day Of The Week Conf
 If you actually want a strict "AND" condition (e.g., <span id="Cron-What If The Calendar Day And Day Of The Week Conflict? Do They Cancel Each Other?-How to avoid this:-only"></span><strong id="only">only</strong> on Mondays that are also between the 1st and 7th), you leave one of the day fields as an asterisk <code>*</code> and handle the extra filtering logic inside your command script using an <code>if</code> statement.
 </p>
 
+<div id="More On Cron Syntax"><h1 id="More On Cron Syntax" class="header"><a href="#More On Cron Syntax">More On Cron Syntax</a></h1></div>
+
+<p>
+Cron syntax follows a 5-field structure: <code>Minute Hour Day-of-Month Month Day-of-Week</code>. Here are uncommon, clever, or counterintuitive crontab patterns that go beyond standard daily or hourly jobs.
+</p>
+
+<div id="More On Cron Syntax-*Standard Field Structure*"><h2 id="*Standard Field Structure*" class="header"><a href="#More On Cron Syntax-*Standard Field Structure*"><span id="More On Cron Syntax-*Standard Field Structure*-Standard Field Structure"></span><strong id="Standard Field Structure">Standard Field Structure</strong></a></h2></div>
+
+<pre text>
+┌───────────── minute (0 - 59)
+│ ┌───────────── hour (0 - 23)
+│ ┌─│───────────── day of month (1 - 31)
+│ │ ┌─│───────────── month (1 - 12)
+│ │ │ ┌─│───────────── day of week (0 - 6) (Sunday=0 or 7)
+│ │ │ │ │
+* * * * * command_to_execute
+</pre>
+
+<div id="More On Cron Syntax-*Standard Field Structure*-Unintuitive &amp; Overlooked Syntax Patterns"><h3 id="Unintuitive &amp; Overlooked Syntax Patterns" class="header"><a href="#More On Cron Syntax-*Standard Field Structure*-Unintuitive &amp; Overlooked Syntax Patterns">Unintuitive &amp; Overlooked Syntax Patterns</a></h3></div>
+
+<ul>
+<li>
+<code>0 9  * 1-5</code> (Workdays Only)*
+
+<li>
+Runs at 9:00 AM every Monday through Friday. Using range dashes (<code>1-5</code>) avoids writing multiple individual lines for each weekday.
+
+<li>
+*<code>/15 9-17  * 1-5</code> (Business Hours Step Intervals)*
+
+<li>
+Runs every 15 minutes, but strictly between 9 AM and 5 PM on weekdays. Combines step values (<code>/</code>) with range limits.
+
+<li>
+<code>0 0 1,15 * *</code> (Bi-Monthly Semi-Static Days)
+
+<li>
+Runs at midnight on the 1st and 15th of every month. Commas serve as discrete set matchers.
+
+<li>
+*<code>0 12 1-7  1</code> (First Monday of the Month)
+
+<li>
+Runs at noon only on the first Monday of any month. The trick: day-of-month is restricted to 1–7, ensuring the Monday (<code>1</code>) fall within the first week.
+
+</ul>
+<div id="More On Cron Syntax-*Standard Field Structure*-The OR-Condition Edge Case (Crucial Footgun)"><h3 id="The OR-Condition Edge Case (Crucial Footgun)" class="header"><a href="#More On Cron Syntax-*Standard Field Structure*-The OR-Condition Edge Case (Crucial Footgun)">The OR-Condition Edge Case (Crucial Footgun)</a></h3></div>
+
+<pre cron>
+# CAUTION: Day-of-Month and Day-of-Week use OR logic, not AND
+0 0 15 * 5
+</pre>
+
+<ul>
+<li>
+Why this trips people up: If <span id="More On Cron Syntax-*Standard Field Structure*-The OR-Condition Edge Case (Crucial Footgun)-both"></span><strong id="both">both</strong> Day-of-Month and Day-of-Week are specified (and neither is <code>*</code>), standard <code>cron</code> executes if <span id="More On Cron Syntax-*Standard Field Structure*-The OR-Condition Edge Case (Crucial Footgun)-either"></span><strong id="either">either</strong> condition is true. The line above runs on <span id="More On Cron Syntax-*Standard Field Structure*-The OR-Condition Edge Case (Crucial Footgun)-every Friday"></span><strong id="every Friday">every Friday</strong> <span id="More On Cron Syntax-*Standard Field Structure*-The OR-Condition Edge Case (Crucial Footgun)-and"></span><strong id="and">and</strong> on the <span id="More On Cron Syntax-*Standard Field Structure*-The OR-Condition Edge Case (Crucial Footgun)-15th of every month"></span><strong id="15th of every month">15th of every month</strong>, not just on Fridays that happen to fall on the 15th.
+
+<li>
+The Workaround (using shell logic):
+
+</ul>
+  
+<pre cron>
+0 0 15 * * [ $(date +\%u) -eq 5 ] &amp;&amp; /path/to/script.sh
+</pre>
+
+<div id="More On Cron Syntax-*Standard Field Structure*-*Shorthand Non-Standard `@` Macros*"><h3 id="*Shorthand Non-Standard `@` Macros*" class="header"><a href="#More On Cron Syntax-*Standard Field Structure*-*Shorthand Non-Standard `@` Macros*">*Shorthand Non-Standard <code>@</code> Macros*</a></h3></div>
+
+<p>
+Most modern cron implementations (Vixie Cron, systemd timers, cronie) support built-in macros that replace the 5-column syntax entirely:
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Macro
+</th>
+<th>
+Equivalent Syntax
+</th>
+<th>
+Execution Timing
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>@reboot</code>
+</td>
+<td>
+<span id="More On Cron Syntax-*Standard Field Structure*-*Shorthand Non-Standard <code>@</code> Macros*-N/A"></span><strong id="N/A">N/A</strong>
+</td>
+<td>
+Runs once at system startup/boot
+</td>
+</tr>
+<tr>
+<td>
+<code>@yearly</code> / <code>@annually</code>
+</td>
+<td>
+<code>0 0 1 1 *</code>
+</td>
+<td>
+Jan 1st at midnight
+</td>
+</tr>
+<tr>
+<td>
+<code>@monthly</code>
+</td>
+<td>
+<code>0 0 1 * *</code>
+</td>
+<td>
+1st of every month at midnight
+</td>
+</tr>
+<tr>
+<td>
+<code>@weekly</code>
+</td>
+<td>
+<code>0 0 * * 0</code>
+</td>
+<td>
+Every Sunday at midnight
+</td>
+</tr>
+<tr>
+<td>
+<code>@daily</code> / <code>@midnight</code>
+</td>
+<td>
+<code>0 0 * * *</code>
+</td>
+<td>
+Every day at midnight
+</td>
+</tr>
+<tr>
+<td>
+<code>@hourly</code>
+</td>
+<td>
+<code>0 * * * *</code>
+</td>
+<td>
+First minute of every hour
+</td>
+</tr>
+</tbody>
+</table>
+
+
+
 <p>
 <br>
 <hr>
