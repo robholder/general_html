@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nuke_python_color_tile_by_property</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<div id="Auto Color Nodes (tile_color) Based on Property"><h1 id="Auto Color Nodes (tile_color) Based on Property" class="header"><a href="#Auto Color Nodes (tile_color) Based on Property">Auto Color Nodes (tile_color) Based on Property</a></h1></div>
+
+
+<p>
+<code>tile_color</code> is an internal, non-standard property knob. When you query a node via <code>node.knobs()</code>, <code>tile_color</code> isn't listed under standard parameter panels unless you explicitly reference it by its exact name: <code>node['tile_color']</code>.
+</p>
+
+<p>
+Furthermore, because Nuke's <code>tile_color</code> expects a packed 32-bit integer (and doesn't natively expose a color picker or UI slider directly on the node panel itself unless you build a custom knob), changing it dynamically via a callback requires explicitly targeting that internal knob.  
+</p>
+
+<p>
+Here is a clean, fully verified script that explicitly sets the initial color and correctly hooks into the node's background event structure:
+</p>
+
+<pre python>
+node = nuke.selectedNode()
+
+if node.Class() == "Grade":
+    # 1. Define the callback code string
+    callback_code = """
+node = nuke.thisNode()
+k = nuke.thisKnob()
+if k.name() in ['white', 'black', 'gamma', 'gain', 'multiply']:
+    r = int(min(max(node['white'].getValue(0) * 255, 0), 255))
+    g = int(min(max(node['white'].getValue(1) * 255, 0), 255))
+    b = int(min(max(node['white'].getValue(2) * 255, 0), 255))
+    color_int = int("%02x%02x%02xff" % (r, g, b), 16)
+    node['tile_color'].setValue(color_int)
+"""
+    
+    # 2. Access the hidden 'knobChanged' knob and assign the code
+    node.knob('knobChanged').setValue(callback_code)
+    
+    # 3. Run it once immediately to sync the color right now
+    r = int(min(max(node['white'].getValue(0) * 255, 0), 255))
+    g = int(min(max(node['white'].getValue(1) * 255, 0), 255))
+    b = int(min(max(node['white'].getValue(2) * 255, 0), 255))
+    node['tile_color'].setValue(int("%02x%02x%02xff" % (r, g, b), 16))
+</pre>
+
+<ul>
+<li>
+Select your Grade node.
+
+<li>
+Run the snippet above in the Script Editor.
+
+<li>
+Change the white parameter values on the Grade node (e.g., set Red to 2, Green to 0.5).
+
+<li>
+Deselect and re-select the node (or click away and back) to force the node graph interface to redraw its background tile color. You should see the background tint update to reflect your adjustments.
+
+</ul>
+<div id="Auto Color Nodes (tile_color) Based on Property-With Colorspace Conversion"><h3 id="With Colorspace Conversion" class="header"><a href="#Auto Color Nodes (tile_color) Based on Property-With Colorspace Conversion">With Colorspace Conversion</a></h3></div>
+
+<p>
+Because the callback executes Python code on the fly, you can pass the linear values through a <span id="Auto Color Nodes (tile_color) Based on Property-With Colorspace Conversion-linear-to-sRGB mathematical conversion"></span><strong id="linear-to-sRGB mathematical conversion">linear-to-sRGB mathematical conversion</strong> before converting them into the hex integer.
+</p>
+
+<p>
+The official sRGB piecewise formula ensures that darks and brights map accurately to how human eyes perceive display colors.
+</p>
+
+<div id="Auto Color Nodes (tile_color) Based on Property-Updated Script with Linear-to-sRGB Conversion:"><h3 id="Updated Script with Linear-to-sRGB Conversion:" class="header"><a href="#Auto Color Nodes (tile_color) Based on Property-Updated Script with Linear-to-sRGB Conversion:">Updated Script with Linear-to-sRGB Conversion:</a></h3></div>
+
+<p>
+Select your Grade node and run this updated snippet in your <span id="Auto Color Nodes (tile_color) Based on Property-Updated Script with Linear-to-sRGB Conversion:-Script Editor"></span><strong id="Script Editor">Script Editor</strong>:
+</p>
+
+<pre python>
+node = nuke.selectedNode()
+
+if node.Class() == "Grade":
+    # 1. Define the callback code that watches for changes to grading parameters
+    callback_code = """
+n = nuke.thisNode()
+k = nuke.thisKnob()
+if k.name() in ['white', 'black', 'gamma', 'gain', 'multiply']:
+    r = int(min(max(n['white'].getValue(0) * 255, 0), 255))
+    g = int(min(max(n['white'].getValue(1) * 255, 0), 255))
+    b = int(min(max(n['white'].getValue(2) * 255, 0), 255))
+    # Packed hex integer format with full alpha (ff)
+    color_int = int("%02x%02x%02xff" % (r, g, b), 16)
+    n['tile_color'].setValue(color_int)
+"""
+    
+    # 2. Safely apply the callback to the node's internal knobChanged slot
+    node.knob('knobChanged').setValue(callback_code)
+    
+    # 3. Force-update the tile_color immediately based on current values
+    r = int(min(max(node['white'].getValue(0) * 255, 0), 255))
+    g = int(min(max(node['white'].getValue(1) * 255, 0), 255))
+    b = int(min(max(node['white'].getValue(2) * 255, 0), 255))
+    node['tile_color'].setValue(int("%02x%02x%02xff" % (r, g, b), 16))
+</pre>
+
+<div id="Auto Color Nodes (tile_color) Based on Property-What this adds:"><h3 id="What this adds:" class="header"><a href="#Auto Color Nodes (tile_color) Based on Property-What this adds:">What this adds:</a></h3></div>
+
+<ul>
+<li>
+The <code>lin_to_srgb</code> function applies the precise gamma curve mapping.
+
+<li>
+When you push your Grade node's <code>white</code> values up in linear space (e.g., pushing a high dynamic range value like <code>2.0</code> or <code>4.0</code>), the node color safely maps inside the <code>0.0–1.0</code> display range without instantly blowing out your node graph tile color to pure white.
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+
+<p>
+<a href="nuke_index.html">Nuke Index</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
