@@ -24,11 +24,32 @@
 <div id="rsync"><h1 id="rsync" class="header"><a href="#rsync">rsync</a></h1></div>
 
 <p>
+I used this one-liner to backup documents to a thumbdrive on macOS:
+</p>
+
+<pre bash>
+rsync -avh --delete-after /Users/noddy/Library/CloudStorage/Dropbox/ /Volumes/Dropbox_backup/Dropbox
+</pre>
+
+<ul>
+<li>
+<code>-a</code> (Archive mode): This is a shorthand flag equivalent to <code>-rlptgoD</code>. It preserves recursion, symlinks, permissions, timestamps, owner, and group info. Always use this for backups.
+
+<li>
+<code>-v</code> (Verbose): Prints information on what files are being transferred.
+
+<li>
+<code>-h</code> (Human-readable): Displays file sizes in a readable format (e.g., KB, MB, GB).
+
+</ul>
+<div id="rsync-rsync - In Detail"><h2 id="rsync - In Detail" class="header"><a href="#rsync-rsync - In Detail">rsync - In Detail</a></h2></div>
+
+<p>
 At its core, <code>rsync</code> (Remote Sync) is a utility used for copying and synchronizing files and directories either locally or across a network.
 </p>
 
 <p>
-What makes <code>rsync</code> legendary among developers and sysadmins is its delta-transfer algorithm. Instead of blindly overwriting files like <code>cp</code> or <code>scp</code>, <code>rsync</code> compares the source and destination, calculates the exact differences, and <span id="rsync-only sends the bytes that actually changed."></span><strong id="only sends the bytes that actually changed.">only sends the bytes that actually changed.</strong>
+What makes <code>rsync</code> legendary among developers and sysadmins is its delta-transfer algorithm. Instead of blindly overwriting files like <code>cp</code> or <code>scp</code>, <code>rsync</code> compares the source and destination, calculates the exact differences, and <span id="rsync-rsync - In Detail-only sends the bytes that actually changed."></span><strong id="only sends the bytes that actually changed.">only sends the bytes that actually changed.</strong>
 </p>
 
 <p>
@@ -47,6 +68,14 @@ rsync [options] /path/to/source/ /path/to/destination/
 
 <div id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️"><h3 id="The &quot;Trailing Slash&quot; Trap ⚠️" class="header"><a href="#rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️">The "Trailing Slash" Trap ⚠️</a></h3></div>
 
+<ul>
+<li>
+<code>src/</code> (with slash): Copy the contents inside src.
+
+<li>
+<code>src</code> (without slash): Copy the folder itself into the destination.
+
+</ul>
 <p>
 There is one massive quirk with <code>rsync</code> that everyone trips over at least once. The presence or absence of a <span id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️-trailing slash"></span><strong id="trailing slash">trailing slash</strong> (<code>/</code>) <span id="rsync-1. The Core Anatomy of an rsync Command-The &quot;Trailing Slash&quot; Trap ⚠️-on the source folder"></span><strong id="on the source folder">on the source folder</strong> completely changes what happens:
 </p>
@@ -157,6 +186,128 @@ rsync -avz --delete source/ dest/
 rsync -avzE --delete source/ dest/
 </pre>
 
+<div id="More"><h1 id="More" class="header"><a href="#More">More</a></h1></div>
+
+<p>
+<code>rsync</code> (Remote Sync) is one of the most powerful, flexible, and efficient tools in the Unix/Linux/macOS ecosystem. What makes it special is its <span id="More-delta-transfer algorithm"></span><strong id="delta-transfer algorithm">delta-transfer algorithm</strong>, meaning it only copies the parts of files that have actually changed (or new files), saving immense amounts of time and bandwidth.
+</p>
+
+<p>
+Here is a practical primer on how <code>rsync</code> works, the essential arguments to know, and strategies for effective backups.
+</p>
+
+<div id="More-1. Essential Argument Options"><h3 id="1. Essential Argument Options" class="header"><a href="#More-1. Essential Argument Options">1. Essential Argument Options</a></h3></div>
+
+<p>
+While <code>rsync</code> has dozens of flags, you only need a handful for 95% of use cases.
+</p>
+
+<ul>
+<li>
+*<code>-a</code> (Archive mode):* This is a shorthand flag equivalent to <code>-rlptgoD</code>. It preserves recursion, symlinks, permissions, timestamps, owner, and group info. <span id="More-1. Essential Argument Options-Always use this for backups."></span><strong id="Always use this for backups.">Always use this for backups.</strong>
+
+<li>
+*<code>-v</code> (Verbose):* Prints information on what files are being transferred.
+
+<li>
+*<code>-h</code> (Human-readable):* Displays file sizes in a readable format (e.g., KB, MB, GB).
+
+<li>
+*<code>-z</code> (Compress):* Compresses file data during transmission. <span id="More-1. Essential Argument Options-Crucial for remote/SSH transfers, but unnecessary for local USB backups."></span><strong id="Crucial for remote/SSH transfers, but unnecessary for local USB backups.">Crucial for remote/SSH transfers, but unnecessary for local USB backups.</strong>
+
+<li>
+*<code>--progress</code>:* Shows a progress bar and percentage complete for each file.
+
+<li>
+*<code>-P</code>:* Equivalent to <code>--partial --progress</code>. Keeps partially transferred files if interrupted so you can resume later.
+
+<li>
+*<code>--dry-run</code> (or <code>-n</code>):* Simulates the transfer without actually copying or deleting anything. <span id="More-1. Essential Argument Options-Always use this first"></span><strong id="Always use this first">Always use this first</strong> when testing a new command to make sure it does what you expect!
+
+<li>
+*<code>--delete</code>:* Deletes destination files that no longer exist in the source. (Makes the destination an exact mirror).
+
+</ul>
+<div id="More-2. The Golden Rule: The Trailing Slash"><h3 id="2. The Golden Rule: The Trailing Slash" class="header"><a href="#More-2. The Golden Rule: The Trailing Slash">2. The Golden Rule: The Trailing Slash</a></h3></div>
+
+<p>
+As we discussed earlier, the trailing slash (<code>/</code>) changes everything:
+</p>
+
+<ul>
+<li>
+*<code>src/</code>* (with slash): Copy the <span id="More-2. The Golden Rule: The Trailing Slash-contents"></span><strong id="contents">contents</strong> inside <code>src</code>.
+
+<li>
+*<code>src</code>* (without slash): Copy the <span id="More-2. The Golden Rule: The Trailing Slash-folder itself"></span><strong id="folder itself">folder itself</strong> into the destination.
+
+</ul>
+<div id="More-3. Core Copying Scenarios"><h3 id="3. Core Copying Scenarios" class="header"><a href="#More-3. Core Copying Scenarios">3. Core Copying Scenarios</a></h3></div>
+
+<div id="More-3. Core Copying Scenarios-A. Local Backup (What you're doing)"><h4 id="A. Local Backup (What you're doing)" class="header"><a href="#More-3. Core Copying Scenarios-A. Local Backup (What you're doing)">A. Local Backup (What you're doing)</a></h4></div>
+
+<pre bash>
+rsync -avh --progress --dry-run ~/Documents/ /Volumes/BackupDrive/Docs/
+</pre>
+
+<p>
+*(Remove <code>--dry-run</code> once you verify the output looks correct).*
+</p>
+
+<div id="More-3. Core Copying Scenarios-B. Remote Backup over SSH"><h4 id="B. Remote Backup over SSH" class="header"><a href="#More-3. Core Copying Scenarios-B. Remote Backup over SSH">B. Remote Backup over SSH</a></h4></div>
+
+<p>
+<code>rsync</code> can push or pull files securely over the network using SSH:
+</p>
+
+<pre bash>
+# Push local folder to a remote server
+rsync -avhz -e ssh ~/Documents/ user@remotehost:/path/to/remote/dir/
+
+# Pull remote folder to your local machine
+rsync -avhz -e ssh user@remotehost:/path/to/remote/dir/ ~/LocalDest/
+</pre>
+
+
+<div id="More-4. Smart Backup Strategies"><h3 id="4. Smart Backup Strategies" class="header"><a href="#More-4. Smart Backup Strategies">4. Smart Backup Strategies</a></h3></div>
+
+<div id="More-4. Smart Backup Strategies-Excluding Unwanted Files (`--exclude`)"><h4 id="Excluding Unwanted Files (`--exclude`)" class="header"><a href="#More-4. Smart Backup Strategies-Excluding Unwanted Files (`--exclude`)">Excluding Unwanted Files (<code>--exclude</code>)</a></h4></div>
+
+<p>
+You often want to ignore cache files, hidden system files, or trash bins.
+</p>
+
+<pre bash>
+rsync -avh --exclude='.DS_Store' --exclude='node_modules/' ~/Projects/ /Volumes/Backup/Projects/
+</pre>
+
+<div id="More-4. Smart Backup Strategies-Creating Time-Machine-Like Backups (`--link-dest`)"><h4 id="Creating Time-Machine-Like Backups (`--link-dest`)" class="header"><a href="#More-4. Smart Backup Strategies-Creating Time-Machine-Like Backups (`--link-dest`)">Creating Time-Machine-Like Backups (<code>--link-dest</code>)</a></h4></div>
+
+<p>
+If you want to keep point-in-time snapshots without wasting tons of storage space, you can use hard links. If a file hasn't changed, <code>rsync</code> links to the previous backup rather than copying the file again:
+</p>
+
+<pre bash>
+rsync -avh --delete \
+  --link-dest=/Volumes/Backup/latest_backup/ \
+  ~/Documents/ \
+  /Volumes/Backup/snapshot_$(date +%Y-%m-%d_%H%M%S)/
+</pre>
+
+
+<div id="More-Pro-Tip Summary Checklist"><h3 id="Pro-Tip Summary Checklist" class="header"><a href="#More-Pro-Tip Summary Checklist">Pro-Tip Summary Checklist</a></h3></div>
+
+<ol>
+<li>
+<span id="More-Pro-Tip Summary Checklist-Test first:"></span><strong id="Test first:">Test first:</strong> Always run with <code>-n</code> or <code>--dry-run</code> when trying a new syntax.
+
+<li>
+<span id="More-Pro-Tip Summary Checklist-Watch permissions:"></span><strong id="Watch permissions:">Watch permissions:</strong> The <code>-a</code> flag is your best friend to keep file metadata intact.
+
+<li>
+<span id="More-Pro-Tip Summary Checklist-Handle deletions carefully:"></span><strong id="Handle deletions carefully:">Handle deletions carefully:</strong> The <code>--delete</code> flag is powerful; a mistake with your source/destination paths can wipe out data you wanted to keep.
+
+</ol>
 <p>
 <hr>
 <br>
