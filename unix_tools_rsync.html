@@ -308,6 +308,97 @@ rsync -avh --delete \
 <span id="More-Pro-Tip Summary Checklist-Handle deletions carefully:"></span><strong id="Handle deletions carefully:">Handle deletions carefully:</strong> The <code>--delete</code> flag is powerful; a mistake with your source/destination paths can wipe out data you wanted to keep.
 
 </ol>
+<div id="Time Machine Style Backups"><h1 id="Time Machine Style Backups" class="header"><a href="#Time Machine Style Backups">Time Machine Style Backups</a></h1></div>
+
+<p>
+The <code>--link-dest</code> option is one of <code>rsync</code>'s most brilliant features. It allows you to create <span id="Time Machine Style Backups-Time-Machine-style incremental backups"></span><strong id="Time-Machine-style incremental backups">Time-Machine-style incremental backups</strong> without needing heavy or proprietary backup software.
+</p>
+
+
+<div id="Time Machine Style Backups-How `--link-dest` Works (The Magic of Hard Links)"><h3 id="How `--link-dest` Works (The Magic of Hard Links)" class="header"><a href="#Time Machine Style Backups-How `--link-dest` Works (The Magic of Hard Links)">How <code>--link-dest</code> Works (The Magic of Hard Links)</a></h3></div>
+
+<p>
+Normally, if you run a backup every day, <code>rsync</code> copies every single file over, which wastes time and disk space.
+</p>
+
+<p>
+With <code>--link-dest</code>, you point <code>rsync</code> to your <span id="Time Machine Style Backups-How <code>--link-dest</code> Works (The Magic of Hard Links)-previous"></span><strong id="previous">previous</strong> backup (let's call it <code>latest</code>).
+</p>
+
+<ol>
+<li>
+If a file <span id="Time Machine Style Backups-How <code>--link-dest</code> Works (The Magic of Hard Links)-has changed"></span><strong id="has changed">has changed</strong> since the last backup, <code>rsync</code> copies the new version into your new backup folder.
+
+<li>
+If a file <span id="Time Machine Style Backups-How <code>--link-dest</code> Works (The Magic of Hard Links)-has not changed"></span><strong id="has not changed">has not changed</strong>, <code>rsync</code> does <span id="Time Machine Style Backups-How <code>--link-dest</code> Works (The Magic of Hard Links)-not"></span><strong id="not">not</strong> copy it. Instead, it creates a <span id="Time Machine Style Backups-How <code>--link-dest</code> Works (The Magic of Hard Links)-hard link"></span><strong id="hard link">hard link</strong> to the file in the previous backup folder.
+
+</ol>
+<p>
+<span id="Time Machine Style Backups-How <code>--link-dest</code> Works (The Magic of Hard Links)-The result:"></span><strong id="The result:">The result:</strong> Every backup folder looks and acts like a complete, standalone copy of your data, but unchanged files share the exact same physical disk space. If you have 500GB of files and only 5GB change each day, 30 days of backups will take up roughly <code>500GB + (5GB × 30) = 650GB</code>, rather than 15 Terabytes!
+</p>
+
+
+<div id="Time Machine Style Backups-Example: Creating a Snapshot Script"><h3 id="Example: Creating a Snapshot Script" class="header"><a href="#Time Machine Style Backups-Example: Creating a Snapshot Script">Example: Creating a Snapshot Script</a></h3></div>
+
+<p>
+Here is how you structure a script to create dated snapshots:
+</p>
+
+<pre bash>
+#!/bin/bash
+
+# Define paths
+SRC="$HOME/Documents/"
+BACKUP_ROOT="/Volumes/BackupDrive/Snapshots"
+LATEST="$BACKUP_ROOT/latest"
+CURRENT="$BACKUP_ROOT/backup_$(date +%Y-%m-%d_%H%M%S)"
+
+# Create the new snapshot using the previous 'latest' folder for comparison
+rsync -avh --delete \
+  --link-dest="$LATEST" \
+  "$SRC" \
+  "$CURRENT"
+
+# Update the 'latest' symlink to point to the fresh backup
+rm -f "$LATEST"
+ln -s "$CURRENT" "$LATEST"
+</pre>
+
+
+<div id="Time Machine Style Backups-How to Retrieve Files from a Specific Date"><h3 id="How to Retrieve Files from a Specific Date" class="header"><a href="#Time Machine Style Backups-How to Retrieve Files from a Specific Date">How to Retrieve Files from a Specific Date</a></h3></div>
+
+<p>
+The best part about <code>rsync</code> snapshots is that <span id="Time Machine Style Backups-How to Retrieve Files from a Specific Date-there is no special restore process required"></span><strong id="there is no special restore process required">there is no special restore process required</strong>.
+</p>
+
+<p>
+Because every snapshot folder is a fully realized directory structure (thanks to hard links), you can browse them just like any normal folder:
+</p>
+
+<ol>
+<li>
+<span id="Time Machine Style Backups-How to Retrieve Files from a Specific Date-Via Finder (macOS):"></span><strong id="Via Finder (macOS):">Via Finder (macOS):</strong>
+
+</ol>
+<p>
+Open your backup drive, go to your snapshots folder, and open the specific folder from the date you want (e.g., <code>backup_2026-05-15_120000</code>).
+</p>
+<ol>
+<li>
+<span id="Time Machine Style Backups-How to Retrieve Files from a Specific Date-Retrieve the file:"></span><strong id="Retrieve the file:">Retrieve the file:</strong>
+
+</ol>
+<p>
+Navigate to the file or folder you accidentally deleted or modified, and simply <span id="Time Machine Style Backups-How to Retrieve Files from a Specific Date-drag and drop"></span><strong id="drag and drop">drag and drop</strong> it back onto your computer.
+</p>
+
+<div id="Time Machine Style Backups-Safe Deletion"><h3 id="Safe Deletion" class="header"><a href="#Time Machine Style Backups-Safe Deletion">Safe Deletion</a></h3></div>
+
+<p>
+If you run out of space and want to delete an old snapshot (e.g., from 6 months ago), you can safely delete that specific folder (e.g., <code>rm -rf backup_2025-11-01...</code>). Because hard links only release data when <span id="Time Machine Style Backups-Safe Deletion-all"></span><strong id="all">all</strong> references to it are gone, deleting one snapshot will not break any other snapshot!
+</p>
+
+
 <p>
 <hr>
 <br>
