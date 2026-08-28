@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_permissions_for_tools</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="Security - Permissions on Directories but Allowing Tool Symlinks"><h1 id="Security - Permissions on Directories but Allowing Tool Symlinks" class="header"><a href="#Security - Permissions on Directories but Allowing Tool Symlinks">Security - Permissions on Directories but Allowing Tool Symlinks</a></h1></div>
+
+<div id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually"><h4 id="How it works conceptually" class="header"><a href="#Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually">How it works conceptually</a></h4></div>
+
+<ol>
+<li>
+Directory Read (<code>r</code>) vs. Execute (<code>x</code>):
+
+<li>
+<span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-Read"></span><strong id="Read">Read</strong> permission on a directory lets a user list its contents (i.e., run <code>ls</code>).
+
+<li>
+<span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-Execute"></span><strong id="Execute">Execute</strong> (or <span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-traverse"></span><strong id="traverse">traverse</strong>) permission lets a user access a known file or subdirectory <span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-inside"></span><strong id="inside">inside</strong> it, even if they cannot list the directory.
+
+<li>
+<span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-The Magic Trick:"></span><strong id="The Magic Trick:">The Magic Trick:</strong> If a user does <span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-not"></span><strong id="not">not</strong> have <code>r</code> (read) permission on a directory, but <span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-does"></span><strong id="does">does</strong> have <code>x</code> (execute) permission, they cannot browse, list, or see what else lives in that directory. However, <span id="Security - Permissions on Directories but Allowing Tool Symlinks-How it works conceptually-if they know the exact path or follow a symlink directly to a file inside it, they can run or read that specific file."></span><strong id="if they know the exact path or follow a symlink directly to a file inside it, they can run or read that specific file.">if they know the exact path or follow a symlink directly to a file inside it, they can run or read that specific file.</strong>
+
+</ol>
+<div id="Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation"><h3 id="Step-by-Step Implementation" class="header"><a href="#Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation">Step-by-Step Implementation</a></h3></div>
+
+<p>
+Assume you have a private directory <code>/home/secret_admin/utils/</code> and you want to share a specific utility called <code>cool_tool</code> with everyone, without letting them browse the <code>utils/</code> folder.
+</p>
+
+<div id="Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-1. Set the directory permissions"><h4 id="1. Set the directory permissions" class="header"><a href="#Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-1. Set the directory permissions">1. Set the directory permissions</a></h4></div>
+
+<p>
+Restrict the directory so that "others" (everyone else) have <span id="Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-1. Set the directory permissions-execute-only"></span><strong id="execute-only">execute-only</strong> access (<code>--x</code>), while you retain full control (<code>rwx</code>):
+</p>
+
+<pre bash>
+chmod 711 /home/secret_admin/utils
+</pre>
+
+<ul>
+<li>
+*Owner (<code>7</code> / <code>rwx</code>):* You can read, write, and browse.
+
+<li>
+*Group (<code>1</code> / <code>--x</code>):* (Optional group settings).
+
+<li>
+*Others (<code>1</code> / <code>--x</code>):* Can <span id="Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-1. Set the directory permissions-traverse"></span><strong id="traverse">traverse</strong> through it, but cannot <code>ls</code> (read) it.
+
+</ul>
+<div id="Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-2. Set the utility file permissions"><h4 id="2. Set the utility file permissions" class="header"><a href="#Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-2. Set the utility file permissions">2. Set the utility file permissions</a></h4></div>
+
+<p>
+Make sure the utility itself has read and execute permissions for everyone:
+</p>
+
+<pre bash>
+chmod 755 /home/secret_admin/utils/cool_tool
+</pre>
+
+<div id="Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-3. Create a global symlink"><h4 id="3. Create a global symlink" class="header"><a href="#Security - Permissions on Directories but Allowing Tool Symlinks-Step-by-Step Implementation-3. Create a global symlink">3. Create a global symlink</a></h4></div>
+
+<p>
+Place a symbolic link to the utility in a system-wide directory that is already in everyone’s <code>$PATH</code> (like <code>/usr/local/bin</code>):
+</p>
+
+<pre bash>
+ln -s /home/secret_admin/utils/cool_tool /usr/local/bin/cool_tool
+</pre>
+
+<div id="Security - Permissions on Directories but Allowing Tool Symlinks-What users experience:"><h3 id="What users experience:" class="header"><a href="#Security - Permissions on Directories but Allowing Tool Symlinks-What users experience:">What users experience:</a></h3></div>
+
+<ul>
+<li>
+<span id="Security - Permissions on Directories but Allowing Tool Symlinks-What users experience:-If a standard user tries to browse your folder:"></span><strong id="If a standard user tries to browse your folder:">If a standard user tries to browse your folder:</strong>
+<pre bash>
+$ ls /home/secret_admin/utils/
+ls: cannot open directory '/home/secret_admin/utils/': Permission denied
+</pre>
+
+</ul>
+<p>
+(They are completely blocked from seeing what else is in there.)
+</p>
+
+<ul>
+<li>
+<span id="Security - Permissions on Directories but Allowing Tool Symlinks-What users experience:-If a standard user tries to run the utility:"></span><strong id="If a standard user tries to run the utility:">If a standard user tries to run the utility:</strong>
+
+</ul>
+  
+<pre bash>
+$ cool_tool
+</pre>
+
+<p>
+(It executes successfully! Because the kernel traverses <code>/home/secret_admin/utils</code> using the execute bit and hits the target file directly.)
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
