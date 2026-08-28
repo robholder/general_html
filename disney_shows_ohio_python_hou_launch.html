@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>disney_shows_ohio_python_hou_launch</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="myserver_index.html">myserver</a>
+</p>
+
+<p>
+<a href="myserver_shows_ohio.html">Ohio</a>
+</p>
+
+<div id="Hou Launch - A Utility by J ames L ojo"><h1 id="Hou Launch - A Utility by J ames L ojo" class="header"><a href="#Hou Launch - A Utility by J ames L ojo">Hou Launch - A Utility by J ames L ojo</a></h1></div>
+
+<div id="Hou Launch - A Utility by J ames L ojo-Overview of the Script"><h3 id="Overview of the Script" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Overview of the Script">Overview of the Script</a></h3></div>
+
+<p>
+At a high level, this script is a <span id="Hou Launch - A Utility by J ames L ojo-Overview of the Script-custom command-line launcher and search utility"></span><strong id="custom command-line launcher and search utility">custom command-line launcher and search utility</strong> for Houdini scene (<code>.hip</code>) files in a studio pipeline.
+</p>
+
+<p>
+Instead of forcing an artist to manually open a terminal, navigate through complex nested directory trees, remember naming conventions, and look up file modification dates, this script automates the entire process:
+</p>
+
+<ol>
+<li>
+It figures out <span id="Hou Launch - A Utility by J ames L ojo-Overview of the Script-what show, sequence, shot, and department"></span><strong id="what show, sequence, shot, and department">what show, sequence, shot, and department</strong> you are working on using environment variables or command-line arguments.
+
+<li>
+It crawls through the studio's file storage hierarchy under those constraints.
+
+<li>
+It filters the files based on who owns them or whether they match a specific shot configuration stored inside the binary files.
+
+<li>
+It presents an interactive, numbered menu sorted by modification date so you can pick one to launch immediately with a single keystroke.
+
+</ol>
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques"><h3 id="Section-by-Section Breakdown &amp; Techniques" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques">Section-by-Section Breakdown &amp; Techniques</a></h3></div>
+
+<p>
+To understand how it pulls this off, let's break the script down into its functional parts:
+</p>
+
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-1. Setup, Environment Variables, and Help Text"><h4 id="1. Setup, Environment Variables, and Help Text" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-1. Setup, Environment Variables, and Help Text">1. Setup, Environment Variables, and Help Text</a></h4></div>
+
+<ul>
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-1. Setup, Environment Variables, and Help Text-What it does:"></span><strong id="What it does:">What it does:</strong> It sets up custom color formatting (<code>F_COLOR</code>, <code>F_BOLD</code>) for the terminal output using ANSI escape codes, defines the help documentation, and grabs active pipeline context variables from the operating system (<code>PROD</code>, <code>NAV_SEQ</code>, <code>NAV_SHOT</code>, <code>NAV_DEPT</code>, <code>USER</code>).
+
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-1. Setup, Environment Variables, and Help Text-Technique:"></span><strong id="Technique:">Technique:</strong> <code>os.getenv()</code> is used to read environmental context. Pipeline environments (like Shotgun/Flow or custom studio shells) populate these variables so the script automatically knows your current context when you open your terminal.
+
+</ul>
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-2. Command-Line Argument Parsing"><h4 id="2. Command-Line Argument Parsing" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-2. Command-Line Argument Parsing">2. Command-Line Argument Parsing</a></h4></div>
+
+<ul>
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-2. Command-Line Argument Parsing-What it does:"></span><strong id="What it does:">What it does:</strong> It loops through whatever flags and numbers you type in your terminal (e.g., <code>hou -l -mine 15</code>). It separates control flags (<code>-mine</code>, <code>-user</code>, <code>-launch</code>, <code>-list</code>, <code>--help</code>) from positional arguments (like a specific shot or sequence number).
+
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-2. Command-Line Argument Parsing-Technique:"></span><strong id="Technique:">Technique:</strong> A custom <code>while</code> loop with an index tracker (<code>i += 1</code> or <code>i += 2</code>) handles flags that consume the next argument (like <code>-user bobby</code>). This is a standard manual way to parse CLI arguments without relying heavily on Python's built-in <code>argparse</code> module, giving the author total control over custom shorthands.
+
+</ul>
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-3. Context Resolution (`nav.Navigator`)"><h4 id="3. Context Resolution (`nav.Navigator`)" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-3. Context Resolution (`nav.Navigator`)">3. Context Resolution (<code>nav.Navigator</code>)</a></h4></div>
+
+<ul>
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-3. Context Resolution (<code>nav.Navigator</code>)-What it does:"></span><strong id="What it does:">What it does:</strong> It imports a custom studio-specific core service module (<code>coreservices import nav</code>) to validate and resolve shorthand numbers (like typing <code>15</code> into a sequence) into official production strings (like sequence <code>010</code> and shot <code>015.00</code>).
+
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-3. Context Resolution (<code>nav.Navigator</code>)-Technique:"></span><strong id="Technique:">Technique:</strong> External library integration. Studio pipelines often write proprietary core Python packages to ensure all pipeline tools talk to the database or file naming convention standardly.
+
+</ul>
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-4. Directory Traversal and Path Construction"><h4 id="4. Directory Traversal and Path Construction" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-4. Directory Traversal and Path Construction">4. Directory Traversal and Path Construction</a></h4></div>
+
+<ul>
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-4. Directory Traversal and Path Construction-What it does:"></span><strong id="What it does:">What it does:</strong> It builds the root path down to the department directory (e.g., <code>seqData/lighting/</code>) and prepares to loop through user subdirectories while skipping clutter (<code>miscData</code>, <code>logs</code>, <code>pic</code>, <code>temp</code>, <code>texture</code>).
+
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-4. Directory Traversal and Path Construction-Technique:"></span><strong id="Technique:">Technique:</strong> Combining <code>os.path.join()</code>, <code>os.listdir()</code>, and boolean list comprehensions (<code>if os.path.basename(sub).lower() not in EXCLUDED_DIRS</code>) to safely filter paths in cross-platform Python.
+
+</ul>
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-5. File Discovery, Filtering, and the `strings` Trick"><h4 id="5. File Discovery, Filtering, and the `strings` Trick" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-5. File Discovery, Filtering, and the `strings` Trick">5. File Discovery, Filtering, and the <code>strings</code> Trick</a></h4></div>
+
+<ul>
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-5. File Discovery, Filtering, and the <code>strings</code> Trick-What it does:"></span><strong id="What it does:">What it does:</strong> Depending on whether you're looking for a specific shot or all shots (<code>wildcard_mode</code>), it executes file searches. For specific shots, it uses a clever pipeline trick: because Houdini files are binary, it uses the Unix <code>strings</code> utility piped into <code>grep</code> to peek <span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-5. File Discovery, Filtering, and the <code>strings</code> Trick-inside"></span><strong id="inside">inside</strong> the binary <code>.hip</code> file text-stream to see if it contains the target shot metadata configuration (<code>uiconfig</code> / shot tag).
+
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-5. File Discovery, Filtering, and the <code>strings</code> Trick-Technique:"></span><strong id="Technique:">Technique:</strong> <span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-5. File Discovery, Filtering, and the <code>strings</code> Trick-Subprocess execution and command pipelining."></span><strong id="Subprocess execution and command pipelining.">Subprocess execution and command pipelining.</strong> The script uses <code>subprocess.getoutput()</code> and <code>subprocess.run(..., shell=True)</code> to leverage powerful native Unix shell utilities (<code>find</code>, <code>ls</code>, <code>sort</code>, <code>tail</code>, <code>strings</code>, <code>grep</code>, <code>stat</code>) directly from Python. This is common in VFX/animation pipelines where Linux command-line tools are heavily optimized for file-system crawling.
+
+</ul>
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-6. Sorting, Displaying, and Interactive Selection"><h4 id="6. Sorting, Displaying, and Interactive Selection" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-6. Sorting, Displaying, and Interactive Selection">6. Sorting, Displaying, and Interactive Selection</a></h4></div>
+
+<ul>
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-6. Sorting, Displaying, and Interactive Selection-What it does:"></span><strong id="What it does:">What it does:</strong> Once a list of matching <code>.hip</code> file paths is compiled, it queries the operating system for each file's modification timestamp (<code>os.stat().st_mtime</code>) and owner username (<code>stat -c %U</code>). It sorts them from newest to oldest, formats them into a clean numbered list, and prints them to the terminal.
+
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-6. Sorting, Displaying, and Interactive Selection-Technique:"></span><strong id="Technique:">Technique:</strong> <span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-6. Sorting, Displaying, and Interactive Selection-Tuple sorting and formatting."></span><strong id="Tuple sorting and formatting.">Tuple sorting and formatting.</strong> It stores files as tuples <code>(mtime_ts, mtime_str, owner, path)</code>, sorts them using Python's <code>sort(reverse=True, key=lambda x: x[0])</code> (putting the most recently modified files at the top), and uses f-strings with alignment padding (<code>:&lt;12</code>) for a neat terminal UI.
+
+</ul>
+<div id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-7. Launching Houdini"><h4 id="7. Launching Houdini" class="header"><a href="#Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-7. Launching Houdini">7. Launching Houdini</a></h4></div>
+
+<ul>
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-7. Launching Houdini-What it does:"></span><strong id="What it does:">What it does:</strong> If you pass <code>-l</code> (launch-only) or type a number from the interactive menu, it constructs a launch command (<code>run_houdini -n /path/to/file.hip &amp;</code>) and fires it off in the background.
+
+<li>
+<span id="Hou Launch - A Utility by J ames L ojo-Section-by-Section Breakdown &amp; Techniques-7. Launching Houdini-Technique:"></span><strong id="Technique:">Technique:</strong> <code>subprocess.Popen()</code> runs the external command asynchronously (using the <code>&amp;</code> background operator in shell mode), meaning the launcher script can safely exit while your newly spawned Houdini session opens up independently.
+<pre python>
+#!/usr/bin/env python3
+"""
+################################################################################
+Script Name: hou_launch (Houdini File Launcher / Finder)
+Description: Searches and launches Houdini scene files based on production context,
+             sequence, shot, and user-defined directory hierarchies.
+
+Author:
+    - Original Author: J ames L ojo
+    - Modified By:     me
+
+Version:
+    - 1.1.0 (2026-08-27) - me:
+        * Updated directory traversal to support the new multi-user
+          'seqData/lighting/&lt;username&gt;/' hierarchy.
+        * Added explicit exclusion handling for miscData, logs, pic, temp, texture.
+        * Integrated 'houdini' subdirectory checks prior to .hip file search.
+
+    - 1.0.0 (Original) - J ames L ojo
+        * Initial script creation and core navigation logic.
+################################################################################
+"""
+
+import sys
+import os
+import subprocess
+from datetime import datetime
+from coreservices import nav
+
+F_COLOR = "\033[38;5;208m"
+F_BOLD = "\033[1m"
+F_UNDERLINE = "\033[4m"
+F_END = "\033[0m"
+HELP_TEXT = f"""
+ {F_COLOR}{F_BOLD}hou
+
+ Usage:
+   hou_launch [flags] &lt;shot&gt;
+   hou_launch [flags] &lt;seq&gt; &lt;shot&gt;
+
+ Flags:
+   -mine                          search for hip files owned by you
+   -u, -user                      search for hip files owned by bobby
+   -l, -launch                    skip selection and just launch latest matching hip file
+   -list                          list results and exit
+   -h, --help                     show this help message and exit
+
+ Examples:
+   hou_launch                            search for hip files containing the current seq and shot
+   hou_launch 15                         search for hip files containing shot 015.00 of the current seq
+   hou_launch -l -mine 15                launch your latest hip containing shot 015.00
+   hou_launch -l -u bobby 15             launch latest hip for shot 015.00 owned by bobby{F_END}
+"""
+
+args = sys.argv[1:]
+prod = os.getenv("PROD")
+seq_default = os.getenv("NAV_SEQ")
+shot_default = os.getenv("NAV_SHOT")
+dept_default = os.getenv("NAV_DEPT")
+user_self = os.getenv("USER")
+
+if not prod:
+    print(f"\n{F_COLOR}{F_BOLD}No gig found.{F_END}\n")
+    sys.exit(1)
+
+user_mode = "all"
+launch_only = False
+list_only = False
+args_clean = []
+
+i = 0
+while i &lt; len(args):
+    if args[i] in ("-h", "--help"):
+        print(HELP_TEXT)
+        sys.exit(0)
+    elif args[i] in ("-user", "-u") and i + 1 &lt; len(args):
+        user_mode = args[i + 1]
+        i += 2
+    elif args[i] == "-mine":
+        user_mode = user_self
+        i += 1
+    elif args[i] in ("-launch", "-l"):
+        launch_only = True
+        i += 1
+    elif args[i] == "-list":
+        list_only = True
+        i += 1
+    else:
+        args_clean.append(args[i])
+        i += 1
+
+if len(args_clean) == 0:
+    shot = shot_default
+    seq = seq_default
+    dept = dept_default
+    if not shot:
+        print(HELP_TEXT)
+        sys.exit(1)
+elif len(args_clean) == 1:
+    if not seq_default:
+        print(f"\n{F_COLOR}{F_BOLD}Sequence is not set.{F_END}\n")
+        sys.exit(1)
+    shot = args_clean[0]
+    seq = seq_default
+    dept = dept_default
+elif len(args_clean) == 2:
+    seq, shot = args_clean
+    dept = dept_default
+else:
+    print(HELP_TEXT)
+    sys.exit(1)
+
+if not dept:
+    print(f"\n{F_COLOR}{F_BOLD}Department is not set.{F_END}\n")
+    sys.exit(1)
+
+n = nav.Navigator()
+n.read_environment()
+n.set_assettype("seq")
+n.set_tree("work")
+n.parse_arguments([seq, shot, dept])
+seq_str = n.get_sequence()
+shot_str = n.get_shot()
+dept_str = n.get_department()
+
+# old department directory path (NEST?)
+#dept_dir = f"/myserver/shows/{prod}/work/Sequences/seq/{seq_str}/seqData/{dept_str}"
+
+# new department directory path (OHIO?)
+dept_dir = f"/myserver/shows/{prod}/work/Sequences/seq/{seq_str}/seqData/{dept_str}"
+
+if not os.path.isdir(dept_dir):
+    print(f"\n{F_COLOR}{F_BOLD}Department directory not found: {dept_dir}{F_END}\n")
+    sys.exit(1)
+
+
+user_filter = ''
+if user_mode != "all":
+    if user_mode == user_self:
+        user_filter = '[ -O "$f" ] &amp;&amp; '
+    else:
+        user_filter = f'[ "$(stat -c %U \"$f\")" = "{user_mode}" ] &amp;&amp; '
+print()
+
+# Explicitly defined exclusions based on a list (update as needed)
+EXCLUDED_DIRS = ["miscdata", "logs", "pic", "temp", "texture"]
+wildcard_mode = (shot_str == "seqData")
+search_label = "any" if wildcard_mode else shot_str
+
+if user_mode == "all":
+    user_label = "any user"
+elif user_mode == user_self:
+    user_label = f"{user_self}"
+else:
+    user_label = f"{user_mode}"
+
+print(f"{F_COLOR}{F_BOLD}Searching sequence {F_UNDERLINE}{seq_str}{F_END}{F_COLOR}{F_BOLD} hip files by {F_UNDERLINE}{user_label}{F_END}{F_COLOR}{F_BOLD} for shot context option: {F_UNDERLINE}{search_label}{F_END}\n")
+
+paths = []
+
+if wildcard_mode:
+    # Iterate through all usernames under seqData/lighting/&lt;username&gt;/
+    usernames = [d for d in os.listdir(dept_dir) if os.path.isdir(os.path.join(dept_dir, d))]
+    for user in usernames:
+        user_path = os.path.join(dept_dir, user)
+        # Get all subdirectories, ignoring the exclusion list
+        subdirs = [os.path.join(user_path, sub) for sub in os.listdir(user_path)]
+        subdirs = [sub for sub in subdirs if os.path.isdir(sub) and os.path.basename(sub).lower() not in EXCLUDED_DIRS]
+
+        for sub in subdirs:
+            houdini_dir = os.path.join(sub, "houdini")
+            if os.path.isdir(houdini_dir):
+                f = subprocess.getoutput(f'ls -1 "{houdini_dir}/lighting_v"????.hip 2&gt;/dev/null | sort | tail -1')
+                if f and os.path.isfile(f):
+                    if user_mode == "all":
+                        paths.append(f)
+                    else:
+                        stat_user = subprocess.getoutput(f'stat -c %U "{f}"').strip()
+                        if (user_mode == user_self and os.stat(f).st_uid == os.getuid()) or (stat_user == user_mode):
+                            paths.append(f)
+else:
+    # Use find over the department base directory, filtering out unwanted directories, and targeting the 'houdini' folder
+    excluded_args = " ".join([f'-name "{ex}" -prune -o' for ex in EXCLUDED_DIRS])
+    # Constructing a find query that dives into usernames, skips exclusions, finds task/shot folders containing a 'houdini' subfolder
+    cmd = f'''
+    find "{dept_dir}" -mindepth 2 -maxdepth 2 -type d \\( {excluded_args} -print \\) | while read d; do
+      houdini_dir="$d/houdini"
+      if [ -d "$houdini_dir" ]; then
+        f=$(ls -1 "$houdini_dir"/lighting_v????.hip 2&gt;/dev/null | sort | tail -1)
+        [ -f "$f" ] &amp;&amp; {user_filter} strings "$f" | grep -q '"uiconfig":"{{\\\\"label\\\\": \\\\"shot\\\\"' &amp;&amp; \\
+          strings "$f" | grep -q '\\[\\\\"{shot_str}\\\\", \\\\"{shot_str}\\\\\"\\]' &amp;&amp; \\
+          echo "$f"
+      fi
+    done
+    '''
+    result = subprocess.run(cmd, shell=True, text=True, capture_output=True)
+    paths = result.stdout.strip().split("\n") if result.stdout.strip() else []
+
+if not paths:
+    print(f"{F_COLOR}{F_BOLD}No matching .hip files found.{F_END}\n")
+    sys.exit(0)
+
+file_info = []
+for path in paths:
+    try:
+        stat = os.stat(path)
+        mtime_ts = stat.st_mtime
+        mtime_str = datetime.fromtimestamp(mtime_ts).strftime("%b %d %H:%M")
+        owner = subprocess.check_output(["stat", "-c", "%U", path], text=True).strip()
+        file_info.append((mtime_ts, mtime_str, owner, path))
+    except Exception:
+        continue
+
+file_info.sort(reverse=True, key=lambda x: x[0])
+max_user_len = max(len(user) for _, _, user, _ in file_info)
+
+if launch_only:
+    latest = file_info[0]
+    print(f"{F_COLOR}{F_BOLD}[1]{F_END} {F_COLOR}{latest[1]:&lt;12} {latest[2]:&lt;{max_user_len}} {latest[3]}{F_END}")
+    launch_cmd = f"run_houdini -n {latest[3]} &amp;"
+    print(f"\n{F_COLOR}{F_BOLD}Running command:\n{launch_cmd}{F_END}\n")
+    subprocess.Popen(launch_cmd, shell=True)
+    sys.exit(0)
+
+for idx, (_, mtime_str, user, path) in enumerate(file_info, 1):
+    padding = " " if idx &lt; 10 else ""
+    print(f"{F_COLOR}{F_BOLD}[{idx}]{padding}{F_END} {F_COLOR}{mtime_str:&lt;12} {user:&lt;{max_user_len}} {path}{F_END}")
+print()
+
+if list_only:
+    sys.exit(0)
+
+try:
+    choice = input(f"{F_COLOR}{F_BOLD}Which hip do you want to open? (0 to cancel){F_END}  ")
+    if choice.strip().isdigit():
+        choice_num = int(choice)
+        if 1 &lt;= choice_num &lt;= len(file_info):
+            selected_path = file_info[choice_num - 1][3]
+            launch_cmd = f"run_houdini -n {selected_path} &amp;"
+            print(f"\n{F_COLOR}{F_BOLD}Running command:\n{launch_cmd}{F_END}\n")
+            subprocess.Popen(launch_cmd, shell=True)
+        elif choice_num == 0:
+            print(f"\n{F_COLOR}{F_BOLD}Cancelled by user.{F_END}\n")
+        else:
+            print(f"\n{F_COLOR}{F_BOLD}Invalid selection.{F_END}\n")
+    else:
+        print(f"\n{F_COLOR}{F_BOLD}Invalid input.{F_END}\n")
+except KeyboardInterrupt:
+    print(f"\n\n{F_COLOR}{F_BOLD}Cancelled by user.{F_END}\n")
+    sys.exit(0)
+
+# end :)
+</pre>
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="myserver_shows_ohio.html">Ohio</a>
+</p>
+
+<p>
+<a href="myserver_index.html">myserver</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
