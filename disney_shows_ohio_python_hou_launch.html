@@ -18,11 +18,11 @@
 </p>
 
 <p>
-<a href="myserver_index.html">myserver</a>
+<a href="disney_index.html">disney</a>
 </p>
 
 <p>
-<a href="myserver_shows_ohio.html">Ohio</a>
+<a href="disney_shows_ohio.html">Ohio</a>
 </p>
 
 <div id="Hou Launch - A Utility by J ames L ojo"><h1 id="Hou Launch - A Utility by J ames L ojo" class="header"><a href="#Hou Launch - A Utility by J ames L ojo">Hou Launch - A Utility by J ames L ojo</a></h1></div>
@@ -187,17 +187,356 @@ Description: Searches and launches Houdini scene files based on production conte
              sequence, shot, and user-defined directory hierarchies.
 
 Author:
-    - Original Author: J ames L ojo
-    - Modified By:     me
+    - Original Author: James Lojo
+    - Modified By:     Robert Holder
 
 Version:
-    - 1.1.0 (2026-08-27) - me:
+    - 1.1.0 (2026-08-27) - Robert Holder:
         * Updated directory traversal to support the new multi-user
           'seqData/lighting/&lt;username&gt;/' hierarchy.
         * Added explicit exclusion handling for miscData, logs, pic, temp, texture.
         * Integrated 'houdini' subdirectory checks prior to .hip file search.
 
-    - 1.0.0 (Original) - J ames L ojo
+    - 1.0.0 (Original) - James Lojo
+        * Initial script creation and core navigation logic.
+################################################################################
+"""
+
+import sys
+import os
+import subprocess
+from datetime import datetime
+from coreservices import nav
+
+# Define terminal output formatting constants (ANSI escape sequences for styling)
+F_COLOR = "\033[38;5;208m"    # Custom orange color code
+F_BOLD = "\033[1m"            # Bold text formatting
+F_UNDERLINE = "\033[4m"       # Underline text formatting
+F_END = "\033[0m"             # Reset/clear all formatting back to default
+
+# Define the comprehensive instruction manual text displayed on -h/--help or incorrect inputs
+HELP_TEXT = f"""
+ {F_COLOR}{F_BOLD}hou
+
+ Usage:
+    hou_launch [flags] &lt;shot&gt;
+    hou_launch [flags] &lt;seq&gt; &lt;shot&gt;
+
+ Flags:
+    -mine                         search for hip files owned by you
+    -u, -user                     search for hip files owned by specified user
+    -l, -launch                   skip selection and just launch latest matching hip file
+    -list                         list results and exit
+    -h, --help                    show this help message and exit
+
+ Examples:
+    hou_launch                          search for hip files containing the current seq and shot
+    hou_launch 15                       search for hip files containing shot 015.00 of the current seq
+    hou_launch -l -mine 15              launch your latest hip containing shot 015.00
+    hou_launch -l -u bobby 15           launch latest hip for shot 015.00 owned by bobby{F_END}
+"""
+
+# ==========================================
+# ENVIRONMENT &amp; INITIAL ARGUMENT PREPARATION
+# ==========================================
+
+# Grab all command-line arguments excluding the script name itself (sys.argv[0])
+args = sys.argv[1:]
+
+# Pull pipeline configuration context from system environment variables
+prod = os.getenv("PROD")                  # Current active production/gig name
+seq_default = os.getenv("NAV_SEQ")        # Default active sequence from environment
+shot_default = os.getenv("NAV_SHOT")      # Default active shot from environment
+dept_default = os.getenv("NAV_DEPT")      # Default active department from environment
+user_self = os.getenv("USER")             # Current logged-in operating system user username
+
+# Critical Check: Ensure the user is running inside an active production context
+if not prod:
+    print(f"\n{F_COLOR}{F_BOLD}No gig found.{F_END}\n")
+    sys.exit(1)
+
+# Initialize command option state flags and container list
+user_mode = "all"      # Default user filtering behavior ("all" users)
+launch_only = False    # Flag to auto-launch the latest file without prompting
+list_only = False      # Flag to print results and exit without launching
+args_clean = []        # List to store leftover positional arguments (sequences/shots)
+
+# ==========================================
+# MANUAL COMMAND-LINE ARGUMENT PARSING LOOP
+# ==========================================
+
+i = 0
+while i &lt; len(args):
+    # Check for help flag requests
+    if args[i] in ("-h", "--help"):
+        print(HELP_TEXT)
+        sys.exit(0)
+    
+    # Check for user specification flag with an accompanying username argument (e.g., -u username)
+    elif args[i] in ("-user", "-u") and i + 1 &lt; len(args):
+        user_mode = args[i + 1]  # Set user_mode to the next argument value
+        i += 2                   # Advance index past both the flag and the value
+    
+    # Check for personal files flag (-mine) which targets the current user's files
+    elif args[i] == "-mine":
+        user_mode = user_self
+        i += 1
+    
+    # Check for direct launch flag (-l / -launch)
+    elif args[i] in ("-launch", "-l"):
+        launch_only = True
+        i += 1
+    
+    # Check for list-only display flag (-list)
+    elif args[i] == "-list":
+        list_only = True
+        i += 1
+    
+    # If the argument isn't a recognized flag, treat it as a positional argument (seq or shot)
+    else:
+        args_clean.append(args[i])
+        i += 1
+
+# ==========================================
+# POSITIONAL ARGUMENT RESOLUTION &amp; FALLBACKS
+# ==========================================
+
+# Case 1: No positional arguments passed (rely entirely on defaults)
+if len(args_clean) == 0:
+    shot = shot_default
+    seq = seq_default
+    dept = dept_default
+    if not shot: # Fallback check: if default shot is missing, show help and quit
+        print(HELP_TEXT)
+        sys.exit(1)
+
+# Case 2: One positional argument passed (assumed to be the shot; sequence falls back to environment)
+elif len(args_clean) == 1:
+    if not seq_default:
+        print(f"\n{F_COLOR}{F_BOLD}Sequence is not set.{F_END}\n")
+        sys.exit(1)
+    shot = args_clean[0]
+    seq = seq_default
+    dept = dept_default
+
+# Case 3: Two positional arguments passed (explicitly provided sequence and shot)
+elif len(args_clean) == 2:
+    seq, shot = args_clean
+    dept = dept_default
+
+# Case 4: Too many positional arguments passed (invalid input structure)
+else:
+    print(HELP_TEXT)
+    sys.exit(1)
+
+# Verify that a department is successfully resolved
+if not dept:
+    print(f"\n{F_COLOR}{F_BOLD}Department is not set.{F_END}\n")
+    sys.exit(1)
+
+# ==========================================
+# PIPELINE NAVIGATOR CONFIGURATION
+# ==========================================
+
+# Instantiate pipeline Navigator utility object from external module 'coreservices'
+n = nav.Navigator()
+n.read_environment()                   # Load environment configurations into the navigator
+n.set_assettype("seq")                 # Set target asset type structure to sequence ("seq")
+n.set_tree("work")                     # Point directory tree tracking to the "work" space
+n.parse_arguments([seq, shot, dept])   # Parse the resolved parameters into the navigation system
+
+# Extract normalized string values from the navigator instance
+seq_str = n.get_sequence()
+shot_str = n.get_shot()
+dept_str = n.get_department()
+
+# Construct the base directory path for the target production department
+dept_dir = f"/disney/shows/{prod}/work/Sequences/seq/{seq_str}/seqData/{dept_str}"
+
+# Validate that the constructed department directory actually exists on the filesystem
+if not os.path.isdir(dept_dir):
+    print(f"\n{F_COLOR}{F_BOLD}Department directory not found: {dept_dir}{F_END}\n")
+    sys.exit(1)
+
+# ==========================================
+# USER FILTER &amp; SEARCH LABEL CONFIGURATION
+# ==========================================
+
+# Construct a shell command snippet for file ownership validation if user filtering is active
+user_filter = ''
+if user_mode != "all":
+    if user_mode == user_self:
+        user_filter = '[ -O "$f" ] &amp;&amp; '  # Check if file is owned by the current user (-O)
+    else:
+        user_filter = f'[ "$(stat -c %U \"$f\")" = "{user_mode}" ] &amp;&amp; '  # Check if owner matches target user string
+print()
+
+# Define standard structural directories that should be skipped during file traversal
+EXCLUDED_DIRS = ["miscdata", "logs", "pic", "temp", "texture"]
+
+# Determine if we are doing a wildcard search (when shot resolution matches "seqData")
+wildcard_mode = (shot_str == "seqData")
+search_label = "any" if wildcard_mode else shot_str
+
+# Set user label description string for logging context output
+if user_mode == "all":
+    user_label = "any user"
+elif user_mode == user_self:
+    user_label = f"{user_self}"
+else:
+    user_label = f"{user_mode}"
+
+# Print formatted search header status message
+print(f"{F_COLOR}{F_BOLD}Searching sequence {F_UNDERLINE}{seq_str}{F_END}{F_COLOR}{F_BOLD} hip files by {F_UNDERLINE}{user_label}{F_END}{F_COLOR}{F_BOLD} for shot context option: {F_UNDERLINE}{search_label}{F_END}\n")
+
+paths = []  # List to store paths of valid matching Houdini scene files
+
+# ==========================================
+# FILE TRAVERSAL &amp; SEARCH EXECUTION
+# ==========================================
+
+if wildcard_mode:
+    # --- WILDCARD MODE: Traverse through multi-user directory structure ---
+    # Find all user subdirectories residing directly under the department path
+    usernames = [d for d in os.listdir(dept_dir) if os.path.isdir(os.path.join(dept_dir, d))]
+    for user in usernames:
+        user_path = os.path.join(dept_dir, user)
+        
+        # Get all subdirectories within the user path, filtering out items in EXCLUDED_DIRS
+        subdirs = [os.path.join(user_path, sub) for sub in os.listdir(user_path)]
+        subdirs = [sub for sub in subdirs if os.path.isdir(sub) and os.path.basename(sub).lower() not in EXCLUDED_DIRS]
+
+        for sub in subdirs:
+            houdini_dir = os.path.join(sub, "houdini")
+            # Check if a 'houdini' folder exists inside the task directory
+            if os.path.isdir(houdini_dir):
+                # Use shell utility command to find the latest version matching 'lighting_v????.hip'
+                f = subprocess.getoutput(f'ls -1 "{houdini_dir}/lighting_v"????.hip 2&gt;/dev/null | sort | tail -1')
+                if f and os.path.isfile(f):
+                    # Filter by user permissions if required
+                    if user_mode == "all":
+                        paths.append(f)
+                    else:
+                        stat_user = subprocess.getoutput(f'stat -c %U "{f}"').strip()
+                        if (user_mode == user_self and os.stat(f).st_uid == os.getuid()) or (stat_user == user_mode):
+                            paths.append(f)
+else:
+    # --- TARGETED MODE: Shell find command execution with pattern matching inside files ---
+    excluded_args = " ".join([f'-name "{ex}" -prune -o' for ex in EXCLUDED_DIRS])
+    
+    # Construct a robust shell command pipeline using `find` and binary string searches (`strings` + `grep`)
+    cmd = f'''
+    find "{dept_dir}" -mindepth 2 -maxdepth 2 -type d \\( {excluded_args} -print \\) | while read d; do
+      houdini_dir="$d/houdini"
+      if [ -d "$houdini_dir" ]; then
+        f=$(ls -1 "$houdini_dir"/lighting_v????.hip 2&gt;/dev/null | sort | tail -1)
+        [ -f "$f" ] &amp;&amp; {user_filter} strings "$f" | grep -q '"uiconfig":"{{\\\\"label\\\\": \\\\"shot\\\\"' &amp;&amp; \\
+          strings "$f" | grep -q '\\[\\\\"{shot_str}\\\\", \\\\"{shot_str}\\\\\"\\]' &amp;&amp; \\
+          echo "$f"
+      fi
+    done
+    '''
+    # Run the constructed shell command and capture standard output results
+    result = subprocess.run(cmd, shell=True, text=True, capture_output=True)
+    paths = result.stdout.strip().split("\n") if result.stdout.strip() else []
+
+# Check if any matching files were successfully discovered
+if not paths:
+    print(f"{F_COLOR}{F_BOLD}No matching .hip files found.{F_END}\n")
+    sys.exit(0)
+
+# ==========================================
+# METADATA COLLECTION &amp; SORTING
+# ==========================================
+
+file_info = []
+for path in paths:
+    try:
+        stat = os.stat(path)
+        mtime_ts = stat.st_mtime                                             # Raw modification timestamp
+        mtime_str = datetime.fromtimestamp(mtime_ts).strftime("%b %d %H:%M")   # Formatted human-readable date/time string
+        owner = subprocess.check_output(["stat", "-c", "%U", path], text=True).strip()  # File owner system name
+        file_info.append((mtime_ts, mtime_str, owner, path))
+    except Exception:
+        continue  # Skip unreadable files safely
+
+# Sort files by modification timestamp in descending order (newest files first)
+file_info.sort(reverse=True, key=lambda x: x[0])
+
+# Calculate max username length for clean text alignment formatting in prints
+max_user_len = max(len(user) for _, _, user, _ in file_info)
+
+# ==========================================
+# LAUNCH OR DISPLAY MENU EXECUTION
+# ==========================================
+
+# If the launch-only flag is set (-l), grab the very latest file and execute it automatically
+if launch_only:
+    latest = file_info[0]
+    print(f"{F_COLOR}{F_BOLD}[1]{F_END} {F_COLOR}{latest[1]:&lt;12} {latest[2]:&lt;{max_user_len}} {latest[3]}{F_END}")
+    launch_cmd = f"run_houdini -n {latest[3]} &amp;"
+    print(f"\n{F_COLOR}{F_BOLD}Running command:\n{launch_cmd}{F_END}\n")
+    subprocess.Popen(launch_cmd, shell=True)
+    sys.exit(0)
+
+# Print a numbered list of all discovered matching scene files
+for idx, (_, mtime_str, user, path) in enumerate(file_info, 1):
+    padding = " " if idx &lt; 10 else ""
+    print(f"{F_COLOR}{F_BOLD}[{idx}]{padding}{F_END} {F_COLOR}{mtime_str:&lt;12} {user:&lt;{max_user_len}} {path}{F_END}")
+print()
+
+# If list-only flag is enabled, exit right after printing results
+if list_only:
+    sys.exit(0)
+
+# ==========================================
+# INTERACTIVE USER PROMPT &amp; SELECTION
+# ==========================================
+
+try:
+    choice = input(f"{F_COLOR}{F_BOLD}Which hip do you want to open? (0 to cancel){F_END}  ")
+    if choice.strip().isdigit():
+        choice_num = int(choice)
+        # Validate selection index bounds
+        if 1 &lt;= choice_num &lt;= len(file_info):
+            selected_path = file_info[choice_num - 1][3]
+            launch_cmd = f"run_houdini -n {selected_path} &amp;"
+            print(f"\n{F_COLOR}{F_BOLD}Running command:\n{launch_cmd}{F_END}\n")
+            subprocess.Popen(launch_cmd, shell=True) # Launch Houdini in the background
+        elif choice_num == 0:
+            print(f"\n{F_COLOR}{F_BOLD}Cancelled by user.{F_END}\n")
+        else:
+            print(f"\n{F_COLOR}{F_BOLD}Invalid selection.{F_END}\n")
+    else:
+        print(f"\n{F_COLOR}{F_BOLD}Invalid input.{F_END}\n")
+except KeyboardInterrupt:
+    # Handle user keyboard interrupt (Ctrl+C) gracefully
+    print(f"\n\n{F_COLOR}{F_BOLD}Cancelled by user.{F_END}\n")
+    sys.exit(0)
+
+# end :)
+</pre>
+
+<pre python>
+#!/usr/bin/env python3
+"""
+################################################################################
+Script Name: hou_launch (Houdini File Launcher / Finder)
+Description: Searches and launches Houdini scene files based on production context,
+             sequence, shot, and user-defined directory hierarchies.
+
+Author:
+    - Original Author: James Lojo
+    - Modified By:     Robert Holder
+
+Version:
+    - 1.1.0 (2026-08-27) - Robert Holder:
+        * Updated directory traversal to support the new multi-user
+          'seqData/lighting/&lt;username&gt;/' hierarchy.
+        * Added explicit exclusion handling for miscData, logs, pic, temp, texture.
+        * Integrated 'houdini' subdirectory checks prior to .hip file search.
+
+    - 1.0.0 (Original) - James Lojo
         * Initial script creation and core navigation logic.
 ################################################################################
 """
@@ -441,11 +780,11 @@ except KeyboardInterrupt:
 
 
 <p>
-<a href="myserver_shows_ohio.html">Ohio</a>
+<a href="disney_shows_ohio.html">Ohio</a>
 </p>
 
 <p>
-<a href="myserver_index.html">myserver</a>
+<a href="disney_index.html">disney</a>
 </p>
 
 <p>
