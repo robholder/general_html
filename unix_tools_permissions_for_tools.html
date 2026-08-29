@@ -121,6 +121,78 @@ $ cool_tool
 (It executes successfully! Because the kernel traverses <code>/home/secret_admin/utils</code> using the execute bit and hits the target file directly.)
 </p>
 
+<div id="Git Protection"><h1 id="Git Protection" class="header"><a href="#Git Protection">Git Protection</a></h1></div>
+
+<p>
+To secure your repository while allowing users to execute the tool, you should set the <code>.git</code> directory permissions to *<code>700</code>* (owner-only access: <code>rwx------</code>).
+</p>
+
+<div id="Git Protection-Why this matters (How `711` works)"><h3 id="Why this matters (How `711` works)" class="header"><a href="#Git Protection-Why this matters (How `711` works)">Why this matters (How <code>711</code> works)</a></h3></div>
+
+<p>
+A <code>711</code> permission on your parent development directory means:
+</p>
+
+<ul>
+<li>
+<span id="Git Protection-Why this matters (How <code>711</code> works)-Blocked:"></span><strong id="Blocked:">Blocked:</strong> Other users <span id="Git Protection-Why this matters (How <code>711</code> works)-cannot"></span><strong id="cannot">cannot</strong> list the contents (<code>ls</code>) of the directory.
+
+<li>
+<span id="Git Protection-Why this matters (How <code>711</code> works)-Allowed:"></span><strong id="Allowed:">Allowed:</strong> Other users <span id="Git Protection-Why this matters (How <code>711</code> works)-can traverse through"></span><strong id="can traverse through">can traverse through</strong> it if they know the exact path to a file inside (which is why your symlinked tool works).
+
+</ul>
+<p>
+However, if your <code>.git</code> directory has default permissions (usually <code>755</code>), any user who guesses or knows the path <code>.git/</code> can traverse into it. Because <code>.git</code> contains your entire source code history, commit logs, branches, and potentially sensitive config data, a default permission leaves your source code exposed.
+</p>
+
+<div id="Git Protection-Recommended Steps"><h3 id="Recommended Steps" class="header"><a href="#Git Protection-Recommended Steps">Recommended Steps</a></h3></div>
+
+<ol>
+<li>
+*Lock down the <code>.git</code> directory:*
+
+</ol>
+  
+<pre bash>
+chmod 700 .git
+</pre>
+
+
+<p>
+*This ensures that even though others can traverse the parent <code>711</code> directory, they are explicitly blocked from entering or reading anything inside the <code>.git</code> folder unless they are the owner.*
+</p>
+
+<ol>
+<li>
+<span id="Git Protection-Recommended Steps-Ensure git internal files are secure:"></span><strong id="Ensure git internal files are secure:">Ensure git internal files are secure:</strong>
+
+</ol>
+<p>
+Git usually creates files inside <code>.git</code> with restricted permissions automatically, but running a recursive lock on <code>.git</code> doesn't hurt to be safe:
+</p>
+
+<pre bash>
+chmod -R og-rwx .git
+</pre>
+
+<div id="Git Protection-Best Practice Alternative"><h3 id="Best Practice Alternative" class="header"><a href="#Git Protection-Best Practice Alternative">Best Practice Alternative</a></h3></div>
+
+<p>
+While <code>chmod 711</code> on the dev folder and <code>700</code> on <code>.git</code> works as a quick fix, running shared production tools straight out of an active development/git directory is risky.
+</p>
+
+<p>
+If possible, consider a cleaner deployment model:
+</p>
+
+<ul>
+<li>
+<span id="Git Protection-Best Practice Alternative-Build/Compile/Copy"></span><strong id="Build/Compile/Copy">Build/Compile/Copy</strong> the stable tool to a dedicated deployment directory (e.g., <code>/usr/local/bin/my_tool</code> or a shared production path) rather than symlinking directly into a live dev workspace.
+
+<li>
+This completely separates your source code and <code>.git</code> history from the tools regular users need to touch.
+
+</ul>
 <p>
 <br>
 <hr>
