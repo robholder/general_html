@@ -231,6 +231,100 @@ If possible, consider a cleaner deployment model:
 This completely separates your source code and <code>.git</code> history from the tools regular users need to touch.
 
 </ul>
+<div id="Git Protection-Other Directories"><h2 id="Other Directories" class="header"><a href="#Git Protection-Other Directories">Other Directories</a></h2></div>
+
+<div id="Git Protection-Other Directories-Understanding Your Current Permissions"><h3 id="Understanding Your Current Permissions" class="header"><a href="#Git Protection-Other Directories-Understanding Your Current Permissions">Understanding Your Current Permissions</a></h3></div>
+
+<p>
+Your default folders (<code>Documents</code>, <code>Downloads</code>, etc.) currently show <code>drwxr-xr-x</code> (<code>755</code>). This means the owner has full read, write, and execute permissions, while <span id="Git Protection-Other Directories-Understanding Your Current Permissions-group members and others have read and execute permissions"></span><strong id="group members and others have read and execute permissions">group members and others have read and execute permissions</strong>.
+</p>
+
+<p>
+While others cannot <span id="Git Protection-Other Directories-Understanding Your Current Permissions-modify"></span><strong id="modify">modify</strong> or <span id="Git Protection-Other Directories-Understanding Your Current Permissions-delete"></span><strong id="delete">delete</strong> your files (since there is no write permission for <code>others</code>), they <span id="Git Protection-Other Directories-Understanding Your Current Permissions-can"></span><strong id="can">can</strong> list the contents of those folders and read any files inside them, provided they have local access to your machine. On a multi-user machine or a shared development environment, this is a privacy leak.
+</p>
+
+<div id="Git Protection-Other Directories-Should You Tighten These Settings?"><h3 id="Should You Tighten These Settings?" class="header"><a href="#Git Protection-Other Directories-Should You Tighten These Settings?">Should You Tighten These Settings?</a></h3></div>
+
+<p>
+Yes, for folders containing personal documents, credentials, or code, it is best practice to restrict access to only your user account.
+</p>
+
+<ul>
+<li>
+<span id="Git Protection-Other Directories-Should You Tighten These Settings?-The Ideal Setting:"></span><strong id="The Ideal Setting:">The Ideal Setting:</strong> <code>chmod 700</code> (<code>drwx------</code>) or <code>chmod -R og-rwx</code> for private directories. This ensures that only you can read, write, or enter those directories.
+
+<li>
+<span id="Git Protection-Other Directories-Should You Tighten These Settings?-Why it matters:"></span><strong id="Why it matters:">Why it matters:</strong> Even if a corporate machine is technically "yours," IT support, auditing tools, or shared accounts (if applicable) might exist. Restricting standard local users from snooping in your <code>Documents</code> is standard security hygiene.
+
+</ul>
+<div id="Git Protection-Other Directories-Is It OK in a Corporate System?"><h3 id="Is It OK in a Corporate System?" class="header"><a href="#Git Protection-Other Directories-Is It OK in a Corporate System?">Is It OK in a Corporate System?</a></h3></div>
+
+<p>
+Generally, <span id="Git Protection-Other Directories-Is It OK in a Corporate System?-yes, tightening your local folder permissions is completely fine and often encouraged"></span><strong id="yes, tightening your local folder permissions is completely fine and often encouraged">yes, tightening your local folder permissions is completely fine and often encouraged</strong> by security teams. However, keep a few operational caveats in mind:
+</p>
+
+<ul>
+<li>
+<span id="Git Protection-Other Directories-Is It OK in a Corporate System?-Corporate Backups:"></span><strong id="Corporate Backups:">Corporate Backups:</strong> Some automated enterprise backup agents run with elevated privileges (root/system) to back up your machine. These tools bypass standard file permissions, so tightening them won't break your backups.
+
+<li>
+<span id="Git Protection-Other Directories-Is It OK in a Corporate System?-Shared Workflows:"></span><strong id="Shared Workflows:">Shared Workflows:</strong> If you intentionally collaborate with other developers locally on the same machine by dropping files into shared directories, restricting permissions will break that workflow.
+
+<li>
+<span id="Git Protection-Other Directories-Is It OK in a Corporate System?-Company Policy:"></span><strong id="Company Policy:">Company Policy:</strong> Always defer to internal IT security policies if your company explicitly mandates specific compliance configurations.
+
+</ul>
+<div id="Git Protection-Other Directories-How to Verify If You Are the Only User"><h3 id="How to Verify If You Are the Only User" class="header"><a href="#Git Protection-Other Directories-How to Verify If You Are the Only User">How to Verify If You Are the Only User</a></h3></div>
+
+<p>
+To check if other human user accounts exist on your system, you can inspect the user database.
+</p>
+
+<ul>
+<li>
+<span id="Git Protection-Other Directories-How to Verify If You Are the Only User-On Linux:"></span><strong id="On Linux:">On Linux:</strong> Run <code>awk -F: '\(3 &gt;= 1000 &amp;&amp; \)1 != "nobody" {print $1}' /etc/passwd</code> to list standard user accounts. If only your username appears, you are the sole human user.
+
+<li>
+<span id="Git Protection-Other Directories-How to Verify If You Are the Only User-On macOS:"></span><strong id="On macOS:">On macOS:</strong> Run <code>dscl . -list /Users</code> and look through the list, ignoring system accounts (usually starting with an underscore).
+
+<li>
+<span id="Git Protection-Other Directories-How to Verify If You Are the Only User-Quick active check:"></span><strong id="Quick active check:">Quick active check:</strong> Run <code>who</code> to see who is currently logged into the machine.
+
+</ul>
+<div id="Git Protection-Other Directories-chmod 700 vs. chmod -R og-rwx"><h3 id="chmod 700 vs. chmod -R og-rwx" class="header"><a href="#Git Protection-Other Directories-chmod 700 vs. chmod -R og-rwx">chmod 700 vs. chmod -R og-rwx</a></h3></div>
+
+<p>
+While both restrict access so that only you can access the files, they work differently in scope and application:
+</p>
+
+<ul>
+<li>
+*<code>chmod 7</code>:*
+
+<li>
+Applies to a <span id="Git Protection-Other Directories-chmod 700 vs. chmod -R og-rwx-single file or directory"></span><strong id="single file or directory">single file or directory</strong> specified in the command.
+
+<li>
+It sets the exact permission mode (User gets <code>rwx</code>, Group gets <code>---</code>, Others gets <code>---</code>). It does <span id="Git Protection-Other Directories-chmod 700 vs. chmod -R og-rwx-not"></span><strong id="not">not</strong> affect files inside the directory unless specified.
+
+<li>
+*`chmod -R og-rwx
+
+<li>
+The <code>-R</code> flag makes it <span id="Git Protection-Other Directories-chmod 700 vs. chmod -R og-rwx-recursive"></span><strong id="recursive">recursive</strong>, meaning it applies the change to the target directory <span id="Git Protection-Other Directories-chmod 700 vs. chmod -R og-rwx-and"></span><strong id="and">and</strong> every file and subdirectory nested inside it.
+
+<li>
+<code>og-rwx</code> means "remove (<code>-</code>) others' and group's read, write, and execute permissions," while leaving your user permissions untouched.
+
+</ul>
+<p>
+If you are securing a folder with existing files inside it (like <code>Documents</code> or <code>Downloads</code>), <code>ch-R</code> is typically what you want so that the files inside are protected as well, not just the folder shell.
+</p>
+
+<p>
+Are you using a Linux machine or a Mac for your development work right now?
+</p>
+
 <p>
 <br>
 <hr>
