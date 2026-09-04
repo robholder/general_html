@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>houdini_expression_to_loop_through_an_input_sequence</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Houdini.html">Houdini</a>
+</p>
+
+<div id="Expression to Loop an Input Sequence of Maps"><h1 id="Expression to Loop an Input Sequence of Maps" class="header"><a href="#Expression to Loop an Input Sequence of Maps">Expression to Loop an Input Sequence of Maps</a></h1></div>
+
+<p>
+I had a limited (seemless loop) of input maps. The sequence stopped after the last image when driven by \(F (or in my proprietary version of a Houdini node <code>\)frame</code>).
+</p>
+
+<p>
+These are some expressions to either 'loop' them or 'bounce' them back and forth.
+</p>
+
+<p>
+All these examples assume the sequence is a collection of files from 1 to 102.
+</p>
+
+<p>
+Original expression:
+</p>
+<pre c>
+$frame
+</pre>
+
+<p>
+Simple loop:
+</p>
+
+<pre c>
+# Singlemap &gt; Pick Map Expr
+(($frame - 1) % 102) + 1
+</pre>
+
+<p>
+If it doesn't loop nicely, try bounce with:
+</p>
+
+<pre c>
+((($frame + 100) % 202) - 101)
+</pre>
+
+<div id="Expression to Loop an Input Sequence of Maps-How it works:"><h4 id="How it works:" class="header"><a href="#Expression to Loop an Input Sequence of Maps-How it works:">How it works:</a></h4></div>
+
+<ul>
+<li>
+<code>202</code> is the full cycle length of a complete bounce (101 frames up + 101 frames down).
+
+<li>
+<code>+ 100</code> and <code>- 101</code> shift the wave so it neatly bottoms out at <code>1</code> and peaks at <code>102</code>.
+
+<li>
+<code>abs()</code> turns the falling slope of the modulo division into a rising-and-falling triangle wave.
+
+</ul>
+<p>
+In more detail...
+</p>
+
+<pre python>
+def bounce(f):
+    return 1 + abs(((f + 100) % 202) - 101)
+
+for f in range(1, 15):
+    print(f"frame {f:3d} -&gt; {bounce(f)}")
+
+print("---")
+for f in range(100, 105):
+    print(f"frame {f:3d} -&gt; {bounce(f)}")
+
+print("---")
+for f in range(200, 206):
+    print(f"frame {f:3d} -&gt; {bounce(f)}")
+</pre>
+
+<pre text>
+frame   1 -&gt; 1
+frame   2 -&gt; 2
+frame   3 -&gt; 3
+frame   4 -&gt; 4
+frame   5 -&gt; 5
+frame   6 -&gt; 6
+frame   7 -&gt; 7
+frame   8 -&gt; 8
+frame   9 -&gt; 9
+frame  10 -&gt; 10
+frame  11 -&gt; 11
+frame  12 -&gt; 12
+frame  13 -&gt; 13
+frame  14 -&gt; 14
+---
+frame 100 -&gt; 100
+frame 101 -&gt; 101
+frame 102 -&gt; 102
+frame 103 -&gt; 101
+frame 104 -&gt; 100
+---
+frame 200 -&gt; 4
+frame 201 -&gt; 3
+frame 202 -&gt; 2
+frame 203 -&gt; 1
+frame 204 -&gt; 2
+frame 205 -&gt; 3
+</pre>
+
+<pre python>
+def breakdown(f):
+    p1 = f + 100
+    p2 = p1 % 202
+    p3 = p2 - 101
+    p4 = abs(p3)
+    p5 = p4 + 1
+    return f"Frame {f}: ({f} + 100) = {p1} | {p1} % 202 = {p2} | {p2} - 101 = {p3} | abs({p3}) = {p4} | {p4} + 1 = {p5}"
+
+for f in [1, 50, 102, 103, 150, 203]:
+    print(breakdown(f))
+</pre>
+
+<pre text>
+Frame 1: (1 + 100) = 101 | 101 % 202 = 101 | 101 - 101 = 0 | abs(0) = 0 | 0 + 1 = 1
+Frame 50: (50 + 100) = 150 | 150 % 202 = 150 | 150 - 101 = 49 | abs(49) = 49 | 49 + 1 = 50
+Frame 102: (102 + 100) = 202 | 202 % 202 = 0 | 0 - 101 = -101 | abs(-101) = 101 | 101 + 1 = 102
+Frame 103: (103 + 100) = 203 | 203 % 202 = 1 | 1 - 101 = -100 | abs(-100) = 100 | 100 + 1 = 101
+Frame 150: (150 + 100) = 250 | 250 % 202 = 48 | 48 - 101 = -53 | abs(-53) = 53 | 53 + 1 = 54
+Frame 203: (203 + 100) = 303 | 303 % 202 = 101 | 101 - 101 = 0 | abs(0) = 0 | 0 + 1 = 1
+</pre>
+
+<p>
+It helps to break down the formula step-by-step. The snippet you shared is actually the inner "engine" of the full bounce formula, which looks like this with the <code>abs()</code> (absolute value) and <code>+ 1</code> included:
+</p>
+
+<pre c>
+$1 + abs((($frame + 100) % 202) - 101)$$
+</pre>
+
+<p>
+Here is what each part of that expression does to turn a linear timeline into a <span id="Expression to Loop an Input Sequence of Maps-How it works:-triangle wave"></span><strong id="triangle wave">triangle wave</strong> (rising up to 102, then falling back down to 1):
+</p>
+
+<div id="Expression to Loop an Input Sequence of Maps-Step-by-Step Breakdown"><h3 id="Step-by-Step Breakdown" class="header"><a href="#Expression to Loop an Input Sequence of Maps-Step-by-Step Breakdown">Step-by-Step Breakdown</a></h3></div>
+
+<ol>
+<li>
+<code>$frame + 100</code> (The Shift): Shifts your timeline forward so the math aligns neatly with our cycle blocks.
+
+<li>
+<code>% 202</code> (The Loop): The modulo operator divides the frame by 202 and outputs only the remainder. This creates a repeating sawtooth pattern that resets every 202 frames.
+
+<li>
+<code>- 101</code> (The Center): Shifts that 0-to-201 sawtooth range down so it oscillates between <code>-101</code> and <code>+100</code>.
+
+<li>
+<code>abs(...)</code> (The Bounce): Absolute value turns all negative numbers positive. Instead of dropping off a cliff when it hits zero, it bounces back up. This turns the sawtooth wave into a "V" shaped wave (rising and falling).
+
+<li>
+<code>+ 1</code> (The Final Offset): Shifts the minimum value from 0 up to <code>1</code> (and the peak from <code>101</code> up to <code>102</code>).
+
+</ol>
+<p>
+---
+</p>
+
+<div id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames"><h3 id="Walkthrough with Example Frames" class="header"><a href="#Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames">Walkthrough with Example Frames</a></h3></div>
+
+<p>
+Let's trace what happens to specific frames as they pass through the formula:
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Frame (f)
+</th>
+<th>
+f + 100
+</th>
+<th>
+\% 202 (Remainder)
+</th>
+<th>
+- 101 (Centered)
+</th>
+<th>
+abs() (The V-Bounce)
+</th>
+<th>
++ 1 (Final Output)
+</th>
+<th>
+Motion
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-Frame 1"></span><strong id="Frame 1">Frame 1</strong>
+</td>
+<td>
+101
+</td>
+<td>
+101
+</td>
+<td>
+0
+</td>
+<td>
+0
+</td>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-1"></span><strong id="1">1</strong>
+</td>
+<td>
+Start of bounce (bottom)
+</td>
+</tr>
+<tr>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-Frame 50"></span><strong id="Frame 50">Frame 50</strong>
+</td>
+<td>
+150
+</td>
+<td>
+150
+</td>
+<td>
+49
+</td>
+<td>
+49
+</td>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-50"></span><strong id="50">50</strong>
+</td>
+<td>
+Rising up
+</td>
+</tr>
+<tr>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-Frame 102"></span><strong id="Frame 102">Frame 102</strong>
+</td>
+<td>
+202
+</td>
+<td>
+0
+</td>
+<td>
+-101
+</td>
+<td>
+101
+</td>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-102"></span><strong id="102">102</strong>
+</td>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-Peak"></span><strong id="Peak">Peak</strong> (Top of the bounce)
+</td>
+</tr>
+<tr>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-Frame 103"></span><strong id="Frame 103">Frame 103</strong>
+</td>
+<td>
+203
+</td>
+<td>
+1
+</td>
+<td>
+-100
+</td>
+<td>
+100
+</td>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-101"></span><strong id="101">101</strong>
+</td>
+<td>
+Turning around, heading back down
+</td>
+</tr>
+<tr>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-Frame 150"></span><strong id="Frame 150">Frame 150</strong>
+</td>
+<td>
+250
+</td>
+<td>
+48
+</td>
+<td>
+-53
+</td>
+<td>
+53
+</td>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-54"></span><strong id="54">54</strong>
+</td>
+<td>
+Falling back down
+</td>
+</tr>
+<tr>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-Frame 203"></span><strong id="Frame 203">Frame 203</strong>
+</td>
+<td>
+303
+</td>
+<td>
+101
+</td>
+<td>
+0
+</td>
+<td>
+0
+</td>
+<td>
+<span id="Expression to Loop an Input Sequence of Maps-Walkthrough with Example Frames-1"></span><strong id="1">1</strong>
+</td>
+<td>
+Bottom again, ready to loop
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="Expression to Loop an Input Sequence of Maps-Visualizing the Shape"><h3 id="Visualizing the Shape" class="header"><a href="#Expression to Loop an Input Sequence of Maps-Visualizing the Shape">Visualizing the Shape</a></h3></div>
+
+<p>
+If you plotted this on a graph, instead of a repeating ramp going <code>1, 2, 3... 102, 1, 2, 3...</code> (which causes a harsh visual pop at the loop point), this formula draws smooth mountain peaks:
+</p>
+
+<pre text>
+  102             /\          /\
+                 /  \        /  \
+    1           /    \______/    \______
+              01     102        203     (Frames)
+</pre>
+
+<div id="Expression to Loop an Input Sequence of Maps-Visualizing the Shape-Conditional"><h4 id="Conditional" class="header"><a href="#Expression to Loop an Input Sequence of Maps-Visualizing the Shape-Conditional">Conditional</a></h4></div>
+
+<div id="Expression to Loop an Input Sequence of Maps-Visualizing the Shape-Option 2: The Conditional Approach"><h4 id="Option 2: The Conditional Approach" class="header"><a href="#Expression to Loop an Input Sequence of Maps-Visualizing the Shape-Option 2: The Conditional Approach">Option 2: The Conditional Approach</a></h4></div>
+
+<p>
+If you prefer a logic-based layout that reads explicitly like a timeline split, you can use an if statement (commonly supported in expression parsers like Houdini Hscript):
+</p>
+
+<pre c>
+$x = ($frame - 1) % 202;
+($x &lt; 102) ? ($x + 1) : (203 - $x)
+</pre>
+
+<p>
+Note: If your environment doesn't allow multi-line variable declarations in a single field, you can flatten it into a single-line inline if function:
+</p>
+
+<pre c>
+if((($frame - 1) % 202) &lt; 102, (($frame - 1) % 202) + 1, 203 - (($frame - 1) % 202))
+</pre>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
