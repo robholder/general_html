@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_pwd</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="pwd"><h1 id="pwd" class="header"><a href="#pwd">pwd</a></h1></div>
+
+<p>
+Even though <code>pwd</code> (Print Working Directory) looks like one of the simplest commands in Unix/Linux, it hides a few fascinating technical design choices and behaviors under the hood:
+</p>
+
+<div id="pwd-1. It Has a &quot;Twin Identity&quot; (Built-in vs. Binary)"><h3 id="1. It Has a &quot;Twin Identity&quot; (Built-in vs. Binary)" class="header"><a href="#pwd-1. It Has a &quot;Twin Identity&quot; (Built-in vs. Binary)">1. It Has a "Twin Identity" (Built-in vs. Binary)</a></h3></div>
+
+<p>
+When you type <code>pwd</code>, you usually aren't running a standalone program file.
+</p>
+
+<ul>
+<li>
+<span id="pwd-1. It Has a &quot;Twin Identity&quot; (Built-in vs. Binary)-The Shell Built-in:"></span><strong id="The Shell Built-in:">The Shell Built-in:</strong> Most modern shells (like Bash and Zsh) have <code>pwd</code> hardcoded directly into them as a <span id="pwd-1. It Has a &quot;Twin Identity&quot; (Built-in vs. Binary)-shell built-in"></span><strong id="shell built-in">shell built-in</strong> for maximum speed.
+
+<li>
+<span id="pwd-1. It Has a &quot;Twin Identity&quot; (Built-in vs. Binary)-The External Binary:"></span><strong id="The External Binary:">The External Binary:</strong> There is <span id="pwd-1. It Has a &quot;Twin Identity&quot; (Built-in vs. Binary)-also"></span><strong id="also">also</strong> a physical executable file living at <code>/bin/pwd</code> (part of the GNU Coreutils package).
+
+</ul>
+<p>
+You can see both on your system by running:
+</p>
+
+<pre bash>
+type -a pwd
+</pre>
+
+<div id="pwd-2. They Have Opposite Default Behaviors"><h3 id="2. They Have Opposite Default Behaviors" class="header"><a href="#pwd-2. They Have Opposite Default Behaviors">2. They Have Opposite Default Behaviors</a></h3></div>
+
+<p>
+Because there are two versions of <code>pwd</code>, they don't even agree on how to handle symlinks by default:
+</p>
+
+<ul>
+<li>
+The Shell Built-in (<code>pwd</code>) defaults to Logical mode (<code>-L</code>). It respects the symlink path you just walked through (like your <code>~/.nuke</code> experience).
+
+<li>
+The External Binary (<code>/bin/pwd</code>) defaults to *Physical mode (<code>-P</code>). If you run <code>/bin/pwd</code> inside a symlinked directory, it immediately strips away the shortcut and prints the raw physical path.
+
+</ul>
+<div id="pwd-3. It Doesn't Always Ask the Kernel"><h3 id="3. It Doesn't Always Ask the Kernel" class="header"><a href="#pwd-3. It Doesn't Always Ask the Kernel">3. It Doesn't Always Ask the Kernel</a></h3></div>
+
+<p>
+When you use the shell's built-in <code>pwd</code>, it doesn't actually query the hard drive or the Linux kernel's file system table to figure out where you are. Instead, it reads the <code>＄PWD</code> environment variable, which the shell updates dynamically every time you type <code>cd</code>.
+</p>
+
+<p>
+This is why it's lightning-fast: it's just echoing a string the shell is already keeping track of in memory.
+</p>
+
+<div id="pwd-4. It Powers the Magic of `cd -`"><h3 id="4. It Powers the Magic of `cd -`" class="header"><a href="#pwd-4. It Powers the Magic of `cd -`">4. It Powers the Magic of <code>cd -</code></a></h3></div>
+
+<p>
+Have you ever wondered how typing <code>cd -</code> instantly takes you back to your previous directory?
+</p>
+
+<p>
+The shell relies on two companion environment variables that work hand-in-hand with <code>pwd</code>:
+</p>
+
+<ul>
+<li>
+<code>＄PWD</code> (Current Working Directory)
+
+<li>
+<code>＄OLDPWD</code> (Previous Working Directory)
+
+</ul>
+<p>
+Every time you change directories, the shell swaps these variables. When you type <code>cd -</code>, the shell is essentially just telling itself: <code>cd ＄OLDPWD</code>.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
