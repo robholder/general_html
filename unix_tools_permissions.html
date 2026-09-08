@@ -267,6 +267,83 @@ Use Case
 </table>
 
 
+<div id="Symlinks and Permissions"><h1 id="Symlinks and Permissions" class="header"><a href="#Symlinks and Permissions">Symlinks and Permissions</a></h1></div>
+
+<p>
+Understanding how permissions apply to <span id="Symlinks and Permissions-symbolic links (symlinks)"></span><strong id="symbolic links (symlinks)">symbolic links (symlinks)</strong> is one of the most common tripping points in Unix. Symlinks introduce a unique "illusion" regarding how access is controlled.
+</p>
+
+<div id="Symlinks and Permissions-1. The Core Rule: Symlink Permissions Are Ignored"><h3 id="1. The Core Rule: Symlink Permissions Are Ignored" class="header"><a href="#Symlinks and Permissions-1. The Core Rule: Symlink Permissions Are Ignored">1. The Core Rule: Symlink Permissions Are Ignored</a></h3></div>
+
+<p>
+When you run <code>ls -l</code> on a symbolic link, you will almost always see permissions that look completely open:
+</p>
+
+<pre bash>
+lrwxrwxrwx  1 myaccount  staff  14 Sep  7 10:00 my_link -&gt; /path/to/target
+</pre>
+
+<ul>
+<li>
+Notice the leading <code>l</code> (meaning "link") and the <code>rwxrwxrwx</code> (<code>777</code>) across the board.
+
+</ul>
+<p>
+<span id="Symlinks and Permissions-1. The Core Rule: Symlink Permissions Are Ignored-The Golden Rule:"></span><strong id="The Golden Rule:">The Golden Rule:</strong> Those <code>rwxrwxrwx</code> permissions on the symlink <span id="Symlinks and Permissions-1. The Core Rule: Symlink Permissions Are Ignored-do not matter and are completely ignored by the operating system"></span><strong id="do not matter and are completely ignored by the operating system">do not matter and are completely ignored by the operating system</strong>.
+</p>
+
+<p>
+When a user tries to access a file or directory through a symlink, the OS evaluates the permissions of the <span id="Symlinks and Permissions-1. The Core Rule: Symlink Permissions Are Ignored-target file or directory"></span><strong id="target file or directory">target file or directory</strong>, not the symlink itself.
+</p>
+
+<div id="Symlinks and Permissions-2. How Access is Actually Evaluated"><h3 id="2. How Access is Actually Evaluated" class="header"><a href="#Symlinks and Permissions-2. How Access is Actually Evaluated">2. How Access is Actually Evaluated</a></h3></div>
+
+<p>
+If User B tries to read a file via a symlink (<code>~/Documents/EE/my_link.pdf</code>), the system checks:
+</p>
+
+<ol>
+<li>
+<span id="Symlinks and Permissions-2. How Access is Actually Evaluated-The Symlink:"></span><strong id="The Symlink:">The Symlink:</strong> Does the user have permission to <span id="Symlinks and Permissions-2. How Access is Actually Evaluated-reach"></span><strong id="reach">reach</strong> the location where the symlink sits? (Traversal permissions on parent folders still apply).
+
+<li>
+<span id="Symlinks and Permissions-2. How Access is Actually Evaluated-The Target:"></span><strong id="The Target:">The Target:</strong> Once the OS follows the link to the actual file (<code>/path/to/target</code>), it checks if User B has <span id="Symlinks and Permissions-2. How Access is Actually Evaluated-Read"></span><strong id="Read">Read</strong> (<code>r</code>) permission on that target file.
+
+<li>
+If the target file is <code>600</code> (private to you), User B will get a <span id="Symlinks and Permissions-2. How Access is Actually Evaluated-Permission Denied"></span><strong id="Permission Denied">Permission Denied</strong> error, even though the symlink itself says <code>777</code>.
+
+</ol>
+<div id="Symlinks and Permissions-3. What Happens When You Run `chmod` on a Symlink?"><h3 id="3. What Happens When You Run `chmod` on a Symlink?" class="header"><a href="#Symlinks and Permissions-3. What Happens When You Run `chmod` on a Symlink?">3. What Happens When You Run <code>chmod</code> on a Symlink?</a></h3></div>
+
+<p>
+If you run <code>chmod</code> directly on a symbolic link, a subtle trap occurs:
+</p>
+
+<pre bash>
+chmod 644 my_link
+</pre>
+
+<ul>
+<li>
+<span id="Symlinks and Permissions-3. What Happens When You Run <code>chmod</code> on a Symlink?-By default:"></span><strong id="By default:">By default:</strong> The operating system follows the link and changes the permissions of the <span id="Symlinks and Permissions-3. What Happens When You Run <code>chmod</code> on a Symlink?-actual target file"></span><strong id="actual target file">actual target file</strong>, not the link file.
+
+<li>
+<span id="Symlinks and Permissions-3. What Happens When You Run <code>chmod</code> on a Symlink?-If you want to target the link itself:"></span><strong id="If you want to target the link itself:">If you want to target the link itself:</strong> Most modern systems ignore symlink-specific permissions anyway, but flags like <code>chmod -h</code> exist to modify the link wrapper itself rather than the target. However, because symlink permissions are never enforced for access, changing them serves no security purpose.
+
+</ul>
+<div id="Symlinks and Permissions-Summary Checklist for Symlinks"><h3 id="Summary Checklist for Symlinks" class="header"><a href="#Symlinks and Permissions-Summary Checklist for Symlinks">Summary Checklist for Symlinks</a></h3></div>
+
+<ul>
+<li>
+Don't trust the <code>ls -l</code> output of a symlink; <code>777</code> there does not mean the file is public.
+
+<li>
+Security lives on the target: If you want to protect or share a file that has a symlink pointing to it, apply your <code>chmod</code> rules directly to the original target file or directory.
+
+<li>
+Traversal still applies: Users must still have traversal (<code>x</code>) rights on any parent directories the symlink has to pass through to reach its destination.
+
+</ul>
 <p>
 <br>
 <hr>
