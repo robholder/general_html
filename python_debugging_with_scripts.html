@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>python_debugging_with_scripts</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+
+<div id="List Environment Variables"><h3 id="List Environment Variables" class="header"><a href="#List Environment Variables">List Environment Variables</a></h3></div>
+
+<p>
+This was a script I ran to find all the environment variables that might be something to do with keyframes (in a specific facility's environment):
+</p>
+
+<pre python>
+import os
+import hou
+
+print("--- SCANNING OS ENVIRONMENT ---")
+for k, v in os.environ.items():
+    if any(term in k.lower() for term in ["shot", "seq", "nav", "pipeline", "task"]):
+        print(f"{k} = {v}")
+
+print("\n--- SCANNING HOU.SESSION ---")
+# Check if your pipeline tools store state in hou.session
+for attr in dir(hou.session):
+    if not attr.startswith("__"):
+        print(f"hou.session.{attr} = {getattr(hou.session, attr)}")
+
+print("\n--- CURRENT HIP FILE ---")
+print(f"Hip File Path: {hou.hipFile.name()}")
+</pre>
+
+<p>
+This looked for key terms that might contain the list of key terms.
+</p>
+
+<p>
+Also, it looked through the proprietary <code>hou.session</code> module, and look what methods in that library.
+</p>
+
+
+<div id="List Methods in Proprietary Library"><h3 id="List Methods in Proprietary Library" class="header"><a href="#List Methods in Proprietary Library">List Methods in Proprietary Library</a></h3></div>
+
+<p>
+Here we list methods in a proprietary library (<code>coreservices.prodmanUtils</code> in this case)
+</p>
+
+<pre python>
+import hou
+
+print("=== CHECKING CORESERVICES FUNCTIONS ===")
+try:
+    from coreservices import prodmanUtils as pm
+
+    # Print all functions available in the module to see if there's a 'get_current_shot' or similar
+    functions = [attr for attr in dir(pm) if callable(getattr(pm, attr))]
+    for f in functions:
+        if not f.startswith("_"):
+            print(f"  - {f}")
+except Exception as e:
+    print(f"Could not inspect prodmanUtils: {e}")
+
+print("\n=== SCANNING SCENE FOR PIPELINE NODES ===")
+# Look for common pipeline or manager nodes at the object level
+for node in hou.node("/obj").children():
+    if any(
+        term in node.type().name().lower()
+        for term in ["manager", "shot", "pipeline", "env", "control"]
+    ):
+        print(f"Found potential manager node: {node.path()} (Type: {node.type().name()})")
+</pre>
+
+<div id="Inspecting Attributes and Methods"><h2 id="Inspecting Attributes and Methods" class="header"><a href="#Inspecting Attributes and Methods">Inspecting Attributes and Methods</a></h2></div>
+
+<pre python>
+ui_obj = hou.session.render_pass_manager_ui
+
+print("--- Inspecting RenderPassManagerUI Attributes &amp; Methods ---")
+for attr in dir(ui_obj):
+    if not attr.startswith("_"):
+        print(f"  - {attr}")
+
+print("\n--- Checking Common Context Methods ---")
+for name in [
+    "get_shot",
+    "shot",
+    "sequence",
+    "get_sequence",
+    "context",
+    "get_context",
+    "get_current_shot",
+]:
+    if hasattr(ui_obj, name):
+        val = getattr(ui_obj, name)
+        result = val() if callable(val) else val
+        print(f"Found '{name}': {result}")
+</pre>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>

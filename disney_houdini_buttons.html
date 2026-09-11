@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>disney_houdini_buttons</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="disney_index.html">Disney</a>
+</p>
+
+<div id="Houdini - Button Scripts"><h1 id="Houdini - Button Scripts" class="header"><a href="#Houdini - Button Scripts">Houdini - Button Scripts</a></h1></div>
+
+<div id="Houdini - Button Scripts-Keyframe Advance (Disney pipeline)"><h2 id="Keyframe Advance (Disney pipeline)" class="header"><a href="#Houdini - Button Scripts-Keyframe Advance (Disney pipeline)">Keyframe Advance (Disney pipeline)</a></h2></div>
+
+<p>
+Picks up keyframes as set in Shotgun/Shotgrid/Flow:
+</p>
+
+<pre python>
+import os
+import hou
+
+# Import module safely
+try:
+    from coreservices import prodmanUtils as pm
+except ImportError:
+    pm = None
+
+
+def get_shot_number():
+    # Context Option to get active shot
+    try:
+        shot = hou.contextOption("shot")
+        if shot:
+            return str(shot)
+    except Exception:
+        pass
+
+def get_seq_number():
+    return os.getenv("NAV_SEQ")
+
+def get_shotgun_keyframes():
+    seq = get_seq_number()
+    shot = get_shot_number()
+    if not seq or not shot or not pm:
+        return None
+
+    try:
+        keyframes = pm.getShotKeyframes(f"{seq}/{shot}")
+        if keyframes:
+            if isinstance(keyframes, (list, tuple)):
+                return ", ".join(map(str, keyframes))
+            return str(keyframes)
+    except Exception as e:
+        print(f"Error fetching Shotgun keyframes for {seq}/{shot}: {e}")
+    return None
+
+
+def default_keyframes():
+    """Find the shotgun keyframes, or default keyframes for a shot's framerange (first, middle, end)"""
+    shotgun_keyframes = get_shotgun_keyframes()
+    if shotgun_keyframes:
+        return shotgun_keyframes
+
+    # Fallback to current Houdini timeline range if Shotgun data isn't available
+    play_range = hou.playbar.playbackRange()
+    firstframe = int(play_range[0])
+    lastframe = int(play_range[1])
+    midframe = firstframe + (lastframe - firstframe) // 2
+
+    return f"{firstframe}, {midframe}, {lastframe}"
+
+
+# --- Main Shelf Tool Execution ---
+raw_frames = default_keyframes()
+
+if not raw_frames:
+    hou.ui.displayMessage(
+        "Could not retrieve keyframes or timeline range.",
+        severity=hou.severityType.Error,
+    )
+else:
+    try:
+        # Parse the string into a list of integers
+        cleaned_str = str(raw_frames).strip("[]")
+        frame_list = [int(f.strip()) for f in cleaned_str.split(",") if f.strip()]
+    except ValueError:
+        hou.ui.displayMessage(
+            f"Could not parse integers from keyframe result: {raw_frames}",
+            severity=hou.severityType.Error,
+        )
+        frame_list = []
+
+    if frame_list:
+        session_key = "shelf_frame_cycle_index"
+
+        # Initialize session state if it doesn't exist yet
+        if not hasattr(hou.session, session_key):
+            setattr(hou.session, session_key, 0)
+
+        current_index = getattr(hou.session, session_key)
+
+        # Grab target frame and set timeline
+        target_frame = frame_list[current_index]
+        hou.setFrame(target_frame)
+        print(
+            f"Advanced to frame {target_frame} (Shot: {get_seq_number()}/{get_shot_number()} | Position {current_index + 1}/{len(frame_list)})"
+        )
+
+        # Increment index, wrapping around to 0 at the end of the list
+        next_index = (current_index + 1) % len(frame_list)
+        setattr(hou.session, session_key, next_index)
+</pre>
+
+
+<div id="Houdini - Button Scripts-Switch on AutoSave"><h2 id="Switch on AutoSave" class="header"><a href="#Houdini - Button Scripts-Switch on AutoSave">Switch on AutoSave</a></h2></div>
+
+<p>
+Use in conjunction with auto-saves (backups). This tool switches on the Auto-save checkbox in the edit menu with Python. It seems more 'sticky' than doing it manually (on scene re-open). Run once and hopefully it'll stick through sessions (more than manual switching).
+</p>
+
+<pre python>
+try:
+    hou.appendSessionModuleSource('''hou.hscript("autosave on")''')
+    print("Houdini Auto-Save: Successfully enabled")
+except Exception as e:
+    print(f"Houdini Auto-Save Error: {e}")
+</pre>
+
+<div id="Houdini - Button Scripts-List Emissions (Disney Pipeline)"><h2 id="List Emissions (Disney Pipeline)" class="header"><a href="#Houdini - Button Scripts-List Emissions (Disney Pipeline)">List Emissions (Disney Pipeline)</a></h2></div>
+
+<pre python>
+import hou
+
+def find_all_emissions():
+    # Dictionary to hold emission numbers as keys and lists of matching node paths as values
+    emission_dict = {}
+
+    # Loop through the range 1 to 50 (inclusive)
+    for emNum in range(1, 51):
+        matching_lights = []
+
+        # Loop through all nodes in the scene recursively
+        for node in hou.node("/").allSubChildren():
+            parm = node.parm("emissionCategory")
+            if parm is not None:
+                try:
+                    if int(parm.eval()) == emNum:
+                        matching_lights.append(node)
+                except (ValueError, TypeError):
+                    continue
+
+        # If we found any matching nodes for this emission number, sort and store them
+        if matching_lights:
+            sorted_paths = [light.path() for light in sorted(matching_lights, key=lambda x: x.path())]
+            emission_dict[emNum] = sorted_paths
+
+    # Check if we found anything across the entire range 1-50
+    if not emission_dict:
+        hou.ui.displayMessage(
+            "No matching items found for emission categories 1 through 50.", 
+            severity=hou.severityType.Message,
+            title="Emission Search Results"
+        )
+        return
+
+    # Build the formatted report lines
+    report_lines = []
+    
+    for emNum, paths in sorted(emission_dict.items()):
+        report_lines.append(f"\n#  emission {emNum}:")
+        for path in paths:
+            report_lines.append(path)  # Or add indentation if preferred: f"    {path}"
+
+    # Join everything into a single multi-line string
+    message_text = "\n".join(report_lines)
+
+    # 1. Print to the Python Console (making sure it flushes/writes)
+    print("\n" + message_text + "\n")
+
+    # Total count of items found for the popup summary
+    total_found = sum(len(paths) for paths in emission_dict.values())
+
+    # 2. Display the copyable popup dialog box with the details expanded
+    hou.ui.displayMessage(
+        f"Found {total_found} item(s) across {len(emission_dict)} emission category/categories (1-50).",
+        severity=hou.severityType.Message,
+        title="Emission Search Results",
+        details=message_text,
+        details_expanded=True  # Automatically opens the copyable text drawer
+    )
+
+# Run the function
+find_all_emissions()
+</pre>
+
+
+<div id="Houdini - Button Scripts-List Emissions (Disney Pipeline)-Search for Emission Number"><h3 id="Search for Emission Number" class="header"><a href="#Houdini - Button Scripts-List Emissions (Disney Pipeline)-Search for Emission Number">Search for Emission Number</a></h3></div>
+
+<pre python>
+import hou
+
+def get_integer_input():
+    while True:
+        button_pressed, user_input = hou.ui.readInput(
+            "Enter a number:", 
+            title="Integer Input Tool", 
+            buttons=("OK", "Cancel"), 
+            default_choice=0, 
+            close_choice=1
+        )
+        if button_pressed != 0:
+            return None
+        try:
+            return int(user_input.strip())
+        except ValueError:
+            hou.ui.displayMessage(
+                "Invalid input! Please enter a valid integer.", 
+                severity=hou.severityType.Error
+            )
+
+def findEms():
+    emNum = get_integer_input()
+    if emNum is None:
+        return
+
+    matching_lights = []
+    for node in hou.node("/").allSubChildren():
+        parm = node.parm("emissionCategory")
+        if parm is not None and parm.eval() == emNum:
+            matching_lights.append(node)
+
+    if not matching_lights:
+        hou.ui.displayMessage(
+            f"No matching lights found for emission value {emNum}.", 
+            severity=hou.severityType.Message,
+            title="Search Results"
+        )
+        return
+
+    # Build the list of paths
+    results = [f"Emission {emNum}: {light.path()}" for light in sorted(matching_lights, key=lambda x: x.path())]
+    message_text = "\n".join(results)
+    print(f"\n--- Search Results for Emission {emNum} ({len(matching_lights)} found) ---")
+    for light in sorted(matching_lights, key=lambda x: x.path()):
+        print(f"Emission {emNum}: {light.path()}")
+    print("--------------------------------------------------")
+    
+    # Display popup with selectable details expanded
+    hou.ui.displayMessage(
+        f"Found {len(matching_lights)} matching light(s) for Emission {emNum}.",
+        severity=hou.severityType.Message,
+        title="Search Results",
+        details=message_text,
+        details_expanded=True  # Automatically reveals the copyable box
+    )
+
+findEms()
+</pre>
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="disney_index.html">Disney</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
