@@ -107,11 +107,13 @@ else:
     if frame_list:
         session_key = "shelf_frame_cycle_index"
 
-        # Initialize session state if it doesn't exist yet
+        # Initialize session state if it doesn't exist
         if not hasattr(hou.session, session_key):
             setattr(hou.session, session_key, 0)
 
-        current_index = getattr(hou.session, session_key)
+        # CRITICAL: Always wrap the current index using modulo. 
+        # This fixes stale/cached session indices that are out of bounds.
+        current_index = getattr(hou.session, session_key) % len(frame_list)
 
         # Grab target frame and set timeline
         target_frame = frame_list[current_index]
@@ -120,7 +122,7 @@ else:
             f"Advanced to frame {target_frame} (Shot: {get_seq_number()}/{get_shot_number()} | Position {current_index + 1}/{len(frame_list)})"
         )
 
-        # Increment index, wrapping around to 0 at the end of the list
+        # Increment index safely, wrapping around to 0 at the end of the list
         next_index = (current_index + 1) % len(frame_list)
         setattr(hou.session, session_key, next_index)
 </pre>
