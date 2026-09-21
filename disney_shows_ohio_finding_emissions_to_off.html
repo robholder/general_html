@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>disney_shows_ohio_finding_emissions_to_off</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">Index</a>
+</p>
+
+<p>
+<a href="disney_index.html">Disney</a>
+</p>
+
+<p>
+<a href="disney_shows_ohio.html">Ohio</a>
+</p>
+
+<div id="Finding a List of Emissions to Turn Off"><h1 id="Finding a List of Emissions to Turn Off" class="header"><a href="#Finding a List of Emissions to Turn Off">Finding a List of Emissions to Turn Off</a></h1></div>
+
+<p>
+Make sure the scene has the <code>lgt_metadata</code> node inline for Houdini renders (to allow for emission StickyNotes).
+</p>
+
+<p>
+In Nuke, when 'Emission Notes' have been installed for all the Read Instances, select all that do not contribute to a render (of a pass).
+</p>
+
+<div id="Finding a List of Emissions to Turn Off-Example"><h4 id="Example" class="header"><a href="#Finding a List of Emissions to Turn Off-Example">Example</a></h4></div>
+
+<p>
+For a character:
+</p>
+<ul>
+<li>
+If the Instance doesn't contribute to the comp for that pass:
+
+<ul>
+<li>
+Move the Read Instance down to the stream pipe (horizontal stream)
+
+<li>
+Switch off the 'Merge' node
+
+</ul>
+<li>
+Because of this visual technique, you can select all the emission notes for the pass in one sweep.
+
+<li>
+Run the following Python script to harvest all the emission light names:
+
+</ul>
+  
+<pre python>
+import re
+import nuke
+
+lights = []
+nodes = nuke.selectedNodes()
+
+for n in nodes:
+  # Check if the node is a StickyNote to avoid errors on other node types
+  if n.Class() == 'StickyNote':
+    label_knob = n.knob('label')
+
+    if label_knob:
+      label_content = label_knob.value()
+
+      # Regex to find everything between &lt;font color=white&gt; and &lt;/font&gt;
+      # This handles case-insensitivity and optional quotes around the color value
+      matches = re.findall(
+          r'&lt;font\s+color=["\']?white["\']?&gt;(.*?)&lt;/font&gt;',
+          label_content,
+          re.IGNORECASE,
+      )
+
+      # Add found strings to our list (stripping any extra whitespace)
+      for match in matches:
+        lights.append(match.strip())
+
+# Print the resulting list to the Nuke Script Editor
+for light in lights:
+    print(light)
+
+#############################################################
+</pre>
+
+<ul>
+<li>
+If it worked (the script only examines StickyNote nodes in a selection, so you can be quite free with the selection), you can copy the list of lights from the Script Editor window into a text file:
+
+</ul>
+  
+<pre text>
+char_bookshelf_RIM_lgt
+ch_alice_rim_portal_lgt
+ch_alice_top_lgt
+char_exit_FILL_lgt
+char_bookshelf_portal_FILL_lgt
+bookshelf_cage_KICKER_lgt
+bookshelf_FILL_lgt
+char_bookshelf_BNC_lgt
+poster_spot_lgt
+tunnel_sphere02_lgt
+tunnel_sphere01_lgt
+rays_cuc_close_lgt
+rays_cuc_lgt
+lamp01_pink_lgt
+lamp01_pink_spread_lgt
+window01_pink_lgt
+window02_pink_lgt
+window03_pink_lgt
+window04_pink_lgt
+window05_pink_lgt
+lamp_bulb01_lgt
+lamp_bulb02_lgt
+ch_bizba_green_rim_lgt
+ch_cat_top_light_lgt
+ch_alice_bounce_front_lgt
+portal_exteriorFAR_lgt
+portal_exterior_lgt
+</pre>
+
+<ul>
+<li>
+Then, using a text editor, insert the address string before each light name:
+
+</ul>
+  
+<pre text>
+:wdas:shot:lrigLOCAL:&lt;light_name&gt;
+</pre>
+
+<div id="Finding a List of Emissions to Turn Off-Example:"><h4 id="Example:" class="header"><a href="#Finding a List of Emissions to Turn Off-Example:">Example:</a></h4></div>
+
+<pre text>
+:wdas:shot:lrigLOCAL:candles_KEY_spot_lgt
+:wdas:shot:lrigLOCAL:bookshelf_cage_KICKER_lgt
+:wdas:shot:lrigLOCAL:char_bookshelf_portal_FILL_lgt
+:wdas:shot:lrigLOCAL:poster_spot_lgt
+:wdas:shot:lrigLOCAL:en_char_spot_lgt
+:wdas:shot:lrigLOCAL:sphereLight_magic_lgt
+:wdas:shot:lrigLOCAL:ch_kick_local_bizba_lgt
+:wdas:shot:lrigLOCAL:ch_tail_alice_lgt
+:wdas:shot:lrigLOCAL:tunnel_sphere01_lgt
+:wdas:shot:lrigLOCAL:portal_KEY_lgt
+</pre>
+
+<ul>
+<li>
+With Vim, you can run this on the list:
+
+</ul>
+  
+<pre vim>
+%s/^/:wdas:shot:lrigLOCAL:/g
+</pre>
+
+<div id="Finding a List of Emissions to Turn Off-Houdini"><h3 id="Houdini" class="header"><a href="#Finding a List of Emissions to Turn Off-Houdini">Houdini</a></h3></div>
+
+<div id="Finding a List of Emissions to Turn Off-Houdini-Creating the Selection List"><h4 id="Creating the Selection List" class="header"><a href="#Finding a List of Emissions to Turn Off-Houdini-Creating the Selection List">Creating the Selection List</a></h4></div>
+
+<ul>
+<li>
+Back in Houdini, go to the relevant render pass block (for the pass you've harvested the emissions to be switched off).
+
+<li>
+Add a <code>dpipe Collections</code> node just after the render settings node of the pass:
+
+<ul>
+<li>
+NOTE: If the light contributions are different per shot, add a pass edit for the customized shots/passes.
+
+</ul>
+<li>
+Create an <em>empty</em> Collection (perhaps name it <code>lgt_emissionsOff_&lt;render_pass&gt;</code>):
+
+<ul>
+<li>
+If you inadvertently find items in the collection, delete them from its inventory.
+
+</ul>
+<li>
+Switch the Collection list to 'text' mode.
+
+<li>
+Paste in the list from your edited light list (with the <code>wdas</code> addresses).
+
+<li>
+On the elements list part of the Collections parm panel (lower half), use the 'Collection Bindings' row of tools:
+
+<ul>
+<li>
+<code>Select these patches</code>
+
+</ul>
+</ul>
+<div id="Finding a List of Emissions to Turn Off-Houdini-Setting EmissionsOFF"><h4 id="Setting EmissionsOFF" class="header"><a href="#Finding a List of Emissions to Turn Off-Houdini-Setting EmissionsOFF">Setting EmissionsOFF</a></h4></div>
+
+<p>
+After the Collections node (you can actually set this node aside - the collection serves no purpose other than to be a selection set)
+</p>
+<ul>
+<li>
+Create a <code>dpipe Modifier</code> node
+
+<li>
+Set to <code>emissionsOFF</code>
+
+<li>
+Select the light list using the Collections group method (as above)
+
+<li>
+Add them to the assignment section (Targets) on the <code>emissionsOFF</code> modifier node
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="disney_shows_ohio.html">Ohio</a>
+</p>
+
+<p>
+<a href="disney_index.html">Disney</a>
+</p>
+
+<p>
+<a href="index.html">Index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
