@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_shell_parameter_expansion</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)"><h1 id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)">Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)</a></h1></div>
+
+<p>
+<span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Parameter Expansion"></span><strong id="Parameter Expansion">Parameter Expansion</strong> is a built-in feature of POSIX-compliant shells like Bash and Zsh. It allows you to manipulate strings, extract substrings, provide default values, and perform search-and-replace operations instantly without invoking external utilities like <code>sed</code>, <code>awk</code>, or <code>cut</code>.
+</p>
+
+<p>
+Because it happens entirely within the shell, it is extremely fast and works identically across scripts and interactive terminal prompts.
+</p>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Basic Syntax"><h2 id="Basic Syntax" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Basic Syntax">Basic Syntax</a></h2></div>
+
+<p>
+The general form of parameter expansion is:
+</p>
+
+<pre bash>
+${parameter}
+</pre>
+
+<p>
+In many cases, the braces <code>{}</code> are optional (e.g., <code>＄var</code>), but they become <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Basic Syntax-mandatory"></span><strong id="mandatory">mandatory</strong> as soon as you add modifiers, operators, or attempt to attach text immediately following the variable name.
+</p>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)"><h2 id="1. Substring Removal (Pattern Matching)" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)">1. Substring Removal (Pattern Matching)</a></h2></div>
+
+<p>
+These operators look at a variable's value and trim matching patterns from either the <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-right (end)"></span><strong id="right (end)">right (end)</strong> or <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-left (beginning)"></span><strong id="left (beginning)">left (beginning)</strong>. They come in two flavors: <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-shortest match"></span><strong id="shortest match">shortest match</strong> (<code>%</code> or <code>#</code>) and <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-longest match"></span><strong id="longest match">longest match</strong> (<code>%%</code> or <code>##</code>).
+</p>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-Right-Side Removal (Suffix)"><h3 id="Right-Side Removal (Suffix)" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-Right-Side Removal (Suffix)">Right-Side Removal (Suffix)</a></h3></div>
+
+<p>
+Used heavily for changing file extensions or stripping trailing paths.
+</p>
+
+<ul>
+<li>
+<code>＄{var%pattern}</code> (Shortest Suffix Match)
+
+</ul>
+<p>
+Removes the smallest matching pattern from the end of the string.
+</p>
+
+<pre bash>
+filename="archive.tar.gz"
+echo "${filename%.*}"
+# Output: archive.tar
+</pre>
+
+
+<ul>
+<li>
+<code>＄{var%%pattern}</code> (Longest Suffix Match)
+
+</ul>
+<p>
+Removes the largest matching pattern from the end of the string.
+</p>
+
+<pre bash>
+filename="archive.tar.gz"
+echo "${filename%%.*}"
+# Output: archive
+</pre>
+
+
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-Left-Side Removal (Prefix)"><h3 id="Left-Side Removal (Prefix)" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-1. Substring Removal (Pattern Matching)-Left-Side Removal (Prefix)">Left-Side Removal (Prefix)</a></h3></div>
+
+<p>
+Used heavily for stripping directory paths or protocol prefixes.
+</p>
+
+<ul>
+<li>
+<code>＄{var#pattern}</code> (Shortest Prefix Match)
+
+</ul>
+<p>
+Removes the smallest matching pattern from the beginning of the string.
+</p>
+
+<pre bash>
+filepath="/usr/local/bin/node"
+echo "${filepath#*/}"
+# Output: usr/local/bin/node   (removes the very first slash)
+</pre>
+
+
+<ul>
+<li>
+<code>＄{ar##pattern}</code> (Longest Prefix Match)
+
+</ul>
+<p>
+Removes the largest matching pattern from the beginning of the string. Often used to isolate a filename from an absolute path (like <code>basename</code>).
+</p>
+
+<pre bash>
+filepath="/usr/local/bin/node"
+echo "${filepath##*/}"
+# Output: node   (removes everything up to the final slash)
+</pre>
+
+<p>
+(Note: These patterns support wildcards like <code>*</code>, <code>?</code>, and character classes like <code>[0-9]*</code>).
+</p>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-2. Substring Extraction"><h2 id="2. Substring Extraction" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-2. Substring Extraction">2. Substring Extraction</a></h2></div>
+
+<p>
+You can slice a variable by index, much like an array or Python string.
+</p>
+
+<ul>
+<li>
+<code>＄{var:offset}</code>
+
+</ul>
+<p>
+Extracts everything from the string starting at the given 0-based index.
+</p>
+
+<pre bash>
+str="Hello_World"
+echo "${str:6}"
+# Output: World
+</pre>
+
+<ul>
+<li>
+<code>＄{var:offset:length}</code>
+
+</ul>
+<p>
+Extracts a specific number of characters starting from the offset.
+</p>
+
+<pre bash>
+str="Hello_World"
+echo "${str:0:5}"
+# Output: Hello
+</pre>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-3. Search and Replace"><h2 id="3. Search and Replace" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-3. Search and Replace">3. Search and Replace</a></h2></div>
+
+<p>
+You can substitute parts of a string inline without writing complex regular expressions.
+</p>
+
+<ul>
+<li>
+<code>＄{var//pattern/replacement}</code> (Global Replacement)
+
+</ul>
+<p>
+Replaces <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-3. Search and Replace-all"></span><strong id="all">all</strong> occurrences of the pattern.
+</p>
+
+<pre bash>
+sentence="foo bar foo baz"
+echo "${sentence//foo/qux}"
+# Output: qux bar qux baz
+</pre>
+
+<ul>
+<li>
+<code>＄{var/pattern/replacement}</code> (Single Replacement)
+
+</ul>
+<p>
+Replaces only the <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-3. Search and Replace-first"></span><strong id="first">first</strong> occurrence of the pattern.
+</p>
+
+<pre bash>
+sentence="foo bar foo baz"
+echo "${sentence/foo/qux}"
+# Output: qux bar foo baz
+</pre>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-4. Default Values and Error Handling"><h2 id="4. Default Values and Error Handling" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-4. Default Values and Error Handling">4. Default Values and Error Handling</a></h2></div>
+
+<p>
+Parameter expansion can also control what happens if a variable is unset, empty, or uninitialized.
+</p>
+
+<ul>
+<li>
+<code>＄{var:-default}</code> (Use Default If Unset or Empty)
+
+</ul>
+<p>
+If <code>var</code> is empty or unset, it evaluates to <code>default</code>. (If it has a value, it keeps it).
+</p>
+
+<pre bash>
+echo "${USERNAME:-guest}"
+</pre>
+
+<ul>
+<li>
+<code>＄{var:?error_message}</code> (Error If Unset or Empty)
+
+</ul>
+<p>
+If <code>var</code> is missing, it halts execution and prints your custom error message to standard error. Great for shell script validation.
+</p>
+
+<pre bash>
+: "${API_KEY:?Error: API_KEY environment variable is required.}"
+</pre>
+
+<div id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Summary Cheat Sheet"><h2 id="Summary Cheat Sheet" class="header"><a href="#Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Summary Cheat Sheet">Summary Cheat Sheet</a></h2></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Expression
+</th>
+<th>
+Description
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>＄{var%pattern}</code>
+</td>
+<td>
+Trim shortest match from the <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Summary Cheat Sheet-right"></span><strong id="right">right</strong> (end)
+</td>
+</tr>
+<tr>
+<td>
+<code>＄{var%%pattern}</code>
+</td>
+<td>
+Trim longest match from the <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Summary Cheat Sheet-right"></span><strong id="right">right</strong> (end)
+</td>
+</tr>
+<tr>
+<td>
+<code>＄{var#pattern}</code>
+</td>
+<td>
+Trim shortest match from the <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Summary Cheat Sheet-left"></span><strong id="left">left</strong> (start)
+</td>
+</tr>
+<tr>
+<td>
+<code>＄{var##pattern}</code>
+</td>
+<td>
+Trim longest match from the <span id="Shell Parameter Expansion Reference Guide (Bash &amp; Zsh)-Summary Cheat Sheet-left"></span><strong id="left">left</strong> (start)
+</td>
+</tr>
+<tr>
+<td>
+<code>＄{var/pat/repl}</code>
+</td>
+<td>
+Replace first match of <code>pat</code> with <code>repl</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>＄{var//pat/repl}</code>
+</td>
+<td>
+Replace all matches of <code>pat</code> with <code>repl</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>＄{var:offset:len}</code>
+</td>
+<td>
+Extract substring by index and length
+</td>
+</tr>
+<tr>
+<td>
+<code>＄{var:-default}</code>
+</td>
+<td>
+Fallback value if unset or empty
+</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="shell_and_bash.html">Shell and Bash</a> 
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
