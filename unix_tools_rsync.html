@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_rsync</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<div id="rsync"><h1 id="rsync" class="header"><a href="#rsync">rsync</a></h1></div>
+
+<ul>
+<li>
+<a href="unix_tools_rsync_old.html">rsync - Old Notes</a>
+
+</ul>
+<div id="rsync-Linux/macOS `rsync` Command: Reference &amp; Practical Guide"><h2 id="Linux/macOS `rsync` Command: Reference &amp; Practical Guide" class="header"><a href="#rsync-Linux/macOS `rsync` Command: Reference &amp; Practical Guide">Linux/macOS <code>rsync</code> Command: Reference &amp; Practical Guide</a></h2></div>
+
+<p>
+<code>rsync</code> (Remote Sync) is one of the most powerful, flexible, and efficient tools in the Unix, Linux, and macOS ecosystem. What makes it legendary is its <span id="rsync-Linux/macOS <code>rsync</code> Command: Reference &amp; Practical Guide-delta-transfer algorithm"></span><strong id="delta-transfer algorithm">delta-transfer algorithm</strong>, meaning it only copies the exact bytes that have actually changed (or new files), saving immense amounts of time and bandwidth compared to tools like <code>cp</code> or <code>scp</code>.
+</p>
+
+<div id="rsync-1. Quick Start / Example Usage"><h2 id="1. Quick Start / Example Usage" class="header"><a href="#rsync-1. Quick Start / Example Usage">1. Quick Start / Example Usage</a></h2></div>
+
+<pre bash>
+# Backup documents to a local thumbdrive (simulating first with dry-run)
+rsync -avh --progress --dry-run ~/Documents/ /Volumes/BackupDrive/Docs/
+</pre>
+
+<div id="rsync-2. Core Anatomy of an `rsync` Command"><h2 id="2. Core Anatomy of an `rsync` Command" class="header"><a href="#rsync-2. Core Anatomy of an `rsync` Command">2. Core Anatomy of an <code>rsync</code> Command</a></h2></div>
+
+<p>
+The basic syntax is always:
+</p>
+
+<pre bash>
+rsync [options] /path/to/source/ /path/to/destination/
+</pre>
+
+<div id="rsync-2. Core Anatomy of an `rsync` Command-The &quot;Trailing Slash&quot; Trap ⚠️"><h3 id="The &quot;Trailing Slash&quot; Trap ⚠️" class="header"><a href="#rsync-2. Core Anatomy of an `rsync` Command-The &quot;Trailing Slash&quot; Trap ⚠️">The "Trailing Slash" Trap ⚠️</a></h3></div>
+
+<p>
+The presence or absence of a *trailing slash (<code>/</code>) on the source folder* completely changes what happens:
+</p>
+
+<ul>
+<li>
+*With a trailing slash (<code>source/</code>):* Copies the <span id="rsync-2. Core Anatomy of an <code>rsync</code> Command-The &quot;Trailing Slash&quot; Trap ⚠️-contents"></span><strong id="contents">contents</strong> inside the folder into the destination.
+<pre bash>
+rsync -a /my/photos/ /backup/
+# Result: /backup/pic1.jpg, /backup/pic2.jpg
+</pre>
+
+<li>
+Without a trailing slash (<code>source</code>): Copies the <span id="rsync-2. Core Anatomy of an <code>rsync</code> Command-The &quot;Trailing Slash&quot; Trap ⚠️-folder itself"></span><strong id="folder itself">folder itself</strong> into the destination.
+<pre bash>
+rsync -a /my/photos /backup/
+# Result: /backup/photos/pic1.jpg, /backup/photos/pic2.jpg
+</pre>
+
+</ul>
+<div id="rsync-3. Essential Flags Reference"><h2 id="3. Essential Flags Reference" class="header"><a href="#rsync-3. Essential Flags Reference">3. Essential Flags Reference</a></h2></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Flag
+</th>
+<th>
+Name
+</th>
+<th>
+Description
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>-a</code>
+</td>
+<td>
+Archive Mode
+</td>
+<td>
+Shorthand for <code>-rlptgoD</code> (recursive, symlinks, permissions, modification times, groups, owners). <span id="rsync-3. Essential Flags Reference-Always use this for backups."></span><strong id="Always use this for backups.">Always use this for backups.</strong>
+</td>
+</tr>
+<tr>
+<td>
+<code>-v</code>
+</td>
+<td>
+Verbose
+</td>
+<td>
+Prints information on what files are being transferred.
+</td>
+</tr>
+<tr>
+<td>
+<code>-h</code>
+</td>
+<td>
+Human-readable
+</td>
+<td>
+Displays file sizes in a readable format (e.g., KB, MB, GB).
+</td>
+</tr>
+<tr>
+<td>
+<code>-z</code>
+</td>
+<td>
+Compress
+</td>
+<td>
+Compresses file data during transmission (crucial for remote/SSH transfers, unnecessary for local USB backups).
+</td>
+</tr>
+<tr>
+<td>
+<code>-P</code>
+</td>
+<td>
+Partial / Progress
+</td>
+<td>
+Equivalent to <code>--partial --progress</code>. Shows progress bars and allows resuming interrupted transfers.
+</td>
+</tr>
+<tr>
+<td>
+<code>-n</code> or <code>--dry-run</code>
+</td>
+<td>
+Dry Run
+</td>
+<td>
+<span id="rsync-3. Essential Flags Reference-Always use this first!"></span><strong id="Always use this first!">Always use this first!</strong> Simulates the sync without modifying any files to verify behavior.
+</td>
+</tr>
+<tr>
+<td>
+<code>--delete</code>
+</td>
+<td>
+Delete
+</td>
+<td>
+Deletes files in the destination directory if they no longer exist in the source (creates an exact mirror).
+</td>
+</tr>
+<tr>
+<td>
+<code>--exclude='pattern'</code>
+</td>
+<td>
+Exclude
+</td>
+<td>
+Skips files or directories matching the pattern (e.g., <code>--exclude='*/.snapshot/'</code>).
+</td>
+</tr>
+</tbody>
+</table>
+
+<div id="rsync-4. Practical Copying Scenarios"><h2 id="4. Practical Copying Scenarios" class="header"><a href="#rsync-4. Practical Copying Scenarios">4. Practical Copying Scenarios</a></h2></div>
+
+<div id="rsync-4. Practical Copying Scenarios-A. Local Backup"><h3 id="A. Local Backup" class="header"><a href="#rsync-4. Practical Copying Scenarios-A. Local Backup">A. Local Backup</a></h3></div>
+
+<pre bash>
+rsync -avh --progress ~/Documents/ /Volumes/BackupDrive/Docs/
+</pre>
+
+<div id="rsync-4. Practical Copying Scenarios-B. Remote Backup over SSH"><h3 id="B. Remote Backup over SSH" class="header"><a href="#rsync-4. Practical Copying Scenarios-B. Remote Backup over SSH">B. Remote Backup over SSH</a></h3></div>
+
+<pre bash>
+# Push local folder to a remote server
+rsync -avhz -e ssh ~/Documents/ user@remotehost:/path/to/remote/dir/
+
+# Pull remote folder to your local machine
+rsync -avhz -e ssh user@remotehost:/path/to/remote/dir/ ~/LocalDest/
+</pre>
+
+<div id="rsync-4. Practical Copying Scenarios-C. Excluding Unwanted Files (e.g., `.snapshot` directories)"><h3 id="C. Excluding Unwanted Files (e.g., `.snapshot` directories)" class="header"><a href="#rsync-4. Practical Copying Scenarios-C. Excluding Unwanted Files (e.g., `.snapshot` directories)">C. Excluding Unwanted Files (e.g., <code>.snapshot</code> directories)</a></h3></div>
+
+<p>
+Network-attached storage systems (ZFS, NetApp, Isilon) often automatically create hidden <code>.snapshot</code> folders. To exclude them cleanly at any depth:
+</p>
+
+<pre bash>
+rsync -avh --exclude='**/.snapshot/' /source/images/ /destination/images/
+</pre>
+
+<ul>
+<li>
+<code>*/.snapshot</code>: Matches <code>.snapshot</code> folders only <span id="rsync-4. Practical Copying Scenarios-C. Excluding Unwanted Files (e.g., <code>.snapshot</code> directories)-one level deep"></span><strong id="one level deep">one level deep</strong>.
+
+<li>
+<code>**/.snapshot</code>: Matches <code>.snapshot</code> folders <span id="rsync-4. Practical Copying Scenarios-C. Excluding Unwanted Files (e.g., <code>.snapshot</code> directories)-at any depth"></span><strong id="at any depth">at any depth</strong> in the tree (recommended).
+
+</ul>
+<div id="rsync-5. Advanced Strategies: Time-Machine-Style Backups (`--link-dest`)"><h2 id="5. Advanced Strategies: Time-Machine-Style Backups (`--link-dest`)" class="header"><a href="#rsync-5. Advanced Strategies: Time-Machine-Style Backups (`--link-dest`)">5. Advanced Strategies: Time-Machine-Style Backups (<code>--link-dest</code>)</a></h2></div>
+
+<p>
+You can create point-in-time incremental snapshots without wasting immense storage space by leveraging hard links. If a file hasn't changed, <code>rsync</code> links to the previous backup rather than copying it again.
+</p>
+
+<div id="rsync-5. Advanced Strategies: Time-Machine-Style Backups (`--link-dest`)-Example Snapshot Script (`backup.sh`):"><h3 id="Example Snapshot Script (`backup.sh`):" class="header"><a href="#rsync-5. Advanced Strategies: Time-Machine-Style Backups (`--link-dest`)-Example Snapshot Script (`backup.sh`):">Example Snapshot Script (<code>backup.sh</code>):</a></h3></div>
+
+<pre bash>
+#!/bin/bash
+SRC="$HOME/Documents/"
+BACKUP_ROOT="/Volumes/BackupDrive/Snapshots"
+LATEST="$BACKUP_ROOT/latest"
+CURRENT="$BACKUP_ROOT/backup_$(date +%Y-%m-%d_%H%M%S)"
+
+# Create new snapshot using the previous 'latest' folder for comparison
+rsync -avh --delete \
+  --link-dest="$LATEST" \
+  "$SRC" \
+  "$CURRENT"
+
+# Update the 'latest' symlink to point to the fresh backup
+rm -f "$LATEST"
+ln -s "$CURRENT" "$LATEST"
+</pre>
+
+<ul>
+<li>
+How it restores: Because every snapshot folder is a fully realized directory via hard links, you can browse them normally in Finder/Explorer and drag-and-drop restored files directly. Deleting old snapshots (<code>rm -rf</code>) is safe because hard links only release data when <span id="rsync-5. Advanced Strategies: Time-Machine-Style Backups (<code>--link-dest</code>)-Example Snapshot Script (<code>backup.sh</code>):-all"></span><strong id="all">all</strong> references are gone.
+
+</ul>
+<div id="rsync-6. macOS vs. Linux Quirks"><h2 id="6. macOS vs. Linux Quirks" class="header"><a href="#rsync-6. macOS vs. Linux Quirks">6. macOS vs. Linux Quirks</a></h2></div>
+
+<p>
+If you are syncing between a Mac and a Linux machine, keep these two critical differences in mind:
+</p>
+
+<ol>
+<li>
+<span id="rsync-6. macOS vs. Linux Quirks-The Engine Version:"></span><strong id="The Engine Version:">The Engine Version:</strong>
+
+<li>
+<span id="rsync-6. macOS vs. Linux Quirks-Linux"></span><strong id="Linux">Linux</strong> ships with modern <code>rsync</code> 3.x (incremental scanning).
+
+<li>
+<span id="rsync-6. macOS vs. Linux Quirks-macOS"></span><strong id="macOS">macOS</strong> ships with an ancient <code>rsync</code> 2.6.9 due to GPLv3 licensing. It scans the entire tree into memory before sending files, which can feel sluggish on massive repos.
+
+<li>
+<span id="rsync-6. macOS vs. Linux Quirks-Fix:"></span><strong id="Fix:">Fix:</strong> Install a modern version via Homebrew: <code>brew install rsync</code>.
+
+<li>
+Extended Attributes (Mac Metadata):
+
+<li>
+macOS stores Finder tags, colors, and resource forks in extended attributes. To preserve these on Mac-to-Mac or Mac-to-Linux transfers, add the *<code>-E</code>* (or <code>--extended-attributes</code>) flag:
+
+</ol>
+  
+<pre bash>
+rsync -avzE --delete source/ dest/
+</pre>
+
+<p>
+<hr>
+<br>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
