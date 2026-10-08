@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vimwiki_corporate_storage</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="vim_admin.html">Vim - Admin</a>
+</p>
+
+<p>
+<a href="vim_learning.html">Vim - Learning</a>
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories"><h1 id="Storing Vimwiki Away from .snapshot Directories" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories">Storing Vimwiki Away from .snapshot Directories</a></h1></div>
+
+<p>
+To avoid getting backed up via <code>.snapshot</code> directories on corporate systems:
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Move the Data to a True Local Directory"><h4 id="Move the Data to a True Local Directory" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Move the Data to a True Local Directory">Move the Data to a True Local Directory</a></h4></div>
+
+
+<p>
+• Move your vimwiki directories to the physical computer's local hard drive—usually under <code>/var/tmp/</code>, or a local scratch space like /scratch/.
+• Network snapshots only happen on network-mounted shares.
+</p>
+
+<p>
+The /tmp directory is a standard temporary workspace found on Linux, macOS, and other Unix-like operating systems. It is a shared scratchpad where the operating system, running applications, and users can write temporary data that is only needed for a short period. It is <em>not</em> permanent.
+</p>
+
+<p>
+An alternative is the <code>/var/tmp/</code> directory. Not permanent, but less volatile for often used files.
+</p>
+
+
+<div id="Storing Vimwiki Away from .snapshot Directories-If You Must Use Temporary Directories"><h4 id="If You Must Use Temporary Directories" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-If You Must Use Temporary Directories">If You Must Use Temporary Directories</a></h4></div>
+
+<p>
+If you have no choice but to use system temporary directories, use /var/tmp instead of /tmp.
+</p>
+
+<table>
+<thead>
+<tr>
+<th>
+Feature
+</th>
+<th>
+/tmp
+</th>
+<th>
+/var/tmp
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Bypasses Network Snapshots?
+</td>
+<td>
+Yes (Lives locally)
+</td>
+<td>
+Yes (Lives locally)
+</td>
+</tr>
+<tr>
+<td>
+Survives a Reboot?
+</td>
+<td>
+❌ No (Wiped instantly)
+</td>
+<td>
+Yes (Persistent)
+</td>
+</tr>
+<tr>
+<td>
+Automatic Cleanup?
+</td>
+<td>
+Cleared every 10 days (or on boot)
+</td>
+<td>
+Cleared only if unaccessed for 30+ days
+</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+Since your network home directory might be where the snapshots are happening, moving the actual folder to /var/tmp ensures the physical files sit safely on your machine's local hard drive. A symlink in your home folder can just act as a lightweight pointer (consuming zero snapshot space).
+</p>
+
+<p>
+Here is the exact step-by-step process to set this up safely without losing your notes:
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 1: Move your existing notes to /var/tmp"><h3 id="Step 1: Move your existing notes to /var/tmp" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 1: Move your existing notes to /var/tmp">Step 1: Move your existing notes to /var/tmp</a></h3></div>
+
+<p>
+First, copy your entire existing Vimwiki folder to the local persistent temporary directory. Replace vimwiki with the actual name of your folder if it is capitalized or different:
+</p>
+
+<pre bash>
+cp -r ~/vimwiki /var/tmp/vimwiki
+</pre>
+
+<p>
+Tip: Using cp instead of mv first ensures you have a safety backup in case you make a typo in the next steps.
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 1: Move your existing notes to /var/tmp-rsync Alternative"><h4 id="rsync Alternative" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 1: Move your existing notes to /var/tmp-rsync Alternative">rsync Alternative</a></h4></div>
+
+<p>
+<code>rsync</code> is the best tool for this because it handles directory structures cleanly and allows you to explicitly ignore specific files and folders.
+</p>
+
+<p>
+By default, standard copy commands like <code>cp -r</code> or an unconfigured <code>rsync</code> will get stuck in an infinite loop or throw errors if they try to copy the virtual <code>.snapshot</code> directory.
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 1: Move your existing notes to /var/tmp-The Exact rsync Command"><h4 id="The Exact rsync Command" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 1: Move your existing notes to /var/tmp-The Exact rsync Command">The Exact rsync Command</a></h4></div>
+
+<p>
+To copy your wiki folder to /var/tmp while completely ignoring the .snapshot directory, run this command:
+</p>
+
+<pre bash>
+rsync -av --exclude='.snapshot/' ~/vimwiki/ /var/tmp/vimwiki/
+</pre>
+
+<p>
+Breakdown of the command flags:
+</p>
+
+<ul>
+<li>
+<code>-a</code> (archive mode): This is critical. It preserves your file permissions, modification times, symlinks, and ownership exactly as they are.
+
+<li>
+<code>-v</code> (verbose): This prints the files on your screen as they copy so you can watch the progress.
+
+<li>
+<code>--exclude='.snapshot/'</code>: This tells <code>rsync</code> to completely skip over any directory named <code>.snapshot</code> encountered during the transfer.
+
+<li>
+The trailing slashes (<code>/</code>): Placing a slash at the end of both paths (<code>~/vimwiki/</code> and <code>/var/tmp/vimwiki/</code>) tells <code>rsync</code> to copy the contents of the source folder into the contents of the destination folder, avoiding nesting a folder inside a folder (like /var/tmp/vimwiki/vimwiki).
+
+</ul>
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 2: Verify the files copied correctly"><h3 id="Step 2: Verify the files copied correctly" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 2: Verify the files copied correctly">Step 2: Verify the files copied correctly</a></h3></div>
+
+<p>
+Check that your notes are intact inside the new local directory:
+</p>
+
+<pre bash>
+ls -la /var/tmp/vimwiki
+</pre>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 3: Delete the original network folder"><h3 id="Step 3: Delete the original network folder" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 3: Delete the original network folder">Step 3: Delete the original network folder</a></h3></div>
+
+<p>
+Now that your files are safe in <code>/var/tmp</code>, delete the original folder from your network home directory so the snapshot engine stops tracking changes to it:
+</p>
+
+<pre bash>
+rm -rf ~/vimwiki
+</pre>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 4: Create the Symlink"><h3 id="Step 4: Create the Symlink" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 4: Create the Symlink">Step 4: Create the Symlink</a></h3></div>
+
+<p>
+Create the symbolic link pointing from your home directory to the new local path:
+</p>
+
+<pre bash>
+ln -s /var/tmp/vimwiki ~/vimwiki
+</pre>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 5: Test it"><h3 id="Step 5: Test it" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 5: Test it">Step 5: Test it</a></h3></div>
+
+<p>
+Verify the link works by listing your home directory folder. It should seamlessly show your notes:
+</p>
+
+<pre bash>
+ls -la ~/vimwiki
+</pre>
+
+<p>
+When you open Vim and trigger your Vimwiki shortcut, Vim will follow the symlink and read/write directly to <code>/var/tmp/vimwiki</code> without realizing anything has changed.
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Step 5: Test it-⚠️ Two Crucial Risks to Keep in Mind"><h4 id="⚠️ Two Crucial Risks to Keep in Mind" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Step 5: Test it-⚠️ Two Crucial Risks to Keep in Mind">⚠️ Two Crucial Risks to Keep in Mind</a></h4></div>
+
+<p>
+While this perfectly solves your snapshot issue, you must look out for these two caveats:
+</p>
+<ul>
+<li>
+The 30-Day Cleanup Rule: Most corporate Linux environments run a background cleanup script (<code>systemd-tmpfiles-clean</code>). By default, it automatically deletes files in <code>/var/tmp</code> that haven't been modified or accessed in 30 days. If you go on a month-long vacation or don't open your wiki for a few weeks, the system might wipe your notes. To prevent this, just touch the folder occasionally, or add touch <code>/var/tmp/vimwiki</code> to your <code>~/.bashrc</code> or <code>~/.zshrc</code> file so it updates every time you open a terminal.
+
+<li>
+Hardware Dependency: Because <code>/var/tmp</code> lives on that specific physical machine's hard drive, you will only be able to access your Vimwiki when using that exact workstation. If you SSH into your corporate network from a different machine or a backup server, your <code>~/vimwiki</code> symlink will look "broken" because that second machine won't have your files on its local <code>/var/tmp</code> drive.
+
+</ul>
+<p>
+If you want to completely eliminate the risk of the 30-day auto-deletion, we can check if you have a non-temporary local folder. To find one, what is the output if you run:
+</p>
+<ul>
+<li>
+<code>df -h</code> (This will show us all local vs. network hard drives mounted to your machine)
+
+</ul>
+<div id="Storing Vimwiki Away from .snapshot Directories-Location"><h2 id="Location" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Location">Location</a></h2></div>
+
+<p>
+The <code>/var/tmp</code> directory is physically local to the specific machine you are currently logged into, but it is globally shared across all users who have access to that machine.
+Here is exactly how it breaks down across your criteria:
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Location-Where is it? (It is Local)"><h3 id="Where is it? (It is Local)" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Location-Where is it? (It is Local)">Where is it? (It is Local)</a></h3></div>
+
+<p>
+It lives on your computer's local, physical hard drive (usually under the root / partition). Because it does not live on the corporate storage servers, it is completely invisible to the network snapshot engines.
+</p>
+
+<div id="Storing Vimwiki Away from .snapshot Directories-Location-Is it shared across users? (Yes, Globally)"><h3 id="Is it shared across users? (Yes, Globally)" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Location-Is it shared across users? (Yes, Globally)">Is it shared across users? (Yes, Globally)</a></h3></div>
+
+<p>
+Any user logged into that specific workstation or server can see and write to <code>/var/tmp</code>.
+</p>
+<ul>
+<li>
+Permissions: By default, <code>/var/tmp</code> has a special permission bit set called the "sticky bit" (visible as a <code>t</code> at the end of its permissions, like <code>drwxrwxrwt</code>).
+
+<li>
+What the sticky bit means: While any user can create files inside <code>/var/tmp</code>, users cannot delete, modify, or rename files owned by someone else.
+
+</ul>
+<div id="Storing Vimwiki Away from .snapshot Directories-Location-What this means for your Vimwiki plan:"><h3 id="What this means for your Vimwiki plan:" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Location-What this means for your Vimwiki plan:">What this means for your Vimwiki plan:</a></h3></div>
+
+<p>
+Because it is shared, your <code>rsync</code> command will create a folder structure like <code>/var/tmp/vimwiki/</code> that belongs strictly to your username.
+</p>
+<ul>
+<li>
+Other users on that machine will be able to see the filenames of your notes if they browse <code>/var/tmp</code>.
+
+<li>
+However, because of default Linux file permissions (<code>umask</code>), they generally will not be able to read or modify the contents of your notes unless your files are explicitly set to be world-readable.
+
+</ul>
+<div id="Storing Vimwiki Away from .snapshot Directories-Location-Secure it further (Optional)"><h3 id="Secure it further (Optional)" class="header"><a href="#Storing Vimwiki Away from .snapshot Directories-Location-Secure it further (Optional)">Secure it further (Optional)</a></h3></div>
+
+<p>
+If your Vimwiki contains sensitive or private notes and you want to ensure no other local users can even peer into the directory, you can lock down the local folder immediately after running your <code>rsync</code> command by restricting its permissions:
+</p>
+
+<pre bash>
+chmod 700 /var/tmp/vimwiki
+</pre>
+
+<p>
+This ensures that only you (and the system root administrator) have permission to read, write, or list the files inside that directory.o
+</p>
+
+<div id="Checking the System"><h1 id="Checking the System" class="header"><a href="#Checking the System">Checking the System</a></h1></div>
+
+<p>
+Here is how to check your default file sharing privacy (<code>umask</code>) and verify who else is logging into your machine to ensure your local Vimwiki repository is completely secure.
+</p>
+
+<div id="Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)"><h3 id="Suggestion 1: Check Your File Sharing Privacy (umask)" class="header"><a href="#Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)">Suggestion 1: Check Your File Sharing Privacy (umask)</a></h3></div>
+
+<p>
+By default, when you or a program creates a new file or directory, Linux applies a mask called a <code>umask</code> to restrict permissions. Let's see how private your system is by default.
+</p>
+
+<div id="Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)-Open your terminal and simply type:"><h4 id="Open your terminal and simply type:" class="header"><a href="#Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)-Open your terminal and simply type:">Open your terminal and simply type:</a></h4></div>
+   
+<pre bash>
+umask
+</pre>
+
+<div id="Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)-Interpret the 4-digit numeric output:"><h4 id="Interpret the 4-digit numeric output:" class="header"><a href="#Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)-Interpret the 4-digit numeric output:">Interpret the 4-digit numeric output:</a></h4></div>
+
+<ul>
+<li>
+<code>0022</code> or <code>0002</code> (Standard corporate default): This means files are readable by other users. If this is your output, other users on the machine can read your Vimwiki notes in <code>/var/tmp</code> unless you explicitly lock it down.
+
+<li>
+<code>0077</code> (Secure default): This means all new files are strictly private to you.
+
+</ul>
+<div id="Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)-🔒 How to secure it right now:"><h4 id="🔒 How to secure it right now:" class="header"><a href="#Checking the System-Suggestion 1: Check Your File Sharing Privacy (umask)-🔒 How to secure it right now:">🔒 How to secure it right now:</a></h4></div>
+
+<p>
+Regardless of your default <code>umask</code>, you can completely lock down your local Vimwiki folder so that only you (and root) can see it. Run this command:
+</p>
+
+<pre bash>
+chmod 700 /var/tmp/vimwiki
+</pre>
+
+<p>
+If you run <code>ls -ld /var/tmp/vimwiki</code>, the permissions should now look like <code>drwx------</code>, meaning read, write, and execute permissions belong exclusively to you.
+</p>
+
+<div id="Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine"><h3 id="Suggestion 2: See Who Else Logs Into This Specific Machine" class="header"><a href="#Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine">Suggestion 2: See Who Else Logs Into This Specific Machine</a></h3></div>
+
+<p>
+Because <code>/var/tmp</code> is shared among local users, it's good to know exactly who you are sharing the computer with. You can check this using two different commands:
+</p>
+
+<div id="Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine-A. See who is logged in right now"><h4 id="A. See who is logged in right now" class="header"><a href="#Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine-A. See who is logged in right now">A. See who is logged in right now</a></h4></div>
+
+<p>
+Type the following command to see a live list of active users, what terminal they are using, and when they logged in:
+</p>
+
+<pre bash>
+who
+</pre>
+
+<p>
+(If you only see your own username listed, you are the only one actively using the machine right now).
+</p>
+
+<div id="Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine-B. See who has logged in recently (Login History)"><h4 id="B. See who has logged in recently (Login History)" class="header"><a href="#Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine-B. See who has logged in recently (Login History)">B. See who has logged in recently (Login History)</a></h4></div>
+
+<p>
+Type this command to view the historical log of all recent user logins on this system:
+</p>
+
+<pre bash>
+last | head -n 20
+</pre>
+
+<p>
+This prints the last 20 login sessions. If you see names other than your own, those are the coworkers or system administrators who share this local hard drive space with you.
+</p>
+
+<div id="Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine-Summary Checklist to Finish Your Move Safely"><h4 id="Summary Checklist to Finish Your Move Safely" class="header"><a href="#Checking the System-Suggestion 2: See Who Else Logs Into This Specific Machine-Summary Checklist to Finish Your Move Safely">Summary Checklist to Finish Your Move Safely</a></h4></div>
+
+<p>
+Now that your <code>rsync</code> is done and you know how to secure it, here is the final sequence of commands to execute to wrap everything up:
+</p>
+
+<pre bash>
+# 1.Lock down the local directory so other users can't read your notes
+chmod 700 /var/tmp/vimwiki
+# 2. Delete the original folder from the network share (stops snapshots)
+rm -rf ~/vimwiki
+# 3. Create the symlink shortcut
+ln -s /var/tmp/vimwiki ~/vimwiki
+</pre>
+
+<div id="Setting a 'Touch' command with Crontab"><h1 id="Setting a 'Touch' command with Crontab" class="header"><a href="#Setting a 'Touch' command with Crontab">Setting a 'Touch' command with Crontab</a></h1></div>
+
+<p>
+A crontab cronjob is the perfect, bulletproof way to touch this directory to preserve.
+</p>
+
+<p>
+Using cron ensures that even if you don't log into the machine or open a terminal for weeks (like during a vacation), the system will automatically update the timestamps on your Vimwiki folder, completely immune to the 30-day <code>/var/tmp</code> cleanup policy.
+</p>
+
+<p>
+Here is how to set it up in less than a minute:
+</p>
+
+<div id="Setting a 'Touch' command with Crontab-Step 1: Open your user crontab"><h3 id="Step 1: Open your user crontab" class="header"><a href="#Setting a 'Touch' command with Crontab-Step 1: Open your user crontab">Step 1: Open your user crontab</a></h3></div>
+
+<p>
+Open your personal cron configuration file in editing mode by running:
+</p>
+
+<pre bash>
+crontab -e
+</pre>
+
+<p>
+Note: If it asks you to choose an editor, pick your favorite, like Vim or Nano.
+</p>
+
+<div id="Setting a 'Touch' command with Crontab-Step 2: Add the automated touch rule"><h3 id="Step 2: Add the automated touch rule" class="header"><a href="#Setting a 'Touch' command with Crontab-Step 2: Add the automated touch rule">Step 2: Add the automated touch rule</a></h3></div>
+
+<p>
+Scroll to the very bottom of the file and paste the following line on its own blank line:
+</p>
+
+<pre vim>
+0 0 * * * touch /var/tmp/vimwiki
+</pre>
+
+<div id="Setting a 'Touch' command with Crontab-Step 2: Add the automated touch rule-How this specific rule works:"><h4 id="How this specific rule works:" class="header"><a href="#Setting a 'Touch' command with Crontab-Step 2: Add the automated touch rule-How this specific rule works:">How this specific rule works:</a></h4></div>
+
+
+<ul>
+<li>
+<code>0 0 * * *</code>: This tells cron to run the command every single day at midnight (12:00 AM).
+
+<li>
+<code>touch /var/tmp/vimwiki</code>: This updates the "last modified/accessed" timestamp of your folder to the current time without altering any of the actual files inside it. Because the timestamp updates daily, it will never trigger the 30-day automatic deletion threshold.
+
+</ul>
+<div id="Setting a 'Touch' command with Crontab-Step 3: Save and Exit"><h3 id="Step 3: Save and Exit" class="header"><a href="#Setting a 'Touch' command with Crontab-Step 3: Save and Exit">Step 3: Save and Exit</a></h3></div>
+
+<ul>
+<li>
+If you are using Vim: Press Esc, type <code>:wq</code>, and hit Enter.
+
+<li>
+If you are using Nano: Press Ctrl + O to save, hit Enter, then Ctrl + X to exit.
+
+</ul>
+<p>
+Once saved, your terminal will output a success message: crontab: installing new crontab.
+</p>
+
+<div id="Setting a 'Touch' command with Crontab-💡 Extra Safety Step (Optional)"><h3 id="💡 Extra Safety Step (Optional)" class="header"><a href="#Setting a 'Touch' command with Crontab-💡 Extra Safety Step (Optional)">💡 Extra Safety Step (Optional)</a></h3></div>
+
+<p>
+If you want to be 100% certain that your files are safe, you can instruct the cron job to update both the main folder and all notes inside it by adding the recursive flag (<code>-c</code> is not needed, just touch the folder and files).
+</p>
+
+<p>
+Changing the command to <code>touch -h /var/tmp/vimwiki /var/tmp/vimwiki/*</code> ensures the entire structure stays fresh.
+</p>
+
+<p>
+However, just touching the top-level folder <code>touch /var/tmp/vimwiki</code> is usually more than enough to stop system cleanup daemons from deleting the directory.
+</p>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+
+
+<p>
+<a href="vim_learning.html">Vim - Learning</a>
+</p>
+
+<p>
+<a href="vim_admin.html">Vim - Admin</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                // Point autoloader to the CDN components
+                Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+                
+                document.querySelectorAll("pre").forEach(pre => {
+                    // Identify language from Vimwiki's <pre lang> attribute
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    pre.className = "language-" + lang;
+                    
+                    // Ensure the <code> wrapper exists for Prism
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.innerHTML = pre.innerHTML;
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                // Final highlight pass
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
