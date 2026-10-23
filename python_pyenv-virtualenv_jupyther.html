@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>python_pyenv-virtualenv_jupyther</title>
+
+    <!-- Dynamically points to your root style.css -->
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <!-- Dynamically points to your root prism.css -->
+    <link rel="stylesheet" type="text/css" href="prism/prism.css">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+<div id="PyEnv, Virtalenv &amp; Jypyter"><h1 id="PyEnv, Virtalenv &amp; Jypyter" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter">PyEnv, Virtalenv &amp; Jypyter</a></h1></div>
+
+<p>
+You can absolutely build on your existing setup without installing anything new. You already have a pristine, modern base version of Python (3.12.4) ready to use, as well as a pyenv-virtualenv plugin wrapper structure already active on your machine.
+</p>
+
+<p>
+Instead of a new installation, you can simply create a clean, dedicated environment for your energy analysis right on top of your existing 3.12.4 engine.
+</p>
+
+<p>
+Here is the exact terminal sequence using your current setup:
+</p>
+
+<div id="PyEnv, Virtalenv &amp; Jypyter-Step 1: Create a Dedicated Energy Virtualenv"><h3 id="Step 1: Create a Dedicated Energy Virtualenv" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-Step 1: Create a Dedicated Energy Virtualenv">Step 1: Create a Dedicated Energy Virtualenv</a></h3></div>
+
+<p>
+Since your pyenv versions output shows you use named symlinks (like 3.12.4_demucs), let's create a cleanly named equivalent for your electricity data tracking:
+</p>
+
+<pre bash>
+pyenv virtualenv 3.12.4 energy_analysis_3.12.4
+</pre>
+
+<div id="PyEnv, Virtalenv &amp; Jypyter-Step 2: Initialize Your Project Folder"><h3 id="Step 2: Initialize Your Project Folder" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-Step 2: Initialize Your Project Folder">Step 2: Initialize Your Project Folder</a></h3></div>
+
+<p>
+Navigate to where you want to work and lock it to your new environment:
+</p>
+
+<pre bash>
+mkdir -p ~/energy-analysis
+cd ~/energy-analysis
+pyenv local energy_analysis_3.12.4
+</pre>
+
+<p>
+Your terminal will now automatically switch to this clean workspace environment whenever you enter this directory.
+</p>
+
+<div id="PyEnv, Virtalenv &amp; Jypyter-Step 3: Install the Data Science Stack"><h3 id="Step 3: Install the Data Science Stack" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-Step 3: Install the Data Science Stack">Step 3: Install the Data Science Stack</a></h3></div>
+
+<p>
+Since this environment is completely fresh, install pandas, matplotlib, and jupyter:
+</p>
+
+<pre bash>
+pip install --upgrade pip
+pip install pandas matplotlib jupyter
+</pre>
+
+<div id="PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files"><h2 id="🐍 The Python Code to Analyze SCE Files" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files">🐍 The Python Code to Analyze SCE Files</a></h2></div>
+
+<table>
+<tr>
+<td>
+This is a continuation of an AI query regarding CSV files from SCEdison.
+</td>
+</tr>
+</table>
+
+<p>
+Now that your environment is ready, here is the complete Python script to load your Southern California Edison files, parse the 15-minute columns, factor in your solar generation, and generate your year-over-year comparison graph.
+</p>
+
+<p>
+You can save this as analyze.py or run it inside a Jupyter Notebook cell:
+</p>
+
+<pre python>
+import glob
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 1. Automatically find and read all your electricity CSV files in the folder
+csv_files = glob.glob("*.csv")
+all_data = []
+
+for file in csv_files:
+    # Skip the 11 metadata header lines specific to SCE files
+    df = pd.read_csv(file, skiprows=11)
+    all_data.append(df)
+
+# Combine all files into a single master sheet
+master_df = pd.concat(all_data, ignore_index=True)
+
+# Clean hidden spaces out of the column headers
+master_df.columns = master_df.columns.str.strip()
+
+# 2. Parse timestamps and handle the extra whitespace in SCE strings
+master_df['Timestamp'] = pd.to_datetime(
+    master_df['Energy Consumption time Period Start'].str.strip(), 
+    format='%m/%d/%Y %I:%M%p'
+)
+
+# 3. Create tracking metrics
+master_df['Year'] = master_df['Timestamp'].dt.year
+master_df['DayOfYear'] = master_df['Timestamp'].dt.dayofyear
+
+# Calculate Net Footprint: Grid usage minus Solar generation sent back
+master_df['Net_Usage'] = master_df['Delivered'] - master_df['Received']
+
+# 4. Roll 15-minute intervals up into clean daily usage sums
+daily_df = master_df.groupby(['Year', 'DayOfYear'])['Net_Usage'].sum().reset_index()
+
+# 5. Pivot data to layer years directly on top of each other
+pivot_df = daily_df.pivot(index='DayOfYear', columns='Year', values='Net_Usage')
+
+# 6. Generate the multi-year overlay graph
+plt.figure(figsize=(14, 7))
+for year in pivot_df.columns:
+    plt.plot(pivot_df.index, pivot_df[year], label=f'Year {year}', alpha=0.8, linewidth=1.5)
+
+plt.title('Year-Over-Year Home Net Electricity Footprint Comparison', fontsize=14, fontweight='bold')
+plt.xlabel('Day of the Year (Jan 1 to Dec 31)', fontsize=12)
+plt.ylabel('Daily Net Power Consumption (kWh)', fontsize=12)
+plt.legend(title="Billing Years")
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tight_layout()
+
+# Save the visual plot to your folder
+plt.savefig('energy_comparison_trend.png', dpi=300)
+plt.show()
+</pre>
+
+<div id="PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files-How to Interpret the Output Graph"><h4 id="How to Interpret the Output Graph" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files-How to Interpret the Output Graph">How to Interpret the Output Graph</a></h4></div>
+
+<ul>
+<li>
+Delivered vs Received: If your solar arrays were producing heavily on a beautiful afternoon, your Net_Usage value will go negative for those hours.
+
+<li>
+Spotting the 2-Year Shift: When the graph renders, look for the vertical separation between the line trends. If your line from 2025/2026 sits drastically higher across the board compared to 2024, it confirms a constant load draw issue (like an appliance cycling continuously).
+
+</ul>
+<p>
+When you are ready to execute the file, let me know:
+</p>
+
+<ul>
+<li>
+Do your CSV files spans across different individual years or partial consecutive months?
+
+<li>
+Would you like to add a filter to isolate only the peak AC afternoon hours (e.g., 12 PM - 6 PM) to see if the consumption jump is purely an air conditioning problem?
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="Python.html">Python</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <!-- Dynamically points to your root prism.js -->
+    <script src="prism/prism.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                document.querySelectorAll("pre").forEach(pre => {
+                    // 1. Find the language name from Vimwiki's attributes
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    
+                    // 2. Clear any conflicting class and assign the correct Prism format
+                    pre.className = "language-" + lang;
+                    
+                    // 3. Re-wrap the inner text into a <code> block so Prism can read it
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.textContent = pre.textContent; // Safe extraction of text
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                
+                // 4. Run the highlight pass over the newly formatted blocks
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
