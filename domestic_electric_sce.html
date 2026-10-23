@@ -69,6 +69,134 @@ Date,Energy Consumption time Period Start,Energy Consumption time Period End,Del
 ...
 </pre>
 
+
+<div id="Usage - Southern California Edison-Notes"><h2 id="Notes" class="header"><a href="#Usage - Southern California Edison-Notes">Notes</a></h2></div>
+
+<p>
+To master this exact type of multi-year energy analysis using your CSV files, you need to learn Pandas (for data cleaning and manipulation) and Matplotlib / Seaborn (for data visualization).
+</p>
+
+<p>
+Because your utility provider (Southern California Edison) includes several rows of text headers before the actual data table starts, standard CSV tutorials won't work out of the box. You specifically need tutorials that focus on skipping headers, parsing datetimes, grouping data (resampling), and overlaying time-series data.
+</p>
+
+<p>
+The best specific tutorials and paths to learn these concepts are broken down below.
+</p>
+
+<div id="Usage - Southern California Edison-Notes-1. Handling the Messy Headers &amp; Loading Data"><h3 id="1. Handling the Messy Headers &amp; Loading Data" class="header"><a href="#Usage - Southern California Edison-Notes-1. Handling the Messy Headers &amp; Loading Data">1. Handling the Messy Headers &amp; Loading Data</a></h3></div>
+
+<p>
+Your file has 11 lines of metadata before the Date,Energy Consumption... columns begin. You need to learn how to clean this during the import phase.
+</p>
+<ul>
+<li>
+What to search for/learn: pandas.read_csv() using the skiprows parameter, string stripping, and column renaming.
+
+<li>
+Recommended Free Tutorial:
+
+<ul>
+<li>
+Real Python's "Reading and Writing CSV Files in Python". Focus explicitly on the section regarding parsing complex or non-standard CSV files using Pandas.
+
+</ul>
+</ul>
+<div id="Usage - Southern California Edison-Notes-2. Working with Timestamps (Datetime Indexing)"><h3 id="2. Working with Timestamps (Datetime Indexing)" class="header"><a href="#Usage - Southern California Edison-Notes-2. Working with Timestamps (Datetime Indexing)">2. Working with Timestamps (Datetime Indexing)</a></h3></div>
+
+<p>
+Your files contain 15-minute intervals (e.g., 12:00AM, 12:15AM). To overlay years on top of each other, you must learn to convert these text strings into Python datetime objects, extract the day/month, and normalize them to a shared timeline.
+</p>
+<ul>
+<li>
+What to search for/learn: pd.to_datetime(), DataFrame.dt accessor (like .dt.month, .dt.day), and setting a DatetimeIndex.
+
+<li>
+Recommended Free Tutorial:
+
+<ul>
+<li>
+Kaggle's "Time Series" micro-course or DataCamp's open community tutorials on "Python Time Series Data". Look for how to convert strings to timestamps and create separate "Year", "Month", and "Day" columns for filtering.
+
+</ul>
+</ul>
+<div id="Usage - Southern California Edison-Notes-3. Aggregating 15-Minute Data to Daily/Monthly Totals"><h3 id="3. Aggregating 15-Minute Data to Daily/Monthly Totals" class="header"><a href="#Usage - Southern California Edison-Notes-3. Aggregating 15-Minute Data to Daily/Monthly Totals">3. Aggregating 15-Minute Data to Daily/Monthly Totals</a></h3></div>
+
+<p>
+Since your file gives you consumption every 15 minutes, a raw multi-year plot will have hundreds of thousands of messy points. You need to learn how to mathematically roll those 15-minute intervals into clean hourly, daily, or monthly sums.
+</p>
+
+<ul>
+<li>
+What to search for/learn: Pandas .groupby() and .resample() functions.
+
+<li>
+Recommended Free Tutorial:
+
+<ul>
+<li>
+Corey Schafer's YouTube Playlist: "Python Pandas Tutorial" (specifically Part 10: Working with Dates and Time Series Data). This is widely considered the absolute clearest visual breakdown of resampling power data over years.
+
+</ul>
+</ul>
+<div id="Usage - Southern California Edison-Notes-4. Plotting Year-Over-Year Overlay Lines"><h3 id="4. Plotting Year-Over-Year Overlay Lines" class="header"><a href="#Usage - Southern California Edison-Notes-4. Plotting Year-Over-Year Overlay Lines">4. Plotting Year-Over-Year Overlay Lines</a></h3></div>
+
+<p>
+To see 2024, 2025, and 2026 lines layered directly on top of each other on an annual X-axis (January through December), you need to learn how to unstack your data.
+</p>
+
+<ul>
+<li>
+What to search for/learn: Pivot tables (df.pivot()) and Matplotlib line plots.
+
+<li>
+Recommended Free Tutorial:
+
+<ul>
+<li>
+W3Schools "Python Machine Learning - Line Plot" or the official Matplotlib "Intro to Lifecycle of a Plot" documentation. You want to learn how to pass a pivoted dataframe directly into plt.plot() so Python automatically generates one uniquely colored line per year.
+
+</ul>
+</ul>
+<div id="Usage - Southern California Edison-🛠️ Quick-Start Python Blueprint"><h2 id="🛠️ Quick-Start Python Blueprint" class="header"><a href="#Usage - Southern California Edison-🛠️ Quick-Start Python Blueprint">🛠️ Quick-Start Python Blueprint</a></h2></div>
+
+<p>
+To kickstart your learning, here is the functional blueprint that resolves the unique structural quirks of your specific Southern California Edison file format. You can paste this directly into a Jupyter Notebook or a script to see how the concepts fit together:
+</p>
+
+<pre python>
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 1. Load data, skipping the 11 metadata lines at the top
+df = pd.read_csv('your_file.csv', skiprows=11)
+
+# Clean up column names (stripping hidden whitespaces)
+df.columns = df.columns.str.strip()
+
+# 2. Convert the interval start column to real Python datetimes
+df['Timestamp'] = pd.to_datetime(df['Energy Consumption time Period Start'])
+
+# 3. Create helper columns to split apart the dates
+df['Year'] = df['Timestamp'].dt.year
+df['DayOfYear'] = df['Timestamp'].dt.dayofyear  # Shared 1-365 timeline
+
+# 4. Group the 15-minute data into clean daily consumption sums
+daily_df = df.groupby(['Year', 'DayOfYear'])['Delivered'].sum().reset_index()
+
+# 5. Pivot the data so columns represent individual years
+pivot_df = daily_df.pivot(index='DayOfYear', columns='Year', values='Delivered')
+
+# 6. Plot the years directly over each other to spot the anomaly!
+pivot_df.plot(figsize=(12, 6))
+plt.title('Year-Over-Year Electricity Consumption Comparison')
+plt.xlabel('Day of the Year (1-365)')
+plt.ylabel('Total Daily Energy Consumption (kWh)')
+plt.grid(True)
+plt.show()
+</pre>
+
+
 <p>
 <br>
 <hr>
