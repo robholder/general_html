@@ -103,11 +103,14 @@ Yes, you can absolutely build this exact launcher using the native macOS Shortcu
 Just like Automator, the Shortcuts app has a built-in shell execution engine, but it requires explicit environment variables because it runs in a bare, non-interactive environment.
 </p>
 
+<div id="Example - Electricity Data Analysis"><h1 id="Example - Electricity Data Analysis" class="header"><a href="#Example - Electricity Data Analysis">Example - Electricity Data Analysis</a></h1></div>
+
+
 <p>
 Here is how to build your clickable Jupyter Energy Analyzer app wrapper via Shortcuts:
 </p>
 
-<div id="PyEnv, Virtalenv &amp; Jypyter-2. Is there a way of launching via the dock? (Or must it be from the terminal?)-Step-by-Step Configuration"><h3 id="Step-by-Step Configuration" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-2. Is there a way of launching via the dock? (Or must it be from the terminal?)-Step-by-Step Configuration">Step-by-Step Configuration</a></h3></div>
+<div id="Example - Electricity Data Analysis-Step-by-Step Configuration"><h3 id="Step-by-Step Configuration" class="header"><a href="#Example - Electricity Data Analysis-Step-by-Step Configuration">Step-by-Step Configuration</a></h3></div>
 
 <ol>
 <li>
@@ -142,7 +145,7 @@ jupyter notebook
 Why this script works: The Shortcuts app doesn't load your terminal profiles automatically. Adding explicit Homebrew paths and initializing pyenv manually ensures macOS can reliably point straight to your energy_analysis_3.12.4 virtual environment binaries.
 
 </ul>
-<div id="PyEnv, Virtalenv &amp; Jypyter-2. Is there a way of launching via the dock? (Or must it be from the terminal?)-Pinning the Shortcut Directly to Your Dock"><h3 id="Pinning the Shortcut Directly to Your Dock" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-2. Is there a way of launching via the dock? (Or must it be from the terminal?)-Pinning the Shortcut Directly to Your Dock">Pinning the Shortcut Directly to Your Dock</a></h3></div>
+<div id="Example - Electricity Data Analysis-Pinning the Shortcut Directly to Your Dock"><h3 id="Pinning the Shortcut Directly to Your Dock" class="header"><a href="#Example - Electricity Data Analysis-Pinning the Shortcut Directly to Your Dock">Pinning the Shortcut Directly to Your Dock</a></h3></div>
 
 <p>
 Once your script is saved, turning it into a clickable application file is incredibly simple:
@@ -177,7 +180,7 @@ Do you want to see how to add an icon graphic to your Shortcut (like an energy b
 Are you ready to test the file loop script to confirm it aggregates your CSV logs correctly?
 
 </ul>
-<div id="PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files"><h2 id="🐍 The Python Code to Analyze SCE Files" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files">🐍 The Python Code to Analyze SCE Files</a></h2></div>
+<div id="Example - Electricity Data Analysis-🐍 The Python Code to Analyze SCE Files"><h2 id="🐍 The Python Code to Analyze SCE Files" class="header"><a href="#Example - Electricity Data Analysis-🐍 The Python Code to Analyze SCE Files">🐍 The Python Code to Analyze SCE Files</a></h2></div>
 
 <table>
 <tr>
@@ -251,7 +254,7 @@ plt.savefig('energy_comparison_trend.png', dpi=300)
 plt.show()
 </pre>
 
-<div id="PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files-How to Interpret the Output Graph"><h4 id="How to Interpret the Output Graph" class="header"><a href="#PyEnv, Virtalenv &amp; Jypyter-🐍 The Python Code to Analyze SCE Files-How to Interpret the Output Graph">How to Interpret the Output Graph</a></h4></div>
+<div id="Example - Electricity Data Analysis-🐍 The Python Code to Analyze SCE Files-How to Interpret the Output Graph"><h4 id="How to Interpret the Output Graph" class="header"><a href="#Example - Electricity Data Analysis-🐍 The Python Code to Analyze SCE Files-How to Interpret the Output Graph">How to Interpret the Output Graph</a></h4></div>
 
 <ul>
 <li>
@@ -271,6 +274,87 @@ Do your CSV files spans across different individual years or partial consecutive
 
 <li>
 Would you like to add a filter to isolate only the peak AC afternoon hours (e.g., 12 PM - 6 PM) to see if the consumption jump is purely an air conditioning problem?
+
+</ul>
+<div id="Example - Electricity Data Analysis-Smoothing The Graph"><h2 id="Smoothing The Graph" class="header"><a href="#Example - Electricity Data Analysis-Smoothing The Graph">Smoothing The Graph</a></h2></div>
+
+<p>
+To make your graph smoother and easier to read, you can apply a <span id="Example - Electricity Data Analysis-Smoothing The Graph-rolling average (moving average)"></span><strong id="rolling average (moving average)">rolling average (moving average)</strong>. This softens the jagged, day-to-day spikes caused by sudden weather changes or weekly usage shifts, turning a chaotic zigzag into clean, flowing seasonal trends.
+</p>
+
+<p>
+A <span id="Example - Electricity Data Analysis-Smoothing The Graph-7-day or 14-day rolling window"></span><strong id="7-day or 14-day rolling window">7-day or 14-day rolling window</strong> is the standard approach for this. Here is the updated, complete script with a <span id="Example - Electricity Data Analysis-Smoothing The Graph-7-day rolling average"></span><strong id="7-day rolling average">7-day rolling average</strong> built right in:
+</p>
+
+<div id="Example - Electricity Data Analysis-Smoothing The Graph-Updated Python Script"><h3 id="Updated Python Script" class="header"><a href="#Example - Electricity Data Analysis-Smoothing The Graph-Updated Python Script">Updated Python Script</a></h3></div>
+
+<pre python>
+import glob
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 1. Automatically find and read all your electricity CSV files in the folder
+csv_files = glob.glob("*.csv")
+all_data = []
+
+for file in csv_files:
+    # Skip the 11 metadata header lines specific to SCE files
+    df = pd.read_csv(file, skiprows=11)
+    all_data.append(df)
+
+# Combine all files into a single master sheet
+master_df = pd.concat(all_data, ignore_index=True)
+
+# Clean hidden spaces out of the column headers
+master_df.columns = master_df.columns.str.strip()
+
+# 2. Parse timestamps and handle the extra whitespace in SCE strings
+master_df['Timestamp'] = pd.to_datetime(
+    master_df['Energy Consumption time Period Start'].str.strip(), 
+    format='%m/%d/%Y %I:%M%p')
+
+# 3. Create tracking metrics
+master_df['Year'] = master_df['Timestamp'].dt.year
+master_df['DayOfYear'] = master_df['Timestamp'].dt.day_of_year
+
+# Calculate Net Footprint: Grid usage minus Solar generation sent back
+master_df['Net_Usage'] = master_df['Delivered'] - master_df['Received']
+
+# 4. Roll 15-minute intervals up into clean daily usage sums
+daily_df = master_df.groupby(['Year', 'DayOfYear'])['Net_Usage'].sum().reset_index()
+
+# 5. Pivot data to layer years directly on top of each other
+pivot_df = daily_df.pivot(index='DayOfYear', columns='Year', values='Net_Usage')
+
+# 6. Apply a 7-day rolling average to smooth out daily spikes and noise
+# (You can change window=7 to 14 or 30 if you want an even smoother curve)
+pivot_df = pivot_df.rolling(window=7, min_periods=1).mean()
+
+# 7. Generate the multi-year overlay graph
+plt.figure(figsize=(14, 7))
+for year in pivot_df.columns:
+    plt.plot(pivot_df.index, pivot_df[year], label=f'Year {year}', alpha=0.85, linewidth=2)
+
+plt.title('Year-Over-Year Home Net Electricity Footprint (7-Day Smoothed)', fontsize=14, fontweight='bold')
+plt.xlabel('Day of the Year (Jan 1 to Dec 31)', fontsize=12)
+plt.ylabel('Daily Net Power Consumption (kWh - Smoothed)', fontsize=12)
+plt.legend(title="Billing Years")
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tight_layout()
+
+# Save the visual plot to your folder
+plt.savefig('energy_comparison_trend_smooth.png', dpi=300)
+plt.show()
+</pre>
+
+<div id="Example - Electricity Data Analysis-Smoothing The Graph-What changed?"><h3 id="What changed?" class="header"><a href="#Example - Electricity Data Analysis-Smoothing The Graph-What changed?">What changed?</a></h3></div>
+
+<ul>
+<li>
+<code>pivot_df.rolling(window=7, min_periods=1).mean()</code>: This averages each day out with the preceding 6 days, flattening out erratic weather spikes while preserving the overall seasonal shape.
+
+<li>
+<span id="Example - Electricity Data Analysis-Smoothing The Graph-What changed?-Tip"></span><strong id="Tip">Tip</strong>: If 7 days is still a bit too jumpy for you, you can change <code>window=7</code> to <code>window=14</code> for a smoother bi-weekly trend line.
 
 </ul>
 <p>
