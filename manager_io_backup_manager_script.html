@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>manager_io_backup_manager_script</title>
+
+    <!-- Dynamically points to your root style.css -->
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <!-- Dynamically points to your root prism.css -->
+    <link rel="stylesheet" type="text/css" href="prism/prism.css">
+</head>
+<body>
+
+    <div class="content">
+        
+
+<div id="1. The Configuration File (`backup_manager.conf`)"><h2 id="1. The Configuration File (`backup_manager.conf`)" class="header"><a href="#1. The Configuration File (`backup_manager.conf`)">1. The Configuration File (<code>backup_manager.conf</code>)</a></h2></div>
+
+<p>
+Create this file in the same directory as your script (e.g., <code>~/bin/backup_manager.conf</code>). Because it is separate, you can customize it per machine without touching the execution logic.
+</p>
+
+<p>
+Save as: <code>~/bin/backup_manager.conf</code>
+</p>
+<pre zsh>
+# ==============================================================================
+# Configuration File for backup_manager.zsh
+# Place this file in the same directory as backup_manager.zsh
+# ==============================================================================
+
+# 1. Define Local Manager.io Application Data Directory for this machine
+LOCAL_DIR="$HOME/Documents/Manager.io/Businesses"
+
+# 2. Map each local filename (Key) to its dedicated Dropbox path (Value) for this machine
+typeset -A FILES=(
+    ["BusinessA.manager"]="$HOME/Dropbox/RealEstate/Personal_Property/QuickBooks/Manager_io/BusinessA.manager"
+    ["BusinessB.manager"]="$HOME/Dropbox/RealEstate/Personal_Property/QuickBooks/Manager_io/BusinessB.manager"
+    ["BusinessC.manager"]="$HOME/Dropbox/RealEstate/Personal_Property/QuickBooks/Manager_io/BusinessC.manager"
+)
+</pre>
+
+<div id="2. Main Script (`backup_manager.zsh`)"><h2 id="2. Main Script (`backup_manager.zsh`)" class="header"><a href="#2. Main Script (`backup_manager.zsh`)">2. Main Script (<code>backup_manager.zsh</code>)</a></h2></div>
+
+<p>
+The script uses Zsh path modifiers (<code>${0:A:h}</code>) to automatically find the config file right next to wherever the script is stored or symlinked from.
+</p>
+
+<p>
+Save as: <code>~/bin/backup_manager</code>
+</p>
+
+
+<pre zsh>
+#!/bin/zsh
+# ==============================================================================
+# Script Name:    backup_manager
+# Version:        1.2.0
+# Last Updated:   2026-11-15
+# Description:    Safely backs up or restores Manager.io SQLite (.manager) business
+#                 files between the local Application Data folder and dedicated
+#                 Dropbox subdirectories on macOS using an external config file.
+#
+# Key Features:
+#  - Blocks execution if Manager.io is currently running to prevent copying
+#    or overwriting unflushed SQLite WAL (-wal/-shm) journal states.
+#  - Compares modification timestamps and displays human-readable + relative
+#    dates before prompting for confirmation.
+#  - Protects against overwriting newer files in either direction.
+#  - Creates a timestamped local .bak file before restoring from Dropbox.
+#
+# Usage:
+#  Backup (Local -&gt; Dropbox):  ~/bin/backup_manager
+#  Restore (Dropbox -&gt; Local): ~/bin/backup_manager --restore
+# ==============================================================================
+
+# Automatically locate the directory where this script resides (handles symlinks safely)
+SCRIPT_DIR="${0:A:h}"
+CONFIG_FILE="$SCRIPT_DIR/backup_manager.conf"
+
+# Ensure the config companion file exists
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "❌ ERROR: Configuration file not found at: $CONFIG_FILE"
+    echo "Please ensure 'backup_manager.conf' is placed in the same directory as this script."
+    exit 1
+fi
+
+# Source the machine-specific configuration paths and file maps
+source "$CONFIG_FILE"
+
+MODE="backup"
+if [[ "$1" == "--restore" || "$1" == "-r" ]]; then
+    MODE="restore"
+elif [[ -n "$1" ]]; then
+    echo "Usage: $0 [--restore|-r]"
+    exit 1
+fi
+
+# 1. Safety Check: Prevent copying/restoring while Manager.io is running
+if pgrep -x "Manager" &gt;/dev/null || pgrep -f "ManagerDesktop" &gt;/dev/null; then
+    echo "⚠️  WARNING: Manager.io is currently running!"
+    echo "Close Manager.io completely first so SQLite flushes its journal files cleanly."
+    exit 1
+fi
+
+# Helper: Format epoch timestamp into human-readable date + relative time
+human_time() {
+    local epoch=$1
+    local now=$(date +%s)
+    local diff=$((now - epoch))
+    local formatted=$(date -r "$epoch" "+%b %d, %Y at %I:%M %p")
+    
+    local rel=""
+    if (( diff &lt; 60 )); then
+        rel="${diff}s ago"
+    elif (( diff &lt; 3600 )); then
+        rel="$((diff / 60))m ago"
+    elif (( diff &lt; 86400 )); then
+        rel="$((diff / 3600))h ago"
+    else
+        rel="$((diff / 86400))d ago"
+    fi
+    echo "$formatted ($rel)"
+}
+
+if [[ "$MODE" == "backup" ]]; then
+    echo "📤 BACKUP MODE: Checking local Manager.io files -&gt; Dropbox...\n"
+else
+    echo "📥 RESTORE MODE: Checking Dropbox copies -&gt; local Manager.io folder...\n"
+fi
+
+for local_file dropbox_path in "${(@kv)FILES}"; do
+    local_path="$LOCAL_DIR/$local_file"
+    dropbox_dir=$(dirname "$dropbox_path")
+
+    # ==========================================================================
+    # BACKUP WORKFLOW (Local -&gt; Dropbox)
+    # ==========================================================================
+    if [[ "$MODE" == "backup" ]]; then
+        if [[ ! -f "$local_path" ]]; then
+            echo "❌ Missing local live file: $local_path"
+            continue
+        fi
+
+        mkdir -p "$dropbox_dir"
+        local_mtime=$(stat -f %m "$local_path")
+        local_human=$(human_time "$local_mtime")
+
+        if [[ ! -f "$dropbox_path" ]]; then
+            echo "🆕 New destination for: $local_file"
+            echo "   Local live file: $local_human"
+            read -q "REPLY?   Copy to Dropbox now? [y/N] "
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                cp -p "$local_path" "$dropbox_path"
+                echo "   ✅ Copied to Dropbox.\n"
+            else
+                echo "   ⏭️  Skipped.\n"
+            fi
+            continue
+        fi
+
+        dropbox_mtime=$(stat -f %m "$dropbox_path")
+        dropbox_human=$(human_time "$dropbox_mtime")
+
+        if (( local_mtime &gt; dropbox_mtime )); then
+            echo "⬆️  Update available for: $local_file"
+            echo "   Local version:   $local_human"
+            echo "   Dropbox version: $dropbox_human"
+            read -q "REPLY?   Overwrite older Dropbox copy with local version? [y/N] "
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                cp -p "$local_path" "$dropbox_path"
+                echo "   ✅ Updated Dropbox copy.\n"
+            else
+                echo "   ⏭️  Skipped.\n"
+            fi
+
+        elif (( dropbox_mtime &gt; local_mtime )); then
+            echo "🚨 WARNING: Dropbox copy is NEWER than your local live file for: $local_file"
+            echo "   Local version:   $local_human"
+            echo "   Dropbox version: $dropbox_human"
+            echo "   Tip: Run '$0 --restore' if you want to pull the newer Dropbox version down."
+            read -q "REPLY?   Overwrite NEWER Dropbox copy with older local file anyway? [y/N] "
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                cp -p "$local_path" "$dropbox_path"
+                echo "   ⚠️  Overwrote Dropbox copy with local version.\n"
+            else
+                echo "   🛡️  Protected newer Dropbox copy (skipped).\n"
+            fi
+
+        else
+            echo "✔️  Up to date: $local_file ($local_human)\n"
+        fi
+
+    # ==========================================================================
+    # RESTORE WORKFLOW (Dropbox -&gt; Local)
+    # ==========================================================================
+    else
+        if [[ ! -f "$dropbox_path" ]]; then
+            echo "❌ Missing Dropbox backup file: $dropbox_path"
+            continue
+        fi
+
+        mkdir -p "$LOCAL_DIR"
+        dropbox_mtime=$(stat -f %m "$dropbox_path")
+        dropbox_human=$(human_time "$dropbox_mtime")
+
+        if [[ ! -f "$local_path" ]]; then
+            echo "🆕 Local file does not exist yet: $local_file"
+            echo "   Dropbox version: $dropbox_human"
+            read -q "REPLY?   Restore from Dropbox to local Manager folder? [y/N] "
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                cp -p "$dropbox_path" "$local_path"
+                echo "   ✅ Restored locally.\n"
+            else
+                echo "   ⏭️  Skipped.\n"
+            fi
+            continue
+        fi
+
+        local_mtime=$(stat -f %m "$local_path")
+        local_human=$(human_time "$local_mtime")
+
+        if (( dropbox_mtime &gt; local_mtime )); then
+            echo "⬇️  Newer Dropbox version available for: $local_file"
+            echo "   Dropbox version: $dropbox_human"
+            echo "   Local version:   $local_human"
+            read -q "REPLY?   Restore newer Dropbox version locally (creates a .bak first)? [y/N] "
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                cp -p "$local_path" "${local_path}.$(date +%Y%m%d_%H%M%S).bak"
+                rm -f "${local_path}-wal" "${local_path}-shm"
+                cp -p "$dropbox_path" "$local_path"
+                echo "   ✅ Restored from Dropbox (old local file saved as .bak).\n"
+            else
+                echo "   ⏭️  Skipped.\n"
+            fi
+
+        elif (( local_mtime &gt; dropbox_mtime )); then
+            echo "🚨 WARNING: Your LOCAL live file is NEWER than Dropbox for: $local_file"
+            echo "   Local version:   $local_human"
+            echo "   Dropbox version: $dropbox_human"
+            read -q "REPLY?   Overwrite NEWER local file with older Dropbox copy anyway? [y/N] "
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                cp -p "$local_path" "${local_path}.$(date +%Y%m%d_%H%M%S).bak"
+                rm -f "${local_path}-wal" "${local_path}-shm"
+                cp -p "$dropbox_path" "$local_path"
+                echo "   ⚠️  Overwrote local file (old version saved as .bak).\n"
+            else
+                echo "   🛡️  Protected newer local file (skipped).\n"
+            fi
+
+        else
+            echo "✔️  Up to date: $local_file ($local_human)\n"
+        fi
+    fi
+done
+</pre>
+
+<div id="2. Main Script (`backup_manager.zsh`)-Why this design works well:"><h3 id="Why this design works well:" class="header"><a href="#2. Main Script (`backup_manager.zsh`)-Why this design works well:">Why this design works well:</a></h3></div>
+
+<ol>
+<li>
+*Dynamic Path Resolution (<code>${0:A:h}</code>):* Even if you execute <code>backup_manager.zsh</code> from anywhere via your system <code>PATH</code> or invoke it through a symbolic link, Zsh reliably calculates the exact folder where the script lives and safely grabs <code>backup_manager.conf</code> right beside it.
+
+<li>
+<span id="2. Main Script (<code>backup_manager.zsh</code>)-Why this design works well:-Git Friendly:"></span><strong id="Git Friendly:">Git Friendly:</strong> If you track your scripts in a GitHub repository, you can commit <code>backup_manager.zsh</code> while adding <code>backup_manager.conf</code> to your <code>.gitignore</code> (or keep a <code>backup_manager.conf.template</code> file) so machine-specific usernames and custom mount paths never accidentally leak into version control.
+
+</ol>
+
+    </div>
+
+    <!-- Dynamically points to your root prism.js -->
+    <script src="prism/prism.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                document.querySelectorAll("pre").forEach(pre => {
+                    // 1. Find the language name from Vimwiki's attributes
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    
+                    // 2. Clear any conflicting class and assign the correct Prism format
+                    pre.className = "language-" + lang;
+                    
+                    // 3. Re-wrap the inner text into a <code> block so Prism can read it
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.textContent = pre.textContent; // Safe extraction of text
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                
+                // 4. Run the highlight pass over the newly formatted blocks
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
