@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>manager_io_synching_script_network</title>
+
+    <!-- Dynamically points to your root style.css -->
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <!-- Dynamically points to your root prism.css -->
+    <link rel="stylesheet" type="text/css" href="prism/prism.css">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="manager_io.html">Manager.io</a>
+</p>
+
+<div id="Synching Between Two Macs"><h1 id="Synching Between Two Macs" class="header"><a href="#Synching Between Two Macs">Synching Between Two Macs</a></h1></div>
+
+<p>
+Here is the complete, linear setup from scratch for <code>macmini.local</code> and <code>macbook-m3.local</code> (both with user <code>noddy</code>), keeping <code>macbook-m3.local</code> as the <span id="Synching Between Two Macs-master"></span><strong id="master">master</strong> machine while allowing you to trigger syncs from either Mac, check whether <code>Manager.io</code> is open, block accidental overwrites when a non-master copy is newer, and push changes back to master only with <code>--reverse</code>.
+</p>
+
+<div id="Synching Between Two Macs-Overview of the Linear Order"><h2 id="Overview of the Linear Order" class="header"><a href="#Synching Between Two Macs-Overview of the Linear Order">Overview of the Linear Order</a></h2></div>
+
+<ol>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Enable Remote Login"></span><strong id="Enable Remote Login">Enable Remote Login</strong> on both Macs so they accept SSH connections.
+
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Generate uniquely named SSH keys"></span><strong id="Generate uniquely named SSH keys">Generate uniquely named SSH keys</strong> on each Mac (<code>id_ed25519_macmini</code> on <code>macmini.local</code> and <code>id_ed25519_macbook_m3</code> on <code>macbook-m3.local</code>).
+
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Authorize each Mac's public key"></span><strong id="Authorize each Mac's public key">Authorize each Mac's public key</strong> on the other Mac and configure <code>~/.ssh/config</code> on each Mac so passwordless <code>ssh</code> works in both directions.
+
+<li>
+Install and test <code>sync-manager.sh</code> on both Macs.
+
+</ol>
+<div id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs"><h3 id="Step 1: Turn On Remote Login on Both Macs" class="header"><a href="#Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs">Step 1: Turn On Remote Login on Both Macs</a></h3></div>
+
+<ol>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs-Enable Remote Login in System Settings:"></span><strong id="Enable Remote Login in System Settings:">Enable Remote Login in System Settings:</strong> On macmini.local and macbook-m3.local.
+
+</ol>
+<p>
+On both Macs, open <span id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs-System Settings -&gt; General -&gt; Sharing"></span><strong id="System Settings -&gt; General -&gt; Sharing">System Settings -&gt; General -&gt; Sharing</strong> and turn on <span id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs-Remote Login"></span><strong id="Remote Login">Remote Login</strong>. Note each Mac's <code>.local</code> hostname (for example, <code>macmini.local</code> and <code>macbook-m3.local</code>).
+</p>
+
+<p>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs-Verification:"></span><strong id="Verification:">Verification:</strong> On each Mac, the <span id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs-Remote Login"></span><strong id="Remote Login">Remote Login</strong> toggle is on and when clicking on the 'i' displays <code>ssh noddy@...</code>.
+</p>
+
+<ol>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs-Verify Network Reachability with ping:"></span><strong id="Verify Network Reachability with ping:">Verify Network Reachability with ping:</strong> From macmini.local and macbook-m3.local.
+
+</ol>
+<p>
+From <code>macmini.local</code>, run <code>ping -c 3 macbook-m3.local</code>. From <code>macbook-m3.local</code>, run <code>ping -c 3 macmini.local</code>.
+</p>
+
+<p>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 1: Turn On Remote Login on Both Macs-Verification:"></span><strong id="Verification:">Verification:</strong> Both commands report <code>3 packets received</code> with <code>0.0% packet loss</code>.
+</p>
+
+<div id="Synching Between Two Macs-Overview of the Linear Order-Step 2: Create Uniquely Named SSH Keys on Each Mac"><h3 id="Step 2: Create Uniquely Named SSH Keys on Each Mac" class="header"><a href="#Synching Between Two Macs-Overview of the Linear Order-Step 2: Create Uniquely Named SSH Keys on Each Mac">Step 2: Create Uniquely Named SSH Keys on Each Mac</a></h3></div>
+
+<ol>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 2: Create Uniquely Named SSH Keys on Each Mac-Generate macmini.local's SSH Key Pair:"></span><strong id="Generate macmini.local's SSH Key Pair:">Generate macmini.local's SSH Key Pair:</strong> Run on macmini.local.
+
+</ol>
+<p>
+In Terminal on <code>macmini.local</code>, create a dedicated key pair:
+</p>
+
+<pre zsh>
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_macmini -C "noddy@macmini.local"
+chmod 700 ~/.ssh &amp;&amp; chmod 600 ~/.ssh/id_ed25519_macmini &amp;&amp; chmod 644 ~/.ssh/id_ed25519_macmini.pub
+</pre>
+
+<p>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 2: Create Uniquely Named SSH Keys on Each Mac-Verification:"></span><strong id="Verification:">Verification:</strong> <code>ls -la ~/.ssh/id_ed25519_macmini*</code> lists both the private key (<code>600</code>) and <code>.pub</code> public key (<code>644</code>).
+</p>
+
+
+<ol>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 2: Create Uniquely Named SSH Keys on Each Mac-Generate macbook-m3.local's SSH Key Pair:"></span><strong id="Generate macbook-m3.local's SSH Key Pair:">Generate macbook-m3.local's SSH Key Pair:</strong> Run on macbook-m3.local.
+
+</ol>
+<p>
+In Terminal on <code>macbook-m3.local</code>, create its own uniquely named key pair:
+</p>
+
+<pre zsh>
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_macbook_m3 -C "noddy@macbook-m3.local"
+chmod 700 ~/.ssh &amp;&amp; chmod 600 ~/.ssh/id_ed25519_macbook_m3 &amp;&amp; chmod 644 ~/.ssh/id_ed25519_macbook_m3.pub
+</pre>
+
+<p>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 2: Create Uniquely Named SSH Keys on Each Mac-Verification:"></span><strong id="Verification:">Verification:</strong> <code>ls -la ~/.ssh/id_ed25519_macbook_m3*</code> lists both the private key (<code>600</code>) and <code>.pub</code> public key (<code>644</code>).
+</p>
+
+<div id="Synching Between Two Macs-Overview of the Linear Order-Step 3: Authorize Keys and Configure `~/.ssh/config` Both Ways"><h3 id="Step 3: Authorize Keys and Configure `~/.ssh/config` Both Ways" class="header"><a href="#Synching Between Two Macs-Overview of the Linear Order-Step 3: Authorize Keys and Configure `~/.ssh/config` Both Ways">Step 3: Authorize Keys and Configure <code>~/.ssh/config</code> Both Ways</a></h3></div>
+
+<ol>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 3: Authorize Keys and Configure <code>~/.ssh/config</code> Both Ways-Authorize macmini's Key on macbook-m3 and Configure SSH:"></span><strong id="Authorize macmini's Key on macbook-m3 and Configure SSH:">Authorize macmini's Key on macbook-m3 and Configure SSH:</strong> Run on macmini.local.
+
+</ol>
+<p>
+Push <code>id_ed25519_macmini.pub</code> into <code>~/.ssh/authorized_keys</code> on <code>macbook-m3.local</code>, then add a host entry to <code>~/.ssh/config</code> on <code>macmini.local</code>:
+</p>
+
+<pre zsh>
+cat ~/.ssh/id_ed25519_macmini.pub | ssh noddy@macbook-m3.local 'mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; cat &gt;&gt; ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys'
+touch ~/.ssh/config &amp;&amp; chmod 600 ~/.ssh/config
+cat &lt;&lt;'EOF' &gt;&gt; ~/.ssh/config
+
+Host macbook-m3.local
+User noddy
+IdentityFile ~/.ssh/id_ed25519_macmini
+IdentitiesOnly yes
+EOF
+</pre>
+
+<p>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 3: Authorize Keys and Configure <code>~/.ssh/config</code> Both Ways-Verification:"></span><strong id="Verification:">Verification:</strong> Running <code>ssh -o BatchMode=yes noddy@macbook-m3.local "echo mini-to-m3-ok"</code> prints <code>mini-to-m3-ok</code> without asking for a password.
+</p>
+
+<ol>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 3: Authorize Keys and Configure <code>~/.ssh/config</code> Both Ways-Authorize macbook-m3's Key on macmini and Configure SSH:"></span><strong id="Authorize macbook-m3's Key on macmini and Configure SSH:">Authorize macbook-m3's Key on macmini and Configure SSH:</strong> Run on macbook-m3.local.
+
+</ol>
+<p>
+Push <code>id_ed25519_macbook_m3.pub</code> into <code>~/.ssh/authorized_keys</code> on <code>macmini.local</code>, then add a host entry to <code>~/.ssh/config</code> on <code>macbook-m3.local</code>:
+</p>
+
+<pre zsh>
+cat ~/.ssh/id_ed25519_macbook_m3.pub | ssh noddy@macmini.local 'mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; cat &gt;&gt; ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys'
+touch ~/.ssh/config &amp;&amp; chmod 600 ~/.ssh/config
+cat &lt;&lt;'EOF' &gt;&gt; ~/.ssh/config
+
+Host macmini.local
+User noddy
+IdentityFile ~/.ssh/id_ed25519_macbook_m3
+IdentitiesOnly yes
+EOF
+</pre>
+
+<p>
+<span id="Synching Between Two Macs-Overview of the Linear Order-Step 3: Authorize Keys and Configure <code>~/.ssh/config</code> Both Ways-Verification:"></span><strong id="Verification:">Verification:</strong> Running <code>ssh -o BatchMode=yes noddy@macmini.local "echo m3-to-mini-ok"</code> prints <code>m3-to-mini-ok</code> without asking for a password.
+</p>
+
+<div id="Synching Between Two Macs-Overview of the Linear Order-Step 4: Install `sync-manager.sh` on Both Machines"><h3 id="Step 4: Install `sync-manager.sh` on Both Machines" class="header"><a href="#Synching Between Two Macs-Overview of the Linear Order-Step 4: Install `sync-manager.sh` on Both Machines">Step 4: Install <code>sync-manager.sh</code> on Both Machines</a></h3></div>
+
+<p>
+Save this script as <code>~/bin/sync-manager.sh</code> on <span id="Synching Between Two Macs-Overview of the Linear Order-Step 4: Install <code>sync-manager.sh</code> on Both Machines-both"></span><strong id="both">both</strong> <code>macmini.local</code> and <code>macbook-m3.local</code>, and run <code>chmod +x ~/bin/sync-manager.sh</code> on each.
+</p>
+
+<pre zsh>
+#!/usr/bin/env zsh
+set -euo pipefail
+
+# Master machine (macbook-m3.local) and master file paths as stored ON macbook-m3
+MASTER_HOST_SHORT="macbook-m3"
+MASTER_SSH="noddy@macbook-m3.local"
+MASTER_FILES=(
+  "/Users/noddy/Library/CloudStorage/Dropbox/RealEstate/RHAZ/RanasingheAndHolder-AZ/Manager_io/RHAZ.manager"
+  "/Users/noddy/Library/CloudStorage/Dropbox/RealEstate/Personal_Property_EquityShared/QueenCreek_FruitTreeLn/Manager_io/Kim_and_Holder.manager"
+  "/Users/noddy/Library/CloudStorage/Dropbox/RealEstate/Personal_Property/Manager_io/HOLDER_AZ.manager"
+)
+
+# Secondary / non-master machine and folder (macmini.local)
+PEER_SSH="noddy@macmini.local"
+PEER_DIR="/Users/noddy/Documents/Manager.io"
+
+REVERSE=false
+DRY_RUN=false
+FORCE=false
+
+usage() {
+  cat &lt;&lt;'EOF'
+Usage: sync-manager.sh [--reverse] [--dry-run] [--force]
+
+  --reverse    Push newer secondary changes back to the macbook-m3 master
+  --dry-run    Preview what rsync would do without changing files
+  --force      Skip the check for open Manager.io processes
+EOF
+  exit 1
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --reverse) REVERSE=true ;;
+    --dry-run) DRY_RUN=true ;;
+    --force)   FORCE=true ;;
+    -h|--help) usage ;;
+    *) echo "Unknown option: $arg"; usage ;;
+  esac
+done
+
+CURRENT_SHORT="$(scutil --get LocalHostName 2&gt;/dev/null || hostname -s)"
+CURRENT_SHORT="${CURRENT_SHORT%.local}"
+
+check_manager_closed() {
+  [[ "$FORCE" == true ]] &amp;&amp; return 0
+
+  if pgrep -if "Manager(\.io|Desktop)?\.app" &gt;/dev/null 2&gt;&amp;1 || pgrep -ix "Manager" &gt;/dev/null 2&gt;&amp;1; then
+    echo "WARNING: Manager.io is open on $CURRENT_SHORT. Quit it (Cmd+Q) or pass --force." &gt;&amp;2
+    exit 1
+  fi
+
+  local remote_target=""
+  if [[ "$CURRENT_SHORT" == "$MASTER_HOST_SHORT" ]]; then
+    remote_target="$PEER_SSH"
+  else
+    remote_target="$MASTER_SSH"
+  fi
+
+  if ssh -o BatchMode=yes -o ConnectTimeout=5 "$remote_target" \
+    'pgrep -if "Manager(\.io|Desktop)?\.app" &gt;/dev/null 2&gt;&amp;1 || pgrep -ix "Manager" &gt;/dev/null 2&gt;&amp;1' 2&gt;/dev/null; then
+    echo "WARNING: Manager.io is open on $remote_target. Quit it there or pass --force." &gt;&amp;2
+    exit 1
+  fi
+}
+
+get_local_mtime() {
+  stat -f '%m' "$1" 2&gt;/dev/null || echo 0
+}
+
+get_remote_mtime() {
+  local host="$1"
+  local file_path="$2"
+  ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" \
+    "stat -f '%m' $(printf '%q' "$file_path") 2&gt;/dev/null || echo 0"
+}
+
+check_manager_closed
+
+RSYNC_OPTS=(-av --progress)
+[[ "$DRY_RUN" == true ]] &amp;&amp; RSYNC_OPTS+=(--dry-run)
+
+if [[ "$CURRENT_SHORT" == "$MASTER_HOST_SHORT" ]]; then
+  # Invoked FROM master (macbook-m3) -&gt; sync against PEER_DIR on macmini.local
+  for master_path in "${MASTER_FILES[@]}"; do
+    if [[ ! -e "$master_path" ]]; then
+      echo "Warning: Master file missing, skipping: $master_path" &gt;&amp;2
+      continue
+    fi
+
+    filename="$(basename "$master_path")"
+    peer_file="$PEER_DIR/$filename"
+    master_mtime="$(get_local_mtime "$master_path")"
+    peer_mtime="$(get_remote_mtime "$PEER_SSH" "$peer_file")"
+
+    if [[ "$REVERSE" == true ]]; then
+      if [[ "$peer_mtime" -eq 0 ]]; then
+        echo "Skipping reverse sync (secondary file missing): $peer_file"
+        continue
+      fi
+      echo "[REVERSE] Secondary -&gt; Master: $filename"
+      rsync "${RSYNC_OPTS[@]}" "${PEER_SSH}:$(printf '%q' "$peer_file")" "$master_path"
+    else
+      if [[ "$peer_mtime" -gt "$master_mtime" ]]; then
+        echo "SKIPPED: Secondary '$filename' is newer than master. Use --reverse to push it to master."
+        continue
+      fi
+      echo "[MASTER -&gt; SECONDARY] $filename"
+      ssh -o BatchMode=yes "$PEER_SSH" "mkdir -p $(printf '%q' "$PEER_DIR")"
+      rsync "${RSYNC_OPTS[@]}" "$master_path" "${PEER_SSH}:$(printf '%q' "$PEER_DIR")/"
+    fi
+  done
+else
+  # Invoked FROM secondary (macmini) -&gt; sync against MASTER_SSH
+  mkdir -p "$PEER_DIR"
+
+  for master_path in "${MASTER_FILES[@]}"; do
+    filename="$(basename "$master_path")"
+    local_file="$PEER_DIR/$filename"
+    master_mtime="$(get_remote_mtime "$MASTER_SSH" "$master_path")"
+    local_mtime="$(get_local_mtime "$local_file")"
+
+    if [[ "$REVERSE" == true ]]; then
+      if [[ ! -e "$local_file" ]]; then
+        echo "Skipping reverse sync (local file missing): $local_file"
+        continue
+      fi
+      echo "[REVERSE] Secondary -&gt; Master: $filename"
+      rsync "${RSYNC_OPTS[@]}" "$local_file" "${MASTER_SSH}:$(printf '%q' "$master_path")"
+    else
+      if [[ "$master_mtime" -eq 0 ]]; then
+        echo "Warning: Master file not found on $MASTER_SSH, skipping: $master_path" &gt;&amp;2
+        continue
+      fi
+      if [[ "$local_mtime" -gt "$master_mtime" ]]; then
+        echo "SKIPPED: Local '$filename' is newer than master. Use --reverse to push it to master."
+        continue
+      fi
+      echo "[MASTER -&gt; SECONDARY] $filename"
+      rsync "${RSYNC_OPTS[@]}" "${MASTER_SSH}:$(printf '%q' "$master_path")" "$PEER_DIR/"
+    fi
+  done
+fi
+</pre>
+
+<div id="Synching Between Two Macs-Overview of the Linear Order-How to Run From Either Machine"><h3 id="How to Run From Either Machine" class="header"><a href="#Synching Between Two Macs-Overview of the Linear Order-How to Run From Either Machine">How to Run From Either Machine</a></h3></div>
+
+<ul>
+<li>
+<span id="Synching Between Two Macs-Overview of the Linear Order-How to Run From Either Machine-Preview without changing files:"></span><strong id="Preview without changing files:">Preview without changing files:</strong> <code>sync-manager.sh --dry-run</code>
+
+<li>
+*Sync master (<code>macbook-m3</code>) to secondary (<code>macmini</code>):* <code>sync-manager.sh</code> (skips any file if the secondary copy is newer)
+
+<li>
+*Push newer secondary changes back to master (<code>macbook-m3</code>):* <code>sync-manager.sh --reverse</code>
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+
+<p>
+<a href="manager_io.html">Manager.io</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <!-- Dynamically points to your root prism.js -->
+    <script src="prism/prism.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                document.querySelectorAll("pre").forEach(pre => {
+                    // 1. Find the language name from Vimwiki's attributes
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    
+                    // 2. Clear any conflicting class and assign the correct Prism format
+                    pre.className = "language-" + lang;
+                    
+                    // 3. Re-wrap the inner text into a <code> block so Prism can read it
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.textContent = pre.textContent; // Safe extraction of text
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                
+                // 4. Run the highlight pass over the newly formatted blocks
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
