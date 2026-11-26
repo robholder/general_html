@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>macos_ssh_between_local_machines</title>
+
+    <!-- Dynamically points to your root style.css -->
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <!-- Dynamically points to your root prism.css -->
+    <link rel="stylesheet" type="text/css" href="prism/prism.css">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="macos.html">MacOS</a>
+</p>
+
+<div id="SSH on Local Network"><h1 id="SSH on Local Network" class="header"><a href="#SSH on Local Network">SSH on Local Network</a></h1></div>
+
+<p>
+Here is a guide for setting up passwordless SSH between <code>macmini.local</code> and <code>macbook-m3.local</code> so interactive logins, file transfers, and <code>BatchMode</code> commands work smoothly.
+</p>
+
+<div id="SSH on Local Network-1. Enable Remote Login on Both Macs"><h2 id="1. Enable Remote Login on Both Macs" class="header"><a href="#SSH on Local Network-1. Enable Remote Login on Both Macs">1. Enable Remote Login on Both Macs</a></h2></div>
+
+<p>
+Before keys can authenticate, each Mac must allow incoming SSH connections.
+</p>
+
+<div id="SSH on Local Network-1. Enable Remote Login on Both Macs-1. Turn On Remote Login:"><h4 id="1. Turn On Remote Login:" class="header"><a href="#SSH on Local Network-1. Enable Remote Login on Both Macs-1. Turn On Remote Login:">1. Turn On Remote Login:</a></h4></div>
+
+<p>
+On both <code>macmini.local</code> and <code>macbook-m3.local</code>:
+</p>
+
+<p>
+Open <span id="SSH on Local Network-1. Enable Remote Login on Both Macs-1. Turn On Remote Login:-System Settings &gt; General &gt; Sharing"></span><strong id="System Settings &gt; General &gt; Sharing">System Settings &gt; General &gt; Sharing</strong>, then switch <span id="SSH on Local Network-1. Enable Remote Login on Both Macs-1. Turn On Remote Login:-Remote Login"></span><strong id="Remote Login">Remote Login</strong> on. Note the <code>.local</code> address shown under <span id="SSH on Local Network-1. Enable Remote Login on Both Macs-1. Turn On Remote Login:-Remote Login"></span><strong id="Remote Login">Remote Login</strong> (confirming <code>macmini.local</code> and <code>macbook-m3.local</code>).
+</p>
+
+<p>
+<span id="SSH on Local Network-1. Enable Remote Login on Both Macs-1. Turn On Remote Login:-Verification:"></span><strong id="Verification:">Verification:</strong>
+</p>
+<ul>
+<li>
+<span id="SSH on Local Network-1. Enable Remote Login on Both Macs-1. Turn On Remote Login:-Remote Login"></span><strong id="Remote Login">Remote Login</strong> shows an active status (such as a green indicator or "On").
+
+</ul>
+<div id="SSH on Local Network-1. Enable Remote Login on Both Macs-2. *Allow SSH Through Any Active Firewall:"><h4 id="2. *Allow SSH Through Any Active Firewall:" class="header"><a href="#SSH on Local Network-1. Enable Remote Login on Both Macs-2. *Allow SSH Through Any Active Firewall:">2. *Allow SSH Through Any Active Firewall:</a></h4></div>
+
+<p>
+Optional firewall check.
+</p>
+
+<p>
+If <span id="SSH on Local Network-1. Enable Remote Login on Both Macs-2. *Allow SSH Through Any Active Firewall:-Firewall"></span><strong id="Firewall">Firewall</strong> is enabled under <span id="SSH on Local Network-1. Enable Remote Login on Both Macs-2. *Allow SSH Through Any Active Firewall:-System Settings &gt; Network &gt; Firewall"></span><strong id="System Settings &gt; Network &gt; Firewall">System Settings &gt; Network &gt; Firewall</strong>, make sure <code>sshd</code> / <span id="SSH on Local Network-1. Enable Remote Login on Both Macs-2. *Allow SSH Through Any Active Firewall:-Remote Login"></span><strong id="Remote Login">Remote Login</strong> is allowed.
+</p>
+
+<p>
+<span id="SSH on Local Network-1. Enable Remote Login on Both Macs-2. *Allow SSH Through Any Active Firewall:-Verification:"></span><strong id="Verification:">Verification:</strong>
+</p>
+<ul>
+<li>
+Neither Mac blocks port 22 connections from the other Mac on the local network.
+
+</ul>
+<div id="SSH on Local Network-2. Generate SSH Keys on Each Mac"><h2 id="2. Generate SSH Keys on Each Mac" class="header"><a href="#SSH on Local Network-2. Generate SSH Keys on Each Mac">2. Generate SSH Keys on Each Mac</a></h2></div>
+
+<p>
+Create an Ed25519 key pair on each machine so each Mac has its own identity when connecting to the other.
+</p>
+
+<pre bash>
+# Run on macmini.local
+mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_macmini -N ""
+
+# Run on macbook-m3.local
+mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_macbook_m3 -N ""
+</pre>
+
+<p>
+<span id="SSH on Local Network-2. Generate SSH Keys on Each Mac-Verification:"></span><strong id="Verification:">Verification:</strong>
+</p>
+<ul>
+<li>
+Running <code>ls -la ~/.ssh</code> on each Mac shows both the private key (<code>id_ed25519_...</code>) and public key (<code>id_ed25519_....pub</code>).
+
+</ul>
+<div id="SSH on Local Network-3. Share Public Keys for Mutual Access"><h2 id="3. Share Public Keys for Mutual Access" class="header"><a href="#SSH on Local Network-3. Share Public Keys for Mutual Access">3. Share Public Keys for Mutual Access</a></h2></div>
+
+<p>
+Add each Mac's public key to the other Mac's <code>~/.ssh/authorized_keys</code> file so both directions work without passwords.
+</p>
+
+<pre bash>
+# From macmini.local -&gt; authorize macmini's key on macbook-m3.local
+cat ~/.ssh/id_ed25519_macmini.pub | ssh noddy@macbook-m3.local \
+  "mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; cat &gt;&gt; ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys"
+
+# From macbook-m3.local -&gt; authorize macbook-m3's key on macmini.local
+cat ~/.ssh/id_ed25519_macbook_m3.pub | ssh noddy@macmini.local \
+  "mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; cat &gt;&gt; ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys"
+</pre>
+
+<p>
+You may be prompted for your <code>noddy</code> account password once during this initial key copy.
+</p>
+
+<p>
+<span id="SSH on Local Network-3. Share Public Keys for Mutual Access-Verification:"></span><strong id="Verification:">Verification:</strong>
+</p>
+<ul>
+<li>
+Each machine's <code>~/.ssh/authorized_keys</code> file has <code>600</code> permissions and contains the other Mac's <code>ssh-ed25519 ...</code> public key line.
+
+</ul>
+<div id="SSH on Local Network-4. Map Keys in `~/.ssh/config`"><h2 id="4. Map Keys in `~/.ssh/config`" class="header"><a href="#SSH on Local Network-4. Map Keys in `~/.ssh/config`">4. Map Keys in <code>~/.ssh/config</code></a></h2></div>
+
+<p>
+Each Mac needs its own <code>~/.ssh/config</code> file containing only the <code>Host</code> block for the *<span id="SSH on Local Network-4. Map Keys in <code>~/.ssh/config</code>-other"></span><strong id="other">other</strong>* machine, using the private key stored locally on the machine you are typing from.
+</p>
+
+<div id="SSH on Local Network-4. Map Keys in `~/.ssh/config`-1. On `macmini.local` (to connect out to `macbook-m3.local`)"><h3 id="1. On `macmini.local` (to connect out to `macbook-m3.local`)" class="header"><a href="#SSH on Local Network-4. Map Keys in `~/.ssh/config`-1. On `macmini.local` (to connect out to `macbook-m3.local`)">1. On <code>macmini.local</code> (to connect out to <code>macbook-m3.local</code>)</a></h3></div>
+
+<p>
+Open <code>~/.ssh/config</code> in a text editor such as <code>nano ~/.ssh/config</code> and add this block (pointing to <code>macmini.local</code>'s local private key, <code>id_ed25519_macmini</code>):
+</p>
+
+<pre bash>
+Host macbook-m3.local
+  HostName macbook-m3.local
+  User noddy
+  IdentityFile ~/.ssh/id_ed25519_macmini
+  IdentitiesOnly yes
+</pre>
+
+<p>
+Save the file (<code>Ctrl + O</code>, <code>Return</code>, <code>Ctrl + X</code> in <code>nano</code>), then set its permissions:
+</p>
+
+<pre bash>
+chmod 600 ~/.ssh/config
+</pre>
+
+<p>
+<span id="SSH on Local Network-4. Map Keys in <code>~/.ssh/config</code>-1. On <code>macmini.local</code> (to connect out to <code>macbook-m3.local</code>)-Verification:"></span><strong id="Verification:">Verification:</strong>
+</p>
+<ul>
+<li>
+Running <code>cat ~/.ssh/config</code> on <code>macmini.local</code> shows only the <code>Host macbook-m3.local</code> block, and <code>ls -l ~/.ssh/config</code> shows <code>-rw-------</code> permissions.
+
+</ul>
+<div id="SSH on Local Network-4. Map Keys in `~/.ssh/config`-2. On `macbook-m3.local` (to connect out to `macmini.local`)"><h3 id="2. On `macbook-m3.local` (to connect out to `macmini.local`)" class="header"><a href="#SSH on Local Network-4. Map Keys in `~/.ssh/config`-2. On `macbook-m3.local` (to connect out to `macmini.local`)">2. On <code>macbook-m3.local</code> (to connect out to <code>macmini.local</code>)</a></h3></div>
+
+<p>
+Open <code>~/.ssh/config</code> on <code>macbook-m3.local</code> (<code>nano ~/.ssh/config</code>) and add this block (pointing to <code>macbook-m3.local</code>'s local private key, <code>id_ed25519_macbook_m3</code>):
+</p>
+
+<pre bash>
+Host macmini.local
+  HostName macmini.local
+  User noddy
+  IdentityFile ~/.ssh/id_ed25519_macbook_m3
+  IdentitiesOnly yes
+</pre>
+
+<p>
+Save the file (<code>Ctrl + O</code>, <code>Return</code>, <code>Ctrl + X</code> in <code>nano</code>), then set its permissions:
+</p>
+
+<pre bash>
+chmod 600 ~/.ssh/config
+</pre>
+
+<p>
+<span id="SSH on Local Network-4. Map Keys in <code>~/.ssh/config</code>-2. On <code>macbook-m3.local</code> (to connect out to <code>macmini.local</code>)-Verification:"></span><strong id="Verification:">Verification:</strong>
+</p>
+<ul>
+<li>
+Running <code>cat ~/.ssh/config</code> on <code>macbook-m3.local</code> shows only the <code>Host macmini.local</code> block, and <code>ls -l ~/.ssh/config</code> shows <code>-rw-------</code> permissions.
+
+</ul>
+<div id="SSH on Local Network-5. Test Interactive and `BatchMode` Connections"><h2 id="5. Test Interactive and `BatchMode` Connections" class="header"><a href="#SSH on Local Network-5. Test Interactive and `BatchMode` Connections">5. Test Interactive and <code>BatchMode</code> Connections</a></h2></div>
+
+<p>
+Verify both interactive shell logins and non-interactive commands from each machine.
+</p>
+
+<pre bash>
+# From macmini.local to macbook-m3.local
+ssh -o BatchMode=yes -o ConnectTimeout=5 noddy@macbook-m3.local "hostname &amp;&amp; uptime"
+
+# From macbook-m3.local to macmini.local
+ssh -o BatchMode=yes -o ConnectTimeout=5 noddy@macmini.local "hostname &amp;&amp; uptime"
+</pre>
+
+<p>
+<span id="SSH on Local Network-5. Test Interactive and <code>BatchMode</code> Connections-Verification:"></span><strong id="Verification:">Verification:</strong>
+</p>
+<ul>
+<li>
+Both commands print the target machine's hostname and uptime immediately without asking for a password or passphrase, and typing <code>exit</code> inside an interactive <code>ssh</code> session returns to your local prompt.
+
+</ul>
+<p>
+With key-based SSH enabled between <code>macmini.local</code> and <code>macbook-m3.local</code>, you can open interactive shells, run remote commands without typing a password, and transfer files or scripts cleanly over your local network.
+</p>
+
+<div id="SSH on Local Network-Logging Into a Remote Mac"><h2 id="Logging Into a Remote Mac" class="header"><a href="#SSH on Local Network-Logging Into a Remote Mac">Logging Into a Remote Mac</a></h2></div>
+
+<p>
+Connect using the target machine's <code>.local</code> hostname and your <code>noddy</code> account. Because your <code>BatchMode</code> Ed25519 keys are already set up, connections authenticate automatically when the matching key is available.
+</p>
+
+<div id="SSH on Local Network-Logging Into a Remote Mac-Basic Connection Commands"><h3 id="Basic Connection Commands" class="header"><a href="#SSH on Local Network-Logging Into a Remote Mac-Basic Connection Commands">Basic Connection Commands</a></h3></div>
+
+<ul>
+<li>
+*From <code>macmini.local</code> to <code>macbook-m3.local</code>:*
+<pre bash>
+ssh noddy@macbook-m3.local
+</pre>
+
+<li>
+*From <code>macbook-m3.local</code> to <code>macmini.local</code>:*
+<pre bash>
+ssh noddy@macmini.local
+</pre>
+
+<li>
+<span id="SSH on Local Network-Logging Into a Remote Mac-Basic Connection Commands-Explicitly specify an identity file (useful if testing or bypassing defaults):"></span><strong id="Explicitly specify an identity file (useful if testing or bypassing defaults):">Explicitly specify an identity file (useful if testing or bypassing defaults):</strong>
+<pre bash>
+ssh -i ~/.ssh/id_ed25519_macbook_m3 noddy@macbook-m3.local
+</pre>
+
+<li>
+<span id="SSH on Local Network-Logging Into a Remote Mac-Basic Connection Commands-Exit back to your local machine:"></span><strong id="Exit back to your local machine:">Exit back to your local machine:</strong>
+
+</ul>
+<p>
+Type <code>exit</code> and press <code>Return</code> (or press <code>Ctrl + D</code> on an empty line).
+</p>
+
+<div id="SSH on Local Network-Logging Into a Remote Mac-Verifying Key Authentication Without Prompting"><h3 id="Verifying Key Authentication Without Prompting" class="header"><a href="#SSH on Local Network-Logging Into a Remote Mac-Verifying Key Authentication Without Prompting">Verifying Key Authentication Without Prompting</a></h3></div>
+
+<p>
+Test non-interactive authentication before automating anything:
+</p>
+
+<pre bash>
+ssh -o BatchMode=yes -o ConnectTimeout=5 noddy@macbook-m3.local "hostname &amp;&amp; uptime"
+</pre>
+
+<p>
+If that prints the hostname and uptime without asking for a password or passphrase, key-based login is working cleanly.
+</p>
+
+
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs"><h2 id="Practical Examples Between Your Two Macs" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs">Practical Examples Between Your Two Macs</a></h2></div>
+
+<p>
+Once SSH works in <code>BatchMode</code>, you can treat the remote Mac as an extension of your terminal for quick checks, remote script execution, and file movement.
+</p>
+
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-1. Run a Command Remotely Without Opening a Full Session"><h3 id="1. Run a Command Remotely Without Opening a Full Session" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-1. Run a Command Remotely Without Opening a Full Session">1. Run a Command Remotely Without Opening a Full Session</a></h3></div>
+
+<p>
+Pass a command string right after the host to execute it on the remote Mac and return immediately:
+</p>
+
+<pre bash>
+# Check free disk space on macbook-m3.local
+ssh noddy@macbook-m3.local "df -h /"
+
+# Check if Manager.io is running on macmini.local
+ssh noddy@macmini.local "pgrep -if 'Manager' || echo 'Not running'"
+</pre>
+
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-2. Copy Scripts or Files Between Machines"><h3 id="2. Copy Scripts or Files Between Machines" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-2. Copy Scripts or Files Between Machines">2. Copy Scripts or Files Between Machines</a></h3></div>
+
+<p>
+Use <code>scp</code> or <code>rsync</code> when moving files or syncing scripts like <code>/Users/noddy/bin/sync_manager.sh</code>:
+</p>
+
+<pre bash>
+# Copy updated sync_manager.sh from macmini.local to macbook-m3.local
+scp /Users/noddy/bin/sync_manager.sh noddy@macbook-m3.local:/Users/noddy/bin/sync_manager.sh
+
+# Preview copying a single file with rsync
+rsync -avi --dry-run /Users/noddy/bin/sync_manager.sh noddy@macbook-m3.local:/Users/noddy/bin/sync_manager.sh
+</pre>
+
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-3. Trigger a Sync or Check Remotely"><h3 id="3. Trigger a Sync or Check Remotely" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-3. Trigger a Sync or Check Remotely">3. Trigger a Sync or Check Remotely</a></h3></div>
+
+<p>
+You can run <code>/Users/noddy/bin/sync_manager.sh</code> directly on the remote machine over SSH when you want to trigger a run from the other Mac:
+</p>
+
+<pre bash>
+# Run a dry-run sync check on macbook-m3.local from macmini.local
+ssh noddy@macbook-m3.local "/Users/noddy/bin/sync_manager.sh --dry-run"
+</pre>
+
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-4. Stream Remote Logs or Output Live"><h3 id="4. Stream Remote Logs or Output Live" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-4. Stream Remote Logs or Output Live">4. Stream Remote Logs or Output Live</a></h3></div>
+
+<p>
+Watch output from a remote command in real time in your local terminal:
+</p>
+
+<pre bash>
+# Stream recent system log entries for sshd or login activity on macbook-m3.local
+ssh noddy@macbook-m3.local "log show --last 15m --predicate 'process == \"sshd\"' --style compact"
+</pre>
+
+<div id="SSH on Local Network-Quick Troubleshooting Checklist"><h2 id="Quick Troubleshooting Checklist" class="header"><a href="#SSH on Local Network-Quick Troubleshooting Checklist">Quick Troubleshooting Checklist</a></h2></div>
+
+<table>
+<thead>
+<tr>
+<th>
+Symptom
+</th>
+<th>
+Likely Cause
+</th>
+<th>
+Quick Check
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Permission denied (publickey)</code> in <code>BatchMode</code>
+</td>
+<td>
+Wrong key used or public key missing from <code>~/.ssh/authorized_keys</code> on target
+</td>
+<td>
+Run with <code>-v</code> (<code>ssh -v noddy@macbook-m3.local</code>) to see which key file is offered
+</td>
+</tr>
+<tr>
+<td>
+<code>Could not resolve hostname ...local</code>
+</td>
+<td>
+Bonjour/mDNS lookup delayed or Wi-Fi/Ethernet interface sleeping
+</td>
+<td>
+Wake the target Mac or verify its hostname in <span id="SSH on Local Network-Quick Troubleshooting Checklist-System Settings &gt; General &gt; Sharing"></span><strong id="System Settings &gt; General &gt; Sharing">System Settings &gt; General &gt; Sharing</strong>
+</td>
+</tr>
+<tr>
+<td>
+Connection hangs and times out
+</td>
+<td>
+Remote Login (SSH) disabled or firewall blocking port 22
+</td>
+<td>
+Enable <span id="SSH on Local Network-Quick Troubleshooting Checklist-Remote Login"></span><strong id="Remote Login">Remote Login</strong> under <span id="SSH on Local Network-Quick Troubleshooting Checklist-System Settings &gt; General &gt; Sharing"></span><strong id="System Settings &gt; General &gt; Sharing">System Settings &gt; General &gt; Sharing</strong> on the target Mac
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<br>
+<hr>
+</p>
+
+
+<p>
+<a href="macos.html">MacOS</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <!-- Dynamically points to your root prism.js -->
+    <script src="prism/prism.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                document.querySelectorAll("pre").forEach(pre => {
+                    // 1. Find the language name from Vimwiki's attributes
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    
+                    // 2. Clear any conflicting class and assign the correct Prism format
+                    pre.className = "language-" + lang;
+                    
+                    // 3. Re-wrap the inner text into a <code> block so Prism can read it
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.textContent = pre.textContent; // Safe extraction of text
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                
+                // 4. Run the highlight pass over the newly formatted blocks
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
