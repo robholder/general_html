@@ -408,6 +408,131 @@ scp /Users/&lt;username&gt;/bin/sync_manager.sh &lt;username&gt;@macbook-m3.loca
 rsync -avi --dry-run /Users/&lt;username&gt;/bin/sync_manager.sh &lt;username&gt;@macbook-m3.local:/Users/&lt;username&gt;/bin/sync_manager.sh
 </pre>
 
+<p>
+<code>--dry-run</code> tells <code>rsync</code> to simulate the transfer and print what it would do without actually copying, modifying, or deleting any files on the destination (<code>macbook-m3.local</code>).
+</p>
+
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-2. Copy Scripts or Files Between Machines-Why Use `--dry-run` Before Syncing?"><h4 id="Why Use `--dry-run` Before Syncing?" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-2. Copy Scripts or Files Between Machines-Why Use `--dry-run` Before Syncing?">Why Use <code>--dry-run</code> Before Syncing?</a></h4></div>
+
+<ul>
+<li>
+Safe preview: Lets you confirm <code>rsync</code> is targeting the right source and destination paths before overwriting files or creating changes on <code>macbook-m3.local</code>.
+
+<li>
+Inspects exact changes (<code>-avi</code>): Combined with <code>-avi</code> (archive mode, verbose, itemized changes), it shows which files would be transferred and why (for example, new file, changed size, or changed timestamp) without making any edits yet.
+
+<li>
+Catches path or connection errors early: Verifies SSH reachability and path validity before a real transfer runs.
+
+</ul>
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-2. Copy Scripts or Files Between Machines-How to Run the Real Copy Afterward"><h4 id="How to Run the Real Copy Afterward" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-2. Copy Scripts or Files Between Machines-How to Run the Real Copy Afterward">How to Run the Real Copy Afterward</a></h4></div>
+
+<p>
+Once the <code>--dry-run</code> output looks right, remove <code>--dry-run</code> to perform the actual transfer:
+</p>
+
+<pre bash>
+rsync -avi /Users/&lt;username&gt;/bin/sync_manager.sh &lt;username&gt;@macbook-m3.local:/Users/&lt;username&gt;/bin/sync_manager.sh
+</pre>
+
+<ul>
+<li>
+Verification: <code>rsync</code> transfers the file over SSH and exits with status <code>0</code>; if the file already matches on the destination, it reports no transfer needed.
+
+</ul>
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags"><h3 id="Explaining the -avi flags" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags">Explaining the -avi flags</a></h3></div>
+
+<p>
+In <code>rsync -avi</code>, <code>-avi</code> combines three flags (<code>-a</code>, <code>-v</code>, <code>-i</code>), and each transferred item gets an itemized change code on the left.
+</p>
+
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags-What the `-avi` Flags Do"><h4 id="What the `-avi` Flags Do" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags-What the `-avi` Flags Do">What the <code>-avi</code> Flags Do</a></h4></div>
+
+<ul>
+<li>
+<code>-a</code> (archive mode): Preserves permissions, timestamps, owner/group (when permitted), symlinks, and recursive behavior—equivalent to <code>-rlptgoD</code>.
+
+<li>
+<code>-v</code> (verbose): Prints progress and summary transfer statistics.
+
+<li>
+<code>-i</code> (itemize changes): Prints a structured change code before each file or directory path so you can see <span id="SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags-What the <code>-avi</code> Flags Do-why"></span><strong id="why">why</strong> <code>rsync</code> is acting on it.
+
+</ul>
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags-Itemized Output Codes (`-i`)"><h4 id="Itemized Output Codes (`-i`)" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags-Itemized Output Codes (`-i`)">Itemized Output Codes (<code>-i</code>)</a></h4></div>
+
+<p>
+A typical line looks like:
+</p>
+
+<pre text>
+&gt;f..t...... sync_manager.sh
+</pre>
+
+<p>
+Here is how to read the main parts of that code:
+</p>
+
+<ul>
+<li>
+Position 1 (action/direction):
+
+<ul>
+<li>
+<code>&gt;</code> means the file is being transferred to the receiver (<code>macbook-m3.local</code>).
+
+<li>
+<code>c</code> means a local change or creation is happening (such as creating a directory or symlink).
+
+<li>
+<code>.</code> means the item is not being transferred (attributes only or already up to date).
+
+</ul>
+<li>
+Position 2 (file type):
+
+<ul>
+<li>
+<code>f</code> = regular file, <code>d</code> = directory, <code>L</code> = symlink.
+
+</ul>
+<li>
+Remaining characters (what changed):
+
+<ul>
+<li>
+<code>s</code> = file size differs.
+
+<li>
+<code>t</code> = modification time differs (with <code>-a</code>, <code>rsync</code> updates the remote timestamp to match).
+
+<li>
+<code>p</code> = permissions differ.
+
+<li>
+<code>o</code> / <code>g</code> = owner or group differs.
+
+<li>
+A dot (<code>.</code>) in any slot means that attribute matches and is unchanged.
+
+</ul>
+</ul>
+<div id="SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags-Quick Examples to Watch For"><h4 id="Quick Examples to Watch For" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-Explaining the -avi flags-Quick Examples to Watch For">Quick Examples to Watch For</a></h4></div>
+
+<ul>
+<li>
+<code>&gt;f+++++++++ sync_manager.sh</code>: A brand-new file being created on the destination.
+
+<li>
+<code>&gt;f.st...... sync_manager.sh</code>: An existing file being updated because both its size (<code>s</code>) and timestamp (<code>t</code>) changed.
+
+<li>
+<code>&gt;f..t...... sync_manager.sh</code>: A file being updated where only the timestamp (<code>t</code>) or metadata changed (or byte size happened to match).
+
+<li>
+No line for <code>sync_manager.sh</code>: The file already matches on the destination, so <code>rsync</code> skips it.
+
+</ul>
 <div id="SSH on Local Network-Practical Examples Between Your Two Macs-3. Trigger a Sync or Check Remotely"><h3 id="3. Trigger a Sync or Check Remotely" class="header"><a href="#SSH on Local Network-Practical Examples Between Your Two Macs-3. Trigger a Sync or Check Remotely">3. Trigger a Sync or Check Remotely</a></h3></div>
 
 <p>
