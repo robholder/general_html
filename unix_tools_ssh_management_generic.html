@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unix_tools_ssh_management_generic</title>
+
+    <!-- Dynamically points to your root style.css -->
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <!-- Dynamically points to your root prism.css -->
+    <link rel="stylesheet" type="text/css" href="prism/prism.css">
+</head>
+<body>
+
+    <div class="content">
+        
+<p>
+<a href="index.html">index</a>
+</p>
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+
+<div id="SSH - Generic"><h1 id="SSH - Generic" class="header"><a href="#SSH - Generic">SSH - Generic</a></h1></div>
+
+<div id="SSH - Generic-1. Generate and Load Keys"><h2 id="1. Generate and Load Keys" class="header"><a href="#SSH - Generic-1. Generate and Load Keys">1. Generate and Load Keys</a></h2></div>
+
+<p>
+Prefer <code>ed25519</code> for new keys; keep <code>rsa</code> or older keys only for legacy systems that require them. Always set a passphrase on keys stored on a laptop.
+</p>
+
+<pre bash>
+# Generate a new Ed25519 key
+ssh-keygen -t ed25519 -C "&lt;your-email@example.com&gt;"
+
+# Start ssh-agent (pick the line for your shell):
+# Bash / Zsh / POSIX:
+eval "$(ssh-agent -s)"
+# tcsh / csh:
+eval `ssh-agent -c`
+
+# Load your private key (replace filename as needed)
+ssh-add ~/.ssh/id_ed25519
+
+# macOS modern (Sequoia / recent macOS) - store passphrase in Keychain:
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+
+# macOS legacy (e.g., Mojave) - store passphrase in Keychain:
+ssh-add -K ~/.ssh/id_ed25519
+</pre>
+
+<p>
+Add the public key to GitHub or the remote server:
+</p>
+
+<pre bash>
+cat ~/.ssh/id_ed25519.pub
+# Copy the full line (ssh-ed25519 AAAA... &lt;comment&gt;) into GitHub &gt; Settings &gt; SSH and GPG keys
+</pre>
+
+
+<div id="SSH - Generic-2. Organizing ~/.ssh/config"><h2 id="2. Organizing ~/.ssh/config" class="header"><a href="#SSH - Generic-2. Organizing ~/.ssh/config">2. Organizing ~/.ssh/config</a></h2></div>
+
+<p>
+OpenSSH reads <code>~/.ssh/config</code> top to bottom. For most settings, the *<span id="SSH - Generic-2. Organizing ~/.ssh/config-first matching line"></span><strong id="first matching line">first matching line</strong>* for a host applies, so put *<span id="SSH - Generic-2. Organizing ~/.ssh/config-specific hosts above broader patterns"></span><strong id="specific hosts above broader patterns">specific hosts above broader patterns</strong>*, and put <code>Host *</code> *<span id="SSH - Generic-2. Organizing ~/.ssh/config-last"></span><strong id="last">last</strong>*.
+</p>
+
+<div id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy A: Simple Single-Key / Mac Keychain Setup"><h3 id="Strategy A: Simple Single-Key / Mac Keychain Setup" class="header"><a href="#SSH - Generic-2. Organizing ~/.ssh/config-Strategy A: Simple Single-Key / Mac Keychain Setup">Strategy A: Simple Single-Key / Mac Keychain Setup</a></h3></div>
+
+<ul>
+<li>
+<span id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy A: Simple Single-Key / Mac Keychain Setup-When to use:"></span><strong id="When to use:">When to use:</strong> One personal machine, one primary key, and you want macOS Keychain integration.
+
+<li>
+<span id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy A: Simple Single-Key / Mac Keychain Setup-Superseded by:"></span><strong id="Superseded by:">Superseded by:</strong> Strategy B or C once you manage multiple keys, servers, or accounts.
+<pre bash>
+# ~/.ssh/config (modern macOS)
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519
+
+Host *
+  AddKeysToAgent yes
+  UseKeychain yes
+</pre>
+
+</ul>
+<div id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy B: Multiple Accounts or Aliases (Recommended as Soon as You Have 2+ Keys)"><h3 id="Strategy B: Multiple Accounts or Aliases (Recommended as Soon as You Have 2+ Keys)" class="header"><a href="#SSH - Generic-2. Organizing ~/.ssh/config-Strategy B: Multiple Accounts or Aliases (Recommended as Soon as You Have 2+ Keys)">Strategy B: Multiple Accounts or Aliases (Recommended as Soon as You Have 2+ Keys)</a></h3></div>
+
+<ul>
+<li>
+<span id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy B: Multiple Accounts or Aliases (Recommended as Soon as You Have 2+ Keys)-When to use:"></span><strong id="When to use:">When to use:</strong> Separate keys for personal vs. work/client accounts, or short nicknames for servers.
+
+<li>
+*Why it's better than <code>Host *</code> + <code>IdentityFile</code>:* Prevents SSH from trying the wrong key or hitting account lockouts on shared hostnames.
+<pre bash>
+# ~/.ssh/config
+# More specific aliases/hosts come FIRST
+
+Host github-personal
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_personal
+  IdentitiesOnly yes
+
+Host my-server
+  HostName 192.0.2.10
+  User deploy
+  IdentityFile ~/.ssh/id_ed25519_server
+  IdentitiesOnly yes
+
+# Broad fallback goes LAST
+Host *
+  AddKeysToAgent yes
+</pre>
+
+</ul>
+<div id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy C: Wildcard / Domain Patterns"><h3 id="Strategy C: Wildcard / Domain Patterns" class="header"><a href="#SSH - Generic-2. Organizing ~/.ssh/config-Strategy C: Wildcard / Domain Patterns">Strategy C: Wildcard / Domain Patterns</a></h3></div>
+
+<ul>
+<li>
+<span id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy C: Wildcard / Domain Patterns-When to use:"></span><strong id="When to use:">When to use:</strong> Several hosts share a naming pattern or internal domain and use the same key or user.
+
+<li>
+<span id="SSH - Generic-2. Organizing ~/.ssh/config-Strategy C: Wildcard / Domain Patterns-Precedence note:"></span><strong id="Precedence note:">Precedence note:</strong> Place above <code>Host *</code>, but below exact <code>Host</code> aliases that need exceptions.
+<pre bash>
+Host *.internal.example.com
+  User ops
+  IdentityFile ~/.ssh/id_ed25519_ops
+</pre>
+
+</ul>
+<div id="SSH - Generic-3. Test and Debug Connections"><h2 id="3. Test and Debug Connections" class="header"><a href="#SSH - Generic-3. Test and Debug Connections">3. Test and Debug Connections</a></h2></div>
+
+<pre bash>
+# Test GitHub authentication
+ssh -T git@github.com
+# Expected: "Hi &lt;user&gt;! You've successfully authenticated, but GitHub does not provide shell access."
+
+# Clone over SSH (accept host fingerprint on first connect if verified)
+git clone git@github.com:&lt;user&gt;/&lt;repo&gt;.git
+
+# Inspect effective config for a target host without connecting
+ssh -G github-personal | grep -E "hostname|user|identityfile|usekeychain|addkeystoagent"
+</pre>
+
+
+<div id="SSH - Generic-4. Change or Verify Key Passphrase"><h2 id="4. Change or Verify Key Passphrase" class="header"><a href="#SSH - Generic-4. Change or Verify Key Passphrase">4. Change or Verify Key Passphrase</a></h2></div>
+
+<p>
+Changing a passphrase updates only the local private key file; your public key on GitHub or servers does not change.
+</p>
+
+<pre bash>
+# Change (or remove by entering a blank new passphrase)
+ssh-keygen -p -f ~/.ssh/id_ed25519
+
+# Quick test without connecting to a remote host (prints public key if passphrase works)
+ssh-keygen -y -f ~/.ssh/id_ed25519
+
+# End-to-end test against a remote host
+ssh -i ~/.ssh/id_ed25519 user@hostname
+</pre>
+
+
+<div id="SSH - Generic-5. Machine-Specific &amp; Historical Notes"><h2 id="5. Machine-Specific &amp; Historical Notes" class="header"><a href="#SSH - Generic-5. Machine-Specific &amp; Historical Notes">5. Machine-Specific &amp; Historical Notes</a></h2></div>
+
+<ul>
+<li>
+<span id="SSH - Generic-5. Machine-Specific &amp; Historical Notes-M3 MacBook Pro (Sequoia):"></span><strong id="M3 MacBook Pro (Sequoia):">M3 MacBook Pro (Sequoia):</strong> Uses <code>ssh-add --apple-use-keychain</code> and <code>UseKeychain yes</code> in <code>~/.ssh/config</code>.
+
+<li>
+<span id="SSH - Generic-5. Machine-Specific &amp; Historical Notes-2012 Intel MacBook Pro (Mojave):"></span><strong id="2012 Intel MacBook Pro (Mojave):">2012 Intel MacBook Pro (Mojave):</strong> Uses <code>ssh-add -K</code> and <code>UseKeychain yes</code>. Ensure the file is at <code>~/.ssh/config</code> (with the leading dot), not <code>~/ssh/config</code>.
+
+<li>
+<span id="SSH - Generic-5. Machine-Specific &amp; Historical Notes-Linux (Bash vs. tcsh):"></span><strong id="Linux (Bash vs. tcsh):">Linux (Bash vs. tcsh):</strong> Use <code>eval "$(ssh-agent -s)"</code> in Bash; use <code>eval </code>ssh-agent`<code> or </code>eval <code>ssh-agent -c</code><code> in </code>tcsh`.
+
+<li>
+<span id="SSH - Generic-5. Machine-Specific &amp; Historical Notes-Pmount session log:"></span><strong id="Pmount session log:">Pmount session log:</strong> Generated an <code>ed25519</code> key with passphrase, started agent with <code>eval </code>ssh-agent -c (<code>tcsh</code>), loaded <code>~/.ssh/id_ed25519_pm</code>, added <code>~/.ssh/id_ed25519_pm.pub</code> to GitHub, and cloned the repo over SSH.
+
+</ul>
+<div id="Strategy D: Multiple GitHub Accounts"><h1 id="Strategy D: Multiple GitHub Accounts" class="header"><a href="#Strategy D: Multiple GitHub Accounts">Strategy D: Multiple GitHub Accounts</a></h1></div>
+
+<ul>
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-When to use:"></span><strong id="When to use:">When to use:</strong> Separate keys for personal and work/client GitHub accounts on the same machine.
+
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-Why it works:"></span><strong id="Why it works:">Why it works:</strong> Distinct <code>Host</code> aliases point to <code>HostName github.com</code> with explicit keys and <code>IdentitiesOnly yes</code>.
+<pre bash>
+# ~/.ssh/config
+
+# Default / personal GitHub account
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_personal
+  IdentitiesOnly yes
+
+# Work / secondary GitHub account alias
+Host github.com-work
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_work
+  IdentitiesOnly yes
+</pre>
+
+</ul>
+<p>
+When cloning or updating a repo for the work account, point the remote at the <code>github.com-work</code> alias instead of <code>github.com</code>:
+</p>
+
+<pre bash>
+# Clone using the work alias
+git clone git@github.com-work:&lt;work-org-or-user&gt;/&lt;repo&gt;.git
+
+# Or switch an existing repo's remote URL
+git remote set-url origin git@github.com-work:&lt;work-org-or-user&gt;/&lt;repo&gt;.git
+
+# Test the work alias
+ssh -T git@github.com-work
+</pre>
+
+<div id="Strategy D: Multiple GitHub Accounts-Strategy E: Jump Host (Bastion) with ProxyJump"><h3 id="Strategy E: Jump Host (Bastion) with ProxyJump" class="header"><a href="#Strategy D: Multiple GitHub Accounts-Strategy E: Jump Host (Bastion) with ProxyJump">Strategy E: Jump Host (Bastion) with ProxyJump</a></h3></div>
+
+<ul>
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-Strategy E: Jump Host (Bastion) with ProxyJump-When to use:"></span><strong id="When to use:">When to use:</strong> Reaching internal/private hosts through a bastion host in a single <code>ssh</code> or <code>scp</code> command.
+
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-Strategy E: Jump Host (Bastion) with ProxyJump-Supersedes:"></span><strong id="Supersedes:">Supersedes:</strong> Manual two-hop logins or older <code>ProxyCommand</code> workarounds for standard bastion hops.
+<pre bash>
+# ~/.ssh/config
+
+Host bastion
+  HostName bastion.example.com
+  User jumpuser
+  IdentityFile ~/.ssh/id_ed25519_bastion
+  IdentitiesOnly yes
+
+Host app-internal
+  HostName 10.20.30.40
+  User appuser
+  IdentityFile ~/.ssh/id_ed25519_internal
+  IdentitiesOnly yes
+  ProxyJump bastion
+
+# Chain multiple hops if needed (left to right):
+# ProxyJump jump1,jump2
+</pre>
+<pre bash>
+# Connects through `bastion` to `app-internal` automatically
+ssh app-internal
+</pre>
+
+</ul>
+<div id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors"><h2 id="6. Troubleshooting Common SSH Errors" class="header"><a href="#Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors">6. Troubleshooting Common SSH Errors</a></h2></div>
+
+<div id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Bad File Permissions (Permissions 0644 for private key are too open)"><h3 id="Bad File Permissions (Permissions 0644 for private key are too open)" class="header"><a href="#Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Bad File Permissions (Permissions 0644 for private key are too open)">Bad File Permissions (Permissions 0644 for private key are too open)</a></h3></div>
+
+<ul>
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Bad File Permissions (Permissions 0644 for private key are too open)-Cause:"></span><strong id="Cause:">Cause:</strong> OpenSSH refuses private keys that are group- or world-readable, and strict setups check <code>~/.ssh</code> permissions too.
+
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Bad File Permissions (Permissions 0644 for private key are too open)-Fix &amp; verify:"></span><strong id="Fix &amp; verify:">Fix &amp; verify:</strong>
+<pre bash>
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/id_*
+chmod 644 ~/.ssh/*.pub
+# Verify permissions (expect drwx------ for ~/.ssh and -rw------- for private keys):
+ls -la ~/.ssh
+</pre>
+
+</ul>
+<div id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Permission denied (publickey)"><h3 id="Permission denied (publickey)" class="header"><a href="#Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Permission denied (publickey)">Permission denied (publickey)</a></h3></div>
+
+<ul>
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Permission denied (publickey)-Cause:"></span><strong id="Cause:">Cause:</strong> The server does not have your public key in <code>~/.ssh/authorized_keys</code> (or GitHub account settings), or SSH tried a different key first.
+
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-Permission denied (publickey)-Fix &amp; verify:"></span><strong id="Fix &amp; verify:">Fix &amp; verify:</strong>
+<pre bash>
+# 1. Confirm which key SSH actually selects and negotiates
+ssh -vT git@github.com 2&gt;&amp;1 | grep -E "Offering public key|Identity file|Authenticated"
+
+# 2. Check that your public key matches what you uploaded to GitHub/server
+cat ~/.ssh/id_ed25519.pub
+
+# 3. For multi-account setups, confirm IdentitiesOnly is active in effective config
+ssh -G github.com-work | grep -E "hostname|user|identityfile|identitiesonly"
+</pre>
+
+</ul>
+<div id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-SSH Agent Not Running or Key Not Loaded"><h3 id="SSH Agent Not Running or Key Not Loaded" class="header"><a href="#Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-SSH Agent Not Running or Key Not Loaded">SSH Agent Not Running or Key Not Loaded</a></h3></div>
+
+<ul>
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-SSH Agent Not Running or Key Not Loaded-Cause:"></span><strong id="Cause:">Cause:</strong> A new terminal or shell session has no running <code>ssh-agent</code> environment variables, or the key was not added (or expired/reset after reboot).
+
+<li>
+<span id="Strategy D: Multiple GitHub Accounts-6. Troubleshooting Common SSH Errors-SSH Agent Not Running or Key Not Loaded-Fix &amp; verify:"></span><strong id="Fix &amp; verify:">Fix &amp; verify:</strong>
+<pre bash>
+# Start agent (Bash / Zsh) and list loaded key fingerprints
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+# Verify loaded keys (expect non-empty fingerprint list):
+ssh-add -l
+</pre>
+
+</ul>
+<p>
+<br>
+<hr>
+</p>
+
+
+
+<p>
+<a href="unix_tools_index.html">Unix Tools</a>
+</p>
+
+<p>
+<a href="index.html">index</a>
+</p>
+
+    </div>
+
+    <!-- Dynamically points to your root prism.js -->
+    <script src="prism/prism.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.Prism) {
+                document.querySelectorAll("pre").forEach(pre => {
+                    // 1. Find the language name from Vimwiki's attributes
+                    let lang = pre.getAttributeNames().find(a => !["class", "style", "id"].includes(a)) || "text";
+                    
+                    // 2. Clear any conflicting class and assign the correct Prism format
+                    pre.className = "language-" + lang;
+                    
+                    // 3. Re-wrap the inner text into a <code> block so Prism can read it
+                    if (!pre.querySelector("code")) {
+                        const code = document.createElement("code");
+                        code.className = "language-" + lang;
+                        code.textContent = pre.textContent; // Safe extraction of text
+                        pre.innerHTML = "";
+                        pre.appendChild(code);
+                    }
+                });
+                
+                // 4. Run the highlight pass over the newly formatted blocks
+                Prism.highlightAll();
+            }
+        });
+    </script>
+</body>
+</html>
